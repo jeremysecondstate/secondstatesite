@@ -7,7 +7,7 @@ EXCLUDED_DIRS = {'.venv', '__pycache__', '.git'}
 ALLOWED_TOP_LEVEL_DIRS = {'secondstateapp', 'secondstate', 'static', 'staticfiles', 'templates'}
 
 # Only these file types will be shown
-ALLOWED_FILE_EXTS = {'.py', '.html', '.css'}
+ALLOWED_FILE_EXTS = {'.py', '.html', '.css', '.txt', '.gitignore', '.sh'}
 
 
 def build_tree(start_path, indent="", is_root=False, lines=None):
