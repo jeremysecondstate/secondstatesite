@@ -1,4 +1,10 @@
 secondstate
+├── build.sh
+│   #!/usr/bin/env bash
+│   set -o errexit
+│   
+│   python manage.py collectstatic --noinput
+│   python manage.py migrate
 ├── manage.py
 │   #!/usr/bin/env python
 │   """Django's command-line utility for administrative tasks."""
@@ -22,6 +28,7 @@ secondstate
 │   
 │   if __name__ == '__main__':
 │       main()
+├── requirements.txt
 ├── secondstate
 │   ├── __init__.py
 │   ├── asgi.py
