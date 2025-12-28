@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SecondState</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'secondstateapp/site.css' %}">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="{% url 'home' %}">SecondState</a>
+    <nav>
+      <a href="{% url 'about' %}">About</a>
+      <a href="{% url 'gallery' %}">Gallery</a>
+      <a href="{% url 'pieces_sold' %}">Pieces Sold</a>
+      <a href="{% url 'contact' %}">Contact</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    © {% now "Y" %} SecondState — Fine Art Prints
+  </footer>
+</body>
+</html>
