@@ -1,0 +1,24 @@
+# Django / Python
+__pycache__/
+*.py[cod]
+*.log
+*.sqlite3
+*.db
+*.pid
+*.pyo
+*.pyd
+
+# Django static/media build outputs
+staticfiles/
+media/
+
+# Env / secrets
+.env
+.env.*
+*.pem
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
