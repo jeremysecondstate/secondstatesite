@@ -79,13 +79,18 @@ WSGI_APPLICATION = 'secondstate.wsgi.application'
 #     }
 # }
 
+DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+
+db_kwargs = dict(conn_max_age=600)
+
+# Only enforce SSL for Postgres (Render)
+if DATABASE_URL.startswith("postgres"):
+    db_kwargs["ssl_require"] = not DEBUG
+
 DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-        ssl_require=not DEBUG,
-    )
+    "default": dj_database_url.parse(DATABASE_URL, **db_kwargs)
 }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
