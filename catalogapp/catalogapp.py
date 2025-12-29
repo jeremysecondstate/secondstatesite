@@ -13,12 +13,10 @@ from functools import partial
 BASE_URL = "https://secondstate.art"
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1100, 780
-CATALOG_API_KEY = os.environ.get("CATALOG_API_KEY", "")
+CATALOG_API_KEY = "276e19f127f140623e73e6c160bbd8ed"
 
 def api_headers():
-    if not CATALOG_API_KEY:
-        return {}
-    return {"276e19f127f140623e73e6c160bbd8ed": CATALOG_API_KEY}
+    return {"X-API-KEY": CATALOG_API_KEY}
 
 
 class ArtCatalogApp:
