@@ -4,10 +4,10 @@ import os
 EXCLUDED_DIRS = {'.venv', '__pycache__', '.git'}
 
 # Only these directories will be shown directly under the project root
-ALLOWED_TOP_LEVEL_DIRS = {'secondstateapp', 'secondstate', 'static', 'staticfiles', 'templates'}
+ALLOWED_TOP_LEVEL_DIRS = {'secondstateapp', 'secondstate', 'catalogapp', 'static', 'staticfiles', 'templates'}
 
 # Only these file types will be shown
-ALLOWED_FILE_EXTS = {'.py', '.html', '.css', '.txt', '.gitignore', '.sh'}
+ALLOWED_FILE_EXTS = {'.py', '.html', '.css', '.txt', '.gitignore', '.sh', '.xlsx'}
 
 
 def build_tree(start_path, indent="", is_root=False, lines=None):

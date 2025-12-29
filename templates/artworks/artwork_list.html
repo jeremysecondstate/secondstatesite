@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<h1 class="text-center">Available Artworks</h1>
+{% if artworks %}
+<div class="row row-cols-1 row-cols-md-3 g-4">
+    {% for artwork in artworks %}
+        {% include 'artworks/artwork_card.html' %}
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-center text-muted">No artworks available at the moment. Please check back later!</p>
+{% endif %}
+{% endblock %}
