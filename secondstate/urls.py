@@ -6,4 +6,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("secondstateapp.urls")),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+# Serve media via Django (OK for small traffic, not best-practice)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
