@@ -22,8 +22,11 @@ def contact(request):
     return render(request, "contact.html")
 
 def gallery(request):
-    # leave blank for now (later: pull from DB)
-    return render(request, "gallery.html")
+    # Show the same content as /artworks/
+    artworks = Artwork.objects.all()
+    # artworks = Artwork.objects.order_by("-id")
+    return render(request, "artworks/artwork_list.html", {"artworks": artworks})
+
 
 def pieces_sold(request):
     # leave blank for now (later: pull from DB)
