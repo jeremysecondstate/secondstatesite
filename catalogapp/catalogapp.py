@@ -18,7 +18,7 @@ CATALOG_API_KEY = os.environ.get("CATALOG_API_KEY", "")
 def api_headers():
     if not CATALOG_API_KEY:
         return {}
-    return {"X-API-KEY": CATALOG_API_KEY}
+    return {"276e19f127f140623e73e6c160bbd8ed": CATALOG_API_KEY}
 
 
 class ArtCatalogApp:
@@ -248,7 +248,8 @@ class ArtCatalogApp:
         sel = self.tree.selection()
         if not sel or self.current_results is None:
             return
-        idx = int(self.tree.item(sel[0], "values")[-1])  # we store dataframe index in a hidden column
+
+        idx = int(sel[0])  # Treeview iid == dataframe index
         row = self.current_results.loc[idx]
         details = self.format_catalog_entry(row)
 
@@ -265,16 +266,35 @@ class ArtCatalogApp:
         )
         if not path:
             return
+
         try:
-            self.df = pd.read_excel(path)
+            # Read without headers first so we can find the real header row
+            preview = pd.read_excel(path, header=None, nrows=30)
+
+            header_row = None
+            for i in range(len(preview)):
+                row_vals = preview.iloc[i].astype(str).str.strip().tolist()
+                if "Title" in row_vals and "Artist" in row_vals:
+                    header_row = i
+                    break
+
+            if header_row is None:
+                raise ValueError("Could not find a header row containing both 'Title' and 'Artist'.")
+
+            self.df = pd.read_excel(path, header=header_row)
+            self.df.columns = [str(c).strip() for c in self.df.columns]  # normalize
+
             # Persist last path (optional lightweight)
             try:
-                with open(os.path.join(os.path.dirname(__file__), ".last_catalog_path.txt"), "w", encoding="utf-8") as f:
+                with open(os.path.join(os.path.dirname(__file__), ".last_catalog_path.txt"), "w",
+                          encoding="utf-8") as f:
                     f.write(path)
             except Exception:
                 pass
+
             self._clear_results()
             self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
+
         except Exception as e:
             messagebox.showerror("Load Error", f"Failed to load Excel file:\n{e}")
 
@@ -365,13 +385,13 @@ class ArtCatalogApp:
             self.tree.insert(
                 "",
                 tk.END,
+                iid=str(idx),  # store df index here
                 values=(
                     self.safe(row.get("Artist", "")),
                     self.safe(row.get("Title", "")),
                     self.safe(row.get("Year", "")),
                     self.safe(row.get("Medium", "")),
                     self.safe(row.get("Catalog Number", "")),
-                    idx,  # hidden data index
                 )
             )
 
