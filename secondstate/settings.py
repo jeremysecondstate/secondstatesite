@@ -7,7 +7,7 @@ SALES_XLSX_PATH = os.environ.get("SALES_XLSX_PATH", "/var/data/sales/SUPREME SAL
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-insecure-change-me")
 # DEBUG = True
-DEBUG = os.environ.get("DEBUG", "false").lower() == "True"
+DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
