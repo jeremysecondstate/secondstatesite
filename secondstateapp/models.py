@@ -1,4 +1,9 @@
 from django.db import models
+from PIL import Image
+from io import BytesIO
+from django.core.files.base import ContentFile
+import os
+
 
 class Artwork(models.Model):
     title = models.CharField(max_length=255)
@@ -17,8 +22,45 @@ class Artwork(models.Model):
     is_available = models.BooleanField(default=True)
 
 class ArtworkImage(models.Model):
-    artwork = models.ForeignKey(Artwork, related_name='images', on_delete=models.CASCADE)
-    image = models.ImageField(upload_to='artworks/')
+    artwork = models.ForeignKey("Artwork", related_name="images", on_delete=models.CASCADE)
+    image = models.ImageField(upload_to="artworks/")
 
-    def __str__(self):
-        return f"{self.artwork.title} - Image {self.id}"
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)  # save original first so self.image.path exists
+
+        if not self.image:
+            return
+
+        img = Image.open(self.image.path)
+
+        # Fix orientation from phones (optional but useful)
+        try:
+            from PIL import ImageOps
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+
+        # Convert to RGB for JPEG
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+
+        # Resize: cap the long edge (pick your number)
+        MAX_EDGE = 2000
+        img.thumbnail((MAX_EDGE, MAX_EDGE), Image.Resampling.LANCZOS)
+
+        # Re-encode as JPEG with quality
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=82, optimize=True, progressive=True)
+
+        base, _ext = os.path.splitext(os.path.basename(self.image.name))
+        new_name = f"artworks/{base}.jpg"
+        self.image.save(new_name, ContentFile(buffer.getvalue()), save=False)
+
+        super().save(update_fields=["image"])
+
+# class ArtworkImage(models.Model):
+#     artwork = models.ForeignKey(Artwork, related_name='images', on_delete=models.CASCADE)
+#     image = models.ImageField(upload_to='artworks/')
+#
+#     def __str__(self):
+#         return f"{self.artwork.title} - Image {self.id}"

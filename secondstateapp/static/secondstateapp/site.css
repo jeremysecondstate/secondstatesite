@@ -178,3 +178,11 @@ a:focus-visible{
   .hero{ padding: 44px 18px; }
   .nav{ padding: 12px 14px; }
 }
+
+/* Keep list/grid images uniform */
+.card-img-top{
+  width: 100%;
+  height: 260px;
+  object-fit: cover;   /* crop nicely */
+  display:block;
+}
