@@ -614,7 +614,7 @@ class ArtCatalogApp:
             while True:
                 image_path = filedialog.askopenfilename(
                     title=f"Select Image for ‘{title}’",
-                    filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
+                    filetypes=[("Image Files", "*.JPG *.jpeg *.png")]
                 )
                 if image_path:
                     images.append(image_path)
