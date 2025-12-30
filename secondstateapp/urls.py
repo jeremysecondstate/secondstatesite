@@ -12,4 +12,8 @@ urlpatterns = [
     path("artworks/upload_artwork/", views.upload_artwork, name="upload_artwork"),
     path("artworks/delete_artwork/", views.delete_artwork, name="delete_artwork"),
     path("healthz", views.healthz, name="healthz"),
+    path("pieces-sold/", views.sold_list, name="pieces_sold"),  # replace old pieces_sold view
+    path("pieces-sold/upload/", views.upload_sold_piece, name="upload_sold_piece"),
+    path("pieces-sold/delete/", views.delete_sold_piece, name="delete_sold_piece"),
+
 ]

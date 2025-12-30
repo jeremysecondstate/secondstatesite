@@ -1,5 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Pieces Sold</h1>
-<p>Coming soon. (This will be populated from sales records.)</p>
+  <h1>Pieces Sold</h1>
+
+  {% if sold_pieces %}
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+      {% for s in sold_pieces %}
+        <div class="col">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body">
+              <p class="card-text"><strong>{{ s.title }}</strong></p>
+              <p class="card-text">{{ s.artist }}</p>
+              <p class="card-text text-muted">
+                {% if s.date %}{{ s.date }}{% endif %}
+                {% if s.sale_location %} • {{ s.sale_location }}{% endif %}
+              </p>
+              {% if s.net_sale_price %}
+                <p class="card-text"><strong>${{ s.net_sale_price }}</strong></p>
+              {% endif %}
+              {% if s.auction_house %}
+                <p class="card-text">{{ s.auction_house }}</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-center text-muted">No sold pieces published yet.</p>
+  {% endif %}
 {% endblock %}

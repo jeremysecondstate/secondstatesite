@@ -1,11 +1,92 @@
+# secondstateapp/views.py
 import json
 import os
+from decimal import Decimal
+
 # from django.conf import settings
 from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
-from .models import Artwork, ArtworkImage  # Import ArtworkImage model
+
+from .models import Artwork, ArtworkImage, SoldPiece
+
+
+@csrf_exempt
+def sold_list(request):
+    """Render HTML normally; return JSON when format=json (matches artworks behavior)."""
+    qs = SoldPiece.objects.all()
+
+    if request.GET.get("format") == "json":
+        data = list(qs.values(
+            "id", "date", "artist", "title",
+            "sale_location", "net_sale_price",
+            "auction_house", "purchased_location", "purchase_date"
+        ))
+        return JsonResponse({"sold": data})
+
+    return render(request, "pieces_sold.html", {"sold_pieces": qs})
+
+
+@csrf_exempt
+def upload_sold_piece(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    if not _authorized(request):
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    try:
+        data = request.POST
+
+        # Parse date safely (expects YYYY-MM-DD)
+        date_val = parse_date(data.get("date") or "")  # None if blank/bad
+
+        price_raw = data.get("net_sale_price")
+        price_val = Decimal(price_raw) if price_raw not in (None, "", "nan") else None
+
+        sp = SoldPiece.objects.create(
+            date=date_val,
+            artist=data.get("artist") or "",
+            title=data.get("title") or "",
+            sale_location=data.get("sale_location") or "",
+            net_sale_price=price_val,
+            auction_house=data.get("auction_house") or "",
+            purchased_location=data.get("purchased_location") or "",
+            purchase_date=parse_date(data.get("purchase_date") or ""),
+        )
+        return JsonResponse({"message": "Sold piece uploaded!", "id": sp.id}, status=201)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@csrf_exempt
+def delete_sold_piece(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    if not _authorized(request):
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    try:
+        payload = json.loads(request.body or "{}")
+        sold_id = payload.get("id")
+
+        if not sold_id:
+            return JsonResponse({"error": "Missing id"}, status=400)
+
+        sp = SoldPiece.objects.filter(id=sold_id).first()
+        if not sp:
+            return JsonResponse({"error": "Not found"}, status=404)
+
+        sp.delete()
+        return JsonResponse({"message": "Deleted"}, status=200)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
 def healthz(request):
     return JsonResponse({"ok": True})
 def home(request):

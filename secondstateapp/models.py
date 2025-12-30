@@ -5,6 +5,29 @@ from django.core.files.base import ContentFile
 import os
 
 
+class SoldPiece(models.Model):
+    # Keep it simple + match the spreadsheet
+    date = models.DateField(blank=True, null=True)
+
+    artist = models.CharField(max_length=255, blank=True, null=True)
+    title = models.CharField(max_length=255, blank=True, null=True)  # from "Name"
+
+    sale_location = models.CharField(max_length=255, blank=True, null=True)
+    net_sale_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+
+    auction_house = models.CharField(max_length=255, blank=True, null=True)  # optional if you want it
+    purchased_location = models.CharField(max_length=255, blank=True, null=True)  # optional
+    purchase_date = models.DateField(blank=True, null=True)  # optional
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-id"]
+
+    def __str__(self):
+        return f"{self.artist} — {self.title}"
+
+
 class Artwork(models.Model):
     title = models.CharField(max_length=255)
     artist = models.CharField(max_length=255)
