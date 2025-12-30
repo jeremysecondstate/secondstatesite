@@ -18,19 +18,19 @@
     </div>
 
     <!-- Main Image Display -->
-    {% if artwork.images.all %}
+    {% if artwork.images.exists %}
         <div class="text-center">
-            <img id="mainImage" src="{{ artwork.images.first.image.url }}" class="img-fluid main-img" alt="{{ artwork.title }}" onclick="openFullscreen(this)">
+          <img id="mainImage" src="{{ artwork.images.first.image.url }}" class="img-fluid main-img" alt="{{ artwork.title }}" onclick="openFullscreen(this)">
         </div>
 
         <!-- Thumbnail Gallery -->
         <div class="thumbnails text-center mt-3">
-            {% for image in artwork.images.all %}
-                <img src="{{ image.image.url }}" class="thumbnail-img" onclick="changeMainImage(this)">
-            {% endfor %}
+           {% for image in artwork.images.all %}
+               <img src="{{ image.image.url }}" class="thumbnail-img" onclick="changeMainImage(this)">
+           {% endfor %}
         </div>
     {% else %}
-        <p class="text-center text-muted">No images available</p>
+      <p class="text-center text-muted">No images available</p>
     {% endif %}
 
     <!-- Artwork Details -->

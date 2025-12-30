@@ -80,7 +80,7 @@ def main():
     print(tree_text)
 
     # Also write to a .txt file
-    out_file = "project_tree.txt"
+    out_file = "project_tree_working.txt"
     with open(out_file, "w", encoding="utf-8") as f:
         f.write(tree_text)
 
