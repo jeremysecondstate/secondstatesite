@@ -1,5 +1,48 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Pieces Sold</h1>
-<p>Coming soon. (This will be populated from sales records.)</p>
+
+{% if sales_error %}
+  <p class="text-danger">Sales import error: {{ sales_error }}</p>
+{% endif %}
+
+{% if sales %}
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Artist</th>
+          <th>Title</th>
+          <th>Auction House</th>
+          <th>Sale Location</th>
+          <th class="text-end">Net Sale Price</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for s in sales %}
+          <tr>
+            <td>
+              {% if s.date %}{{ s.date|date:"Y-m-d" }}{% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td>{{ s.artist|default:"" }}</td>
+            <td><em>{{ s.title|default:"" }}</em></td>
+            <td>{{ s.auction_house|default:"" }}</td>
+            <td>{{ s.sale_location|default:"" }}</td>
+            <td class="text-end">
+              {% if s.net_sale_price is not None %}
+                ${{ s.net_sale_price|floatformat:2 }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p>No sales recorded yet.</p>
+{% endif %}
 {% endblock %}

@@ -14,4 +14,10 @@ urlpatterns = [
     path("artworks/delete_artwork/", views.delete_artwork, name="delete_artwork"),
 
     path("healthz", views.healthz, name="healthz"),
+
+    path("sales/upload_sales_sheet/", views.upload_sales_sheet, name="upload_sales_sheet"),
+    path("sales/list/", views.sales_list, name="sales_list"),
+    path("sales/add/", views.sales_add, name="sales_add"),
+    path("sales/delete/", views.sales_delete, name="sales_delete"),
+
 ]

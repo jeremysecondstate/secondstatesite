@@ -58,9 +58,15 @@ class ArtworkImage(models.Model):
 
         super().save(update_fields=["image"])
 
-# class ArtworkImage(models.Model):
-#     artwork = models.ForeignKey(Artwork, related_name='images', on_delete=models.CASCADE)
-#     image = models.ImageField(upload_to='artworks/')
-#
-#     def __str__(self):
-#         return f"{self.artwork.title} - Image {self.id}"
+# secondstateapp/models.py
+class Sale(models.Model):
+    date = models.DateField(blank=True, null=True)
+    artist = models.CharField(max_length=255, blank=True, null=True)
+    title = models.CharField(max_length=255, blank=True, null=True)
+    sale_location = models.CharField(max_length=255, blank=True, null=True)
+    net_sale_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    auction_house = models.CharField(max_length=255, blank=True, null=True)
+
+    # Optional: link to artwork if it exists in inventory DB
+    artwork = models.ForeignKey("Artwork", null=True, blank=True, on_delete=models.SET_NULL, related_name="sales")
+

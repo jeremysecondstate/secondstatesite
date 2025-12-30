@@ -3,10 +3,11 @@ from pathlib import Path
 import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+SALES_XLSX_PATH = os.environ.get("SALES_XLSX_PATH", "/var/data/sales/SUPREME SALES.xlsx")
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-insecure-change-me")
-DEBUG = True
-# DEBUG = os.environ.get("DEBUG", "false").lower() == "True"
+# DEBUG = True
+DEBUG = os.environ.get("DEBUG", "false").lower() == "True"
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
