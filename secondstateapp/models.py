@@ -20,53 +20,30 @@ class Artwork(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     is_available = models.BooleanField(default=True)
-
 class ArtworkImage(models.Model):
     artwork = models.ForeignKey("Artwork", related_name="images", on_delete=models.CASCADE)
     image = models.ImageField(upload_to="artworks/")
-
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)  # save original first so self.image.path exists
-
         if not self.image:
             return
-
         img = Image.open(self.image.path)
-
         # Fix orientation from phones (optional but useful)
         try:
             from PIL import ImageOps
             img = ImageOps.exif_transpose(img)
         except Exception:
             pass
-
         # Convert to RGB for JPEG
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
-
         # Resize: cap the long edge (pick your number)
         MAX_EDGE = 2000
         img.thumbnail((MAX_EDGE, MAX_EDGE), Image.Resampling.LANCZOS)
-
         # Re-encode as JPEG with quality
         buffer = BytesIO()
         img.save(buffer, format="JPEG", quality=82, optimize=True, progressive=True)
-
         base, _ext = os.path.splitext(os.path.basename(self.image.name))
         new_name = f"artworks/{base}.jpg"
         self.image.save(new_name, ContentFile(buffer.getvalue()), save=False)
-
         super().save(update_fields=["image"])
-
-# secondstateapp/models.py
-class Sale(models.Model):
-    date = models.DateField(blank=True, null=True)
-    artist = models.CharField(max_length=255, blank=True, null=True)
-    title = models.CharField(max_length=255, blank=True, null=True)
-    sale_location = models.CharField(max_length=255, blank=True, null=True)
-    net_sale_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-    auction_house = models.CharField(max_length=255, blank=True, null=True)
-
-    # Optional: link to artwork if it exists in inventory DB
-    artwork = models.ForeignKey("Artwork", null=True, blank=True, on_delete=models.SET_NULL, related_name="sales")
-

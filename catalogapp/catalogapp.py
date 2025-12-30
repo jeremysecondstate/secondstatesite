@@ -14,7 +14,6 @@ BASE_URL = "https://secondstate.art"
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1100, 780
 CATALOG_API_KEY = "276e19f127f140623e73e6c160bbd8ed"
-SALES_SHEET_ENDPOINT = f"{BASE_URL}/sales/upload_sales_sheet/"
 
 def api_headers():
     return {"X-API-KEY": CATALOG_API_KEY}
@@ -73,8 +72,6 @@ class ArtCatalogApp:
         self.df = None
         self.current_results = None
         self.open_listings_button = None
-        self.mode = "inventory"  # "inventory" or "sales"
-        self.sales_path = None  # remember the sales xlsx path for upload
 
         # ------- MENUBAR -------
         self._build_menubar()
@@ -103,13 +100,7 @@ class ArtCatalogApp:
         loader_row = ttk.Frame(left)
         loader_row.pack(fill=tk.X, pady=(0, 10))
         ttk.Label(loader_row, text="Catalog Source:", style="Subtle.TLabel").pack(side=tk.LEFT)
-
-        btns = ttk.Frame(loader_row)
-        btns.pack(side=tk.RIGHT)
-
-        ttk.Button(btns, text="Open Inventory Excel…", command=self.load_inventory_excel, style="Accent.TButton").pack(
-            side=tk.LEFT, padx=(0, 8))
-        ttk.Button(btns, text="Open Sales Excel…", command=self.load_sales_excel).pack(side=tk.LEFT)
+        ttk.Button(loader_row, text="Open Excel…", command=self.load_excel, style="Accent.TButton").pack(side=tk.RIGHT)
 
         # Search box
         ttk.Label(left, text="Search by Title or Artist").pack(anchor="w", pady=(8, 4))
@@ -129,9 +120,6 @@ class ArtCatalogApp:
         ttk.Button(left, text="Delete Artwork from Website", command=self.delete_artwork, style="Danger.TButton").pack(fill=tk.X, pady=4)
         ttk.Separator(left).pack(fill=tk.X, pady=12)
         ttk.Button(left, text="Go to Your Listings", command=lambda: webbrowser.open(f"{BASE_URL}/artworks/")).pack(fill=tk.X, pady=4)
-        ttk.Button(left, text="Upload Sales Spreadsheet → Pieces Sold", command=self.upload_sales_sheet).pack(fill=tk.X,
-                                                                                                              pady=(6,
-                                                                                                                    4))
 
         # Helpful shortcuts info
         ttk.Label(left, text="Shortcuts", style="Subtle.TLabel").pack(anchor="w", pady=(16, 6))
@@ -210,7 +198,7 @@ class ArtCatalogApp:
     def _build_menubar(self):
         menubar = tk.Menu(self.master)
         file_menu = tk.Menu(menubar, tearoff=False)
-        file_menu.add_command(label="Open Inventory Excel…", accelerator="Ctrl+O", command=self.load_inventory_excel)
+        file_menu.add_command(label="Open Excel…", accelerator="Ctrl+O", command=self.load_excel)
         file_menu.add_separator()
         file_menu.add_command(label="Export Search → Word", accelerator="Ctrl+E", command=self.export_to_word)
         file_menu.add_command(label="Export Entire Database", accelerator="Ctrl+D", command=self.export_entire_database)
@@ -229,8 +217,8 @@ class ArtCatalogApp:
 
         self.master.config(menu=menubar)
         # Bind Ctrl+O after menu creation
-        self.master.bind_all("<Control-o>", lambda e: self.load_inventory_excel())
-        self.master.bind_all("<Control-O>", lambda e: self.load_inventory_excel())
+        self.master.bind_all("<Control-o>", lambda e: self.load_excel())
+        self.master.bind_all("<Control-O>", lambda e: self.load_excel())
 
     def _set_status(self, text):
         self.status.config(text=text)
@@ -269,15 +257,16 @@ class ArtCatalogApp:
         self.details_text.configure(state=tk.DISABLED)
 
     # -------------- Data Loading --------------
-    def load_inventory_excel(self):
+    def load_excel(self):
         path = filedialog.askopenfilename(
-            title="Select Inventory Excel Catalog",
+            title="Select Excel Catalog",
             filetypes=[("Excel files", "*.xlsx *.xls")]
         )
         if not path:
             return
 
         try:
+            # Read without headers first so we can find the real header row
             preview = pd.read_excel(path, header=None, nrows=30)
 
             header_row = None
@@ -291,12 +280,9 @@ class ArtCatalogApp:
                 raise ValueError("Could not find a header row containing both 'Title' and 'Artist'.")
 
             self.df = pd.read_excel(path, header=header_row)
-            self.df.columns = [str(c).strip() for c in self.df.columns]
+            self.df.columns = [str(c).strip() for c in self.df.columns]  # normalize
 
-            self.mode = "inventory"
-            self.sales_path = None  # not relevant here
-
-            # Persist last path (optional)
+            # Persist last path (optional lightweight)
             try:
                 with open(os.path.join(os.path.dirname(__file__), ".last_catalog_path.txt"), "w",
                           encoding="utf-8") as f:
@@ -305,7 +291,7 @@ class ArtCatalogApp:
                 pass
 
             self._clear_results()
-            self._set_status(f"[Inventory] Loaded: {os.path.basename(path)} — {len(self.df):,} records")
+            self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
 
         except Exception as e:
             messagebox.showerror("Load Error", f"Failed to load Excel file:\n{e}")
@@ -321,44 +307,6 @@ class ArtCatalogApp:
                     self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
         except Exception:
             pass
-
-    def load_sales_excel(self):
-        path = filedialog.askopenfilename(
-            title="Select Sales Excel Spreadsheet",
-            filetypes=[("Excel files", "*.xlsx *.xls")]
-        )
-        if not path:
-            return
-
-        try:
-            preview = pd.read_excel(path, header=None, nrows=30)
-
-            header_row = None
-            for i in range(len(preview)):
-                row_vals = preview.iloc[i].astype(str).str.strip().tolist()
-                # Common columns you showed earlier
-                if "Artist" in row_vals and ("Name" in row_vals or "Title" in row_vals):
-                    header_row = i
-                    break
-
-            if header_row is None:
-                raise ValueError("Could not find a header row containing 'Artist' and 'Name' (or 'Title').")
-
-            self.df = pd.read_excel(path, header=header_row)
-            self.df.columns = [str(c).strip() for c in self.df.columns]
-
-            # Normalize: treat Name as Title for searching/preview
-            if "Title" not in self.df.columns and "Name" in self.df.columns:
-                self.df["Title"] = self.df["Name"]
-
-            self.mode = "sales"
-            self.sales_path = path
-
-            self._clear_results()
-            self._set_status(f"[Sales] Loaded: {os.path.basename(path)} — {len(self.df):,} rows")
-
-        except Exception as e:
-            messagebox.showerror("Load Error", f"Failed to load Sales spreadsheet:\n{e}")
 
     def _clear_results(self):
         for i in self.tree.get_children():
@@ -376,22 +324,7 @@ class ArtCatalogApp:
         return str(val).strip() if pd.notna(val) else fallback
 
     def format_catalog_entry(self, row):
-        if self.mode == "sales":
-            artist = self.safe(row.get("Artist", "")).upper() or "UNKNOWN ARTIST"
-            title = self.safe(row.get("Title", "")) or "Untitled"
-            date = self.safe(row.get("Date", ""), "Unknown Date")
-            loc = self.safe(row.get("Sale Location", ""))
-            price = self.safe(row.get("Net Sale Price $", ""))
-            house = self.safe(row.get("Auction House", ""))
-
-            out = f"{artist}\n{title}\nSOLD — {date}"
-            if price:
-                out += f"\nNet: {price}"
-            if house or loc:
-                out += f"\n{house}{' — ' if (house and loc) else ''}{loc}"
-            return out
-
-        # inventory mode (your existing formatting)
+        """Formats an entry for display with clean handling of missing data."""
         artist = self.safe(row.get("Artist", "")).upper() or "UNKNOWN ARTIST"
         title = self.safe(row.get("Title", "")) or "Untitled"
         year = self.safe(row.get("Year", ""), "Unknown Year")
@@ -414,12 +347,13 @@ class ArtCatalogApp:
         if catalog_number:
             formatted += f"\nCatalog #: {catalog_number}"
         formatted += estimate_text
+
         return formatted
 
     # -------------- Search --------------
     def search_catalog(self, event=None):
         if self.df is None:
-            messagebox.showwarning("No Catalog", "Open an Excel file first.")
+            messagebox.showwarning("No Catalog", "Open an Excel catalog first.")
             return
 
         query = self.search_var.get().lower().strip()
@@ -427,11 +361,10 @@ class ArtCatalogApp:
             messagebox.showwarning("Warning", "Enter a search query!")
             return
 
-        # In both modes, search "Title" + "Artist"
         results = self.df[
-            self.df.get("Title", pd.Series(dtype=str)).astype(str).str.lower().str.contains(query, na=False) |
-            self.df.get("Artist", pd.Series(dtype=str)).astype(str).str.lower().str.contains(query, na=False)
-            ]
+            self.df["Title"].astype(str).str.lower().str.contains(query, na=False) |
+            self.df["Artist"].astype(str).str.lower().str.contains(query, na=False)
+        ]
 
         self._clear_results()
 
@@ -442,32 +375,31 @@ class ArtCatalogApp:
             self.text_display.configure(state=tk.DISABLED)
             return
 
+        # Keep results (with original index for lookup)
         self.current_results = results
 
-        # Populate treeview
+        # Populate treeview — add an extra hidden index column at end
         for idx, row in results.iterrows():
             self.tree.insert(
                 "",
                 tk.END,
-                iid=str(idx),
+                iid=str(idx),  # store df index here
                 values=(
                     self.safe(row.get("Artist", "")),
                     self.safe(row.get("Title", "")),
-                    self.safe(row.get("Year", "")) if self.mode == "inventory" else self.safe(row.get("Date", "")),
-                    self.safe(row.get("Medium", "")) if self.mode == "inventory" else self.safe(
-                        row.get("Net Sale Price $", "")),
-                    self.safe(row.get("Catalog Number", "")) if self.mode == "inventory" else self.safe(
-                        row.get("Auction House", "")),
+                    self.safe(row.get("Year", "")),
+                    self.safe(row.get("Medium", "")),
+                    self.safe(row.get("Catalog Number", "")),
                 )
             )
 
-        # Preview formatting
+        # Populate preview text (export uses this by default)
         entries = [self.format_catalog_entry(row) for _, row in results.iterrows()]
         self.text_display.configure(state=tk.NORMAL)
         self.text_display.insert(tk.END, "\n\n".join(entries))
         self.text_display.configure(state=tk.DISABLED)
 
-        self._set_status(f"Found {len(results)} result(s). Mode: {self.mode}. Select a row to view details.")
+        self._set_status(f"Found {len(results)} result(s). Select a row to view details.")
 
     # -------------- Export --------------
     def export_to_word(self):
@@ -614,7 +546,7 @@ class ArtCatalogApp:
             while True:
                 image_path = filedialog.askopenfilename(
                     title=f"Select Image for ‘{title}’",
-                    filetypes=[("Image Files", "*.JPG *.jpeg *.png")]
+                    filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
                 )
                 if image_path:
                     images.append(image_path)
@@ -678,40 +610,6 @@ class ArtCatalogApp:
                     messagebox.showerror("Error", f"Upload failed: {response.text}")
             except Exception as e:
                 messagebox.showerror("Error", f"Upload failed: {e}")
-
-    def upload_sales_sheet(self):
-        """
-        Uploads the currently loaded sales spreadsheet (or asks you to choose one)
-        to the server endpoint that imports it into the DB for Pieces Sold.
-        """
-        if not self.sales_path or not os.path.exists(self.sales_path):
-            pick = filedialog.askopenfilename(
-                title="Select Sales Excel Spreadsheet to Upload",
-                filetypes=[("Excel files", "*.xlsx *.xls")]
-            )
-            if not pick:
-                return
-            self.sales_path = pick
-
-        try:
-            with open(self.sales_path, "rb") as f:
-                files = {"file": (os.path.basename(self.sales_path), f,
-                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
-                r = requests.post(
-                    SALES_SHEET_ENDPOINT,
-                    files=files,
-                    headers=api_headers(),
-                    timeout=120
-                )
-
-            if r.status_code in (200, 201):
-                messagebox.showinfo("Success", "Sales spreadsheet uploaded and imported!")
-                self._set_status("Sales sheet uploaded → Pieces Sold updated.")
-            else:
-                messagebox.showerror("Upload Error", f"Sales upload failed ({r.status_code}):\n{r.text}")
-
-        except Exception as e:
-            messagebox.showerror("Upload Error", f"Sales upload failed:\n{e}")
 
     # -------------- Main --------------
 

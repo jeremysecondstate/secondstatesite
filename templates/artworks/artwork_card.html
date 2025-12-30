@@ -2,20 +2,16 @@
 <div class="col">
     <div class="card h-100 shadow-sm">
         <a href="{% url 'artwork_detail' artwork.id %}">
-          {% with artwork.images.first as img %}
-            {% if img %}
-              <img src="{{ img.image.url }}" class="card-img-top img-fluid" alt="{{ artwork.title }}">
+            {% if artwork.images.all %}
+                <img src="{{ artwork.images.first.image.url }}" class="card-img-top img-fluid" alt="{{ artwork.title }}">
             {% else %}
-              <img src="{% static 'images/default-artwork.jpg' %}" class="card-img-top img-fluid" alt="No Image Available">
+                <img src="{% static 'images/default-artwork.jpg' %}" class="card-img-top img-fluid" alt="No Image Available">
             {% endif %}
-          {% endwith %}
         </a>
-
         <div class="card-body">
             <p class="card-text"><strong>{{ artwork.title }}</strong></p>
             <p class="card-text">{{ artwork.artist }}</p>
             <p class="card-text">{{ artwork.medium }}</p>
-
             <a href="{% url 'artwork_detail' artwork.id %}" class="btn btn-outline-dark btn-sm">View Details</a>
         </div>
     </div>

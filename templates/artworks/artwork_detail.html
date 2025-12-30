@@ -8,45 +8,37 @@
     <a href="{% url 'artwork_list' %}" class="btn btn-primary back-button">
         ⬅️ Browse More Artworks
     </a>
-
     <h1 class="text-center">{{ artwork.title }}</h1>
-
     <!-- Fullscreen Image Container (Initially Hidden) -->
     <div id="fullscreenOverlay" class="fullscreen-overlay" onclick="closeFullscreen()">
         <img id="fullscreenImage" class="fullscreen-img" src="">
         <button id="closeFullscreenBtn" class="close-btn" onclick="closeFullscreen()">❌</button>
     </div>
-
     <!-- Main Image Display -->
-    {% if artwork.images.exists %}
+    {% if artwork.images.all %}
         <div class="text-center">
-          <img id="mainImage" src="{{ artwork.images.first.image.url }}" class="img-fluid main-img" alt="{{ artwork.title }}" onclick="openFullscreen(this)">
+            <img id="mainImage" src="{{ artwork.images.first.image.url }}" class="img-fluid main-img" alt="{{ artwork.title }}" onclick="openFullscreen(this)">
         </div>
-
         <!-- Thumbnail Gallery -->
         <div class="thumbnails text-center mt-3">
-           {% for image in artwork.images.all %}
-               <img src="{{ image.image.url }}" class="thumbnail-img" onclick="changeMainImage(this)">
-           {% endfor %}
+            {% for image in artwork.images.all %}
+                <img src="{{ image.image.url }}" class="thumbnail-img" onclick="changeMainImage(this)">
+            {% endfor %}
         </div>
     {% else %}
-      <p class="text-center text-muted">No images available</p>
+        <p class="text-center text-muted">No images available</p>
     {% endif %}
-
     <!-- Artwork Details -->
     <div class="artwork-info mt-4">
         <p><strong>{{ artwork.artist }}</strong></p>
         <p><i>{{ artwork.title }}</i>{% if artwork.year %}, {{ artwork.year }}{% endif %}</p>
-
         <p>{{ artwork.medium }}</p>
-
         {% if artwork.paper_type or artwork.edition_size %}
             <p>
                 {% if artwork.paper_type %}On {{ artwork.paper_type }}{% endif %}
                 {% if artwork.edition_size %}, signed and numbered from the edition of {{ artwork.edition_size }}{% endif %}
             </p>
         {% endif %}
-
         {% if artwork.printer or artwork.publisher or artwork.description %}
             <p>
                 {% if artwork.printer %}Printed by {{ artwork.printer }}{% endif %}
@@ -54,13 +46,11 @@
                 {% if artwork.description %} {{ artwork.description }}{% endif %}
             </p>
         {% endif %}
-
         {% if artwork.sheet_size %}
             <p><strong>Sheet size:</strong> {{ artwork.sheet_size }}</p>
         {% elif artwork.dimensions_text %}
             <p><strong>Image size:</strong> {{ artwork.dimensions_text }}</p>
         {% endif %}
-
         {% if artwork.catalog_number %}
             <p><strong>Literature:</strong> {{ artwork.catalog_number }}</p>
         {% endif %}
@@ -73,23 +63,19 @@
         </p>
     </div>
 </div>
-
 <!-- JavaScript for Image Switching & Fullscreen Mode -->
 <script>
     function changeMainImage(element) {
         document.getElementById('mainImage').src = element.src;
     }
-
     function openFullscreen(imageElement) {
         document.getElementById('fullscreenImage').src = imageElement.src;
         document.getElementById('fullscreenOverlay').style.display = "flex";
     }
-
     function closeFullscreen() {
         document.getElementById('fullscreenOverlay').style.display = "none";
     }
 </script>
-
 <!-- CSS Styles -->
 <style>
     .back-button {
@@ -104,12 +90,10 @@
         text-decoration: none;
         transition: 0.3s ease-in-out;
     }
-
     .back-button:hover {
         background-color: #0056b3;
         text-decoration: none;
     }
-
     .main-img {
         width: 100%;
         max-height: 500px;
@@ -119,18 +103,15 @@
         cursor: pointer;
         transition: 0.3s ease-in-out;
     }
-
     .main-img:hover {
         transform: scale(1.02);
     }
-
     .thumbnails {
         display: flex;
         justify-content: center;
         gap: 10px;
         flex-wrap: wrap;
     }
-
     .thumbnail-img {
         width: 80px;
         height: 80px;
@@ -140,22 +121,18 @@
         border-radius: 5px;
         transition: border 0.2s ease-in-out;
     }
-
     .thumbnail-img:hover {
         border: 2px solid #333;
     }
-
     .artwork-info {
         background: #f8f9fa;
         padding: 15px;
         border-radius: 8px;
         box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
     }
-
     .description-text {
         white-space: pre-line;
     }
-
     /* Fullscreen Image Styles */
     .fullscreen-overlay {
         display: none;
@@ -169,14 +146,12 @@
         align-items: center;
         z-index: 1000;
     }
-
     .fullscreen-img {
         max-width: 90%;
         max-height: 90%;
         border-radius: 8px;
         box-shadow: 0 0 10px white;
     }
-
     .close-btn {
         position: absolute;
         top: 20px;
@@ -190,10 +165,8 @@
         border-radius: 50%;
         transition: 0.3s;
     }
-
     .close-btn:hover {
         background: #ff1a1a;
     }
 </style>
-
 {% endblock %}
