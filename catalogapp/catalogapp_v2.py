@@ -72,6 +72,8 @@ class ArtCatalogApp:
         self.df = None
         self.current_results = None
         self.open_listings_button = None
+        self.sales_df = None
+        self.current_sales_results = None
 
         # ------- MENUBAR -------
         self._build_menubar()
@@ -120,6 +122,13 @@ class ArtCatalogApp:
         ttk.Button(left, text="Delete Artwork from Website", command=self.delete_artwork, style="Danger.TButton").pack(fill=tk.X, pady=4)
         ttk.Separator(left).pack(fill=tk.X, pady=12)
         ttk.Button(left, text="Go to Your Listings", command=lambda: webbrowser.open(f"{BASE_URL}/artworks/")).pack(fill=tk.X, pady=4)
+
+        ttk.Separator(left).pack(fill=tk.X, pady=12)
+        ttk.Label(left, text="Sales (Pieces Sold)").pack(anchor="w", pady=(4, 6))
+        ttk.Button(left, text="Open Sales Excel…", command=self.load_sales_excel, style="Accent.TButton").pack(fill=tk.X, pady=4)
+        ttk.Button(left, text="Upload Sold Piece(s) to Website", command=self.upload_sold_pieces, style="Success.TButton").pack(fill=tk.X, pady=4)
+        ttk.Button(left, text="Delete Sold Piece from Website", command=self.delete_sold_piece, style="Danger.TButton").pack(fill=tk.X, pady=4)
+        ttk.Button(left, text="Go to Pieces Sold Page", command=lambda: webbrowser.open(f"{BASE_URL}/pieces-sold/")).pack(fill=tk.X, pady=4)
 
         # Helpful shortcuts info
         ttk.Label(left, text="Shortcuts", style="Subtle.TLabel").pack(anchor="w", pady=(16, 6))
@@ -296,6 +305,40 @@ class ArtCatalogApp:
         except Exception as e:
             messagebox.showerror("Load Error", f"Failed to load Excel file:\n{e}")
 
+    def load_sales_excel(self):
+        path = filedialog.askopenfilename(
+            title="Select Sales Excel",
+            filetypes=[("Excel files", "*.xlsx *.xls")]
+        )
+        if not path:
+            return
+
+        try:
+            preview = pd.read_excel(path, header=None, nrows=30)
+
+            header_row = None
+            for i in range(len(preview)):
+                row_vals = preview.iloc[i].astype(str).str.strip().tolist()
+                if "Artist" in row_vals and ("Name" in row_vals or "Title" in row_vals) and "Date" in row_vals:
+                    header_row = i
+                    break
+
+            if header_row is None:
+                raise ValueError("Could not find header row containing 'Date', 'Artist', and 'Name'.")
+
+            self.sales_df = pd.read_excel(path, header=header_row)
+            self.sales_df.columns = [str(c).strip() for c in self.sales_df.columns]
+
+            # Drop empty first column if present
+            if self.sales_df.columns[0].startswith("Unnamed"):
+                self.sales_df = self.sales_df.drop(columns=[self.sales_df.columns[0]])
+
+            self._clear_results()
+            self._set_status(f"Loaded SALES: {os.path.basename(path)}  —  {len(self.sales_df):,} records")
+
+        except Exception as e:
+            messagebox.showerror("Load Error", f"Failed to load Sales Excel:\n{e}")
+
     def _try_load_last_excel(self):
         try:
             cfg = os.path.join(os.path.dirname(__file__), ".last_catalog_path.txt")
@@ -400,6 +443,48 @@ class ArtCatalogApp:
         self.text_display.configure(state=tk.DISABLED)
 
         self._set_status(f"Found {len(results)} result(s). Select a row to view details.")
+
+    def search_sales(self, event=None):
+        if self.sales_df is None:
+            messagebox.showwarning("No Sales Sheet", "Open the Sales Excel first.")
+            return
+
+        query = self.search_var.get().lower().strip()
+        if not query:
+            messagebox.showwarning("Warning", "Enter a search query!")
+            return
+
+        # "Name" is the title column in SUPREME SALES
+        name_col = "Name" if "Name" in self.sales_df.columns else "Title"
+
+        results = self.sales_df[
+            self.sales_df[name_col].astype(str).str.lower().str.contains(query, na=False) |
+            self.sales_df["Artist"].astype(str).str.lower().str.contains(query, na=False)
+            ]
+
+        self._clear_results()
+        if results.empty:
+            self._set_status("No sales results found.")
+            return
+
+        self.current_sales_results = results
+
+        # Reuse the tree view, but map columns
+        for idx, row in results.iterrows():
+            self.tree.insert(
+                "",
+                tk.END,
+                iid=str(idx),
+                values=(
+                    self.safe(row.get("Artist", "")),
+                    self.safe(row.get(name_col, "")),
+                    self.safe(row.get("Date", ""))[:10],
+                    self.safe(row.get("Sale Location", "")),
+                    self.safe(row.get("Net Sale Price $", "")),
+                )
+            )
+
+        self._set_status(f"Found {len(results)} sale record(s).")
 
     # -------------- Export --------------
     def export_to_word(self):
@@ -526,6 +611,65 @@ class ArtCatalogApp:
         ttk.Button(btns, text="Delete from ArtSite", style="Danger.TButton", command=confirm_delete).pack(side=tk.LEFT)
         ttk.Button(btns, text="Close", command=delete_window.destroy).pack(side=tk.RIGHT)
 
+    def delete_sold_piece(self):
+        # Fetch list from site
+        try:
+            r = requests.get(f"{BASE_URL}/pieces-sold/?format=json", headers=api_headers(), timeout=15)
+            r.raise_for_status()
+            sold_list = r.json().get("sold", [])
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to fetch sold pieces: {e}")
+            return
+
+        if not sold_list:
+            messagebox.showinfo("Nothing to delete", "No sold pieces found on the site.")
+            return
+
+        win = tk.Toplevel(self.master)
+        win.title("Delete Sold Piece")
+        win.geometry("620x260")
+        frm = ttk.Frame(win, padding=16)
+        frm.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frm, text="Select Sold Piece to Delete:", style="Header.TLabel").pack(anchor="w")
+
+        # show "Artist — Title (Date)" but store id
+        display = []
+        id_by_display = {}
+        for s in sold_list:
+            txt = f"{s.get('artist', '')} — {s.get('title', '')} ({str(s.get('date', ''))})"
+            display.append(txt)
+            id_by_display[txt] = s.get("id")
+
+        sel_var = tk.StringVar()
+        dropdown = ttk.Combobox(frm, textvariable=sel_var, values=display, state="readonly")
+        dropdown.pack(fill=tk.X, pady=(10, 6))
+
+        def confirm():
+            key = sel_var.get()
+            sold_id = id_by_display.get(key)
+            if not sold_id:
+                return
+            try:
+                rr = requests.post(
+                    f"{BASE_URL}/pieces-sold/delete/",
+                    json={"id": sold_id},
+                    headers=api_headers(),
+                    timeout=20
+                )
+                if rr.status_code == 200:
+                    messagebox.showinfo("Success", "Deleted sold piece.")
+                    win.destroy()
+                else:
+                    messagebox.showerror("Error", rr.text)
+            except Exception as ex:
+                messagebox.showerror("Error", str(ex))
+
+        btns = ttk.Frame(frm)
+        btns.pack(fill=tk.X, pady=(12, 0))
+        ttk.Button(btns, text="Delete", style="Danger.TButton", command=confirm).pack(side=tk.LEFT)
+        ttk.Button(btns, text="Close", command=win.destroy).pack(side=tk.RIGHT)
+
     # -------------- Upload --------------
     def upload_artworks(self):
         if self.current_results is None or self.current_results.empty:
@@ -610,6 +754,44 @@ class ArtCatalogApp:
                     messagebox.showerror("Error", f"Upload failed: {response.text}")
             except Exception as e:
                 messagebox.showerror("Error", f"Upload failed: {e}")
+
+    def upload_sold_pieces(self):
+        if self.current_sales_results is None or self.current_sales_results.empty:
+            messagebox.showwarning("Warning", "No sold pieces to upload. Search the sales sheet first!")
+            return
+
+        # keep same safety rule as artworks
+        if len(self.current_sales_results) > 10:
+            messagebox.showwarning("Warning", "Upload max 10 at a time. Narrow your search.")
+            return
+
+        name_col = "Name" if "Name" in self.current_sales_results.columns else "Title"
+
+        for _, row in self.current_sales_results.iterrows():
+            payload = {
+                "date": str(row.get("Date", ""))[:10] if pd.notna(row.get("Date")) else "",
+                "artist": self.safe(row.get("Artist", "")),
+                "title": self.safe(row.get(name_col, "")),
+                "sale_location": self.safe(row.get("Sale Location", "")),
+                "net_sale_price": self.safe(row.get("Net Sale Price $", "")),
+                "auction_house": self.safe(row.get("Purchased Location", "")),  # or map differently if you want
+                "purchased_location": self.safe(row.get("Purchased Location", "")),
+                "purchase_date": str(row.get("Purchase Date", ""))[:10] if pd.notna(row.get("Purchase Date")) else "",
+            }
+
+            try:
+                r = requests.post(
+                    f"{BASE_URL}/pieces-sold/upload/",
+                    data=payload,
+                    headers=api_headers(),
+                    timeout=30
+                )
+                if r.status_code == 201:
+                    self._set_status(f"Uploaded sold piece: {payload['title']}")
+                else:
+                    messagebox.showerror("Error", f"Upload failed for {payload['title']}:\n{r.text}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Upload request failed:\n{e}")
 
     # -------------- Main --------------
 
