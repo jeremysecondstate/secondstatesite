@@ -7,6 +7,7 @@ from docx import Document
 import webbrowser
 import os
 from functools import partial
+from datetime import datetime
 
 
 # ----- App Config -----
@@ -14,6 +15,7 @@ BASE_URL = "https://secondstate.art"
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1100, 780
 CATALOG_API_KEY = "276e19f127f140623e73e6c160bbd8ed"
+
 
 def api_headers():
     return {"X-API-KEY": CATALOG_API_KEY}
@@ -28,7 +30,6 @@ class ArtCatalogApp:
 
         # -------- THEME / STYLE --------
         self.style = ttk.Style(master)
-        # Choose a reliable base theme and customize
         try:
             self.style.theme_use("clam")
         except tk.TclError:
@@ -41,7 +42,6 @@ class ArtCatalogApp:
 
         master.configure(bg=BG)
 
-        # General paddings & fonts
         self.style.configure(".", font=("Segoe UI", 11))
         self.style.configure("Header.TLabel", font=("Segoe UI Semibold", 16))
         self.style.configure("Subtle.TLabel", foreground="#5a5f73")
@@ -51,29 +51,51 @@ class ArtCatalogApp:
             foreground=[("active", "!disabled", "#000")],
             background=[("active", "!disabled", "#E8ECF7")],
         )
-        self.style.configure("Accent.TButton", padding=10, font=("Segoe UI Semibold", 11), foreground="white", background=ACCENT)
-        self.style.map("Accent.TButton",
-                       background=[("active", "!disabled", "#3E78D1")])
-        self.style.configure("Success.TButton", padding=10, font=("Segoe UI Semibold", 11), foreground="white", background=SUCCESS)
-        self.style.map("Success.TButton",
-                       background=[("active", "!disabled", "#1f7e37")])
-        self.style.configure("Danger.TButton", padding=10, font=("Segoe UI Semibold", 11), foreground="white", background=DANGER)
-        self.style.map("Danger.TButton",
-                       background=[("active", "!disabled", "#b8453f")])
+        self.style.configure(
+            "Accent.TButton",
+            padding=10,
+            font=("Segoe UI Semibold", 11),
+            foreground="white",
+            background=ACCENT,
+        )
+        self.style.map("Accent.TButton", background=[("active", "!disabled", "#3E78D1")])
+
+        self.style.configure(
+            "Success.TButton",
+            padding=10,
+            font=("Segoe UI Semibold", 11),
+            foreground="white",
+            background=SUCCESS,
+        )
+        self.style.map("Success.TButton", background=[("active", "!disabled", "#1f7e37")])
+
+        self.style.configure(
+            "Danger.TButton",
+            padding=10,
+            font=("Segoe UI Semibold", 11),
+            foreground="white",
+            background=DANGER,
+        )
+        self.style.map("Danger.TButton", background=[("active", "!disabled", "#b8453f")])
 
         # Treeview styling
         self.style.configure("Catalog.Treeview", rowheight=28, borderwidth=0, relief="flat")
         self.style.configure("Catalog.Treeview.Heading", font=("Segoe UI Semibold", 11))
-        self.style.map("Catalog.Treeview",
-                       background=[("selected", "#E3EDFF")],
-                       foreground=[("selected", "#000")])
+        self.style.map(
+            "Catalog.Treeview",
+            background=[("selected", "#E3EDFF")],
+            foreground=[("selected", "#000")],
+        )
 
         # ------- State -------
         self.df = None
         self.current_results = None
-        self.open_listings_button = None
         self.sales_df = None
         self.current_sales_results = None
+        self.open_listings_button = None
+
+        # NEW: explicit mode so Search + selection work properly
+        self.mode = "inventory"  # "inventory" or "sales"
 
         # ------- MENUBAR -------
         self._build_menubar()
@@ -82,23 +104,24 @@ class ArtCatalogApp:
         header = ttk.Frame(master, padding=(16, 10, 16, 10))
         header.pack(fill=tk.X)
         ttk.Label(header, text="🎨 Art Catalog Uploader", style="Header.TLabel").pack(side=tk.LEFT)
-        ttk.Label(header, text="Search, manage, and upload artworks to your website.", style="Subtle.TLabel").pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Label(
+            header,
+            text="Search, manage, and upload artworks to your website.",
+            style="Subtle.TLabel",
+        ).pack(side=tk.LEFT, padx=(10, 0))
 
         # ------- MAIN LAYOUT: Paned Window ------
         paned = ttk.Panedwindow(master, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 10))
 
-        # Left: Controls
         left = ttk.Frame(paned, padding=12)
         left.configure(style="Card.TFrame")
         paned.add(left, weight=0)
 
-        # Right: Results
         right = ttk.Frame(paned, padding=0)
         paned.add(right, weight=1)
 
         # ------- LEFT / CONTROL CARD -------
-        # Data loader row
         loader_row = ttk.Frame(left)
         loader_row.pack(fill=tk.X, pady=(0, 10))
         ttk.Label(loader_row, text="Catalog Source:", style="Subtle.TLabel").pack(side=tk.LEFT)
@@ -111,8 +134,10 @@ class ArtCatalogApp:
         search_row.pack(fill=tk.X)
         self.search_entry = ttk.Entry(search_row, textvariable=self.search_var)
         self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.search_entry.bind("<Return>", self.search_catalog)
-        ttk.Button(search_row, text="Search", command=self.search_catalog, style="Accent.TButton").pack(side=tk.LEFT, padx=(8, 0))
+
+        # IMPORTANT: Search now routes based on mode
+        self.search_entry.bind("<Return>", self.run_search)
+        ttk.Button(search_row, text="Search", command=self.run_search, style="Accent.TButton").pack(side=tk.LEFT, padx=(8, 0))
 
         # Actions group
         ttk.Label(left, text="Actions").pack(anchor="w", pady=(16, 6))
@@ -123,6 +148,7 @@ class ArtCatalogApp:
         ttk.Separator(left).pack(fill=tk.X, pady=12)
         ttk.Button(left, text="Go to Your Listings", command=lambda: webbrowser.open(f"{BASE_URL}/artworks/")).pack(fill=tk.X, pady=4)
 
+        # Sales controls
         ttk.Separator(left).pack(fill=tk.X, pady=12)
         ttk.Label(left, text="Sales (Pieces Sold)").pack(anchor="w", pady=(4, 6))
         ttk.Button(left, text="Open Sales Excel…", command=self.load_sales_excel, style="Accent.TButton").pack(fill=tk.X, pady=4)
@@ -133,10 +159,10 @@ class ArtCatalogApp:
         # Helpful shortcuts info
         ttk.Label(left, text="Shortcuts", style="Subtle.TLabel").pack(anchor="w", pady=(16, 6))
         shortcuts = (
-            "Ctrl+F: Search\n"
+            "Ctrl+F: Search (uses current mode)\n"
             "Ctrl+E: Export search\n"
-            "Ctrl+D: Export database\n"
-            "Ctrl+U: Upload results\n"
+            "Ctrl+D: Export database (inventory only)\n"
+            "Ctrl+U: Upload artworks (inventory)\n"
             "Ctrl+Q: Quit"
         )
         ttk.Label(left, text=shortcuts, justify="left").pack(anchor="w")
@@ -156,11 +182,7 @@ class ArtCatalogApp:
         tree_frame = ttk.Frame(tab_results)
         tree_frame.pack(fill=tk.BOTH, expand=True)
 
-        cols = ("Artist", "Title", "Year", "Medium", "Catalog #")
-        self.tree = ttk.Treeview(tree_frame, columns=cols, show="headings", style="Catalog.Treeview")
-        for c in cols:
-            self.tree.heading(c, text=c, command=partial(self._sort_tree, c, False))
-            self.tree.column(c, width=120, stretch=True)
+        self.tree = ttk.Treeview(tree_frame, columns=(), show="headings", style="Catalog.Treeview")
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
@@ -174,7 +196,7 @@ class ArtCatalogApp:
         self.details_text.pack(fill=tk.BOTH, expand=True)
         self.details_text.configure(state=tk.DISABLED)
 
-        # Preview panel (what gets exported by "Export Search → Word")
+        # Preview panel
         self.text_display = scrolledtext.ScrolledText(tab_preview, wrap=tk.WORD, height=20, font=("Segoe UI", 11))
         self.text_display.pack(fill=tk.BOTH, expand=True)
         self.text_display.configure(state=tk.DISABLED)
@@ -183,14 +205,17 @@ class ArtCatalogApp:
         self.status = ttk.Label(master, text="Open an Excel catalog to get started.", anchor="w", padding=(16, 6))
         self.status.pack(fill=tk.X)
 
-        # ------- TOPMOST NUDGE (like original) -------
+        # Configure initial tree for inventory
+        self.configure_tree_for_mode("inventory")
+
+        # ------- TOPMOST NUDGE -------
         self.master.lift()
         self.master.attributes("-topmost", True)
         self.master.after(600, lambda: self.master.attributes("-topmost", False))
 
         # ------- KEYBOARD SHORTCUTS -------
-        master.bind_all("<Control-f>", self.search_catalog)
-        master.bind_all("<Control-F>", self.search_catalog)
+        master.bind_all("<Control-f>", self.run_search)
+        master.bind_all("<Control-F>", self.run_search)
         master.bind_all("<Control-e>", lambda e: self.export_to_word())
         master.bind_all("<Control-E>", lambda e: self.export_to_word())
         master.bind_all("<Control-d>", lambda e: self.export_entire_database())
@@ -199,9 +224,6 @@ class ArtCatalogApp:
         master.bind_all("<Control-U>", lambda e: self.upload_artworks())
         master.bind_all("<Control-q>", lambda e: master.quit())
         master.bind_all("<Control-Q>", lambda e: master.quit())
-
-        # Optional: auto-load last opened file if you like (commented)
-        # self._try_load_last_excel()
 
     # -------------- UI Helpers --------------
     def _build_menubar(self):
@@ -225,40 +247,91 @@ class ArtCatalogApp:
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.master.config(menu=menubar)
-        # Bind Ctrl+O after menu creation
         self.master.bind_all("<Control-o>", lambda e: self.load_excel())
         self.master.bind_all("<Control-O>", lambda e: self.load_excel())
 
     def _set_status(self, text):
         self.status.config(text=text)
 
+    def configure_tree_for_mode(self, mode: str):
+        """Dynamically set Treeview columns for inventory vs sales (fixes UI mismatch)."""
+        # clear rows
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+
+        if mode == "sales":
+            cols = ("Artist", "Title", "Date", "Sale Location", "Price")
+        else:
+            cols = ("Artist", "Title", "Year", "Medium", "Catalog #")
+
+        self.tree["columns"] = cols
+        for c in cols:
+            self.tree.heading(c, text=c, command=partial(self._sort_tree, c, False))
+            self.tree.column(c, width=140, stretch=True)
+
     def _sort_tree(self, col, reverse):
+        """Sort Treeview items. Handles Year (int), Date (date), Price (float), else string."""
         try:
-            data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
-            # Try numeric sort for Year; fallback to string
-            if col == "Year":
-                def to_int(x):
+            items = list(self.tree.get_children(""))
+
+            def parse_date(s):
+                s = (s or "").strip()
+                # try a few common formats
+                for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
                     try:
-                        return int(x[0])
+                        return datetime.strptime(s, fmt)
                     except Exception:
-                        return float("inf")
-                data.sort(key=to_int, reverse=reverse)
+                        pass
+                return datetime.max
+
+            def parse_float(s):
+                s = (s or "").strip().replace("$", "").replace(",", "")
+                try:
+                    return float(s)
+                except Exception:
+                    return float("inf")
+
+            def parse_int(s):
+                s = (s or "").strip()
+                try:
+                    return int(s)
+                except Exception:
+                    return 10**18
+
+            if col == "Year":
+                keyfn = lambda k: parse_int(self.tree.set(k, col))
+            elif col == "Date":
+                keyfn = lambda k: parse_date(self.tree.set(k, col))
+            elif col in ("Price", "Net Sale Price", "Net Sale Price $"):
+                keyfn = lambda k: parse_float(self.tree.set(k, col))
             else:
-                data.sort(key=lambda t: (t[0] or "").lower(), reverse=reverse)
-            for index, (val, k) in enumerate(data):
+                keyfn = lambda k: (self.tree.set(k, col) or "").lower()
+
+            items.sort(key=keyfn, reverse=reverse)
+            for index, k in enumerate(items):
                 self.tree.move(k, "", index)
+
             self.tree.heading(col, command=lambda c=col: self._sort_tree(c, not reverse))
         except Exception as e:
             self._set_status(f"Sort error: {e}")
 
     def _on_select_row(self, event=None):
         sel = self.tree.selection()
-        if not sel or self.current_results is None:
+        if not sel:
             return
 
         idx = int(sel[0])  # Treeview iid == dataframe index
-        row = self.current_results.loc[idx]
-        details = self.format_catalog_entry(row)
+
+        if self.mode == "sales":
+            if self.current_sales_results is None or idx not in self.current_sales_results.index:
+                return
+            row = self.current_sales_results.loc[idx]
+            details = self.format_sales_entry(row)
+        else:
+            if self.current_results is None or idx not in self.current_results.index:
+                return
+            row = self.current_results.loc[idx]
+            details = self.format_catalog_entry(row)
 
         self.details_text.configure(state=tk.NORMAL)
         self.details_text.delete("1.0", tk.END)
@@ -275,7 +348,6 @@ class ArtCatalogApp:
             return
 
         try:
-            # Read without headers first so we can find the real header row
             preview = pd.read_excel(path, header=None, nrows=30)
 
             header_row = None
@@ -289,18 +361,18 @@ class ArtCatalogApp:
                 raise ValueError("Could not find a header row containing both 'Title' and 'Artist'.")
 
             self.df = pd.read_excel(path, header=header_row)
-            self.df.columns = [str(c).strip() for c in self.df.columns]  # normalize
+            self.df.columns = [str(c).strip() for c in self.df.columns]
 
-            # Persist last path (optional lightweight)
             try:
-                with open(os.path.join(os.path.dirname(__file__), ".last_catalog_path.txt"), "w",
-                          encoding="utf-8") as f:
+                with open(os.path.join(os.path.dirname(__file__), ".last_catalog_path.txt"), "w", encoding="utf-8") as f:
                     f.write(path)
             except Exception:
                 pass
 
+            self.mode = "inventory"
+            self.configure_tree_for_mode("inventory")
             self._clear_results()
-            self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
+            self._set_status(f"Loaded INVENTORY: {os.path.basename(path)}  —  {len(self.df):,} records")
 
         except Exception as e:
             messagebox.showerror("Load Error", f"Failed to load Excel file:\n{e}")
@@ -330,9 +402,11 @@ class ArtCatalogApp:
             self.sales_df.columns = [str(c).strip() for c in self.sales_df.columns]
 
             # Drop empty first column if present
-            if self.sales_df.columns[0].startswith("Unnamed"):
+            if len(self.sales_df.columns) > 0 and str(self.sales_df.columns[0]).startswith("Unnamed"):
                 self.sales_df = self.sales_df.drop(columns=[self.sales_df.columns[0]])
 
+            self.mode = "sales"
+            self.configure_tree_for_mode("sales")
             self._clear_results()
             self._set_status(f"Loaded SALES: {os.path.basename(path)}  —  {len(self.sales_df):,} records")
 
@@ -347,6 +421,8 @@ class ArtCatalogApp:
                     path = f.read().strip()
                 if path and os.path.exists(path):
                     self.df = pd.read_excel(path)
+                    self.mode = "inventory"
+                    self.configure_tree_for_mode("inventory")
                     self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
         except Exception:
             pass
@@ -354,10 +430,14 @@ class ArtCatalogApp:
     def _clear_results(self):
         for i in self.tree.get_children():
             self.tree.delete(i)
+
         self.current_results = None
+        self.current_sales_results = None
+
         self.details_text.configure(state=tk.NORMAL)
         self.details_text.delete("1.0", tk.END)
         self.details_text.configure(state=tk.DISABLED)
+
         self.text_display.configure(state=tk.NORMAL)
         self.text_display.delete("1.0", tk.END)
         self.text_display.configure(state=tk.DISABLED)
@@ -367,7 +447,6 @@ class ArtCatalogApp:
         return str(val).strip() if pd.notna(val) else fallback
 
     def format_catalog_entry(self, row):
-        """Formats an entry for display with clean handling of missing data."""
         artist = self.safe(row.get("Artist", "")).upper() or "UNKNOWN ARTIST"
         title = self.safe(row.get("Title", "")) or "Untitled"
         year = self.safe(row.get("Year", ""), "Unknown Year")
@@ -376,7 +455,7 @@ class ArtCatalogApp:
 
         height = self.safe(row.get("Height", ""), "?")
         width = self.safe(row.get("Width", ""), "?")
-        dimensions_text = f"{height}\" x {width}\""
+        dimensions_text = f'{height}" x {width}"'
 
         catalog_number = self.safe(row.get("Catalog Number", ""), "N/A")
         low_estimate = f"${int(row['Low']):,}" if pd.notna(row.get("Low")) else "N/A"
@@ -390,14 +469,56 @@ class ArtCatalogApp:
         if catalog_number:
             formatted += f"\nCatalog #: {catalog_number}"
         formatted += estimate_text
-
         return formatted
 
+    def format_sales_entry(self, row):
+        name_col = "Name" if "Name" in row.index else "Title"
+        artist = self.safe(row.get("Artist", "")).upper() or "UNKNOWN ARTIST"
+        title = self.safe(row.get(name_col, "")) or "Untitled"
+
+        date = self.safe(row.get("Date", ""))
+        sale_location = self.safe(row.get("Sale Location", ""))
+        net_price = self.safe(row.get("Net Sale Price $", ""))
+
+        purchased_location = self.safe(row.get("Purchased Location", ""))
+        purchase_date = self.safe(row.get("Purchase Date", ""))
+        profit = self.safe(row.get("Profit", ""))
+        paid = self.safe(row.get("Been Paid?", ""))
+
+        parts = [
+            f"{artist}",
+            f"{title}",
+            "",
+            f"Date: {date}" if date else "Date: (unknown)",
+            f"Sale Location: {sale_location}" if sale_location else "",
+            f"Net Sale Price: {net_price}" if net_price else "",
+        ]
+        if purchased_location:
+            parts.append(f"Purchased Location: {purchased_location}")
+        if purchase_date:
+            parts.append(f"Purchase Date: {purchase_date}")
+        if profit:
+            parts.append(f"Profit: {profit}")
+        if paid:
+            parts.append(f"Been Paid?: {paid}")
+
+        return "\n".join([p for p in parts if p != ""])
+
     # -------------- Search --------------
+    def run_search(self, event=None):
+        """Routes search to inventory vs sales based on current mode."""
+        if self.mode == "sales":
+            self.search_sales()
+        else:
+            self.search_catalog()
+
     def search_catalog(self, event=None):
         if self.df is None:
             messagebox.showwarning("No Catalog", "Open an Excel catalog first.")
             return
+
+        self.mode = "inventory"
+        self.configure_tree_for_mode("inventory")
 
         query = self.search_var.get().lower().strip()
         if not query:
@@ -418,15 +539,13 @@ class ArtCatalogApp:
             self.text_display.configure(state=tk.DISABLED)
             return
 
-        # Keep results (with original index for lookup)
         self.current_results = results
 
-        # Populate treeview — add an extra hidden index column at end
         for idx, row in results.iterrows():
             self.tree.insert(
                 "",
                 tk.END,
-                iid=str(idx),  # store df index here
+                iid=str(idx),
                 values=(
                     self.safe(row.get("Artist", "")),
                     self.safe(row.get("Title", "")),
@@ -436,7 +555,6 @@ class ArtCatalogApp:
                 )
             )
 
-        # Populate preview text (export uses this by default)
         entries = [self.format_catalog_entry(row) for _, row in results.iterrows()]
         self.text_display.configure(state=tk.NORMAL)
         self.text_display.insert(tk.END, "\n\n".join(entries))
@@ -449,27 +567,31 @@ class ArtCatalogApp:
             messagebox.showwarning("No Sales Sheet", "Open the Sales Excel first.")
             return
 
+        self.mode = "sales"
+        self.configure_tree_for_mode("sales")
+
         query = self.search_var.get().lower().strip()
         if not query:
             messagebox.showwarning("Warning", "Enter a search query!")
             return
 
-        # "Name" is the title column in SUPREME SALES
         name_col = "Name" if "Name" in self.sales_df.columns else "Title"
 
         results = self.sales_df[
             self.sales_df[name_col].astype(str).str.lower().str.contains(query, na=False) |
             self.sales_df["Artist"].astype(str).str.lower().str.contains(query, na=False)
-            ]
+        ]
 
         self._clear_results()
         if results.empty:
             self._set_status("No sales results found.")
+            self.text_display.configure(state=tk.NORMAL)
+            self.text_display.insert(tk.END, "No sales results found.\n")
+            self.text_display.configure(state=tk.DISABLED)
             return
 
         self.current_sales_results = results
 
-        # Reuse the tree view, but map columns
         for idx, row in results.iterrows():
             self.tree.insert(
                 "",
@@ -484,12 +606,17 @@ class ArtCatalogApp:
                 )
             )
 
-        self._set_status(f"Found {len(results)} sale record(s).")
+        entries = [self.format_sales_entry(row) for _, row in results.iterrows()]
+        self.text_display.configure(state=tk.NORMAL)
+        self.text_display.insert(tk.END, "\n\n".join(entries))
+        self.text_display.configure(state=tk.DISABLED)
+
+        self._set_status(f"Found {len(results)} sale record(s). Select a row to view details.")
 
     # -------------- Export --------------
     def export_to_word(self):
         text = self.text_display.get("1.0", tk.END).strip()
-        if not text or text == "No results found.":
+        if not text or text in ("No results found.", "No sales results found."):
             messagebox.showwarning("Nothing to Export", "Search first, or select text to export.")
             return
 
@@ -565,7 +692,6 @@ class ArtCatalogApp:
 
         ttk.Label(frm, text="Select Artwork to Delete:", style="Header.TLabel").pack(anchor="w")
 
-        # Fetch artworks
         try:
             response = requests.get(
                 f"{BASE_URL}/artworks/?format=json",
@@ -612,7 +738,6 @@ class ArtCatalogApp:
         ttk.Button(btns, text="Close", command=delete_window.destroy).pack(side=tk.RIGHT)
 
     def delete_sold_piece(self):
-        # Fetch list from site
         try:
             r = requests.get(f"{BASE_URL}/pieces-sold/?format=json", headers=api_headers(), timeout=15)
             r.raise_for_status()
@@ -633,7 +758,6 @@ class ArtCatalogApp:
 
         ttk.Label(frm, text="Select Sold Piece to Delete:", style="Header.TLabel").pack(anchor="w")
 
-        # show "Artist — Title (Date)" but store id
         display = []
         id_by_display = {}
         for s in sold_list:
@@ -703,7 +827,6 @@ class ArtCatalogApp:
             if not images:
                 continue
 
-            # Detect sheet size flag "S" in Height/Width
             raw_height = str(row.get('Height', '')).strip()
             raw_width = str(row.get('Width', '')).strip()
 
@@ -711,9 +834,9 @@ class ArtCatalogApp:
                 height_clean = raw_height.replace('S', '').strip()
                 width_clean = raw_width.replace('S', '').strip()
                 dimensions_text = ""
-                sheet_size = f"{height_clean}\" x {width_clean}\""
+                sheet_size = f'{height_clean}" x {width_clean}"'
             else:
-                dimensions_text = f"{raw_height}\" x {raw_width}\""
+                dimensions_text = f'{raw_height}" x {raw_width}"'
                 sheet_size = ""
 
             data = {
@@ -747,9 +870,6 @@ class ArtCatalogApp:
                 if response.status_code == 201:
                     messagebox.showinfo("Success", f"‘{title}’ uploaded successfully!")
                     self._set_status(f"Uploaded “{title}”.")
-                    if not self.open_listings_button:
-                        # Optional floating button is less needed now; use status & menu
-                        pass
                 else:
                     messagebox.showerror("Error", f"Upload failed: {response.text}")
             except Exception as e:
@@ -760,7 +880,6 @@ class ArtCatalogApp:
             messagebox.showwarning("Warning", "No sold pieces to upload. Search the sales sheet first!")
             return
 
-        # keep same safety rule as artworks
         if len(self.current_sales_results) > 10:
             messagebox.showwarning("Warning", "Upload max 10 at a time. Narrow your search.")
             return
@@ -774,7 +893,7 @@ class ArtCatalogApp:
                 "title": self.safe(row.get(name_col, "")),
                 "sale_location": self.safe(row.get("Sale Location", "")),
                 "net_sale_price": self.safe(row.get("Net Sale Price $", "")),
-                "auction_house": self.safe(row.get("Purchased Location", "")),  # or map differently if you want
+                "auction_house": self.safe(row.get("Purchased Location", "")),
                 "purchased_location": self.safe(row.get("Purchased Location", "")),
                 "purchase_date": str(row.get("Purchase Date", ""))[:10] if pd.notna(row.get("Purchase Date")) else "",
             }
@@ -792,8 +911,6 @@ class ArtCatalogApp:
                     messagebox.showerror("Error", f"Upload failed for {payload['title']}:\n{r.text}")
             except Exception as e:
                 messagebox.showerror("Error", f"Upload request failed:\n{e}")
-
-    # -------------- Main --------------
 
 
 def main():
