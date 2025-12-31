@@ -27,6 +27,17 @@ class SoldPiece(models.Model):
     def __str__(self):
         return f"{self.artist} — {self.title}"
 
+class SoldPieceImage(models.Model):
+    sold_piece = models.ForeignKey(
+        SoldPiece,
+        related_name="images",
+        on_delete=models.CASCADE
+    )
+    image = models.ImageField(upload_to="sold_pieces/")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"SoldPieceImage({self.sold_piece_id})"
 
 class Artwork(models.Model):
     title = models.CharField(max_length=255)
@@ -43,6 +54,7 @@ class Artwork(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     is_available = models.BooleanField(default=True)
+
 class ArtworkImage(models.Model):
     artwork = models.ForeignKey("Artwork", related_name="images", on_delete=models.CASCADE)
     image = models.ImageField(upload_to="artworks/")

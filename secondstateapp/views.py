@@ -1,65 +1,61 @@
 # secondstateapp/views.py
 import json
 import os
-from decimal import Decimal
 
 # from django.conf import settings
 from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import Artwork, ArtworkImage, SoldPiece
+from .models import SoldPieceImage
 
 
 @csrf_exempt
 def sold_list(request):
-    """Render HTML normally; return JSON when format=json (matches artworks behavior)."""
-    qs = SoldPiece.objects.all()
+    sold_pieces = SoldPiece.objects.all().order_by("-date")
 
     if request.GET.get("format") == "json":
-        data = list(qs.values(
-            "id", "date", "artist", "title",
-            "sale_location", "net_sale_price",
-            "auction_house", "purchased_location", "purchase_date"
-        ))
+        data = []
+        for s in sold_pieces:
+            data.append({
+                "id": s.id,
+                "date": str(s.date) if s.date else "",
+                "artist": s.artist,
+                "title": s.title,
+                "sale_location": s.sale_location,
+                "net_sale_price": s.net_sale_price,
+                "images": [img.image.url for img in s.images.all()],
+            })
         return JsonResponse({"sold": data})
+    # normal render path...
 
-    return render(request, "pieces_sold.html", {"sold_pieces": qs})
 
 
 @csrf_exempt
 def upload_sold_piece(request):
     if request.method != "POST":
-        return JsonResponse({"error": "Invalid request method"}, status=405)
+        return JsonResponse({"error": "POST required"}, status=405)
 
-    if not _authorized(request):
-        return JsonResponse({"error": "Unauthorized"}, status=401)
+    # Create the sold piece (match your current fields)
+    sold = SoldPiece.objects.create(
+        date=request.POST.get("date", "") or None,
+        artist=request.POST.get("artist", ""),
+        title=request.POST.get("title", ""),
+        sale_location=request.POST.get("sale_location", ""),
+        net_sale_price=request.POST.get("net_sale_price", ""),
+        auction_house=request.POST.get("auction_house", ""),
+        purchased_location=request.POST.get("purchased_location", ""),
+        purchase_date=request.POST.get("purchase_date", "") or None,
+    )
 
-    try:
-        data = request.POST
+    # Save any images uploaded (image_0, image_1, etc.)
+    for _, f in request.FILES.items():
+        SoldPieceImage.objects.create(sold_piece=sold, image=f)
 
-        # Parse date safely (expects YYYY-MM-DD)
-        date_val = parse_date(data.get("date") or "")  # None if blank/bad
+    return JsonResponse({"id": sold.id}, status=201)
 
-        price_raw = data.get("net_sale_price")
-        price_val = Decimal(price_raw) if price_raw not in (None, "", "nan") else None
-
-        sp = SoldPiece.objects.create(
-            date=date_val,
-            artist=data.get("artist") or "",
-            title=data.get("title") or "",
-            sale_location=data.get("sale_location") or "",
-            net_sale_price=price_val,
-            auction_house=data.get("auction_house") or "",
-            purchased_location=data.get("purchased_location") or "",
-            purchase_date=parse_date(data.get("purchase_date") or ""),
-        )
-        return JsonResponse({"message": "Sold piece uploaded!", "id": sp.id}, status=201)
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400)
 
 
 @csrf_exempt

@@ -534,7 +534,76 @@ class ArtCatalogApp:
 
     # Backwards compatibility: if old buttons/menu call upload_artworks
     def upload_artworks(self):
-        self.upload_sold_pieces()
+        if self.current_results is None or self.current_results.empty:
+            messagebox.showwarning("Warning", "No sold pieces to upload. Do a search first!")
+            return
+
+        if len(self.current_results) > 10:
+            messagebox.showwarning("Warning", "Upload max 10 at a time. Narrow your search.")
+            return
+
+        for _, row in self.current_results.iterrows():
+            title = self.safe(row.get("Name", ""))
+            if not title:
+                continue
+
+            # 1) Pick images FIRST (so you can’t accidentally “upload without images”)
+            images = []
+            while True:
+                image_path = filedialog.askopenfilename(
+                    title=f"Select Image for ‘{title}’",
+                    filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
+                )
+                if image_path:
+                    images.append(image_path)
+                    more = messagebox.askyesno("Upload More?", "Upload another image for this sold piece?")
+                    if not more:
+                        break
+                else:
+                    break
+
+            if not images:
+                messagebox.showwarning("Missing Images", f"Skipping ‘{title}’ — you must select at least 1 image.")
+                continue
+
+            # 2) Build payload matching your Django view fields
+            payload = {
+                "date": str(row.get("Date", ""))[:10] if pd.notna(row.get("Date")) else "",
+                "artist": self.safe(row.get("Artist", "")),
+                "title": self.safe(row.get("Name", "")),
+                "sale_location": self.safe(row.get("Sale Location", "")),
+                "net_sale_price": self.safe(row.get("Net Sale Price $", "")),
+                "auction_house": self.safe(row.get("Auction House", "")) if "Auction House" in self.df.columns else "",
+                "purchased_location": self.safe(row.get("Purchased Location", "")),
+                "purchase_date": str(row.get("Purchase Date", ""))[:10] if pd.notna(row.get("Purchase Date")) else "",
+            }
+
+            # 3) Files dict for requests
+            files = {}
+            try:
+                for i, img in enumerate(images):
+                    mime = "image/jpeg"
+                    if img.lower().endswith(".png"):
+                        mime = "image/png"
+                    with open(img, "rb") as f:
+                        files[f"image_{i}"] = (os.path.basename(img), f.read(), mime)
+
+                r = requests.post(
+                    f"{BASE_URL}/pieces-sold/upload/",
+                    data=payload,
+                    files=files,
+                    headers=api_headers(),
+                    timeout=60
+                )
+
+                if r.status_code == 201:
+                    messagebox.showinfo("Success", f"Uploaded sold piece: ‘{title}’")
+                    self._set_status(f"Uploaded sold piece: {title}")
+                else:
+                    messagebox.showerror("Upload Failed", f"{title}\n\n{r.status_code}: {r.text}")
+
+            except Exception as e:
+                messagebox.showerror("Upload Error", f"{title}\n\n{e}")
 
     # -------------- Delete (Pieces Sold) --------------
     def delete_sold_piece(self):
