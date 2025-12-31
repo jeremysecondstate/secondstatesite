@@ -1,1 +1,1 @@
-C:/Users/7980X/PycharmProjects/secondstate/catalogapp/catalogdata/SECOND STATE INV.xlsx
+C:/Users/7980X/PycharmProjects/secondstate/catalogapp/catalogdata/SECOND STATE SALES.xlsx
