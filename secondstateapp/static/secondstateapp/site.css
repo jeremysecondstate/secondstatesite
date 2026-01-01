@@ -162,3 +162,23 @@ body{
       object-fit: cover;   /* crop nicely */
       display:block;
     }
+
+    /* ---- Fix: Bootstrap cards inherit white text from body, but default to white bg ---- */
+    .card {
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.14);
+      color: rgba(255,255,255,.92);
+    }
+
+    .card .text-muted {
+      color: rgba(255,255,255,.68) !important;
+    }
+
+    /* Buttons inside dark cards */
+    .card .btn-outline-dark {
+      color: rgba(255,255,255,.92);
+      border-color: rgba(255,255,255,.35);
+    }
+    .card .btn-outline-dark:hover {
+      background: rgba(255,255,255,.10);
+    }
