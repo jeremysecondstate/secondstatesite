@@ -498,56 +498,13 @@ class ArtCatalogApp:
         name_col = "Name" if "Name" in self.current_results.columns else "Title"
 
         for _, row in self.current_results.iterrows():
-            payload = {
-                "date": str(row.get("Date", ""))[:10] if pd.notna(row.get("Date")) else "",
-                "artist": self.safe(row.get("Artist", "")),
-                "title": self.safe(row.get(name_col, "")),
-                "sale_location": self.safe(row.get("Sale Location", "")),
-                "net_sale_price": self._clean_money(row.get("Net Sale Price $", "")),
-                "auction_house": self.safe(row.get("Auction House", "")),
-                "purchased_location": self.safe(row.get("Purchased Location", "")),
-                "purchase_date": str(row.get("Purchase Date", ""))[:10] if pd.notna(row.get("Purchase Date")) else "",
-            }
+            title = self.safe(row.get(name_col, ""))
+            artist = self.safe(row.get("Artist", ""))
 
-            try:
-                r = requests.post(
-                    f"{BASE_URL}/pieces-sold/upload/",
-                    data=payload,
-                    headers=api_headers(),
-                    timeout=30,
-                )
-                if r.status_code == 201:
-                    ok += 1
-                else:
-                    failed += 1
-                    messagebox.showerror(
-                        "Upload failed",
-                        f"{payload['artist']} — {payload['title']}\n\n{r.status_code}\n{r.text}",
-                    )
-            except Exception as e:
-                failed += 1
-                messagebox.showerror("Upload request failed", str(e))
-
-        self._set_status(f"Upload complete. Success: {ok}, Failed: {failed}")
-        if ok:
-            messagebox.showinfo("Done", f"Uploaded {ok} sold piece(s).")
-
-    # Backwards compatibility: if old buttons/menu call upload_artworks
-    def upload_artworks(self):
-        if self.current_results is None or self.current_results.empty:
-            messagebox.showwarning("Warning", "No sold pieces to upload. Do a search first!")
-            return
-
-        if len(self.current_results) > 10:
-            messagebox.showwarning("Warning", "Upload max 10 at a time. Narrow your search.")
-            return
-
-        for _, row in self.current_results.iterrows():
-            title = self.safe(row.get("Name", ""))
             if not title:
                 continue
 
-            # 1) Pick images FIRST (so you can’t accidentally “upload without images”)
+            # 1) Pick images (at least 1)
             images = []
             while True:
                 image_path = filedialog.askopenfilename(
@@ -564,27 +521,26 @@ class ArtCatalogApp:
 
             if not images:
                 messagebox.showwarning("Missing Images", f"Skipping ‘{title}’ — you must select at least 1 image.")
+                failed += 1
                 continue
 
-            # 2) Build payload matching your Django view fields
+            # 2) Payload (keep your cleaned money + field mapping)
             payload = {
                 "date": str(row.get("Date", ""))[:10] if pd.notna(row.get("Date")) else "",
-                "artist": self.safe(row.get("Artist", "")),
-                "title": self.safe(row.get("Name", "")),
+                "artist": artist,
+                "title": title,
                 "sale_location": self.safe(row.get("Sale Location", "")),
-                "net_sale_price": self.safe(row.get("Net Sale Price $", "")),
-                "auction_house": self.safe(row.get("Auction House", "")) if "Auction House" in self.df.columns else "",
+                "net_sale_price": self._clean_money(row.get("Net Sale Price $", "")),
+                "auction_house": self.safe(row.get("Auction House", "")),
                 "purchased_location": self.safe(row.get("Purchased Location", "")),
                 "purchase_date": str(row.get("Purchase Date", ""))[:10] if pd.notna(row.get("Purchase Date")) else "",
             }
 
-            # 3) Files dict for requests
+            # 3) Build files dict
             files = {}
             try:
                 for i, img in enumerate(images):
-                    mime = "image/jpeg"
-                    if img.lower().endswith(".png"):
-                        mime = "image/png"
+                    mime = "image/png" if img.lower().endswith(".png") else "image/jpeg"
                     with open(img, "rb") as f:
                         files[f"image_{i}"] = (os.path.basename(img), f.read(), mime)
 
@@ -593,17 +549,24 @@ class ArtCatalogApp:
                     data=payload,
                     files=files,
                     headers=api_headers(),
-                    timeout=60
+                    timeout=60,
                 )
 
                 if r.status_code == 201:
-                    messagebox.showinfo("Success", f"Uploaded sold piece: ‘{title}’")
-                    self._set_status(f"Uploaded sold piece: {title}")
+                    ok += 1
                 else:
-                    messagebox.showerror("Upload Failed", f"{title}\n\n{r.status_code}: {r.text}")
-
+                    failed += 1
+                    messagebox.showerror(
+                        "Upload failed",
+                        f"{artist} — {title}\n\n{r.status_code}\n{r.text}",
+                    )
             except Exception as e:
-                messagebox.showerror("Upload Error", f"{title}\n\n{e}")
+                failed += 1
+                messagebox.showerror("Upload request failed", str(e))
+
+        self._set_status(f"Upload complete. Success: {ok}, Failed: {failed}")
+        if ok:
+            messagebox.showinfo("Done", f"Uploaded {ok} sold piece(s).")
 
     # -------------- Delete (Pieces Sold) --------------
     def delete_sold_piece(self):
