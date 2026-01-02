@@ -19,6 +19,9 @@ class SoldPiece(models.Model):
     purchased_location = models.CharField(max_length=255, blank=True, null=True)  # optional
     purchase_date = models.DateField(blank=True, null=True)  # optional
 
+    sold_hammer_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    link_to_sale = models.URLField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
