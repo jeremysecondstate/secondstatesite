@@ -349,26 +349,20 @@ class ArtCatalogApp:
         return s
 
     def format_catalog_entry(self, row):
+        date = str(row.get("Date", ""))[:10] if pd.notna(row.get("Date")) else ""
         artist = self.safe(row.get("Artist", "")).upper() or "UNKNOWN ARTIST"
         title = self.safe(row.get("Name", "")) or "Untitled"
-
         sale_location = self.safe(row.get("Sale Location", ""), "Unknown Sale Location")
-        purchased_location = self.safe(row.get("Purchased Location", ""), "Unknown Purchased Location")
-
-        date = str(row.get("Date", ""))[:10] if pd.notna(row.get("Date")) else ""
-        purchase_date = str(row.get("Purchase Date", ""))[:10] if pd.notna(row.get("Purchase Date")) else ""
-        net_sale_price = self.safe(row.get("Net Sale Price $", ""))
-        auction_house = self.safe(row.get("Auction House", ""))
+        sold_hammer_price = self.safe(row.get("Sold Hammer Price $", ""))
+        link_to_sale = self.safe(row.get("Link to Sale", ""))
 
         lines = [
             artist,
             f"{title}",
             f"Date Sold: {date}",
-            f"Net Sale Price: {net_sale_price}",
+            f"Sold Hammer Price: {sold_hammer_price}",
             f"Sale Location: {sale_location}",
-            f"Auction House: {auction_house}" if auction_house else "",
-            f"Purchased Location: {purchased_location}",
-            f"Purchase Date: {purchase_date}" if purchase_date else "",
+            f"Link to Sale: {link_to_sale}" if link_to_sale else "",
         ]
         return "\n".join([l for l in lines if l])
 
@@ -412,7 +406,7 @@ class ArtCatalogApp:
                     self.safe(row.get("Artist", "")),
                     self.safe(row.get(name_col, "")),
                     date,
-                    self.safe(row.get("Net Sale Price $", "")),
+                    self.safe(row.get("Sold Hammer Price $", "")),
                     self.safe(row.get("Sale Location", "")),
                 ),
             )
@@ -530,10 +524,8 @@ class ArtCatalogApp:
                 "artist": artist,
                 "title": title,
                 "sale_location": self.safe(row.get("Sale Location", "")),
-                "net_sale_price": self._clean_money(row.get("Net Sale Price $", "")),
-                "auction_house": self.safe(row.get("Auction House", "")),
-                "purchased_location": self.safe(row.get("Purchased Location", "")),
-                "purchase_date": str(row.get("Purchase Date", ""))[:10] if pd.notna(row.get("Purchase Date")) else "",
+                "sold_hammer_price": self._clean_money(row.get("Sold Hammer Price $", "")),
+                "link_to_sale": str(row.get("Link to Sale", ""))[:10] if pd.notna(row.get("Link to Sale")) else "",
             }
 
             # 3) Build files dict

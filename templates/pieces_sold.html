@@ -24,8 +24,8 @@
                 {% if s.date %}{{ s.date }}{% endif %}
                 {% if s.sale_location %} • {{ s.sale_location }}{% endif %}
               </p>
-              {% if s.net_sale_price %}
-                <p class="card-text"><strong>${{ s.net_sale_price }}</strong></p>
+              {% if s.sold_hammer_price %}
+                <p class="card-text"><strong>${{ s.sold_hammer_price }}</strong></p>
               {% endif %}
             </div>
 

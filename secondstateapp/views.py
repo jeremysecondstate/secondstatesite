@@ -25,10 +25,9 @@ def sold_list(request):
                 "artist": s.artist,
                 "title": s.title,
                 "sale_location": s.sale_location,
-                "net_sale_price": s.net_sale_price,
-                "images": [img.image.url for img in s.images.all()],
                 "sold_hammer_price": s.sold_hammer_price,
                 "link_to_sale": s.link_to_sale,
+                "images": [img.image.url for img in s.images.all()],
             })
         return JsonResponse({"sold": data})
 
@@ -46,12 +45,8 @@ def upload_sold_piece(request):
         artist=request.POST.get("artist", ""),
         title=request.POST.get("title", ""),
         sale_location=request.POST.get("sale_location", ""),
-        net_sale_price=request.POST.get("net_sale_price", "") or None,
         sold_hammer_price=request.POST.get("sold_hammer_price", "") or None,
         link_to_sale=request.POST.get("link_to_sale", "") or None,
-        auction_house=request.POST.get("auction_house", ""),
-        purchased_location=request.POST.get("purchased_location", ""),
-        purchase_date=request.POST.get("purchase_date", "") or None,
     )
 
     # Save any images uploaded (image_0, image_1, etc.)
