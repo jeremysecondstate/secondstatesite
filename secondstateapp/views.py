@@ -27,6 +27,8 @@ def sold_list(request):
                 "sale_location": s.sale_location,
                 "net_sale_price": s.net_sale_price,
                 "images": [img.image.url for img in s.images.all()],
+                "sold_hammer_price": s.sold_hammer_price,
+                "link_to_sale": s.link_to_sale,
             })
         return JsonResponse({"sold": data})
 
@@ -44,7 +46,9 @@ def upload_sold_piece(request):
         artist=request.POST.get("artist", ""),
         title=request.POST.get("title", ""),
         sale_location=request.POST.get("sale_location", ""),
-        net_sale_price=request.POST.get("net_sale_price", ""),
+        net_sale_price=request.POST.get("net_sale_price", "") or None,
+        sold_hammer_price=request.POST.get("sold_hammer_price", "") or None,
+        link_to_sale=request.POST.get("link_to_sale", "") or None,
         auction_house=request.POST.get("auction_house", ""),
         purchased_location=request.POST.get("purchased_location", ""),
         purchase_date=request.POST.get("purchase_date", "") or None,
@@ -145,9 +149,6 @@ def delete_artwork(request):
                 return JsonResponse({'error': 'Artwork not found'}, status=404)
             # Delete all associated images from storage
             for image in artwork.images.all():
-                # image_path = os.path.join(settings.MEDIA_ROOT, str(image.image))
-                # if default_storage.exists(image_path):
-                #     default_storage.delete(image_path)
                 if image.image and default_storage.exists(image.image.name):
                     default_storage.delete(image.image.name)
             # Delete the artwork and its associated images from the database
