@@ -23,6 +23,8 @@
               <p class="card-text text-muted">
                 {% if s.date %}{{ s.date }}{% endif %}
                 {% if s.sale_location %} • {{ s.sale_location }}{% endif %}
+                {% if s.link_to_sale %} • {{ s.link_to_sale }}{% endif %}
+
               </p>
               {% if s.sold_hammer_price %}
                 <p class="card-text"><strong>${{ s.sold_hammer_price }}</strong></p>

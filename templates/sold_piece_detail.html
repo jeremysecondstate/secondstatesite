@@ -26,9 +26,6 @@
       {% if sold.date %}{{ sold.date }}{% endif %}
       {% if sold.sale_location %} • {{ sold.sale_location }}{% endif %}
     </p>
-    {% if sold.net_sale_price %}
-      <p><strong>${{ sold.net_sale_price }}</strong></p>
-    {% endif %}
     {% if sold.sold_hammer_price %}<p>Sold Hammer Price: {{ sold.sold_hammer_price }}</p>{% endif %}
     {% if sold.link_to_sale %}<p>Link to Sale: {{ sold.link_to_sale }}</p>{% endif %}
   </div>
