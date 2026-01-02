@@ -7,6 +7,7 @@ from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from django.db import DataError
 
 from .models import Artwork, ArtworkImage, SoldPiece
 from .models import SoldPieceImage
@@ -39,17 +40,19 @@ def upload_sold_piece(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
 
-    # Create the sold piece (match your current fields)
-    sold = SoldPiece.objects.create(
-        date=request.POST.get("date", "") or None,
-        artist=request.POST.get("artist", ""),
-        title=request.POST.get("title", ""),
-        sale_location=request.POST.get("sale_location", ""),
-        sold_hammer_price=request.POST.get("sold_hammer_price", "") or None,
-        link_to_sale=request.POST.get("link_to_sale") or None,
-    )
+    try:
+        link = (request.POST.get("link_to_sale") or "").strip()
+        sold = SoldPiece.objects.create(
+            date=request.POST.get("date", "") or None,
+            artist=request.POST.get("artist", ""),
+            title=request.POST.get("title", ""),
+            sale_location=request.POST.get("sale_location", ""),
+            sold_hammer_price=request.POST.get("sold_hammer_price", "") or None,
+            link_to_sale=link or None,
+        )
+    except DataError as e:
+        return JsonResponse({"error": f"DataError: {e}"}, status=400)
 
-    # Save any images uploaded (image_0, image_1, etc.)
     for _, f in request.FILES.items():
         SoldPieceImage.objects.create(sold_piece=sold, image=f)
 

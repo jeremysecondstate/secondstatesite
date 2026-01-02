@@ -12,7 +12,7 @@ class SoldPiece(models.Model):
     title = models.CharField(max_length=255, blank=True, null=True)  # from "Name"
     sale_location = models.CharField(max_length=255, blank=True, null=True)
     sold_hammer_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-    link_to_sale = models.URLField(blank=True, null=True)
+    link_to_sale = models.URLField(max_length=1000, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
