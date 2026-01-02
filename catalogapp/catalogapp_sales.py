@@ -626,10 +626,6 @@ class ArtCatalogApp:
         ttk.Button(btns, text="Delete", style="Danger.TButton", command=confirm).pack(side=tk.LEFT)
         ttk.Button(btns, text="Close", command=win.destroy).pack(side=tk.RIGHT)
 
-    # Backwards compatibility: if old buttons/menu call delete_artwork
-    def delete_artwork(self):
-        self.delete_sold_piece()
-
 
 def main():
     root = tk.Tk()
