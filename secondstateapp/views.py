@@ -46,7 +46,7 @@ def upload_sold_piece(request):
         title=request.POST.get("title", ""),
         sale_location=request.POST.get("sale_location", ""),
         sold_hammer_price=request.POST.get("sold_hammer_price", "") or None,
-        link_to_sale=request.POST.get("link_to_sale", "") or None,
+        link_to_sale=request.POST.get("link_to_sale") or None,
     )
 
     # Save any images uploaded (image_0, image_1, etc.)

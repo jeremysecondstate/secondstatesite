@@ -525,7 +525,7 @@ class ArtCatalogApp:
                 "title": title,
                 "sale_location": self.safe(row.get("Sale Location", "")),
                 "sold_hammer_price": self._clean_money(row.get("Sold Hammer Price $", "")),
-                "link_to_sale": str(row.get("Link to Sale", ""))[:10] if pd.notna(row.get("Link to Sale")) else "",
+                "link_to_sale": self.safe(row.get("Link to Sale", "")),
             }
 
             # 3) Build files dict
