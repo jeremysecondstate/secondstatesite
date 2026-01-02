@@ -544,6 +544,8 @@ class ArtCatalogApp:
                     timeout=60,
                 )
 
+                print("UPLOAD RESPONSE:", r.status_code, r.text[:300])
+
                 if r.status_code == 201:
                     ok += 1
                 else:
@@ -557,8 +559,14 @@ class ArtCatalogApp:
                 messagebox.showerror("Upload request failed", str(e))
 
         self._set_status(f"Upload complete. Success: {ok}, Failed: {failed}")
+
         if ok:
             messagebox.showinfo("Done", f"Uploaded {ok} sold piece(s).")
+        elif failed:
+            messagebox.showwarning("Upload finished",
+                                   f"No uploads succeeded.\nFailed: {failed}\n\nCheck the status bar + any error popups.")
+        else:
+            messagebox.showinfo("Nothing uploaded", "No items were uploaded (no title or no images were selected).")
 
     # -------------- Delete (Pieces Sold) --------------
     def delete_sold_piece(self):
