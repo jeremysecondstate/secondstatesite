@@ -1,1 +1,1 @@
-C:/Users/7980X/PycharmProjects/secondstate/catalogapp/catalogdata/SUPREME INV.xlsx
+C:/Users/7980X/PycharmProjects/secondstate/catalogapp/catalogdata/SUPREME SALES.xlsx

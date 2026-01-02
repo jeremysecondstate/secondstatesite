@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <a href="{% url 'pieces_sold' %}" class="btn btn-primary back-button">⬅️ Back to Pieces Sold</a>
+
+  <h1 class="text-center">{{ sold.title }}</h1>
+
+  {% if sold.images.all %}
+    <div class="text-center">
+      <img id="mainImage" src="{{ sold.images.first.image.url }}" class="img-fluid main-img" alt="{{ sold.title }}" onclick="openFullscreen(this)">
+    </div>
+
+    <div class="thumbnails text-center mt-3">
+      {% for image in sold.images.all %}
+        <img src="{{ image.image.url }}" class="thumbnail-img" onclick="changeMainImage(this)">
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-center text-muted">No images available</p>
+  {% endif %}
+
+  <div class="artwork-info mt-4">
+    <p><strong>{{ sold.artist }}</strong></p>
+    <p><i>{{ sold.title }}</i></p>
+    <p class="text-muted">
+      {% if sold.date %}{{ sold.date }}{% endif %}
+      {% if sold.sale_location %} • {{ sold.sale_location }}{% endif %}
+    </p>
+    {% if sold.net_sale_price %}
+      <p><strong>${{ sold.net_sale_price }}</strong></p>
+    {% endif %}
+    {% if sold.auction_house %}<p>{{ sold.auction_house }}</p>{% endif %}
+    {% if sold.purchased_location %}<p>Purchased: {{ sold.purchased_location }}</p>{% endif %}
+    {% if sold.purchase_date %}<p>Purchase date: {{ sold.purchase_date }}</p>{% endif %}
+  </div>
+</div>
+
+<!-- Fullscreen overlay (copied from artwork_detail) -->
+<div id="fullscreenOverlay" class="fullscreen-overlay" onclick="closeFullscreen()">
+  <img id="fullscreenImage" class="fullscreen-img" src="">
+  <button id="closeFullscreenBtn" class="close-btn" onclick="closeFullscreen()">❌</button>
+</div>
+
+<script>
+  function changeMainImage(el){ document.getElementById('mainImage').src = el.src; }
+  function openFullscreen(el){
+    document.getElementById('fullscreenImage').src = el.src;
+    document.getElementById('fullscreenOverlay').style.display = "flex";
+  }
+  function closeFullscreen(){
+    document.getElementById('fullscreenOverlay').style.display = "none";
+  }
+</script>
+{% endblock %}

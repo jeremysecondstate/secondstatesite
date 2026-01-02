@@ -33,7 +33,6 @@ def sold_list(request):
     # ✅ normal render path
     return render(request, "pieces_sold.html", {"sold_pieces": sold_pieces})
 
-
 @csrf_exempt
 def upload_sold_piece(request):
     if request.method != "POST":
@@ -81,6 +80,13 @@ def delete_sold_piece(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+def sold_piece_detail(request, pk):
+    try:
+        sold = SoldPiece.objects.get(id=pk)
+    except SoldPiece.DoesNotExist:
+        return render(request, "404.html")
+    return render(request, "sold_piece_detail.html", {"sold": sold})
 
 def healthz(request):
     return JsonResponse({"ok": True})

@@ -1,12 +1,22 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
   <h1>Pieces Sold</h1>
 
   {% if sold_pieces %}
-    <div class="row row-cols-1 row-cols-md-2 g-4">
+    <div class="row row-cols-1 row-cols-md-3 g-4">
       {% for s in sold_pieces %}
         <div class="col">
           <div class="card h-100 shadow-sm">
+
+            <a href="{% url 'sold_piece_detail' s.id %}">
+              {% if s.images.all %}
+                <img src="{{ s.images.first.image.url }}" class="card-img-top img-fluid" alt="{{ s.title }}">
+              {% else %}
+                <img src="{% static 'images/default-artwork.jpg' %}" class="card-img-top img-fluid" alt="No Image Available">
+              {% endif %}
+            </a>
+
             <div class="card-body">
               <p class="card-text"><strong>{{ s.title }}</strong></p>
               <p class="card-text">{{ s.artist }}</p>
@@ -17,10 +27,8 @@
               {% if s.net_sale_price %}
                 <p class="card-text"><strong>${{ s.net_sale_price }}</strong></p>
               {% endif %}
-              {% if s.auction_house %}
-                <p class="card-text">{{ s.auction_house }}</p>
-              {% endif %}
             </div>
+
           </div>
         </div>
       {% endfor %}
