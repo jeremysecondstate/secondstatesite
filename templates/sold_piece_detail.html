@@ -31,7 +31,9 @@
     {% endif %}
     {% if sold.auction_house %}<p>{{ sold.auction_house }}</p>{% endif %}
     {% if sold.purchased_location %}<p>Purchased: {{ sold.purchased_location }}</p>{% endif %}
-    {% if sold.purchase_date %}<p>Purchase date: {{ sold.purchase_date }}</p>{% endif %}
+    {% if sold.purchase_date %}<p>Purchase Date: {{ sold.purchase_date }}</p>{% endif %}
+    {% if sold.sold_hammer_price %}<p>Sold Hammer Price: {{ sold.sold_hammer_price }}</p>{% endif %}
+    {% if sold.link_to_sale %}<p>Link to Sale: {{ sold.link_to_sale }}</p>{% endif %}
   </div>
 </div>
 
