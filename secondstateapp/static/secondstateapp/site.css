@@ -262,3 +262,24 @@ body{
     .card .btn-outline-dark:hover {
       background: rgba(255,255,255,.10);
     }
+
+    /* Pieces Sold layout helpers */
+    .sold-title { margin: 0 0 6px; font-size: 18px; }
+    .sold-artist { margin: 0 0 10px; color: rgba(255,255,255,.88); }
+    .sold-hammer { margin: 0 0 12px; }
+
+    .sold-meta, .sold-row {
+      margin: 6px 0;
+      color: rgba(255,255,255,.92);   /* brighter than muted */
+      line-height: 1.45;
+    }
+
+    .sold-link {
+      display: inline-block;
+      margin-top: 4px;
+      color: rgba(255,255,255,.92);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .sold-link:hover { opacity: .9; }

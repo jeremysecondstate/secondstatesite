@@ -19,16 +19,31 @@
     <p class="text-center text-muted">No images available</p>
   {% endif %}
 
-  <div class="artwork-info mt-4">
-    <p><strong>{{ sold.artist }}</strong></p>
-    <p><i>{{ sold.title }}</i></p>
-    <p class="text-muted">
-      {% if sold.date %}{{ sold.date }}{% endif %}
-      {% if sold.sale_location %} • {{ sold.sale_location }}{% endif %}
-    </p>
-    {% if sold.sold_hammer_price %}<p>Sold Hammer Price: {{ sold.sold_hammer_price }}</p>{% endif %}
-    {% if sold.link_to_sale %}<p>Link to Sale: {{ sold.link_to_sale }}</p>{% endif %}
+  <div class="artwork-info mt-4 sold-detail">
+    <p class="sold-row"><strong>Artist:</strong> {{ sold.artist }}</p>
+    <p class="sold-row"><strong>Title:</strong> <i>{{ sold.title }}</i></p>
+
+    {% if sold.sold_hammer_price %}
+      <p class="sold-row"><strong>Sale Hammer:</strong> ${{ sold.sold_hammer_price }}</p>
+    {% endif %}
+
+    {% if sold.date %}
+      <p class="sold-row"><strong>Sale Date:</strong> {{ sold.date }}</p>
+    {% endif %}
+
+    {% if sold.sale_location %}
+      <p class="sold-row"><strong>Sale Location:</strong> {{ sold.sale_location }}</p>
+    {% endif %}
+
+    {% if sold.link_to_sale %}
+      <p class="sold-row">
+        <a class="sold-link" href="{{ sold.link_to_sale }}" target="_blank" rel="noopener">
+          Link to Sale ↗
+        </a>
+      </p>
+    {% endif %}
   </div>
+
 </div>
 
 <!-- Fullscreen overlay (copied from artwork_detail) -->

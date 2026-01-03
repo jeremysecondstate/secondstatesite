@@ -17,19 +17,31 @@
               {% endif %}
             </a>
 
-            <div class="card-body">
-              <p class="card-text"><strong>{{ s.title }}</strong></p>
-              <p class="card-text">{{ s.artist }}</p>
-              <p class="card-text text-muted">
-                {% if s.date %}{{ s.date }}{% endif %}
-                {% if s.sale_location %} • {{ s.sale_location }}{% endif %}
-                {% if s.link_to_sale %} • {{ s.link_to_sale }}{% endif %}
+            <div class="card-body sold-card">
+              <p class="sold-title"><strong>{{ s.title }}</strong></p>
+              <p class="sold-artist">{{ s.artist }}</p>
 
-              </p>
               {% if s.sold_hammer_price %}
-                <p class="card-text"><strong>${{ s.sold_hammer_price }}</strong></p>
+                <p class="sold-hammer"><strong>${{ s.sold_hammer_price }}</strong></p>
+              {% endif %}
+
+              {% if s.date %}
+                <p class="sold-meta"><strong>Sale Date:</strong> {{ s.date }}</p>
+              {% endif %}
+
+              {% if s.sale_location %}
+                <p class="sold-meta"><strong>Sale Location:</strong> {{ s.sale_location }}</p>
+              {% endif %}
+
+              {% if s.link_to_sale %}
+                <p class="sold-meta">
+                  <a class="sold-link" href="{{ s.link_to_sale }}" target="_blank" rel="noopener">
+                    Link to Sale ↗
+                  </a>
+                </p>
               {% endif %}
             </div>
+
 
           </div>
         </div>
