@@ -118,6 +118,107 @@ body{
       color: var(--muted);
       max-width:56ch;
     }
+
+    /* --- Home: chic/clean hero --- */
+    .hero--clean{
+      padding: 68px 58px;
+      background: rgba(255,255,255,.045);
+      box-shadow: 0 16px 50px rgba(0,0,0,.38);
+    }
+
+    /* Tone down the heavy glow on the hero */
+    .hero--clean::before{
+      opacity: .35;
+      filter: blur(2px);
+    }
+
+    .kicker{
+      margin: 0 0 14px;
+      display: inline-block;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--hair);
+      background: rgba(255,255,255,.04);
+      color: rgba(255,255,255,.72);
+      font-size: 12px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .hero h1{
+      /* keep your clamp, just make it feel more editorial */
+      letter-spacing: -.015em;
+    }
+
+    .hero-actions{
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .btn{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      border-radius: 999px;
+      text-decoration: none;
+      border: 1px solid transparent;
+      font-weight: 600;
+    }
+
+    .btn-primary-soft{
+      background: rgba(255,255,255,.12);
+      border-color: rgba(255,255,255,.18);
+    }
+
+    .btn-primary-soft:hover{
+      background: rgba(255,255,255,.16);
+    }
+
+    .btn-ghost{
+      background: transparent;
+      border-color: rgba(255,255,255,.18);
+      color: rgba(255,255,255,.82);
+    }
+
+    .btn-ghost:hover{
+      background: rgba(255,255,255,.06);
+    }
+
+    /* --- Simple 3-tile row under hero --- */
+    .home-tiles{
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .tile{
+      border: 1px solid var(--hair);
+      background: rgba(255,255,255,.035);
+      border-radius: 14px;
+      padding: 16px 16px 14px;
+    }
+
+    .tile h2{
+      margin: 0 0 8px;
+      font-size: 14px;
+      letter-spacing: .02em;
+    }
+
+    .tile p{
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    @media (max-width: 820px){
+      .home-tiles{ grid-template-columns: 1fr; }
+    }
+
     /* Page content cards */
     .contact-grid{
       display:grid;

@@ -1,10 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
+<section class="hero hero--clean">
+  <p class="kicker">Fine art prints</p>
+
   <h1>SecondState</h1>
+
   <p class="tagline">
     We collect, sell, and broker fine art prints — only prints.
     Focused sourcing, clean provenance, and thoughtful placement.
   </p>
+
+  <div class="hero-actions">
+    <a class="btn btn-primary-soft" href="{% url 'gallery' %}">View gallery</a>
+    <a class="btn btn-ghost" href="{% url 'contact' %}">Contact</a>
+  </div>
+</section>
+
+<section class="home-tiles">
+  <div class="tile">
+    <h2>Focused sourcing</h2>
+    <p>Curated print-only inventory with clear context.</p>
+  </div>
+  <div class="tile">
+    <h2>Clean provenance</h2>
+    <p>Transparent history and straightforward transactions.</p>
+  </div>
+  <div class="tile">
+    <h2>Thoughtful placement</h2>
+    <p>Guidance on fit, framing, and long-term care.</p>
+  </div>
 </section>
 {% endblock %}
