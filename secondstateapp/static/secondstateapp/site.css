@@ -98,7 +98,7 @@ body{
       /* “logo background” placeholder glow */
       content:"";
       position:absolute;
-      inset:-2px;
+      inset:-2.0px;
       background:
         radial-gradient(700px 380px at 25% 30%, rgba(255,255,255,.12), transparent 60%),
         radial-gradient(520px 340px at 80% 40%, rgba(255,255,255,.10), transparent 58%);
