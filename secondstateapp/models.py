@@ -54,7 +54,7 @@ class Artwork(models.Model):
     def formatted_price(self):
         if self.price is None:
             return ""
-        return f"${int(self.price):,}"
+        return f"$ {int(self.price):,}"
 
     def __str__(self):
         return f"{self.artist} - {self.title}"
