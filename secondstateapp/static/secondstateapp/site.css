@@ -258,11 +258,12 @@ body{
     }
     /* Keep list/grid images uniform */
     .card-img-top{
-      width: 100%;
-      height: 260px;
-      object-fit: cover;   /* crop nicely */
-      display:block;
-    }
+  width: 100%;
+  height: 260px;
+  object-fit: contain;
+  background-color: #0b0c10; /* matches your site bg */
+  padding: 10px;
+}
 
     /* Shared detail-page image gallery styles (Artwork + Sold Piece) - FROM THE artwork_detail.html */
     .back-button{
