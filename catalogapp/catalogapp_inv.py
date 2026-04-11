@@ -14,6 +14,8 @@ BASE_URL = "https://secondstate.art"
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1100, 780
 CATALOG_API_KEY = "276e19f127f140623e73e6c160bbd8ed"
+DEFAULT_CATALOG_PATH = r"J:\Shared drives\SECONDSTATE\THE BOOKS\Oliver Current Print Inventory - Cataloging Program.xlsx"
+
 
 def api_headers():
     return {"X-API-KEY": CATALOG_API_KEY}
@@ -28,7 +30,6 @@ class ArtCatalogApp:
 
         # -------- THEME / STYLE --------
         self.style = ttk.Style(master)
-        # Choose a reliable base theme and customize
         try:
             self.style.theme_use("clam")
         except tk.TclError:
@@ -41,7 +42,6 @@ class ArtCatalogApp:
 
         master.configure(bg=BG)
 
-        # General paddings & fonts
         self.style.configure(".", font=("Segoe UI", 11))
         self.style.configure("Header.TLabel", font=("Segoe UI Semibold", 16))
         self.style.configure("Subtle.TLabel", foreground="#5a5f73")
@@ -51,58 +51,66 @@ class ArtCatalogApp:
             foreground=[("active", "!disabled", "#000")],
             background=[("active", "!disabled", "#E8ECF7")],
         )
-        self.style.configure("Accent.TButton", padding=10, font=("Segoe UI Semibold", 11), foreground="white", background=ACCENT)
-        self.style.map("Accent.TButton",
-                       background=[("active", "!disabled", "#3E78D1")])
-        self.style.configure("Success.TButton", padding=10, font=("Segoe UI Semibold", 11), foreground="white", background=SUCCESS)
-        self.style.map("Success.TButton",
-                       background=[("active", "!disabled", "#1f7e37")])
-        self.style.configure("Danger.TButton", padding=10, font=("Segoe UI Semibold", 11), foreground="white", background=DANGER)
-        self.style.map("Danger.TButton",
-                       background=[("active", "!disabled", "#b8453f")])
+        self.style.configure(
+            "Accent.TButton",
+            padding=10,
+            font=("Segoe UI Semibold", 11),
+            foreground="white",
+            background=ACCENT,
+        )
+        self.style.map("Accent.TButton", background=[("active", "!disabled", "#3E78D1")])
+        self.style.configure(
+            "Success.TButton",
+            padding=10,
+            font=("Segoe UI Semibold", 11),
+            foreground="white",
+            background=SUCCESS,
+        )
+        self.style.map("Success.TButton", background=[("active", "!disabled", "#1f7e37")])
+        self.style.configure(
+            "Danger.TButton",
+            padding=10,
+            font=("Segoe UI Semibold", 11),
+            foreground="white",
+            background=DANGER,
+        )
+        self.style.map("Danger.TButton", background=[("active", "!disabled", "#b8453f")])
 
-        # Treeview styling
         self.style.configure("Catalog.Treeview", rowheight=28, borderwidth=0, relief="flat")
         self.style.configure("Catalog.Treeview.Heading", font=("Segoe UI Semibold", 11))
-        self.style.map("Catalog.Treeview",
-                       background=[("selected", "#E3EDFF")],
-                       foreground=[("selected", "#000")])
+        self.style.map(
+            "Catalog.Treeview",
+            background=[("selected", "#E3EDFF")],
+            foreground=[("selected", "#000")],
+        )
 
-        # ------- State -------
         self.df = None
         self.current_results = None
         self.open_listings_button = None
 
-        # ------- MENUBAR -------
         self._build_menubar()
 
-        # ------- HEADER -------
         header = ttk.Frame(master, padding=(16, 10, 16, 10))
         header.pack(fill=tk.X)
         ttk.Label(header, text="🎨 Art Catalog Uploader", style="Header.TLabel").pack(side=tk.LEFT)
-        ttk.Label(header, text="Search, manage, and upload artworks to your website.", style="Subtle.TLabel").pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Label(
+            header,
+            text="Search, manage, and upload artworks to your website.",
+            style="Subtle.TLabel",
+        ).pack(side=tk.LEFT, padx=(10, 0))
 
-        # ------- MAIN LAYOUT: Paned Window ------
         paned = ttk.Panedwindow(master, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 10))
 
-        # Left: Controls
         left = ttk.Frame(paned, padding=12)
         left.configure(style="Card.TFrame")
         paned.add(left, weight=0)
 
-        # Right: Results
         right = ttk.Frame(paned, padding=0)
         paned.add(right, weight=1)
 
-        # ------- LEFT / CONTROL CARD -------
-        # Data loader row
-        loader_row = ttk.Frame(left)
-        loader_row.pack(fill=tk.X, pady=(0, 10))
-        ttk.Label(loader_row, text="Catalog Source:", style="Subtle.TLabel").pack(side=tk.LEFT)
-        ttk.Button(loader_row, text="Open Excel…", command=self.load_excel, style="Accent.TButton").pack(side=tk.RIGHT)
+        ttk.Label(left, text="Using shared catalog database", style="Subtle.TLabel").pack(anchor="w", pady=(0, 10))
 
-        # Search box
         ttk.Label(left, text="Search by Title or Artist").pack(anchor="w", pady=(8, 4))
         self.search_var = tk.StringVar()
         search_row = ttk.Frame(left)
@@ -110,18 +118,27 @@ class ArtCatalogApp:
         self.search_entry = ttk.Entry(search_row, textvariable=self.search_var)
         self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.search_entry.bind("<Return>", self.search_catalog)
-        ttk.Button(search_row, text="Search", command=self.search_catalog, style="Accent.TButton").pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(search_row, text="Search", command=self.search_catalog, style="Accent.TButton").pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
 
-        # Actions group
         ttk.Label(left, text="Actions").pack(anchor="w", pady=(16, 6))
         ttk.Button(left, text="Export Search → Word", command=self.export_to_word).pack(fill=tk.X, pady=4)
         ttk.Button(left, text="Export Entire Database", command=self.export_entire_database).pack(fill=tk.X, pady=4)
-        ttk.Button(left, text="Upload Artwork(s) to Website", command=self.upload_artworks, style="Success.TButton").pack(fill=tk.X, pady=(10, 4))
-        ttk.Button(left, text="Delete Artwork from Website", command=self.delete_artwork, style="Danger.TButton").pack(fill=tk.X, pady=4)
+        ttk.Button(left, text="Upload Artwork(s) to Website", command=self.upload_artworks, style="Success.TButton").pack(
+            fill=tk.X, pady=(10, 4)
+        )
+        ttk.Button(left, text="Delete Artwork from Website", command=self.delete_artwork, style="Danger.TButton").pack(
+            fill=tk.X, pady=4
+        )
+        ttk.Button(left, text="Clear ALL Website Listings", command=self.clear_all_website_listings, style="Danger.TButton").pack(
+            fill=tk.X, pady=4
+        )
         ttk.Separator(left).pack(fill=tk.X, pady=12)
-        ttk.Button(left, text="Go to Your Listings", command=lambda: webbrowser.open(f"{BASE_URL}/artworks/")).pack(fill=tk.X, pady=4)
+        ttk.Button(left, text="Go to Your Listings", command=lambda: webbrowser.open(f"{BASE_URL}/artworks/")).pack(
+            fill=tk.X, pady=4
+        )
 
-        # Helpful shortcuts info
         ttk.Label(left, text="Shortcuts", style="Subtle.TLabel").pack(anchor="w", pady=(16, 6))
         shortcuts = (
             "Ctrl+F: Search\n"
@@ -132,7 +149,6 @@ class ArtCatalogApp:
         )
         ttk.Label(left, text=shortcuts, justify="left").pack(anchor="w")
 
-        # ------- RIGHT / RESULTS NOTEBOOK -------
         notebook = ttk.Notebook(right)
         notebook.pack(fill=tk.BOTH, expand=True)
 
@@ -143,7 +159,6 @@ class ArtCatalogApp:
         notebook.add(tab_details, text="Details")
         notebook.add(tab_preview, text="Preview Text")
 
-        # Results (Treeview)
         tree_frame = ttk.Frame(tab_results)
         tree_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -160,26 +175,21 @@ class ArtCatalogApp:
 
         self.tree.bind("<<TreeviewSelect>>", self._on_select_row)
 
-        # Details panel
         self.details_text = scrolledtext.ScrolledText(tab_details, wrap=tk.WORD, height=20, font=("Segoe UI", 11))
         self.details_text.pack(fill=tk.BOTH, expand=True)
         self.details_text.configure(state=tk.DISABLED)
 
-        # Preview panel (what gets exported by "Export Search → Word")
         self.text_display = scrolledtext.ScrolledText(tab_preview, wrap=tk.WORD, height=20, font=("Segoe UI", 11))
         self.text_display.pack(fill=tk.BOTH, expand=True)
         self.text_display.configure(state=tk.DISABLED)
 
-        # ------- STATUS BAR -------
-        self.status = ttk.Label(master, text="Open an Excel catalog to get started.", anchor="w", padding=(16, 6))
+        self.status = ttk.Label(master, text="Loading shared catalog database...", anchor="w", padding=(16, 6))
         self.status.pack(fill=tk.X)
 
-        # ------- TOPMOST NUDGE (like original) -------
         self.master.lift()
         self.master.attributes("-topmost", True)
         self.master.after(600, lambda: self.master.attributes("-topmost", False))
 
-        # ------- KEYBOARD SHORTCUTS -------
         master.bind_all("<Control-f>", self.search_catalog)
         master.bind_all("<Control-F>", self.search_catalog)
         master.bind_all("<Control-e>", lambda e: self.export_to_word())
@@ -191,14 +201,13 @@ class ArtCatalogApp:
         master.bind_all("<Control-q>", lambda e: master.quit())
         master.bind_all("<Control-Q>", lambda e: master.quit())
 
-        # Optional: auto-load last opened file if you like (commented)
-        # self._try_load_last_excel()
+        self.master.after(100, self.load_excel)
 
     # -------------- UI Helpers --------------
     def _build_menubar(self):
         menubar = tk.Menu(self.master)
         file_menu = tk.Menu(menubar, tearoff=False)
-        file_menu.add_command(label="Open Excel…", accelerator="Ctrl+O", command=self.load_excel)
+        file_menu.add_command(label="Reload Shared Catalog", command=self.load_excel)
         file_menu.add_separator()
         file_menu.add_command(label="Export Search → Word", accelerator="Ctrl+E", command=self.export_to_word)
         file_menu.add_command(label="Export Entire Database", accelerator="Ctrl+D", command=self.export_entire_database)
@@ -209,6 +218,7 @@ class ArtCatalogApp:
         actions_menu = tk.Menu(menubar, tearoff=False)
         actions_menu.add_command(label="Upload Artwork(s)", accelerator="Ctrl+U", command=self.upload_artworks)
         actions_menu.add_command(label="Delete Artwork from Website", command=self.delete_artwork)
+        actions_menu.add_command(label="Clear ALL Website Listings", command=self.clear_all_website_listings)
         menubar.add_cascade(label="Actions", menu=actions_menu)
 
         help_menu = tk.Menu(menubar, tearoff=False)
@@ -216,9 +226,6 @@ class ArtCatalogApp:
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.master.config(menu=menubar)
-        # Bind Ctrl+O after menu creation
-        self.master.bind_all("<Control-o>", lambda e: self.load_excel())
-        self.master.bind_all("<Control-O>", lambda e: self.load_excel())
 
     def _set_status(self, text):
         self.status.config(text=text)
@@ -226,7 +233,6 @@ class ArtCatalogApp:
     def _sort_tree(self, col, reverse):
         try:
             data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
-            # Try numeric sort for Year; fallback to string
             if col == "Year":
                 def to_int(x):
                     try:
@@ -247,7 +253,7 @@ class ArtCatalogApp:
         if not sel or self.current_results is None:
             return
 
-        idx = int(sel[0])  # Treeview iid == dataframe index
+        idx = int(sel[0])
         row = self.current_results.loc[idx]
         details = self.format_catalog_entry(row)
 
@@ -257,56 +263,32 @@ class ArtCatalogApp:
         self.details_text.configure(state=tk.DISABLED)
 
     # -------------- Data Loading --------------
+    def _load_excel_from_path(self, path):
+        preview = pd.read_excel(path, header=None, nrows=30)
+
+        header_row = None
+        for i in range(len(preview)):
+            row_vals = preview.iloc[i].astype(str).str.strip().tolist()
+            if "Title" in row_vals and "Artist" in row_vals:
+                header_row = i
+                break
+
+        if header_row is None:
+            raise ValueError("Could not find a header row containing both 'Title' and 'Artist'.")
+
+        self.df = pd.read_excel(path, header=header_row)
+        self.df.columns = [str(c).strip() for c in self.df.columns]
+        self._clear_results()
+        self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
+
     def load_excel(self):
-        path = filedialog.askopenfilename(
-            title="Select Excel Catalog",
-            filetypes=[("Excel files", "*.xlsx *.xls")]
-        )
-        if not path:
-            return
-
+        path = DEFAULT_CATALOG_PATH
         try:
-            # Read without headers first so we can find the real header row
-            preview = pd.read_excel(path, header=None, nrows=30)
-
-            header_row = None
-            for i in range(len(preview)):
-                row_vals = preview.iloc[i].astype(str).str.strip().tolist()
-                if "Title" in row_vals and "Artist" in row_vals:
-                    header_row = i
-                    break
-
-            if header_row is None:
-                raise ValueError("Could not find a header row containing both 'Title' and 'Artist'.")
-
-            self.df = pd.read_excel(path, header=header_row)
-            self.df.columns = [str(c).strip() for c in self.df.columns]  # normalize
-
-            # Persist last path (optional lightweight)
-            try:
-                with open(os.path.join(os.path.dirname(__file__), ".last_catalog_path.txt"), "w",
-                          encoding="utf-8") as f:
-                    f.write(path)
-            except Exception:
-                pass
-
-            self._clear_results()
-            self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
-
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Shared catalog file not found:\n{path}")
+            self._load_excel_from_path(path)
         except Exception as e:
             messagebox.showerror("Load Error", f"Failed to load Excel file:\n{e}")
-
-    def _try_load_last_excel(self):
-        try:
-            cfg = os.path.join(os.path.dirname(__file__), ".last_catalog_path.txt")
-            if os.path.exists(cfg):
-                with open(cfg, "r", encoding="utf-8") as f:
-                    path = f.read().strip()
-                if path and os.path.exists(path):
-                    self.df = pd.read_excel(path)
-                    self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
-        except Exception:
-            pass
 
     def _clear_results(self):
         for i in self.tree.get_children():
@@ -319,12 +301,155 @@ class ArtCatalogApp:
         self.text_display.delete("1.0", tk.END)
         self.text_display.configure(state=tk.DISABLED)
 
+    # -------------- Website Listing Helpers --------------
+    def _fetch_website_artworks(self):
+        response = requests.get(
+            f"{BASE_URL}/artworks/?format=json",
+            headers=api_headers(),
+            timeout=20,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        artworks = payload.get("artworks", [])
+        if not isinstance(artworks, list):
+            raise ValueError("Website returned an unexpected artworks payload.")
+        return artworks
+
+    def _clean_name_part(self, value, fallback="UNKNOWN"):
+        text = str(value).strip() if value is not None else ""
+        return text if text else fallback
+
+    def _artist_last_name(self, artwork):
+        artist_candidates = [
+            artwork.get("artist"),
+            artwork.get("artist_name"),
+            artwork.get("artist_display"),
+            artwork.get("creator"),
+            artwork.get("name"),
+        ]
+        artist_text = next((self._clean_name_part(v, "") for v in artist_candidates if self._clean_name_part(v, "")), "")
+        if not artist_text:
+            return "UNKNOWN ARTIST"
+        parts = artist_text.replace(",", " ").split()
+        return parts[-1].upper() if parts else artist_text.upper()
+
+    def _artwork_title(self, artwork):
+        title_candidates = [
+            artwork.get("title"),
+            artwork.get("name"),
+            artwork.get("artwork_title"),
+            artwork.get("object_title"),
+        ]
+        for value in title_candidates:
+            title = self._clean_name_part(value, "")
+            if title:
+                return title
+        return "Untitled"
+
+    def _listing_label(self, artwork):
+        return f"{self._artist_last_name(artwork)} - {self._artwork_title(artwork)}"
+
+    def _delete_artwork_by_title(self, title):
+        response = requests.post(
+            f"{BASE_URL}/artworks/delete_artwork/",
+            json={"title": title},
+            headers=api_headers(),
+            timeout=20,
+        )
+        return response
+
+    def _open_confirm_delete_window(self, artworks_to_delete, parent_window, is_clear_all=False):
+        confirm_window = tk.Toplevel(self.master)
+        confirm_window.title("Confirm Deletion")
+        confirm_window.geometry("760x620")
+        confirm_window.minsize(760, 620)
+        confirm_window.transient(self.master)
+        confirm_window.grab_set()
+
+        frm = ttk.Frame(confirm_window, padding=16)
+        frm.pack(fill=tk.BOTH, expand=True)
+
+        heading = "Confirm ALL Website Listings Removal" if is_clear_all else "Confirm Listing Removal"
+        ttk.Label(frm, text=heading, style="Header.TLabel").pack(anchor="w")
+
+        warning_text = (
+            "This will permanently remove every current artwork listing from SecondState.Art."
+            if is_clear_all
+            else "These selected listings will be permanently removed from SecondState.Art."
+        )
+        ttk.Label(frm, text=warning_text, style="Subtle.TLabel", wraplength=640, justify="left").pack(anchor="w", pady=(8, 12))
+
+        count_text = f"{len(artworks_to_delete)} listing(s) selected for deletion:"
+        ttk.Label(frm, text=count_text).pack(anchor="w", pady=(0, 6))
+
+        listbox = scrolledtext.ScrolledText(frm, wrap=tk.WORD, height=18, font=("Segoe UI", 11))
+        listbox.pack(fill=tk.BOTH, expand=True)
+        listbox.insert(tk.END, "\n".join(self._listing_label(art) for art in artworks_to_delete))
+        listbox.configure(state=tk.DISABLED)
+
+        progress_label = ttk.Label(frm, text="", style="Subtle.TLabel")
+        progress_label.pack(anchor="w", pady=(10, 4))
+
+        btns = ttk.Frame(frm)
+        btns.pack(fill=tk.X, pady=(8, 0))
+
+        def run_deletion():
+            confirm_btn.config(state=tk.DISABLED)
+            cancel_btn.config(state=tk.DISABLED)
+            deleted_count = 0
+            errors = []
+
+            for index, artwork in enumerate(artworks_to_delete, start=1):
+                title = self._artwork_title(artwork)
+                label = self._listing_label(artwork)
+                progress_label.config(text=f"Removing {index} of {len(artworks_to_delete)}: {label}")
+                confirm_window.update_idletasks()
+                try:
+                    response = self._delete_artwork_by_title(title)
+                    if response.status_code == 200:
+                        deleted_count += 1
+                    else:
+                        errors.append(f"{label} — {response.text}")
+                except Exception as ex:
+                    errors.append(f"{label} — {ex}")
+
+            if parent_window and parent_window.winfo_exists():
+                parent_window.destroy()
+            confirm_window.destroy()
+
+            if errors:
+                preview = "\n".join(errors[:10])
+                if len(errors) > 10:
+                    preview += f"\n...and {len(errors) - 10} more error(s)."
+                messagebox.showwarning(
+                    "Deletion Finished with Issues",
+                    f"Removed {deleted_count} listing(s).\n\nSome deletions failed:\n{preview}",
+                )
+                self._set_status(f"Removed {deleted_count} listing(s); {len(errors)} failed.")
+            else:
+                messagebox.showinfo("Success", f"Removed {deleted_count} listing(s) from SecondState.Art.")
+                self._set_status(f"Removed {deleted_count} listing(s) from website.")
+
+        confirm_btn = ttk.Button(
+            btns,
+            text="Confirm Choices",
+            style="Danger.TButton",
+            command=run_deletion,
+        )
+        confirm_btn.pack(side=tk.LEFT)
+        cancel_btn = ttk.Button(btns, text="Cancel", command=confirm_window.destroy)
+        cancel_btn.pack(side=tk.RIGHT)
+
+        confirm_window.update_idletasks()
+        req_w = max(760, min(confirm_window.winfo_reqwidth() + 24, 980))
+        req_h = max(620, min(confirm_window.winfo_reqheight() + 24, 820))
+        confirm_window.geometry(f"{req_w}x{req_h}")
+
     # -------------- Core Formatting --------------
     def safe(self, val, fallback=""):
         return str(val).strip() if pd.notna(val) else fallback
 
     def format_catalog_entry(self, row):
-        """Formats an entry for display with clean handling of missing data."""
         artist = self.safe(row.get("Artist", "")).upper() or "UNKNOWN ARTIST"
         title = self.safe(row.get("Title", "")) or "Untitled"
         year = self.safe(row.get("Year", ""), "Unknown Year")
@@ -362,8 +487,8 @@ class ArtCatalogApp:
             return
 
         results = self.df[
-            self.df["Title"].astype(str).str.lower().str.contains(query, na=False) |
-            self.df["Artist"].astype(str).str.lower().str.contains(query, na=False)
+            self.df["Title"].astype(str).str.lower().str.contains(query, na=False)
+            | self.df["Artist"].astype(str).str.lower().str.contains(query, na=False)
         ]
 
         self._clear_results()
@@ -375,25 +500,22 @@ class ArtCatalogApp:
             self.text_display.configure(state=tk.DISABLED)
             return
 
-        # Keep results (with original index for lookup)
         self.current_results = results
 
-        # Populate treeview — add an extra hidden index column at end
         for idx, row in results.iterrows():
             self.tree.insert(
                 "",
                 tk.END,
-                iid=str(idx),  # store df index here
+                iid=str(idx),
                 values=(
                     self.safe(row.get("Artist", "")),
                     self.safe(row.get("Title", "")),
                     self.safe(row.get("Year", "")),
                     self.safe(row.get("Medium", "")),
                     self.safe(row.get("Catalog Number", "")),
-                )
+                ),
             )
 
-        # Populate preview text (export uses this by default)
         entries = [self.format_catalog_entry(row) for _, row in results.iterrows()]
         self.text_display.configure(state=tk.NORMAL)
         self.text_display.insert(tk.END, "\n\n".join(entries))
@@ -473,58 +595,103 @@ class ArtCatalogApp:
     # -------------- Delete --------------
     def delete_artwork(self):
         delete_window = tk.Toplevel(self.master)
-        delete_window.title("Delete Artwork")
-        delete_window.geometry("520x220")
+        delete_window.title("Delete Artwork from Website")
+        delete_window.geometry("760x620")
+
         frm = ttk.Frame(delete_window, padding=16)
         frm.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frm, text="Select Artwork to Delete:", style="Header.TLabel").pack(anchor="w")
+        ttk.Label(frm, text="Choose Website Listings to Remove", style="Header.TLabel").pack(anchor="w")
+        ttk.Label(
+            frm,
+            text="Check the listings you want to remove, then review your choices on the confirmation screen.",
+            style="Subtle.TLabel",
+            wraplength=700,
+            justify="left",
+        ).pack(anchor="w", pady=(8, 12))
 
-        # Fetch artworks
         try:
-            response = requests.get(
-                f"{BASE_URL}/artworks/?format=json",
-                headers=api_headers(),
-                timeout=15
-            )
-            response.raise_for_status()
-            artwork_list = response.json().get("artworks", [])
-            artwork_titles = [art.get("title", "") for art in artwork_list]
+            artwork_list = self._fetch_website_artworks()
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to fetch artworks: {str(e)}")
+            messagebox.showerror("Error", f"Failed to fetch artworks: {e}")
             delete_window.destroy()
             return
 
-        sel_var = tk.StringVar()
-        dropdown = ttk.Combobox(frm, textvariable=sel_var, values=artwork_titles, state="readonly")
-        dropdown.pack(fill=tk.X, pady=(10, 6))
+        if not artwork_list:
+            messagebox.showinfo("No Listings Found", "There are no artwork listings currently on the website.")
+            delete_window.destroy()
+            return
 
-        info = ttk.Label(frm, text="", style="Subtle.TLabel")
-        info.pack(anchor="w")
+        canvas = tk.Canvas(frm, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(frm, orient="vertical", command=canvas.yview)
+        checklist_frame = ttk.Frame(canvas)
 
-        def confirm_delete():
-            title = sel_var.get()
-            if not title:
+        checklist_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=checklist_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        items = []
+        for artwork in artwork_list:
+            var = tk.BooleanVar(value=False)
+            label = self._listing_label(artwork)
+            cb = ttk.Checkbutton(checklist_frame, text=label, variable=var)
+            cb.pack(anchor="w", fill=tk.X, pady=2)
+            items.append((var, artwork))
+
+        controls = ttk.Frame(frm)
+        controls.pack(fill=tk.X, pady=(12, 0))
+
+        info_label = ttk.Label(controls, text=f"{len(artwork_list)} website listing(s) loaded.", style="Subtle.TLabel")
+        info_label.pack(side=tk.LEFT)
+
+        def select_all():
+            for var, _ in items:
+                var.set(True)
+
+        def clear_selection():
+            for var, _ in items:
+                var.set(False)
+
+        def review_selected():
+            selected = [artwork for var, artwork in items if var.get()]
+            if not selected:
+                messagebox.showwarning("No Selection", "Check at least one listing to remove.")
                 return
-            try:
-                r = requests.post(
-                    f"{BASE_URL}/artworks/delete_artwork/",
-                    json={"title": title},
-                    headers=api_headers(),
-                    timeout=20
-                )
-                if r.status_code == 200:
-                    messagebox.showinfo("Success", f"“{title}” deleted successfully!")
-                    info.config(text=f"Deleted “{title}”.")
-                else:
-                    messagebox.showerror("Error", f"Failed to delete artwork: {r.text}")
-            except Exception as ex:
-                messagebox.showerror("Error", f"Request failed: {ex}")
+            self._open_confirm_delete_window(selected, delete_window, is_clear_all=False)
 
-        btns = ttk.Frame(frm)
-        btns.pack(fill=tk.X, pady=(12, 0))
-        ttk.Button(btns, text="Delete from ArtSite", style="Danger.TButton", command=confirm_delete).pack(side=tk.LEFT)
-        ttk.Button(btns, text="Close", command=delete_window.destroy).pack(side=tk.RIGHT)
+        button_row = ttk.Frame(frm)
+        button_row.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(button_row, text="Select All", command=select_all).pack(side=tk.LEFT)
+        ttk.Button(button_row, text="Clear Selection", command=clear_selection).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(button_row, text="Remove from SecondState.Art", style="Danger.TButton", command=review_selected).pack(side=tk.LEFT, padx=(16, 0))
+        ttk.Button(button_row, text="Close", command=delete_window.destroy).pack(side=tk.RIGHT)
+
+    def clear_all_website_listings(self):
+        try:
+            artwork_list = self._fetch_website_artworks()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to fetch artworks: {e}")
+            return
+
+        if not artwork_list:
+            messagebox.showinfo("No Listings Found", "There are no artwork listings currently on the website.")
+            return
+
+        first_confirm = messagebox.askyesno(
+            "Clear ALL Website Listings",
+            f"This will remove all {len(artwork_list)} current artwork listing(s) from SecondState.Art.\n\nDo you want to continue to the confirmation screen?",
+            icon="warning",
+        )
+        if not first_confirm:
+            return
+
+        self._open_confirm_delete_window(artwork_list, parent_window=None, is_clear_all=True)
 
     # -------------- Upload --------------
     def upload_artworks(self):
@@ -546,7 +713,7 @@ class ArtCatalogApp:
             while True:
                 image_path = filedialog.askopenfilename(
                     title=f"Select Image for ‘{title}’",
-                    filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
+                    filetypes=[("Image Files", "*.jpg *.jpeg *.png")],
                 )
                 if image_path:
                     images.append(image_path)
@@ -559,13 +726,12 @@ class ArtCatalogApp:
             if not images:
                 continue
 
-            # Detect sheet size flag "S" in Height/Width
-            raw_height = str(row.get('Height', '')).strip()
-            raw_width = str(row.get('Width', '')).strip()
+            raw_height = str(row.get("Height", "")).strip()
+            raw_width = str(row.get("Width", "")).strip()
 
-            if raw_height.startswith('S'):
-                height_clean = raw_height.replace('S', '').strip()
-                width_clean = raw_width.replace('S', '').strip()
+            if raw_height.startswith("S"):
+                height_clean = raw_height.replace("S", "").strip()
+                width_clean = raw_width.replace("S", "").strip()
                 dimensions_text = ""
                 sheet_size = f"{height_clean}\" x {width_clean}\""
             else:
@@ -573,15 +739,15 @@ class ArtCatalogApp:
                 sheet_size = ""
 
             data = {
-                'artist': row.get('Artist', ''),
-                'title': title,
-                'year': row.get('Year', ''),
-                'medium': row.get('Medium', ''),
-                'description': row.get('Description/Notes', ''),
-                'dimensions_text': dimensions_text,
-                'sheet_size': sheet_size,
-                'catalog_number': row.get('Catalog Number', ''),
-                'price': price,
+                "artist": row.get("Artist", ""),
+                "title": title,
+                "year": row.get("Year", ""),
+                "medium": row.get("Medium", ""),
+                "description": row.get("Description/Notes", ""),
+                "dimensions_text": dimensions_text,
+                "sheet_size": sheet_size,
+                "catalog_number": row.get("Catalog Number", ""),
+                "price": price,
             }
 
             files_dict = {}
@@ -590,30 +756,26 @@ class ArtCatalogApp:
                     mime = "image/jpeg"
                     if img.lower().endswith(".png"):
                         mime = "image/png"
-                    with open(img, 'rb') as f:
-                        files_dict[f'image_{i}'] = (os.path.basename(img), f.read(), mime)
+                    with open(img, "rb") as f:
+                        files_dict[f"image_{i}"] = (os.path.basename(img), f.read(), mime)
 
                 response = requests.post(
                     f"{BASE_URL}/artworks/upload_artwork/",
                     data=data,
                     files=files_dict,
                     headers=api_headers(),
-                    timeout=60
+                    timeout=60,
                 )
                 if response.status_code == 201:
                     messagebox.showinfo("Success", f"‘{title}’ uploaded successfully!")
                     self._set_status(f"Uploaded “{title}”.")
-                    if not self.open_listings_button:
-                        # Optional floating button is less needed now; use status & menu
-                        pass
                 else:
                     messagebox.showerror("Error", f"Upload failed: {response.text}")
             except Exception as e:
                 messagebox.showerror("Error", f"Upload failed: {e}")
 
-    # -------------- Main --------------
 
-
+# -------------- Main --------------
 def main():
     root = tk.Tk()
     app = ArtCatalogApp(root)
