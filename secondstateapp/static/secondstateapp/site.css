@@ -293,15 +293,60 @@ body{
       text-decoration:none;
     }
 
-    .main-img{
-      width:100%;
-      max-height:500px;
-      object-fit:contain;
-      border:2px solid #ccc;
-      border-radius:10px;
-      cursor:pointer;
-      transition:0.3s ease-in-out;
-    }
+
+
+
+.image-stage{
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.main-img{
+  width: 100%;
+  max-height: 500px;
+  object-fit: contain;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 0.35s ease-in-out, transform 0.3s ease-in-out;
+  opacity: 1;
+}
+
+.main-img.fade-out{
+  opacity: 0;
+}
+
+.image-nav{
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.55);
+  color: white;
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  z-index: 5;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.image-nav:hover{
+  background: rgba(0,0,0,0.75);
+}
+
+.image-nav-left{
+  left: 14px;
+}
+
+.image-nav-right{
+  right: 14px;
+}
+
+
     .main-img:hover{ transform:scale(1.02); }
 
     .thumbnails{
