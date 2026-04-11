@@ -416,7 +416,7 @@ body{
   width: 100%;
   height: 100%;
 
-  background: rgba(0,0,0,0.55); /* dark overlay */
+  background: rgba(0,0,0,0.65); /* slightly darker */
 
   display: flex;
   flex-direction: column;
@@ -430,9 +430,41 @@ body{
 .hero-overlay h1{
   font-size: 3rem;
   letter-spacing: 2px;
+  color: var(--gold);
 }
 
 .hero-overlay p{
   font-size: 1.2rem;
-  opacity: 0.85;
+  opacity: 0.9;
+  max-width: 600px;
+}
+
+.hero-tag{
+  background: rgba(0,0,0,0.75);
+  color: var(--gold-soft);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  margin-bottom: 15px;
+  border: 1px solid rgba(200,169,106,0.4);
+}
+.hero-overlay .btn{
+  background: rgba(0,0,0,0.75);
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  padding: 10px 20px;
+  margin: 8px;
+  transition: all 0.25s ease;
+}
+
+.hero-overlay .btn:hover{
+  background: var(--gold);
+  color: black;
+}
+
+:root{
+  --gold: #c8a96a;
+  --gold-soft: #e0c48a;
+  --dark-overlay: rgba(0,0,0,0.7);
 }
