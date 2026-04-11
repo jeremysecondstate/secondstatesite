@@ -22,17 +22,6 @@ class SoldPiece(models.Model):
     def __str__(self):
         return f"{self.artist} — {self.title}"
 
-class SoldPieceImage(models.Model):
-    sold_piece = models.ForeignKey(
-        SoldPiece,
-        related_name="images",
-        on_delete=models.CASCADE
-    )
-    image = models.ImageField(upload_to="sold_pieces/")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"SoldPieceImage({self.sold_piece_id})"
 
 class Artwork(models.Model):
     title = models.CharField(max_length=255)
