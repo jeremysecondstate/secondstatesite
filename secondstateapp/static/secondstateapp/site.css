@@ -403,6 +403,18 @@ body{
    ========================= */
 /* HERO SECTION */
 
+.hero-divider{
+  width: 125px;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255,255,255,0.7),
+    transparent
+  );
+  margin: 24px 0;
+}
+
 .hero{
   height: 80vh;
   background-image: url("/static/secondstateapp/etching_press.jpg");
