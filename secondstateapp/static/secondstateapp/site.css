@@ -293,7 +293,9 @@ body{
       text-decoration:none;
     }
 
-
+.artwork-detail-page{
+  padding-top: 4px;
+}
 
 
 .image-stage{
