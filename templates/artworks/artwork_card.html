@@ -1,4 +1,4 @@
-{% load static %}
+{% load static artwork_filters %}
 <div class="col">
     <div class="card h-100 shadow-sm">
         <a href="{% url 'artwork_detail' artwork.id %}">
@@ -8,10 +8,15 @@
                 <img src="{% static 'images/default-artwork.jpg' %}" class="card-img-top img-fluid" alt="No Image Available">
             {% endif %}
         </a>
-        <div class="card-body">
-            <p class="card-text"><strong>{{ artwork.title }}</strong></p>
-            <p class="card-text">{{ artwork.artist }}</p>
-            <p class="card-text">{{ artwork.medium }}</p>
+        <div class="card-body artwork-card-body">
+            <p class="artwork-card-title">{{ artwork.title }}</p>
+
+            <div class="artwork-card-divider"></div>
+
+            <p class="artwork-card-artist">{{ artwork.artist }}</p>
+
+            <p class="artwork-card-medium">{{ artwork.medium|highlight_medium_terms }}</p>
+
             <a href="{% url 'artwork_detail' artwork.id %}" class="btn btn-outline-dark btn-sm">View Details</a>
         </div>
     </div>

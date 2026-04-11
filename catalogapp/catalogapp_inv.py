@@ -139,6 +139,8 @@ class ArtCatalogApp:
             fill=tk.X, pady=4
         )
 
+        ttk.Button(left, text="Display All Inventory", command=self.display_all_inventory, style="Accent.TButton").pack(fill=tk.X, pady=4)
+
         ttk.Label(left, text="Shortcuts", style="Subtle.TLabel").pack(anchor="w", pady=(16, 6))
         shortcuts = (
             "Ctrl+F: Search\n"
@@ -163,7 +165,7 @@ class ArtCatalogApp:
         tree_frame.pack(fill=tk.BOTH, expand=True)
 
         cols = ("Artist", "Title", "Year", "Medium", "Catalog #")
-        self.tree = ttk.Treeview(tree_frame, columns=cols, show="headings", style="Catalog.Treeview")
+        self.tree = ttk.Treeview(tree_frame, columns=cols, show="headings", style="Catalog.Treeview", selectmode="extended")
         for c in cols:
             self.tree.heading(c, text=c, command=partial(self._sort_tree, c, False))
             self.tree.column(c, width=120, stretch=True)
@@ -247,6 +249,38 @@ class ArtCatalogApp:
             self.tree.heading(col, command=lambda c=col: self._sort_tree(c, not reverse))
         except Exception as e:
             self._set_status(f"Sort error: {e}")
+
+    def display_all_inventory(self):
+        if self.df is None:
+            messagebox.showwarning("No Catalog", "Open an Excel catalog first.")
+            return
+
+        self._clear_results()
+        self.current_results = self.df
+
+        for idx, row in self.df.iterrows():
+            self.tree.insert(
+                "",
+                tk.END,
+                iid=str(idx),
+                values=(
+                    self.safe(row.get("Artist", "")),
+                    self.safe(row.get("Title", "")),
+                    self.safe(row.get("Year", "")),
+                    self.safe(row.get("Medium", "")),
+                    self.safe(row.get("Catalog Number", "")),
+                )
+            )
+
+        entries = [self.format_catalog_entry(row) for _, row in self.df.iterrows()]
+        self.text_display.configure(state=tk.NORMAL)
+        self.text_display.insert(tk.END, "\n\n".join(entries))
+        self.text_display.configure(state=tk.DISABLED)
+
+        self._set_status(f"Showing all inventory: {len(self.df)} records.")
+
+
+
 
     def _on_select_row(self, event=None):
         sel = self.tree.selection()
@@ -696,58 +730,76 @@ class ArtCatalogApp:
     # -------------- Upload --------------
     def upload_artworks(self):
         if self.current_results is None or self.current_results.empty:
-            messagebox.showwarning("Warning", "No artworks to upload. Do a search first!")
+            messagebox.showwarning("Warning", "No artworks available. Search or display inventory first.")
+
             return
 
-        if len(self.current_results) > 4:
-            messagebox.showwarning("Warning", "Can only upload a max of 4 items at a time. Narrow your search.")
+        selected_items = self.tree.selection()
+        if not selected_items:
+            messagebox.showwarning("No Selection", "Select one or more artworks from the results list first.")
             return
 
-        for _, row in self.current_results.iterrows():
+        if len(selected_items) > 4:
+            messagebox.showwarning("Warning", "Can only upload a max of 4 selected items at a time.")
+            return
+
+        selected_rows = self.current_results.loc[[int(iid) for iid in selected_items]]
+
+        for _, row in selected_rows.iterrows():
             title = row.get("Title", "")
             price = simpledialog.askstring("Enter Sale Price", f"Enter sale price for ‘{title}’:")
             if not price:
                 continue
 
-            images = []
-            while True:
-                image_path = filedialog.askopenfilename(
-                    title=f"Select Image for ‘{title}’",
-                    filetypes=[("Image Files", "*.jpg *.jpeg *.png")],
-                )
-                if image_path:
-                    images.append(image_path)
-                    more = messagebox.askyesno("Upload More?", "Upload another image for this artwork?")
-                    if not more:
-                        break
-                else:
-                    break
+            # First: select a single cover photo
+            cover_image = filedialog.askopenfilename(
+                title=f"Select COVER Image for ‘{title}’",
+                filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
+            )
 
-            if not images:
+            if not cover_image:
                 continue
 
-            raw_height = str(row.get("Height", "")).strip()
-            raw_width = str(row.get("Width", "")).strip()
+            images = [cover_image]
 
-            if raw_height.startswith("S"):
-                height_clean = raw_height.replace("S", "").strip()
-                width_clean = raw_width.replace("S", "").strip()
+            # Then optionally allow multiple extra photos at once
+            more_photos = messagebox.askyesno(
+                "Upload More Photos?",
+                f"Do you want to upload additional photo(s) for ‘{title}’?"
+            )
+
+            if more_photos:
+                extra_images = filedialog.askopenfilenames(
+                    title=f"Select Additional Image(s) for ‘{title}’",
+                    filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
+                )
+
+                if extra_images:
+                    images.extend(extra_images)
+
+            # Detect sheet size flag "S" in Height/Width
+            raw_height = str(row.get('Height', '')).strip()
+            raw_width = str(row.get('Width', '')).strip()
+
+            if raw_height.startswith('S'):
+                height_clean = raw_height.replace('S', '').strip()
+                width_clean = raw_width.replace('S', '').strip()
                 dimensions_text = ""
-                sheet_size = f"{height_clean}\" x {width_clean}\""
+                sheet_size = f'{height_clean}" x {width_clean}"'
             else:
-                dimensions_text = f"{raw_height}\" x {raw_width}\""
+                dimensions_text = f'{raw_height}" x {raw_width}"'
                 sheet_size = ""
 
             data = {
-                "artist": row.get("Artist", ""),
-                "title": title,
-                "year": row.get("Year", ""),
-                "medium": row.get("Medium", ""),
-                "description": row.get("Description/Notes", ""),
-                "dimensions_text": dimensions_text,
-                "sheet_size": sheet_size,
-                "catalog_number": row.get("Catalog Number", ""),
-                "price": price,
+                'artist': row.get('Artist', ''),
+                'title': title,
+                'year': row.get('Year', ''),
+                'medium': row.get('Medium', ''),
+                'description': row.get('Description/Notes', ''),
+                'dimensions_text': dimensions_text,
+                'sheet_size': sheet_size,
+                'catalog_number': row.get('Catalog Number', ''),
+                'price': price,
             }
 
             files_dict = {}
@@ -756,21 +808,23 @@ class ArtCatalogApp:
                     mime = "image/jpeg"
                     if img.lower().endswith(".png"):
                         mime = "image/png"
-                    with open(img, "rb") as f:
-                        files_dict[f"image_{i}"] = (os.path.basename(img), f.read(), mime)
+                    with open(img, 'rb') as f:
+                        files_dict[f'image_{i}'] = (os.path.basename(img), f.read(), mime)
 
                 response = requests.post(
                     f"{BASE_URL}/artworks/upload_artwork/",
                     data=data,
                     files=files_dict,
                     headers=api_headers(),
-                    timeout=60,
+                    timeout=60
                 )
+
                 if response.status_code == 201:
                     messagebox.showinfo("Success", f"‘{title}’ uploaded successfully!")
                     self._set_status(f"Uploaded “{title}”.")
                 else:
                     messagebox.showerror("Error", f"Upload failed: {response.text}")
+
             except Exception as e:
                 messagebox.showerror("Error", f"Upload failed: {e}")
 
