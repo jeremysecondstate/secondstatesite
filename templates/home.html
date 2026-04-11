@@ -20,27 +20,38 @@
 
 
 <section class="hero hero--clean">
-  <p class="kicker">Fine art prints</p>
+  <div class="hero-copy reveal-on-scroll">
+    <p class="kicker">Fine art prints</p>
 
- <h1 class="gallery-title">Second State</h1>
+    <h1 class="gallery-title">Second State</h1>
 
- <div class="gallery-title-line"></div>
+    <div class="gallery-title-line"></div>
 
-
-
-  <p class="tagline">
-   We collect, sell, and broker fine art prints — only prints <br>
-   Focused sourcing, clean provenance, and thoughtful placement.
-</p>
-</section>
-<!--
-
-  <div class="hero-actions">
-    <a class="btn btn-primary-soft" href="{% url 'gallery' %}">View gallery</a>
-    <a class="btn btn-ghost" href="{% url 'contact' %}">Contact</a>
+    <p class="tagline">
+      We collect, sell, and broker fine art prints — only prints <br>
+      Focused sourcing, clean provenance, and thoughtful placement.
+    </p>
   </div>
+</section>
 
-  -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, {
+      threshold: 0.22
+    });
+
+    document.querySelectorAll(".reveal-on-scroll").forEach((el) => {
+      observer.observe(el);
+    });
+  });
+</script>
 
 
 
