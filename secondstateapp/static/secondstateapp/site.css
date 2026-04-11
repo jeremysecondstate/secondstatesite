@@ -394,3 +394,45 @@ body{
     }
 
     .sold-link:hover { opacity: .9; }
+
+/* =========================
+   HOMEPAGE HERO SECTION
+   ========================= */
+/* HERO SECTION */
+
+.hero{
+  height: 80vh;
+  background-image: url("/static/secondstateapp/etching_press.jpg");
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  background-attachment: fixed;
+}
+
+.hero-overlay{
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  background: rgba(0,0,0,0.55); /* dark overlay */
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  color: white;
+  text-align: center;
+}
+
+.hero-overlay h1{
+  font-size: 3rem;
+  letter-spacing: 2px;
+}
+
+.hero-overlay p{
+  font-size: 1.2rem;
+  opacity: 0.85;
+}
