@@ -119,8 +119,7 @@ body{
       max-width:56ch;
     }
 
-    /* --- Home: chic/clean hero --- */
-    .hero--clean{
+    /* --- Home: chic/clean hero ---     .hero--clean{
   text-align: left;
   padding: 68px 58px;
   background: rgba(0,0,0,.58);
@@ -128,6 +127,18 @@ body{
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 16px 50px rgba(0,0,0,.38);
   border: 1px solid rgba(255,255,255,.08);
+} */
+
+    .hero--clean{
+  text-align: left;
+  padding: 68px 58px;
+  background:
+    radial-gradient(800px 260px at 18% 18%, rgba(214,176,111,0.10), transparent 58%),
+    linear-gradient(180deg, rgba(12,13,16,0.86), rgba(7,8,11,0.80));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 16px 50px rgba(0,0,0,.38);
+  border: 1px solid rgba(214,176,111,0.14);
 }
 
     /* Tone down the heavy glow on the hero */
@@ -677,4 +688,54 @@ body{
 }
 
 
-.hero-overlay p
+.hero-overlay p,
+
+/* Homepage title block */
+.gallery-title{
+  margin: 0;
+  font-family: "Playfair Display", serif;
+  font-size: clamp(56px, 9vw, 104px);
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  font-weight: 600;
+
+  background: linear-gradient(
+    180deg,
+    #fff6d8 0%,
+    #f2dfb1 38%,
+    #d6b06f 72%,
+    #b88947 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+
+  text-shadow:
+    0 1px 0 rgba(255,255,255,0.18),
+    0 10px 30px rgba(0,0,0,0.34),
+    0 0 22px rgba(214,176,111,0.16);
+}
+
+.gallery-title-line{
+  width: 180px;
+  height: 2px;
+  margin: 18px 0 26px;
+  border-radius: 999px;
+
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,239,197,0.95) 20%,
+    rgba(214,176,111,0.95) 55%,
+    rgba(255,255,255,0) 100%
+  );
+
+  box-shadow: 0 0 18px rgba(214,176,111,0.28);
+}
+
+.kicker{
+  margin: 0 0 18px;
+  color: rgba(255,239,197,0.82);
+  border: 1px solid rgba(214,176,111,0.22);
+  background: rgba(8,8,10,0.72);
+}
