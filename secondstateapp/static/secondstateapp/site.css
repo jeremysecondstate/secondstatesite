@@ -329,7 +329,7 @@ body{
       max-height: 90%;
       border-radius: 8px;
       box-shadow: 0 0 10px white;
-      transition: transform 0.18s ease, transform-origin 0.05s ease;
+      transition: transform 0.25s ease, transform-origin 0.05s ease;
       cursor: zoom-in;
     }
 
