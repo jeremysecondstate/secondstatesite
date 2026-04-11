@@ -468,3 +468,62 @@ body{
   --gold-soft: #e0c48a;
   --dark-overlay: rgba(0,0,0,0.7);
 }
+
+.kicker{
+  margin: 0 0 14px;
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(200,169,106,.45);
+  background: rgba(0,0,0,.58);
+  color: #d7b97a;
+  font-size: 12px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.hero--clean h1{
+  color: #d7b97a;
+}
+
+.hero--clean .tagline{
+  color: rgba(255,255,255,.88);
+}
+
+.hero-actions .btn-primary-soft{
+  background: rgba(0,0,0,.62);
+  border-color: rgba(200,169,106,.45);
+  color: #d7b97a;
+}
+
+.hero-actions .btn-primary-soft:hover{
+  background: rgba(200,169,106,.18);
+  color: #f0d9a6;
+}
+
+.hero-actions .btn-ghost{
+  background: rgba(0,0,0,.48);
+  border-color: rgba(200,169,106,.35);
+  color: #d7b97a;
+}
+
+.hero-actions .btn-ghost:hover{
+  background: rgba(200,169,106,.14);
+  color: #f0d9a6;
+}
+
+/* HOMEPAGE SERIF TYPOGRAPHY */
+
+.hero-overlay h1,
+.hero--clean h1{
+  font-family: 'Playfair Display', serif;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
+
+.hero-overlay p,
+.hero--clean .tagline{
+  font-family: 'Playfair Display', serif;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
