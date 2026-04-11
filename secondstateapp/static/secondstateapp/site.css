@@ -516,7 +516,7 @@ body{
 
 .hero{
   height: 80vh;
-  background-image: url("//static/secondstateapp/etching_press.jpg");
+  background-image: url("etching_press.jpg");
   background-size: cover;
   background-position: center;
   position: relative;
