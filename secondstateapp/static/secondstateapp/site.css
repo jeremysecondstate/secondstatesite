@@ -357,7 +357,7 @@ body{
   border: 2px solid #ccc;
   border-radius: 10px;
   cursor: pointer;
-  transition: opacity 1.35s ease-in-out, transform 0.3s ease-in-out;
+  transition: opacity 1.2s ease-in-out, transform 0.3s ease-in-out;
   opacity: 1;
 }
 
