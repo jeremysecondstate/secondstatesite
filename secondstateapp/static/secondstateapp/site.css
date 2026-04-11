@@ -121,10 +121,13 @@ body{
 
     /* --- Home: chic/clean hero --- */
     .hero--clean{
-      padding: 68px 58px;
-      background: rgba(255,255,255,.045);
-      box-shadow: 0 16px 50px rgba(0,0,0,.38);
-    }
+  padding: 68px 58px;
+  background: rgba(0,0,0,.58);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 16px 50px rgba(0,0,0,.38);
+  border: 1px solid rgba(255,255,255,.08);
+}
 
     /* Tone down the heavy glow on the hero */
     .hero--clean::before{
