@@ -262,7 +262,7 @@ body{
   height: 260px;
   object-fit: contain;
   background-color: #0b0c10; /* matches your site bg */
-  padding: 6px;
+  padding: 10px;
   display: block;
 }
 
@@ -325,10 +325,16 @@ body{
       z-index:1000;
     }
     .fullscreen-img{
-      max-width:90%;
-      max-height:90%;
-      border-radius:8px;
-      box-shadow:0 0 10px white;
+      max-width: 90%;
+      max-height: 90%;
+      border-radius: 8px;
+      box-shadow: 0 0 10px white;
+      transition: transform 0.18s ease, transform-origin 0.05s ease;
+      cursor: zoom-in;
+    }
+
+.fullscreen-img.zoomed{
+  cursor: zoom-out;
     }
     .close-btn{
       position:absolute;

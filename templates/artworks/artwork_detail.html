@@ -65,15 +65,74 @@
 </div>
 <!-- JavaScript for Image Switching & Fullscreen Mode -->
 <script>
+    let isZoomed = false;
+
     function changeMainImage(element) {
         document.getElementById('mainImage').src = element.src;
     }
+
     function openFullscreen(imageElement) {
-        document.getElementById('fullscreenImage').src = imageElement.src;
-        document.getElementById('fullscreenOverlay').style.display = "flex";
+        const overlay = document.getElementById('fullscreenOverlay');
+        const fullscreenImage = document.getElementById('fullscreenImage');
+
+        fullscreenImage.src = imageElement.src;
+        fullscreenImage.style.transform = "scale(1)";
+        fullscreenImage.style.transformOrigin = "center center";
+        fullscreenImage.classList.remove("zoomed");
+        isZoomed = false;
+
+        overlay.style.display = "flex";
     }
+
     function closeFullscreen() {
-        document.getElementById('fullscreenOverlay').style.display = "none";
+        const overlay = document.getElementById('fullscreenOverlay');
+        const fullscreenImage = document.getElementById('fullscreenImage');
+
+        overlay.style.display = "none";
+        fullscreenImage.style.transform = "scale(1)";
+        fullscreenImage.style.transformOrigin = "center center";
+        fullscreenImage.classList.remove("zoomed");
+        isZoomed = false;
     }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const fullscreenImage = document.getElementById("fullscreenImage");
+        const overlay = document.getElementById("fullscreenOverlay");
+        const closeBtn = document.getElementById("closeFullscreenBtn");
+
+        fullscreenImage.addEventListener("click", function (event) {
+            event.stopPropagation();
+
+            isZoomed = !isZoomed;
+
+            if (isZoomed) {
+                fullscreenImage.style.transform = "scale(2)";
+                fullscreenImage.classList.add("zoomed");
+            } else {
+                fullscreenImage.style.transform = "scale(1)";
+                fullscreenImage.style.transformOrigin = "center center";
+                fullscreenImage.classList.remove("zoomed");
+            }
+        });
+
+        fullscreenImage.addEventListener("mousemove", function (event) {
+            if (!isZoomed) return;
+
+            const rect = fullscreenImage.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * 100;
+            const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+            fullscreenImage.style.transformOrigin = `${x}% ${y}%`;
+        });
+
+        closeBtn.addEventListener("click", function (event) {
+            event.stopPropagation();
+            closeFullscreen();
+        });
+
+        overlay.addEventListener("click", function () {
+            closeFullscreen();
+        });
+    });
 </script>
 {% endblock %}
