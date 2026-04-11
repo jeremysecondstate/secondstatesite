@@ -5,8 +5,6 @@ urlpatterns = [
     path("about/", views.about, name="about"),
     path("contact/", views.contact, name="contact"),
     path("gallery/", views.gallery, name="gallery"),
-    # path("pieces-sold/", views.pieces_sold, name="pieces_sold"),
-    path("pieces-sold/", views.sold_list, name="pieces_sold"),
     path("pieces-sold/<int:pk>/", views.sold_piece_detail, name="sold_piece_detail"),
     # Artworks
     path("artworks/", views.artwork_list, name="artwork_list"),

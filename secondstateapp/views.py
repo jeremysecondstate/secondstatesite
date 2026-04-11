@@ -14,28 +14,6 @@ from .models import SoldPieceImage
 
 
 @csrf_exempt
-def sold_list(request):
-    sold_pieces = SoldPiece.objects.all().order_by("-date")
-
-    if request.GET.get("format") == "json":
-        data = []
-        for s in sold_pieces:
-            data.append({
-                "id": s.id,
-                "date": str(s.date) if s.date else "",
-                "artist": s.artist,
-                "title": s.title,
-                "sale_location": s.sale_location,
-                "sold_hammer_price": s.sold_hammer_price,
-                "link_to_sale": s.link_to_sale,
-                "images": [img.image.url for img in s.images.all()],
-            })
-        return JsonResponse({"sold": data})
-
-    # ✅ normal render path
-    return render(request, "pieces_sold.html", {"sold_pieces": sold_pieces})
-
-@csrf_exempt
 def upload_sold_piece(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
