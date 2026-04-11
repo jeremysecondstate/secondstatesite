@@ -75,11 +75,17 @@
     </div>
 </div>
 <!-- JavaScript for Image Switching & Fullscreen Mode -->
+<!-- templates/artworks/artwork_detail.html -->
+
 <script>
     let isZoomed = false;
     let currentImageIndex = 0;
     let slideshowInterval = null;
+    let imageSwapTimeout = null;
     let imageUrls = [];
+
+    const FADE_DURATION = 1200;
+    const SLIDESHOW_DELAY = 9000;
 
     document.addEventListener("DOMContentLoaded", function () {
         const fullscreenImage = document.getElementById("fullscreenImage");
@@ -134,12 +140,15 @@
 
         currentImageIndex = (index + imageUrls.length) % imageUrls.length;
 
+        clearTimeout(imageSwapTimeout);
         mainImage.classList.add("fade-out");
 
-        setTimeout(() => {
+        imageSwapTimeout = setTimeout(() => {
             mainImage.src = imageUrls[currentImageIndex];
-            mainImage.classList.remove("fade-out");
-        }, 220);
+            requestAnimationFrame(() => {
+                mainImage.classList.remove("fade-out");
+            });
+        }, FADE_DURATION);
     }
 
     function changeMainImage(element, index = null) {
@@ -168,7 +177,7 @@
         stopSlideshow();
         slideshowInterval = setInterval(() => {
             updateMainImage(currentImageIndex + 1);
-        }, 6000);
+        }, SLIDESHOW_DELAY);
     }
 
     function stopSlideshow() {

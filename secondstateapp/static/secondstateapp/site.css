@@ -357,7 +357,7 @@ body{
   border: 2px solid #ccc;
   border-radius: 10px;
   cursor: pointer;
-  transition: opacity 0.35s ease-in-out, transform 0.3s ease-in-out;
+  transition: opacity 1.35s ease-in-out, transform 0.3s ease-in-out;
   opacity: 1;
 }
 
@@ -516,7 +516,7 @@ body{
 
 .hero{
   height: 80vh;
-  background-image: url("/static/secondstateapp/etching_press.jpg");
+  background-image: url("/secondstateapp/static/secondstateapp/etching_press.jpg");
   background-size: cover;
   background-position: center;
   position: relative;
@@ -677,4 +677,4 @@ body{
 }
 
 
-.hero-overlay p,
+.hero-overlay p
