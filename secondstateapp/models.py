@@ -37,18 +37,28 @@ class SoldPieceImage(models.Model):
 class Artwork(models.Model):
     title = models.CharField(max_length=255)
     artist = models.CharField(max_length=255)
-    year = models.CharField(max_length=10, blank=True, null=True)  # New field
+    year = models.CharField(max_length=10, blank=True, null=True)
     medium = models.CharField(max_length=255, blank=True, null=True)
-    paper_type = models.CharField(max_length=255, blank=True, null=True)  # New field
-    printer = models.CharField(max_length=255, blank=True, null=True)  # New field
-    publisher = models.CharField(max_length=255, blank=True, null=True)  # New field
-    edition_size = models.CharField(max_length=50, blank=True, null=True)  # New field
+    paper_type = models.CharField(max_length=255, blank=True, null=True)
+    printer = models.CharField(max_length=255, blank=True, null=True)
+    publisher = models.CharField(max_length=255, blank=True, null=True)
+    edition_size = models.CharField(max_length=50, blank=True, null=True)
     dimensions_text = models.CharField(max_length=255, blank=True, null=True)
-    sheet_size = models.CharField(max_length=255, blank=True, null=True)  # New field
+    sheet_size = models.CharField(max_length=255, blank=True, null=True)
     catalog_number = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     is_available = models.BooleanField(default=True)
+
+    @property
+    def formatted_price(self):
+        if self.price is None:
+            return ""
+        return f"${int(self.price):,}"
+
+    def __str__(self):
+        return f"{self.artist} - {self.title}"
+
 
 class ArtworkImage(models.Model):
     artwork = models.ForeignKey("Artwork", related_name="images", on_delete=models.CASCADE)

@@ -56,7 +56,7 @@
         {% endif %}
         <p>
             {% if artwork.is_available %}
-                <strong>${{ artwork.price }}</strong>
+                <strong>${{ artwork.formatted_price }}</strong>
             {% else %}
                 <strong>Status:</strong> <span class="text-danger">Sold</span>
             {% endif %}
