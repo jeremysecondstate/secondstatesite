@@ -121,6 +121,7 @@ body{
 
     /* --- Home: chic/clean hero --- */
     .hero--clean{
+  text-align: left;
   padding: 68px 58px;
   background: rgba(0,0,0,.58);
   backdrop-filter: blur(10px);
@@ -135,18 +136,7 @@ body{
       filter: blur(2px);
     }
 
-    .kicker{
-      margin: 0 0 14px;
-      display: inline-block;
-      padding: 7px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--hair);
-      background: rgba(255,255,255,.04);
-      color: rgba(255,255,255,.72);
-      font-size: 12px;
-      letter-spacing: .18em;
-      text-transform: uppercase;
-    }
+
 
     .hero h1{
       /* keep your clamp, just make it feel more editorial */
@@ -268,6 +258,22 @@ body{
   padding: 10px;
   display: block;
 }
+
+
+.kicker{
+  display: table;
+  margin: 0 auto 18px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  background: rgba(0,0,0,.68);
+  color: rgba(255,255,255,.72);
+  font-size: 15px;
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
 
     /* Shared detail-page image gallery styles (Artwork + Sold Piece) - FROM THE artwork_detail.html */
     .back-button{
@@ -446,6 +452,10 @@ body{
   font-size: 3rem;
   letter-spacing: 2px;
   color: var(--gold);
+  text-shadow:
+  0 3px 8px rgba(0,0,0,.35),
+  0 0 10px rgba(255,255,255,.20),
+  0 0 24px rgba(255,255,255,.10);
 }
 
 .hero-overlay p{
@@ -484,20 +494,6 @@ body{
   --dark-overlay: rgba(0,0,0,0.7);
 }
 
-.kicker{
-  margin: 0 0 14px;
-  display: inline-block;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(200,169,106,.45);
-  background: rgba(0,0,0,.58);
-  color: #d7b97a;
-  font-size: 12px;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-}
-
-
 
 .hero--clean .tagline{
   color: rgba(255,255,255,.95);
@@ -531,6 +527,46 @@ body{
   color: #f0d9a6;
 }
 
+
+.gallery-title{
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  font-size: clamp(42px, 6vw, 68px);
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  margin-bottom: 10px;
+
+  background: linear-gradient(
+    180deg,
+    #fff4d6 0%,
+    #f0d9a6 35%,
+    #d7b97a 65%,
+    #b8924e 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+
+  text-shadow:
+  0 3px 8px rgba(0,0,0,.35),
+  0 0 10px rgba(255,255,255,.20),
+  0 0 24px rgba(255,255,255,.10);
+
+}
+
+
+.gallery-title-line{
+  width: 302px;
+  height: 2px;
+  margin: 0 0 54px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255,255,255,0.65)
+  );
+}
+
 /* HOMEPAGE SERIF TYPOGRAPHY */
 
 .hero-overlay h1,
@@ -546,8 +582,6 @@ body{
     0 1px 2px rgba(0,0,0,.45),
     0 8px 24px rgba(0,0,0,.28);
 }
-.hero--clean h1 span{
-  font-style: italic;
-}
+
 
 .hero-overlay p,
