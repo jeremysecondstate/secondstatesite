@@ -130,7 +130,7 @@ body{
 } */
 
     .hero--clean{
-  text-align: left;
+  text-align: center;
   padding: 68px 58px;
   background:
     radial-gradient(800px 260px at 18% 18%, rgba(214,176,111,0.10), transparent 58%),
@@ -143,8 +143,8 @@ body{
 
     /* Tone down the heavy glow on the hero */
     .hero--clean::before{
-      opacity: .69;
-      filter: blur(5px);
+      opacity: .35;
+      filter: blur(2px);
     }
 
 
