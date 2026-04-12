@@ -143,8 +143,8 @@ body{
 
     /* Tone down the heavy glow on the hero */
     .hero--clean::before{
-      opacity: .35;
-      filter: blur(2px);
+      opacity: .69;
+      filter: blur(5px);
     }
 
 
