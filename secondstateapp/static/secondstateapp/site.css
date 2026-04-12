@@ -783,9 +783,9 @@ body{
 .hero-copy .tagline{
   margin: 0;
   max-width: 30ch;
-  color: rgba(255,255,255,0.92);
+  color: rgba(255,255,255,0.72);
   line-height: 1.55;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.42);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.22);
 }
 
 /* scroll reveal */
@@ -793,8 +793,8 @@ body{
   opacity: 0;
   transform: translateY(18px);
   transition:
-    opacity 700ms ease,
-    transform 700ms cubic-bezier(.22,1,.36,1);
+    opacity 7000ms ease,
+    transform 7000ms cubic-bezier(.22,1,.36,1);
 }
 
 .reveal-on-scroll.is-visible > *{
