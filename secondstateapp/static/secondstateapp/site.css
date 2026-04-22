@@ -831,3 +831,116 @@ body{
   border: 1px solid rgba(214,176,111,0.22);
   background: rgba(8,8,10,0.72);
 }
+
+/* Restore the original homepage "window" effect:
+   same image soft in the background, same image sharper inside the center panel. */
+.hero--window {
+  min-height: clamp(560px, 78vh, 820px);
+  padding: 0;
+  border-radius: 26px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.10);
+  background-image: url("etching_press.jpg");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  box-shadow: 0 22px 70px rgba(0,0,0,.42);
+}
+
+.hero--window::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: inherit;
+  background-size: inherit;
+  background-position: inherit;
+  filter: blur(14px) brightness(.48);
+  transform: scale(1.08);
+  opacity: .95;
+}
+
+.hero--window::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7,8,11,.18), rgba(7,8,11,.54));
+  z-index: 1;
+}
+
+.hero--window .hero-overlay {
+  position: relative;
+  z-index: 2;
+  min-height: inherit;
+  padding: clamp(28px, 5vw, 54px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.hero-copy--window {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 590px);
+  min-height: 360px;
+  padding: 36px 34px 34px;
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,.10);
+  background-image: url("etching_press.jpg");
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 24px 60px rgba(0,0,0,.34);
+  text-align: left;
+}
+
+.hero-copy--window::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(7,8,11,.86) 0%,
+    rgba(7,8,11,.72) 46%,
+    rgba(7,8,11,.28) 100%
+  );
+  z-index: 0;
+}
+
+.hero-copy--window > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-copy--window .kicker {
+  display: inline-flex;
+  margin: 0 0 18px;
+}
+
+.hero-copy--window .gallery-title-line {
+  width: 160px;
+}
+
+.hero-copy--window .tagline {
+  max-width: 20ch;
+  color: rgba(255,255,255,.88);
+}
+
+.hero-copy--window .hero-actions {
+  justify-content: flex-start;
+}
+
+@media (max-width: 720px) {
+  .hero--window {
+    min-height: 520px;
+    background-attachment: scroll;
+  }
+
+  .hero-copy--window {
+    min-height: unset;
+    padding: 28px 24px 28px;
+  }
+
+  .hero-copy--window .gallery-title {
+    font-size: clamp(44px, 12vw, 72px);
+  }
+}
