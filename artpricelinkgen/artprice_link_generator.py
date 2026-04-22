@@ -31,7 +31,7 @@ except ImportError:
 
 
 APP_TITLE = "Artprice Link Generator"
-DEFAULT_DATE_FROM = "2016-01-01"
+DEFAULT_DATE_FROM = "2018-01-01"
 DEFAULT_CATEGORY_ID = "2"
 DEFAULT_SORT = "datesale_desc"
 
@@ -566,7 +566,7 @@ class App:
         tk.Label(header_left, text="Artprice Link Generator", bg=BG, fg=TEXT, font=self.title_font).pack(anchor="w")
         tk.Label(
             header_left,
-            text="Single listing screenshot and batch spreadsheet Artprice link generation.",
+            text="Single listing screenshot, manual entry, and batch spreadsheet Artprice link generation.",
             bg=BG,
             fg=SUBTLE,
             font=self.body_font,
@@ -638,12 +638,15 @@ class App:
 
         self.image_tab = tk.Frame(self.notebook, bg=PANEL)
         self.batch_tab = tk.Frame(self.notebook, bg=PANEL)
+        self.manual_tab = tk.Frame(self.notebook, bg=PANEL)
 
         self.notebook.add(self.image_tab, text="Upload Photo of Auction Listing")
         self.notebook.add(self.batch_tab, text="Batch Spreadsheet")
+        self.notebook.add(self.manual_tab, text="Search by Title / Artist Name")
 
         self._build_image_tab(self.image_tab)
         self._build_batch_tab(self.batch_tab)
+        self._build_manual_tab(self.manual_tab)
 
         bottom = tk.Frame(outer, bg=BG)
         bottom.pack(fill="both", expand=False, pady=(14, 0))
@@ -758,6 +761,64 @@ class App:
         tk.Label(log_panel, text="Batch Output", bg=PANEL, fg=TEXT, font=self.section_font).pack(anchor="w", padx=12, pady=(10, 0))
         self.batch_log = tk.Text(log_panel, height=18, bg="#fffdf9", fg=TEXT, font=("Menlo", 10), relief="flat", bd=0, wrap="word")
         self.batch_log.pack(fill="both", expand=True, padx=12, pady=(8, 12))
+
+    def _build_manual_tab(self, parent):
+        wrap = tk.Frame(parent, bg=PANEL)
+        wrap.pack(fill="both", expand=True, padx=16, pady=16)
+
+        tk.Label(
+            wrap,
+            text="Search by Title / Artist Name",
+            bg=PANEL,
+            fg=TEXT,
+            font=self.section_font,
+        ).pack(anchor="w")
+
+        tk.Label(
+            wrap,
+            text="Enter artist name and artwork title manually to generate an Artprice link.",
+            bg=PANEL,
+            fg=SUBTLE,
+            font=self.body_font,
+        ).pack(anchor="w", pady=(6, 10))
+
+        self.manual_artist_var = tk.StringVar()
+        self.manual_title_var = tk.StringVar()
+
+        row1 = tk.Frame(wrap, bg=PANEL)
+        row1.pack(fill="x", pady=5)
+        tk.Label(row1, text="Artist", width=12, anchor="w", bg=PANEL, fg=TEXT, font=self.label_font).pack(side="left")
+        tk.Entry(row1, textvariable=self.manual_artist_var, font=self.body_font, relief="flat", bd=0, bg="#fffdf9", fg=TEXT).pack(side="left", fill="x", expand=True, ipady=8)
+
+        row2 = tk.Frame(wrap, bg=PANEL)
+        row2.pack(fill="x", pady=5)
+        tk.Label(row2, text="Title", width=12, anchor="w", bg=PANEL, fg=TEXT, font=self.label_font).pack(side="left")
+        tk.Entry(row2, textvariable=self.manual_title_var, font=self.body_font, relief="flat", bd=0, bg="#fffdf9", fg=TEXT).pack(side="left", fill="x", expand=True, ipady=8)
+
+        btn_row = tk.Frame(wrap, bg=PANEL)
+        btn_row.pack(fill="x", pady=(12, 0))
+        GoldButton(btn_row, "Generate Link", self.generate_manual_link).pack(side="left")
+        GoldButton(btn_row, "🌐 ↗ Open Link", self.open_link).pack(side="left", padx=(10, 0))
+        GoldButton(btn_row, "Copy Link", self.copy_link).pack(side="left", padx=(10, 0))
+        GoldButton(btn_row, "Clear", self.clear_manual_tab).pack(side="left", padx=(10, 0))
+
+        result_shell = tk.Frame(wrap, bg=GOLD_SHADOW)
+        result_shell.pack(fill="both", expand=True, pady=(16, 0))
+        result_panel = tk.Frame(result_shell, bg=PANEL)
+        result_panel.pack(fill="both", expand=True, padx=(0, 3), pady=(0, 3))
+
+        tk.Label(result_panel, text="Result", bg=PANEL, fg=TEXT, font=self.section_font).pack(anchor="w", padx=12, pady=(12, 0))
+        self.manual_output = HyperlinkText(
+            result_panel,
+            height=12,
+            bg="#fffdf9",
+            fg=TEXT,
+            font=self.body_font,
+            relief="flat",
+            bd=0,
+            wrap="word",
+        )
+        self.manual_output.pack(fill="both", expand=True, padx=12, pady=(8, 12))
 
     def _autoload_artist_ids(self):
         candidates = [DEFAULT_ARTIST_ID_PATH]
@@ -888,6 +949,46 @@ class App:
             self.log(f"Single image generation error: {exc}")
             messagebox.showerror("Error", str(exc))
 
+    def generate_manual_link(self):
+        if self.lookup.df is None:
+            messagebox.showwarning("Missing Artist IDs", "Artist ID file not loaded.")
+            return
+
+        artist = self.manual_artist_var.get().strip()
+        title = self.manual_title_var.get().strip()
+
+        if not artist or not title:
+            messagebox.showwarning("Missing Data", "Enter both artist and title.")
+            return
+
+        self.log(f"Manual input artist: {artist}")
+        self.log(f"Manual input title: {title}")
+
+        exact, all_terms = self._resolve_options()
+
+        cleaned_artist = self.extractor.clean_artist_name(artist)
+        cleaned_title = self.extractor.clean_title(title)
+
+        artist_id = self.lookup.lookup(cleaned_artist)
+        keyword = ArtpriceURLBuilder.build_keyword(cleaned_title, exact, all_terms)
+
+        if not artist_id:
+            link = ArtpriceURLBuilder.build_url_without_artist(cleaned_title, exact, all_terms)
+            self.log(f"No artist ID found for manual entry: {cleaned_artist}")
+        else:
+            link = ArtpriceURLBuilder.build_url(artist_id, cleaned_title, exact, all_terms)
+
+        self.last_generated_link = link
+
+        self.manual_output.delete("1.0", "end")
+        self.manual_output.insert("end", link)
+
+        self._set_status_message("Manual Artprice link generated.", "Open Link", link)
+        self.log(f"Manual cleaned artist: {cleaned_artist}")
+        self.log(f"Manual cleaned title: {cleaned_title}")
+        self.log(f"Manual keyword: {keyword}")
+        self.log(f"Manual generated link: {link}")
+
     def choose_batch_file(self):
         path = filedialog.askopenfilename(title="Select Auction Spreadsheet", filetypes=[("Excel Workbook", "*.xlsx")])
         if not path:
@@ -970,6 +1071,14 @@ class App:
         self.output.delete("1.0", "end")
         self.log("Single image panel cleared")
         self._set_status_message("Single image panel cleared.")
+
+    def clear_manual_tab(self):
+        self.manual_artist_var.set("")
+        self.manual_title_var.set("")
+        self.manual_output.delete("1.0", "end")
+        self.last_generated_link = ""
+        self.log("Manual tab cleared")
+        self._set_status_message("Manual tab cleared.")
 
     def _animate_banner(self, tick):
         w = max(self.banner.winfo_width(), 900)
@@ -1059,7 +1168,7 @@ def format_output_workbook(path: str, link_header: str):
 
 def main():
     root = tk.Tk()
-    App(root)
+    app = App(root)
     root.mainloop()
 
 
