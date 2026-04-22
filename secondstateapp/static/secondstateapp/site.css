@@ -1,3 +1,193 @@
+.hero{
+  height: 80vh;
+  background-image: url("etching_press.jpg");
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  background-attachment: fixed;
+}
+
+.hero-overlay{
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  background: rgba(0,0,0,0.65); /* slightly darker */
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  color: white;
+  text-align: center;
+}
+
+.hero-overlay h1{
+  font-size: 3rem;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-shadow:
+          0 3px 8px rgba(0,0,0,.35),
+          0 0 10px rgba(255,255,255,.20),
+          0 0 24px rgba(255,255,255,.10);
+}
+
+.hero-overlay p{
+  font-size: 1.2rem;
+  opacity: 0.9;
+  max-width: 600px;
+}
+
+.hero-tag{
+  background: rgba(0,0,0,0.75);
+  color: var(--gold-soft);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  margin-bottom: 15px;
+  border: 1px solid rgba(200,169,106,0.4);
+}
+.hero-overlay .btn{
+  background: rgba(0,0,0,0.75);
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  padding: 10px 20px;
+  margin: 8px;
+  transition: all 0.25s ease;
+}
+
+.hero-overlay .btn:hover{
+  background: var(--gold);
+  color: black;
+}
+
+:root{
+  --gold: #c8a96a;
+  --gold-soft: #e0c48a;
+  --dark-overlay: rgba(0,0,0,0.7);
+}
+
+
+.hero--clean .tagline{
+  color: rgba(255,255,255,.95);
+  text-shadow:
+          0 1px 2px rgba(0,0,0,.85),
+          0 3px 14px rgba(0,0,0,.55);
+  font-family: 'Playfair Display', serif;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+}
+
+.hero-actions .btn-primary-soft{
+  background: rgba(0,0,0,.62);
+  border-color: rgba(200,169,106,.45);
+  color: #d7b97a;
+}
+
+.hero-actions .btn-primary-soft:hover{
+  background: rgba(200,169,106,.18);
+  color: #f0d9a6;
+}
+
+.hero-actions .btn-ghost{
+  background: rgba(0,0,0,.48);
+  border-color: rgba(200,169,106,.35);
+  color: #d7b97a;
+}
+
+.hero-actions .btn-ghost:hover{
+  background: rgba(200,169,106,.14);
+  color: #f0d9a6;
+}
+
+
+.gallery-title{
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  font-size: clamp(42px, 6vw, 68px);
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  margin-bottom: 10px;
+
+  background: linear-gradient(
+          180deg,
+          #fff4d6 0%,
+          #f0d9a6 35%,
+          #d7b97a 65%,
+          #b8924e 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+
+  text-shadow:
+          0 8px 16px rgba(0,0,0,.95),
+          0 0 20px rgba(255,255,255,.18),
+          0 0 36px rgba(255,255,255,.12);
+
+}
+
+
+.gallery-title-line{
+  width: 302px;
+  height: 2px;
+  margin: 0 0 54px;
+  background: linear-gradient(
+          to right,
+          transparent,
+          rgba(255,255,255,0.65)
+  );
+}
+
+/* HOMEPAGE SERIF TYPOGRAPHY */
+
+.hero-overlay h1,
+
+.hero--clean h1{
+  color: #d7b97a;
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  font-size: clamp(34px, 5vw, 54px);
+  letter-spacing: -0.02em;
+  margin-bottom: 18px;
+  text-shadow:
+          0 1px 2px rgba(0,0,0,.45),
+          0 8px 24px rgba(0,0,0,.28);
+}
+
+
+.hero-overlay p,
+
+  /* Homepage title block */
+.gallery-title{
+  margin: 0;
+  font-family: "Playfair Display", serif;
+  font-size: clamp(56px, 9vw, 104px);
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  font-weight: 600;
+
+  background: linear-gradient(
+          180deg,
+          #fff6d8 0%,
+          #f2dfb1 38%,
+          #d6b06f 72%,
+          #b88947 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+
+  text-shadow:
+          0 1px 0 rgba(255,255,255,0.18),
+          0 10px 30px rgba(0,0,0,0.34),
+          0 0 22px rgba(214,176,111,0.16);
+}
 :root{
   --bg:#0b0c10;
   --text: rgba(255,255,255,.92);
@@ -24,9 +214,9 @@ body{
         linear-gradient(180deg, #07080b 0%, #0b0c10 45%, #07080b 100%);
       overflow-x:hidden;
     }
-    a{color:inherit}
-    a:hover{opacity:.92}
-    a:focus-visible{
+a{color:inherit}
+a:hover{opacity:.92}
+a:focus-visible{
       outline:2px solid rgba(255,255,255,.35);
       outline-offset:3px;
       border-radius:10px;
@@ -104,8 +294,8 @@ body{
         radial-gradient(520px 340px at 80% 40%, rgba(255,255,255,.10), transparent 58%);
       opacity:.75;
     }
-    .hero > *{ position:relative; z-index:1; }
-    .hero h1{
+.hero > *{ position:relative; z-index:1; }
+.hero h1{
       margin:0 0 16px;
       font-size: clamp(36px, 5vw, 56px);
       line-height:1.03;
@@ -130,16 +320,16 @@ body{
 } */
 
     .hero--clean{
-  text-align: center;
-  padding: 68px 58px;
-  background:
+      text-align: center;
+      padding: 68px 58px;
+      background:
     radial-gradient(800px 260px at 18% 18%, rgba(214,176,111,0.10), transparent 58%),
     linear-gradient(180deg, rgba(12,13,16,0.86), rgba(7,8,11,0.80));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 16px 50px rgba(0,0,0,.38);
-  border: 1px solid rgba(214,176,111,0.14);
-}
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 16px 50px rgba(0,0,0,.38);
+      border: 1px solid rgba(214,176,111,0.14);
+    }
 
     /* Tone down the heavy glow on the hero */
     .hero--clean::before{
@@ -262,13 +452,14 @@ body{
     }
     /* Keep list/grid images uniform */
     .card-img-top{
-  width: 100%;
-  height: 260px;
-  object-fit: contain;
-  background-color: #0b0c10; /* matches your site bg */
-  padding: 10px;
+      width: 100%;
+      height: 260px;
+      object-fit: contain;
+      background-color: #0b0c10; /* matches your site bg */
+      padding: 10px;
   display: block;
 }
+
 
 
 .kicker{
@@ -324,16 +515,15 @@ body{
   color: rgba(255,255,255,.86);
 }
 
+
+
+
 .artwork-card-medium strong{
   font-weight: 700;
   color: rgba(255,255,255,.96);
 }
-
-
-
-
-    /* Shared detail-page image gallery styles (Artwork + Sold Piece) - FROM THE artwork_detail.html */
-    .back-button{
+/* Shared detail-page image gallery styles (Artwork + Sold Piece) - FROM THE artwork_detail.html */
+.back-button{
       display:inline-block;
       margin-bottom:20px;
       padding:10px 15px;
@@ -345,15 +535,16 @@ body{
       text-decoration:none;
       transition:0.3s ease-in-out;
     }
+
     .back-button:hover{
       background-color:#0056b3;
       text-decoration:none;
     }
 
+
 .artwork-detail-page{
   padding-top: 4px;
 }
-
 
 .image-stage{
   position: relative;
@@ -401,20 +592,19 @@ body{
   left: 14px;
 }
 
+
 .image-nav-right{
   right: 14px;
 }
 
-
     .main-img:hover{ transform:scale(1.01); }
-
-    .thumbnails{
+.thumbnails{
       display:flex;
       justify-content:center;
       gap:10px;
       flex-wrap:wrap;
     }
-    .thumbnail-img{
+.thumbnail-img{
       width:80px;
       height:80px;
       object-fit:contain;
@@ -425,7 +615,7 @@ body{
       transition:border 0.2s ease-in-out;
       display:block;
     }
-    .thumbnail-img:hover{ border:2px solid #333; }
+.thumbnail-img:hover{ border:2px solid #333; }
 
     /* Fullscreen overlay */
     .fullscreen-overlay{
@@ -439,6 +629,7 @@ body{
       align-items:center;
       z-index:1000;
     }
+
     .fullscreen-img{
       max-width: 90%;
       max-height: 90%;
@@ -447,11 +638,10 @@ body{
       transition: transform 0.25s ease, transform-origin 0.05s ease;
       cursor: zoom-in;
     }
-
 .fullscreen-img.zoomed{
   cursor: zoom-out;
     }
-    .close-btn{
+.close-btn{
       position:absolute;
       top:20px;
       left:20px;
@@ -464,10 +654,11 @@ body{
       border-radius:50%;
       transition:0.3s;
     }
+
+
     .close-btn:hover{ background:#ff1a1a; }
+/* ---- Fix: Bootstrap cards inherit white text from body, but default to white bg ---- */
 
-
-    /* ---- Fix: Bootstrap cards inherit white text from body, but default to white bg ---- */
     .card {
       background: rgba(255,255,255,.06);
       border: 1px solid rgba(255,255,255,.14);
@@ -477,26 +668,26 @@ body{
     .card .text-muted {
       color: rgba(255,255,255,.68) !important;
     }
-
-    /* Buttons inside dark cards */
-    .card .btn-outline-dark {
+/* Buttons inside dark cards */
+.card .btn-outline-dark {
       color: rgba(255,255,255,.92);
       border-color: rgba(255,255,255,.35);
     }
+
     .card .btn-outline-dark:hover {
       background: rgba(255,255,255,.10);
     }
-
-    /* Pieces Sold layout helpers */
-    .sold-title { margin: 0 0 6px; font-size: 18px; }
-    .sold-artist { margin: 0 0 10px; color: rgba(255,255,255,.88); }
-    .sold-hammer { margin: 0 0 12px; }
+/* Pieces Sold layout helpers */
+.sold-title { margin: 0 0 6px; font-size: 18px; }
+.sold-artist { margin: 0 0 10px; color: rgba(255,255,255,.88); }
+.sold-hammer { margin: 0 0 12px; }
 
     .sold-meta, .sold-row {
       margin: 6px 0;
       color: rgba(255,255,255,.92);   /* brighter than muted */
       line-height: 1.45;
     }
+
 
     .sold-link {
       display: inline-block;
@@ -507,10 +698,10 @@ body{
     }
 
     .sold-link:hover { opacity: .9; }
-
 /* =========================
    HOMEPAGE HERO SECTION
    ========================= */
+
 /* HERO SECTION */
 
 .hero-divider{
@@ -523,197 +714,6 @@ body{
     transparent
   );
   margin: 24px 0;
-}
-
-.hero{
-  height: 80vh;
-  background-image: url("etching_press.jpg");
-  background-size: cover;
-  background-position: center;
-  position: relative;
-  background-attachment: fixed;
-}
-
-.hero-overlay{
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-
-  background: rgba(0,0,0,0.65); /* slightly darker */
-
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-
-  color: white;
-  text-align: center;
-}
-
-.hero-overlay h1{
-  font-size: 3rem;
-  letter-spacing: 2px;
-  color: var(--gold);
-  text-shadow:
-  0 3px 8px rgba(0,0,0,.35),
-  0 0 10px rgba(255,255,255,.20),
-  0 0 24px rgba(255,255,255,.10);
-}
-
-.hero-overlay p{
-  font-size: 1.2rem;
-  opacity: 0.9;
-  max-width: 600px;
-}
-
-.hero-tag{
-  background: rgba(0,0,0,0.75);
-  color: var(--gold-soft);
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  letter-spacing: 1px;
-  margin-bottom: 15px;
-  border: 1px solid rgba(200,169,106,0.4);
-}
-.hero-overlay .btn{
-  background: rgba(0,0,0,0.75);
-  color: var(--gold);
-  border: 1px solid var(--gold);
-  padding: 10px 20px;
-  margin: 8px;
-  transition: all 0.25s ease;
-}
-
-.hero-overlay .btn:hover{
-  background: var(--gold);
-  color: black;
-}
-
-:root{
-  --gold: #c8a96a;
-  --gold-soft: #e0c48a;
-  --dark-overlay: rgba(0,0,0,0.7);
-}
-
-
-.hero--clean .tagline{
-  color: rgba(255,255,255,.95);
-  text-shadow:
-    0 1px 2px rgba(0,0,0,.85),
-    0 3px 14px rgba(0,0,0,.55);
-  font-family: 'Playfair Display', serif;
-  font-weight: 500;
-  letter-spacing: -0.3px;
-}
-
-.hero-actions .btn-primary-soft{
-  background: rgba(0,0,0,.62);
-  border-color: rgba(200,169,106,.45);
-  color: #d7b97a;
-}
-
-.hero-actions .btn-primary-soft:hover{
-  background: rgba(200,169,106,.18);
-  color: #f0d9a6;
-}
-
-.hero-actions .btn-ghost{
-  background: rgba(0,0,0,.48);
-  border-color: rgba(200,169,106,.35);
-  color: #d7b97a;
-}
-
-.hero-actions .btn-ghost:hover{
-  background: rgba(200,169,106,.14);
-  color: #f0d9a6;
-}
-
-
-.gallery-title{
-  font-family: 'Playfair Display', serif;
-  font-weight: 600;
-  font-size: clamp(42px, 6vw, 68px);
-  letter-spacing: -0.03em;
-  line-height: 1.02;
-  margin-bottom: 10px;
-
-  background: linear-gradient(
-    180deg,
-    #fff4d6 0%,
-    #f0d9a6 35%,
-    #d7b97a 65%,
-    #b8924e 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
-
-  text-shadow:
-  0 8px 16px rgba(0,0,0,.95),
-  0 0 20px rgba(255,255,255,.18),
-  0 0 36px rgba(255,255,255,.12);
-
-}
-
-
-.gallery-title-line{
-  width: 302px;
-  height: 2px;
-  margin: 0 0 54px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(255,255,255,0.65)
-  );
-}
-
-/* HOMEPAGE SERIF TYPOGRAPHY */
-
-.hero-overlay h1,
-
-.hero--clean h1{
-  color: #d7b97a;
-  font-family: 'Playfair Display', serif;
-  font-weight: 600;
-  font-size: clamp(34px, 5vw, 54px);
-  letter-spacing: -0.02em;
-  margin-bottom: 18px;
-  text-shadow:
-    0 1px 2px rgba(0,0,0,.45),
-    0 8px 24px rgba(0,0,0,.28);
-}
-
-
-.hero-overlay p,
-
-/* Homepage title block */
-.gallery-title{
-  margin: 0;
-  font-family: "Playfair Display", serif;
-  font-size: clamp(56px, 9vw, 104px);
-  line-height: 0.96;
-  letter-spacing: -0.04em;
-  font-weight: 600;
-
-  background: linear-gradient(
-    180deg,
-    #fff6d8 0%,
-    #f2dfb1 38%,
-    #d6b06f 72%,
-    #b88947 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-
-  text-shadow:
-    0 1px 0 rgba(255,255,255,0.18),
-    0 10px 30px rgba(0,0,0,0.34),
-    0 0 22px rgba(214,176,111,0.16);
 }
 
 .hero--clean{
@@ -830,4 +830,117 @@ body{
   color: rgba(255,239,197,0.82);
   border: 1px solid rgba(214,176,111,0.22);
   background: rgba(8,8,10,0.72);
+}
+
+/* Restore the original homepage "window" effect:
+   same image soft in the background, same image sharper inside the center panel. */
+.hero--window {
+  min-height: clamp(560px, 78vh, 820px);
+  padding: 0;
+  border-radius: 26px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.10);
+  background-image: url("etching_press.jpg");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  box-shadow: 0 22px 70px rgba(0,0,0,.42);
+}
+
+.hero--window::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: inherit;
+  background-size: inherit;
+  background-position: inherit;
+  filter: blur(14px) brightness(.48);
+  transform: scale(1.08);
+  opacity: .95;
+}
+
+.hero--window::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7,8,11,.18), rgba(7,8,11,.54));
+  z-index: 1;
+}
+
+.hero--window .hero-overlay {
+  position: relative;
+  z-index: 2;
+  min-height: inherit;
+  padding: clamp(28px, 5vw, 54px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.hero-copy--window {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 590px);
+  min-height: 360px;
+  padding: 36px 34px 34px;
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,.10);
+  background-image: url("etching_press.jpg");
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 24px 60px rgba(0,0,0,.34);
+  text-align: left;
+}
+
+.hero-copy--window::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(7,8,11,.86) 0%,
+    rgba(7,8,11,.72) 46%,
+    rgba(7,8,11,.28) 100%
+  );
+  z-index: 0;
+}
+
+.hero-copy--window > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-copy--window .kicker {
+  display: inline-flex;
+  margin: 0 0 18px;
+}
+
+.hero-copy--window .gallery-title-line {
+  width: 160px;
+}
+
+.hero-copy--window .tagline {
+  max-width: 20ch;
+  color: rgba(255,255,255,.88);
+}
+
+.hero-copy--window .hero-actions {
+  justify-content: flex-start;
+}
+
+@media (max-width: 720px) {
+  .hero--window {
+    min-height: 520px;
+    background-attachment: scroll;
+  }
+
+  .hero-copy--window {
+    min-height: unset;
+    padding: 28px 24px 28px;
+  }
+
+  .hero-copy--window .gallery-title {
+    font-size: clamp(44px, 12vw, 72px);
+  }
 }
