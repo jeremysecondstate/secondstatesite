@@ -1,5 +1,149 @@
 {% extends "base.html" %}
 {% block content %}
+<style>
+  .hero-stage {
+    position: relative;
+    min-height: clamp(560px, 78vh, 820px);
+    border-radius: 28px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.10);
+    box-shadow: 0 22px 70px rgba(0,0,0,.42);
+  }
+
+  .hero-stage__bg {
+    position: absolute;
+    inset: 0;
+    background-image: url("/static/secondstateapp/etching_press.jpg");
+    background-size: cover;
+    background-position: center;
+    filter: blur(16px) brightness(.42);
+    transform: scale(1.08);
+  }
+
+  .hero.hero--window {
+    position: relative;
+    z-index: 1;
+    min-height: inherit;
+    margin: 0;
+    padding: 30px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .hero.hero--window::before,
+  .hero.hero--window::after {
+    display: none;
+  }
+
+  .hero-overlay.hero-overlay--window {
+    position: relative;
+    min-height: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(7,8,11,.10);
+  }
+
+  .hero-focus-frame {
+    position: relative;
+    width: min(100%, 920px);
+    min-height: 470px;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.10);
+    background-image: url("/static/secondstateapp/etching_press.jpg");
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,.34);
+  }
+
+  .hero-focus-frame::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(7,8,11,.08), rgba(7,8,11,.18));
+  }
+
+  .hero-copy.hero-copy--window {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 48px;
+    transform: translateY(-50%);
+    width: min(100%, 560px);
+    min-height: 0;
+    padding: 34px 34px 30px;
+    border-radius: 24px;
+    overflow: hidden;
+    text-align: left;
+    border: 1px solid rgba(255,255,255,.08);
+    background: linear-gradient(
+      90deg,
+      rgba(7,8,11,.82) 0%,
+      rgba(7,8,11,.68) 56%,
+      rgba(7,8,11,.36) 100%
+    );
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 18px 50px rgba(0,0,0,.28);
+  }
+
+  .hero-copy--window .kicker {
+    display: inline-flex;
+    margin: 0 0 18px;
+  }
+
+  .hero-copy--window .gallery-title {
+    font-size: clamp(52px, 7vw, 86px);
+    line-height: .96;
+  }
+
+  .hero-copy--window .gallery-title-line {
+    width: 170px;
+    margin: 18px 0 22px;
+  }
+
+  .hero-copy--window .tagline {
+    max-width: 18ch;
+    margin: 0 0 22px;
+    color: rgba(255,255,255,.88);
+  }
+
+  .hero-copy--window .hero-actions {
+    justify-content: flex-start;
+  }
+
+  @media (max-width: 860px) {
+    .hero.hero--window {
+      padding: 18px;
+    }
+
+    .hero-focus-frame {
+      min-height: 520px;
+    }
+
+    .hero-copy.hero-copy--window {
+      left: 20px;
+      right: 20px;
+      width: auto;
+      max-width: none;
+      padding: 26px 24px 24px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero-stage {
+      min-height: 520px;
+    }
+
+    .hero-copy--window .gallery-title {
+      font-size: clamp(40px, 14vw, 66px);
+    }
+  }
+</style>
+
 <section class="hero-stage reveal-on-scroll">
   <div class="hero-stage__bg"></div>
 
