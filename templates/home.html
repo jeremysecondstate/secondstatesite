@@ -1,24 +1,5 @@
-
-
-<div class="hero">
-    <div class="hero-overlay">
-
-        <h1>Second State Galleries</h1>
-        <div class="hero-divider"></div>
-        <div>
-            <a href="/gallery/" class="btn">View Gallery</a>
-            <a href="/contact/" class="btn">Contact</a>
-        </div>
-
-    </div>
-</div>
-
-
 {% extends "base.html" %}
 {% block content %}
-
-
-
 <section class="hero hero--clean">
   <div class="hero-copy reveal-on-scroll">
     <p class="kicker">FINE ART PRINTS</p>
@@ -29,8 +10,17 @@
 
     <p class="tagline">
       We collect, sell, and broker fine art prints — only prints
-        <br>Focused sourcing, clean provenance, and thoughtful placement.
+      <br>Focused sourcing, clean provenance, and thoughtful placement.
     </p>
+
+    <div class="hero-actions">
+      <a href="{% url 'gallery' %}" class="btn btn-primary-soft">View Gallery</a>
+      {% if user.is_authenticated %}
+        <a href="{% url 'account_profile' %}" class="btn btn-ghost">My Profile</a>
+      {% else %}
+        <a href="{% url 'register' %}" class="btn btn-ghost">Create Account</a>
+      {% endif %}
+    </div>
   </div>
 </section>
 
@@ -52,9 +42,6 @@
     });
   });
 </script>
-
-
-
 
 <section class="home-tiles">
   <div class="tile">
