@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.models import User
 from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -140,7 +141,8 @@ def account_profile(request):
 
 
 def public_profile(request, username):
-    profile_user = get_object_or_404(UserProfile.objects.select_related("user"), user__username=username)
+    site_user = get_object_or_404(User, username=username)
+    profile_user, _ = UserProfile.objects.get_or_create(user=site_user)
     return render(
         request,
         "accounts/public_profile.html",
