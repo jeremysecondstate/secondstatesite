@@ -1,25 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero hero--clean">
-  <div class="hero-copy reveal-on-scroll">
-    <p class="kicker">FINE ART PRINTS</p>
+<section class="hero hero--window">
+  <div class="hero-overlay">
+    <div class="hero-copy hero-copy--window reveal-on-scroll">
+      <p class="kicker">FINE ART PRINTS</p>
 
-    <h1 class="gallery-title">Second State</h1>
+      <h1 class="gallery-title">Second State</h1>
 
-    <div class="gallery-title-line"></div>
+      <div class="gallery-title-line"></div>
 
-    <p class="tagline">
-      We collect, sell, and broker fine art prints — only prints
-      <br>Focused sourcing, clean provenance, and thoughtful placement.
-    </p>
+      <p class="tagline">
+        We collect, sell, and broker fine art prints — only prints
+        <br>Focused sourcing, clean provenance, and thoughtful placement.
+      </p>
 
-    <div class="hero-actions">
-      <a href="{% url 'gallery' %}" class="btn btn-primary-soft">View Gallery</a>
-      {% if user.is_authenticated %}
-        <a href="{% url 'account_profile' %}" class="btn btn-ghost">My Profile</a>
-      {% else %}
-        <a href="{% url 'register' %}" class="btn btn-ghost">Create Account</a>
-      {% endif %}
+      <div class="hero-actions">
+        <a href="{% url 'gallery' %}" class="btn btn-primary-soft">View Gallery</a>
+        {% if user.is_authenticated %}
+          <a href="{% url 'account_profile' %}" class="btn btn-ghost">My Profile</a>
+        {% else %}
+          <a href="{% url 'register' %}" class="btn btn-ghost">Create Account</a>
+        {% endif %}
+      </div>
     </div>
   </div>
 </section>
@@ -34,7 +36,7 @@
         }
       });
     }, {
-      threshold: 0.62
+      threshold: 0.35
     });
 
     document.querySelectorAll(".reveal-on-scroll").forEach((el) => {
