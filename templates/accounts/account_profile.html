@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="profile-layout">
+  <div class="profile-card profile-card--summary">
+    <p class="account-eyebrow">YOUR PROFILE</p>
+    <h1>{{ profile.public_name }}</h1>
+    <p class="account-subtitle">Manage your public profile and the artists you want SecondState to know about.</p>
+
+    <div class="profile-avatar-wrap">
+      {% if profile.avatar %}
+        <img src="{{ profile.avatar.url }}" alt="{{ profile.public_name }} avatar" class="profile-avatar">
+      {% else %}
+        <div class="profile-avatar profile-avatar--placeholder">{{ request.user.username|slice:":1"|upper }}</div>
+      {% endif %}
+    </div>
+
+    <div class="profile-meta">
+      <p><strong>Username:</strong> {{ request.user.username }}</p>
+      {% if request.user.email %}
+        <p><strong>Email:</strong> {{ request.user.email }}</p>
+      {% endif %}
+      <p><strong>Public page:</strong> <a href="{% url 'public_profile' request.user.username %}">View profile</a></p>
+    </div>
+  </div>
+
+  <div class="profile-card">
+    <h2>Edit profile</h2>
+    <form method="post" enctype="multipart/form-data" class="site-form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      {% for field in form %}
+        <div class="form-row">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}
+            <small>{{ field.help_text }}</small>
+          {% endif %}
+          {{ field.errors }}
+        </div>
+      {% endfor %}
+
+      <button type="submit" class="btn btn-primary-soft">Save Profile</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
