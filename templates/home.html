@@ -1,29 +1,35 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero hero--window">
-  <div class="hero-overlay">
-    <div class="hero-copy hero-copy--window reveal-on-scroll">
-      <p class="kicker">FINE ART PRINTS</p>
+<section class="hero-stage reveal-on-scroll">
+  <div class="hero-stage__bg"></div>
 
-      <h1 class="gallery-title">Second State</h1>
+  <section class="hero hero--window">
+    <div class="hero-overlay hero-overlay--window">
+      <div class="hero-focus-frame">
+        <div class="hero-copy hero-copy--window">
+          <p class="kicker">FINE ART PRINTS</p>
 
-      <div class="gallery-title-line"></div>
+          <h1 class="gallery-title">Second State</h1>
 
-      <p class="tagline">
-        We collect, sell, and broker fine art prints — only prints
-        <br>Focused sourcing, clean provenance, and thoughtful placement.
-      </p>
+          <div class="gallery-title-line"></div>
 
-      <div class="hero-actions">
-        <a href="{% url 'gallery' %}" class="btn btn-primary-soft">View Gallery</a>
-        {% if user.is_authenticated %}
-          <a href="{% url 'account_profile' %}" class="btn btn-ghost">My Profile</a>
-        {% else %}
-          <a href="{% url 'register' %}" class="btn btn-ghost">Create Account</a>
-        {% endif %}
+          <p class="tagline">
+            We collect, sell, and broker fine art prints — only prints
+            <br>Focused sourcing, clean provenance, and thoughtful placement.
+          </p>
+
+          <div class="hero-actions">
+            <a href="{% url 'gallery' %}" class="btn btn-primary-soft">View Gallery</a>
+            {% if user.is_authenticated %}
+              <a href="{% url 'account_profile' %}" class="btn btn-ghost">My Profile</a>
+            {% else %}
+              <a href="{% url 'register' %}" class="btn btn-ghost">Create Account</a>
+            {% endif %}
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 </section>
 
 <script>
@@ -36,7 +42,7 @@
         }
       });
     }, {
-      threshold: 0.35
+      threshold: 0.25
     });
 
     document.querySelectorAll(".reveal-on-scroll").forEach((el) => {
