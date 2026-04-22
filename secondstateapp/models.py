@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.db import models
 from PIL import Image
 from io import BytesIO
@@ -52,6 +53,7 @@ class Artwork(models.Model):
 class ArtworkImage(models.Model):
     artwork = models.ForeignKey("Artwork", related_name="images", on_delete=models.CASCADE)
     image = models.ImageField(upload_to="artworks/")
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)  # save original first so self.image.path exists
         if not self.image:
@@ -76,3 +78,28 @@ class ArtworkImage(models.Model):
         new_name = f"artworks/{base}.jpg"
         self.image.save(new_name, ContentFile(buffer.getvalue()), save=False)
         super().save(update_fields=["image"])
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    display_name = models.CharField(max_length=120, blank=True)
+    bio = models.TextField(blank=True)
+    favorite_artists = models.TextField(blank=True)
+    avatar = models.ImageField(upload_to="profiles/", blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["user__username"]
+
+    def __str__(self):
+        return self.display_name or self.user.username
+
+    @property
+    def public_name(self):
+        return self.display_name or self.user.username
+
+    @property
+    def favorite_artists_list(self):
+        raw_value = (self.favorite_artists or "").replace("\n", ",")
+        return [item.strip() for item in raw_value.split(",") if item.strip()]

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="account-shell">
+  <div class="profile-card profile-card--public">
+    <p class="account-eyebrow">SECONDSTATE PROFILE</p>
+    <div class="profile-avatar-wrap">
+      {% if profile_user.avatar %}
+        <img src="{{ profile_user.avatar.url }}" alt="{{ profile_user.public_name }} avatar" class="profile-avatar">
+      {% else %}
+        <div class="profile-avatar profile-avatar--placeholder">{{ profile_user.user.username|slice:":1"|upper }}</div>
+      {% endif %}
+    </div>
+
+    <h1>{{ profile_user.public_name }}</h1>
+    <p class="account-subtitle">@{{ profile_user.user.username }}</p>
+
+    {% if profile_user.bio %}
+      <div class="profile-copy-block">
+        <h2>Bio</h2>
+        <p>{{ profile_user.bio|linebreaksbr }}</p>
+      </div>
+    {% endif %}
+
+    {% if profile_user.favorite_artists_list %}
+      <div class="profile-copy-block">
+        <h2>Favorite artists</h2>
+        <div class="chip-row">
+          {% for artist in profile_user.favorite_artists_list %}
+            <span class="profile-chip">{{ artist }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
