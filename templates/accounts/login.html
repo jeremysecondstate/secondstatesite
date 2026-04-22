@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="account-shell">
+  <div class="account-card">
+    <p class="account-eyebrow">SECONDSTATE ACCOUNT</p>
+    <h1>Log in</h1>
+    <p class="account-subtitle">Access your profile and personalize your experience.</p>
+
+    <form method="post" class="site-form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      {% for field in form %}
+        <div class="form-row">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}
+            <small>{{ field.help_text }}</small>
+          {% endif %}
+          {{ field.errors }}
+        </div>
+      {% endfor %}
+
+      <button type="submit" class="btn btn-primary-soft">Log In</button>
+    </form>
+
+    <p class="account-alt-link">Need an account? <a href="{% url 'register' %}">Register here</a>.</p>
+  </div>
+</section>
+{% endblock %}
