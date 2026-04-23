@@ -36,6 +36,7 @@ DEFAULT_CATEGORY_ID = "2"
 DEFAULT_SORT = "datesale_desc"
 
 DEFAULT_ARTIST_ID_PATH = "/Users/theodoredonson/secondstatesite/artpricelinkgen/ARTIST IDs.xlsx"
+# DEFAULT_ARTIST_ID_PATH = "I:/Shared drives/SECONDSTATE/misc_SECONDSTATE/ARTIST IDs.xlsx"
 DEFAULT_DAUMIER_IMAGE_PATH = "/Users/theodoredonson/PycharmProjects/APRTPRICE LINK GEN2/daumier_smoking_guy.png"
 
 FALLBACK_ARTIST_ID_FILENAMES = [
