@@ -14,7 +14,49 @@
       <p class="account-eyebrow">SECONDSTATE PROFILE</p>
       <h1>{{ profile_user.public_name }}</h1>
       <p class="account-subtitle profile-account-handle">@{{ profile_user.user.username }}</p>
+
+      {% if profile_user.bio %}
+        <div class="profile-hero-intro">{{ profile_user.bio|linebreaksbr }}</div>
+      {% else %}
+        <p class="profile-hero-intro profile-hero-intro--muted">This profile does not have a bio yet.</p>
+      {% endif %}
     </div>
+  </section>
+
+  <section class="profile-public-grid">
+    <div class="profile-card profile-card--public-main">
+      <div class="profile-section-heading">
+        <p class="account-eyebrow">ABOUT</p>
+        <h2>Profile</h2>
+      </div>
+
+      {% if profile_user.bio %}
+        <div class="profile-copy-block profile-copy-block--reading">{{ profile_user.bio|linebreaksbr }}</div>
+      {% else %}
+        <div class="profile-empty-state">
+          <p>No written bio yet.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <aside class="profile-card profile-card--public-side">
+      <div class="profile-section-heading">
+        <p class="account-eyebrow">FAVORITES</p>
+        <h2>Favorite artists</h2>
+      </div>
+
+      {% if profile_user.favorite_artists_list %}
+        <div class="chip-row chip-row--stacked">
+          {% for artist in profile_user.favorite_artists_list %}
+            <span class="profile-chip profile-chip--large">{{ artist }}</span>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="profile-empty-state">
+          <p>No favorite artists added yet.</p>
+        </div>
+      {% endif %}
+    </aside>
   </section>
 </section>
 {% endblock %}
