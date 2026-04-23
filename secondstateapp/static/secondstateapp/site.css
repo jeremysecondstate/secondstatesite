@@ -173,12 +173,12 @@ body{
     }
 
     .btn-primary-soft{
-      background: rgba(255,255,255,.12);
-      border-color: rgba(255,255,255,.18);
+      background: rgb(255 255 255);
+      border-color: rgb(0 0 0);
     }
 
     .btn-primary-soft:hover{
-      background: rgba(255,255,255,.16);
+      background: rgb(206 166 98);
     }
 
     .btn-ghost{
