@@ -1,47 +1,104 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="profile-layout">
-  <div class="profile-card profile-card--summary">
-    <p class="account-eyebrow">YOUR PROFILE</p>
-    <h1>{{ profile.public_name }}</h1>
-    <p class="account-subtitle">Manage your public profile and the artists you want SecondState to know about.</p>
-
-    <div class="profile-avatar-wrap">
-      {% if profile.avatar %}
-        <img src="{{ profile.avatar.url }}" alt="{{ profile.public_name }} avatar" class="profile-avatar">
-      {% else %}
-        <div class="profile-avatar profile-avatar--placeholder">{{ request.user.username|slice:":1"|upper }}</div>
-      {% endif %}
-    </div>
-
-    <div class="profile-meta">
-      <p><strong>Username:</strong> {{ request.user.username }}</p>
-      {% if request.user.email %}
-        <p><strong>Email:</strong> {{ request.user.email }}</p>
-      {% endif %}
-      <p><strong>Public page:</strong> <a href="{% url 'public_profile' request.user.username %}">View profile</a></p>
-    </div>
-  </div>
-
-  <div class="profile-card">
-    <h2>Edit profile</h2>
-    <form method="post" enctype="multipart/form-data" class="site-form">
-      {% csrf_token %}
-      {{ form.non_field_errors }}
-
-      {% for field in form %}
-        <div class="form-row">
-          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-          {{ field }}
-          {% if field.help_text %}
-            <small>{{ field.help_text }}</small>
+<section class="profile-page-shell">
+  <section class="profile-hero-card profile-hero-card--account">
+    <div class="profile-hero-card__backdrop"></div>
+    <div class="profile-hero-card__content">
+      <div class="profile-hero-card__identity">
+        <div class="profile-avatar-wrap profile-avatar-wrap--hero">
+          {% if profile.avatar %}
+            <img src="{{ profile.avatar.url }}" alt="{{ profile.public_name }} avatar" class="profile-avatar profile-avatar--hero">
+          {% else %}
+            <div class="profile-avatar profile-avatar--hero profile-avatar--placeholder">{{ request.user.username|slice:":1"|upper }}</div>
           {% endif %}
-          {{ field.errors }}
         </div>
-      {% endfor %}
 
-      <button type="submit" class="btn btn-primary-soft">Save Profile</button>
-    </form>
-  </div>
+        <div class="profile-hero-card__copy">
+          <p class="account-eyebrow">SECONDSTATE ACCOUNT</p>
+          <h1>{{ profile.public_name }}</h1>
+          <p class="account-subtitle">Shape how collectors and visitors see you. Update your bio, favorite artists, and profile image here.</p>
+
+          <div class="profile-hero-meta">
+            <span class="profile-meta-pill">@{{ request.user.username }}</span>
+            {% if request.user.email %}
+              <span class="profile-meta-pill">{{ request.user.email }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-hero-card__actions">
+        <a href="{% url 'public_profile' request.user.username %}" class="btn btn-primary-soft">View Public Profile</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="profile-layout profile-layout--polished">
+    <aside class="profile-card profile-card--summary profile-card--stacked">
+      <div class="profile-section-heading">
+        <p class="account-eyebrow">PROFILE SNAPSHOT</p>
+        <h2>At a glance</h2>
+      </div>
+
+      <div class="profile-summary-list">
+        <div class="profile-summary-item">
+          <span class="profile-summary-item__label">Display name</span>
+          <strong>{{ profile.public_name }}</strong>
+        </div>
+        <div class="profile-summary-item">
+          <span class="profile-summary-item__label">Username</span>
+          <strong>@{{ request.user.username }}</strong>
+        </div>
+        <div class="profile-summary-item">
+          <span class="profile-summary-item__label">Bio status</span>
+          <strong>{% if profile.bio %}Added{% else %}Still empty{% endif %}</strong>
+        </div>
+        <div class="profile-summary-item">
+          <span class="profile-summary-item__label">Favorite artists</span>
+          <strong>{% if profile.favorite_artists_list %}{{ profile.favorite_artists_list|length }} listed{% else %}None yet{% endif %}</strong>
+        </div>
+      </div>
+
+      {% if profile.favorite_artists_list %}
+        <div class="profile-copy-block">
+          <h3>Current favorite artists</h3>
+          <div class="chip-row">
+            {% for artist in profile.favorite_artists_list %}
+              <span class="profile-chip">{{ artist }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </aside>
+
+    <section class="profile-card profile-card--editor">
+      <div class="profile-section-heading">
+        <p class="account-eyebrow">EDIT PROFILE</p>
+        <h2>Public-facing details</h2>
+        <p class="account-subtitle">These details shape what shows up on your public page. Keep it simple, elegant, and personal.</p>
+      </div>
+
+      <form method="post" enctype="multipart/form-data" class="site-form site-form--polished">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        {% for field in form %}
+          <div class="form-row form-row--polished">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}
+              <small>{{ field.help_text }}</small>
+            {% endif %}
+            {{ field.errors }}
+          </div>
+        {% endfor %}
+
+        <div class="form-actions-row">
+          <button type="submit" class="btn btn-primary-soft">Save Profile</button>
+          <a href="{% url 'public_profile' request.user.username %}" class="btn btn-ghost">Preview Public Page</a>
+        </div>
+      </form>
+    </section>
+  </section>
 </section>
 {% endblock %}
