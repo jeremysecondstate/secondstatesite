@@ -11,6 +11,9 @@ from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
+from django.core.mail import send_mail
+from .forms import ContactForm
+
 
 from .forms import RegisterForm, UserProfileForm
 from .models import Artwork, ArtworkImage, SoldPiece, UserProfile
@@ -63,7 +66,44 @@ def about(request):
 
 
 def contact(request):
-    return render(request, "contact.html")
+    success = False
+
+    if request.method == "POST":
+        form = ContactForm(request.POST)
+
+        if form.is_valid():
+            name = form.cleaned_data["name"]
+            email = form.cleaned_data["email"]
+            message = form.cleaned_data["message"]
+
+            send_mail(
+                subject=f"Second State Contact Form - {name}",
+                message=f"""
+New contact form submission:
+
+Name: {name}
+Email: {email}
+
+Message:
+{message}
+""",
+                from_email="hello@secondstate.art",
+                recipient_list=[
+                    "oliver@secondstate.art",
+                    "hello@secondstate.art",
+                ],
+                fail_silently=False,
+            )
+
+            success = True
+            form = ContactForm()
+    else:
+        form = ContactForm()
+
+    return render(request, "contact.html", {
+        "form": form,
+        "success": success,
+    })
 
 
 def gallery(request):

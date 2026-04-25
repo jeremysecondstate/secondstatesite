@@ -21,4 +21,28 @@
     <p><a href="mailto:hello@secondstate.art">hello@secondstate.art</a></p>
   </div>
 </div>
+    {% if success %}
+  <p>Thanks — your message has been sent.</p>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+
+  <p>
+    <label>Name</label><br>
+    {{ form.name }}
+  </p>
+
+  <p>
+    <label>Email</label><br>
+    {{ form.email }}
+  </p>
+
+  <p>
+    <label>Message</label><br>
+    {{ form.message }}
+  </p>
+
+  <button type="submit">Send</button>
+</form>
 {% endblock %}

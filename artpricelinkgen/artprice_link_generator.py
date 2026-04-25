@@ -31,12 +31,12 @@ except ImportError:
 
 
 APP_TITLE = "Artprice Link Generator"
-DEFAULT_DATE_FROM = "2018-01-01"
+DEFAULT_DATE_FROM = "2016-01-01"
 DEFAULT_CATEGORY_ID = "2"
 DEFAULT_SORT = "datesale_desc"
 
 DEFAULT_ARTIST_ID_PATH = "/Users/theodoredonson/secondstatesite/artpricelinkgen/ARTIST IDs.xlsx"
-DEFAULT_DAUMIER_IMAGE_PATH = "/Users/theodoredonson/PycharmProjects/APRTPRICE LINK GEN2/daumier_smoking_guy.png"
+DEFAULT_DAUMIER_IMAGE_PATH = "/Users/theodoredonson/PycharmProjects/APRTPRICE LINK GEN2/daumier.png"
 
 FALLBACK_ARTIST_ID_FILENAMES = [
     "ARTIST IDs.xlsx",

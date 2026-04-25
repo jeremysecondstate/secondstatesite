@@ -90,3 +90,6 @@ MEDIA_ROOT = Path("/var/data/media")   # <-- inside your Render disk mount
 # WHITENOISE_ROOT = BASE_DIR / "media"
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "hello@secondstate.art"
