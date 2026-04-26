@@ -1,0 +1,1 @@
+"""Artprice link generator package."""
