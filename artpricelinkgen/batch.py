@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from artpricelinkgen.artist_id_resolver import ArtpriceArtistIdResolver
+from artpricelinkgen.artist_id_store import ArtistIdWorkbookStore
 from artpricelinkgen.config import (
     ARTPRICE_LINK_COLUMN,
     ARTIST_COLUMN,
@@ -19,10 +21,14 @@ from artpricelinkgen.workbook_formatting import format_output_workbook
 
 
 class BatchProcessor:
-    def __init__(self, extractor, lookup, logger):
+    def __init__(self, extractor, lookup, logger, resolve_missing_artist_ids: bool = True):
         self.extractor = extractor
         self.lookup = lookup
         self.logger = logger
+        self.resolve_missing_artist_ids = resolve_missing_artist_ids
+        self.resolver = ArtpriceArtistIdResolver()
+        self._resolved_artist_cache = {}
+        self._artist_id_store = None
 
     @staticmethod
     def detect_column(df: pd.DataFrame, names):
@@ -37,6 +43,60 @@ class BatchProcessor:
 
     def detect_title_column(self, df: pd.DataFrame):
         return self.detect_column(df, ["title", "artwork title", "work title", "lot title", "object title"])
+
+    def _artist_id_workbook_store(self):
+        if self._artist_id_store is not None:
+            return self._artist_id_store
+        lookup_path = getattr(self.lookup, "path", None)
+        if not lookup_path:
+            return None
+        self._artist_id_store = ArtistIdWorkbookStore(lookup_path, logger=self.logger)
+        return self._artist_id_store
+
+    def resolve_and_save_artist_id(self, artist_name: str):
+        if not self.resolve_missing_artist_ids:
+            return None
+
+        cache_key = self.extractor.clean_artist_name(artist_name).lower()
+        if cache_key in self._resolved_artist_cache:
+            return self._resolved_artist_cache[cache_key]
+
+        self.logger(f"Trying web resolver for missing artist ID: {artist_name}")
+        try:
+            candidate = self.resolver.resolve(artist_name)
+        except Exception as exc:
+            self.logger(f"Artist ID resolver failed for {artist_name}: {exc}")
+            self._resolved_artist_cache[cache_key] = None
+            return None
+
+        if not candidate:
+            self.logger(f"No high-confidence Artprice ID found for: {artist_name}")
+            self._resolved_artist_cache[cache_key] = None
+            return None
+
+        self.logger(
+            f"Resolved Artprice artist ID for {artist_name}: {candidate.artist_id} "
+            f"({candidate.confidence}, score {candidate.score:.2f})"
+        )
+        self.logger(f"Resolver source URL: {candidate.url}")
+
+        store = self._artist_id_workbook_store()
+        if store:
+            try:
+                appended = store.append_artist_id(
+                    artist=artist_name,
+                    artist_id=candidate.artist_id,
+                    source_url=candidate.url,
+                    confidence=candidate.confidence,
+                )
+                if appended and getattr(self.lookup, "path", None):
+                    self.lookup.load_file(self.lookup.path)
+                    self.logger("Reloaded Artist ID lookup after resolver append.")
+            except Exception as exc:
+                self.logger(f"Could not append resolved Artist ID to workbook: {exc}")
+
+        self._resolved_artist_cache[cache_key] = candidate.artist_id
+        return candidate.artist_id
 
     def process_workbook(self, input_path: str, exact_match: bool, all_terms: bool, progress_callback=None):
         df = pd.read_excel(input_path)
@@ -80,6 +140,11 @@ class BatchProcessor:
             result_df.at[idx, SOURCE_MODE_COLUMN] = "sheet"
 
             artist_id = self.lookup.lookup(listing.artist)
+            resolved_by_web = False
+            if not artist_id:
+                artist_id = self.resolve_and_save_artist_id(listing.artist)
+                resolved_by_web = bool(artist_id)
+
             keyword = ArtpriceURLBuilder.build_keyword(listing.title, exact_match, all_terms)
 
             if not artist_id:
@@ -99,9 +164,9 @@ class BatchProcessor:
             result_df.at[idx, ARTIST_ID_COLUMN] = str(artist_id)
             result_df.at[idx, KEYWORD_COLUMN] = keyword
             result_df.at[idx, ARTPRICE_LINK_COLUMN] = link
-            result_df.at[idx, STATUS_COLUMN] = "OK"
+            result_df.at[idx, STATUS_COLUMN] = "OK - resolved artist ID" if resolved_by_web else "OK"
             if progress_callback:
-                progress_callback(row_num, total, "OK")
+                progress_callback(row_num, total, result_df.at[idx, STATUS_COLUMN])
 
         output_path = self.build_output_path(input_path)
         result_df.to_excel(output_path, index=False)
