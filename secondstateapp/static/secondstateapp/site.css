@@ -552,37 +552,6 @@ body{
   text-align: center;
 }
 
-.hero-video{
-  background-image: none;
-  background-attachment: scroll;
-  isolation: isolate;
-}
-
-.hero-bg-video{
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: 0;
-  opacity: 0.72;
-  filter: grayscale(100%) contrast(1.08) brightness(0.72);
-}
-
-.hero-video::after{
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.48);
-  z-index: 1;
-  pointer-events: none;
-}
-
-.hero-video .hero-copy{
-  position: relative;
-  z-index: 2;
-}
-
 .hero-overlay h1{
   font-size: 3rem;
   letter-spacing: 2px;
