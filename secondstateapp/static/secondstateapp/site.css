@@ -527,23 +527,11 @@ body{
 
 .hero{
   height: 80vh;
+  background-image: url("etching_press.jpg");
+  background-size: cover;
+  background-position: center;
   position: relative;
-  overflow: hidden;
-  background: #000;
-}
-
-.hero-bg-video{
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  z-index: 0;
-}
-
-.hero-overlay{
-  z-index: 1;
+  background-attachment: fixed;
 }
 
 .hero-overlay{
