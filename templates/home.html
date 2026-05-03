@@ -1,4 +1,8 @@
-<div class="hero">
+<div class="hero hero--video">
+    <video class="hero-video" autoplay muted loop playsinline preload="metadata" aria-hidden="true">
+        <source src="/static/secondstateapp/etchings_vid.webm" type="video/webm">
+        <source src="/static/secondstateapp/etching_vid.mp4" type="video/mp4">
+    </video>
     <div class="hero-overlay">
 
         <h1>Second State Galleries</h1>
@@ -10,6 +14,25 @@
 
     </div>
 </div>
+
+<style>
+  .hero--video{
+    background-image: none;
+  }
+
+  .hero-video{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+  }
+
+  .hero--video .hero-overlay{
+    z-index: 1;
+  }
+</style>
 
 
 {% extends "base.html" %}
