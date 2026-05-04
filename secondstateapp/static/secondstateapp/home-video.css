@@ -1,0 +1,29 @@
+/* Homepage fixed-video hero
+   Recreates the original background-attachment: fixed / elevator effect,
+   but with the MP4/WebM video instead of the JPEG. */
+
+.hero--home-video-window{
+  background-image: none;
+  background-attachment: scroll;
+  clip-path: inset(0);
+  isolation: isolate;
+}
+
+.hero-fixed-video{
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hero--home-video-window > *:not(.hero-fixed-video){
+  position: relative;
+  z-index: 1;
+}
+
+.hero--home-video-window .hero-overlay{
+  position: absolute;
+}
