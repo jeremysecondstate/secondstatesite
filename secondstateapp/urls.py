@@ -13,6 +13,8 @@ urlpatterns = [
     path("accounts/logout/", views.logout_view, name="logout"),
     path("account/", views.account_profile, name="account_profile"),
     path("u/<str:username>/", views.public_profile, name="public_profile"),
+    path("schwab/callback", views.schwab_callback, name="schwab_callback"),
+    path("schwab/callback/", views.schwab_callback, name="schwab_callback_slash"),
     # Artworks
     path("artworks/", views.artwork_list, name="artwork_list"),
     path("artworks/<int:pk>/", views.artwork_detail, name="artwork_detail"),
