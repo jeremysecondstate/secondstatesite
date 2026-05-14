@@ -54,6 +54,25 @@ def healthz(request):
     return JsonResponse({"ok": True})
 
 
+def schwab_callback(request):
+    """Display Schwab OAuth callback values for the desktop cockpit setup.
+
+    This endpoint intentionally does not exchange the OAuth code for tokens or
+    store any brokerage credentials. It exists so Schwab can redirect back to an
+    HTTPS URL during the first manual desktop-app authorization flow.
+    """
+    return render(
+        request,
+        "schwab/callback.html",
+        {
+            "code": request.GET.get("code", ""),
+            "state": request.GET.get("state", ""),
+            "error": request.GET.get("error", ""),
+            "error_description": request.GET.get("error_description", ""),
+        },
+    )
+
+
 def home(request):
     return render(request, "home.html")
 
@@ -106,7 +125,7 @@ def login_view(request):
             next_url = request.GET.get("next")
             return redirect(next_url or "account_profile")
     else:
-        form = AuthenticationForm(request)
+        form = AuthenticationForm()
 
     return render(request, "accounts/login.html", {"form": form})
 
