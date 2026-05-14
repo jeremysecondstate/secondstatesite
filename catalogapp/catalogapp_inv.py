@@ -14,7 +14,10 @@ BASE_URL = "https://secondstate.art"
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1100, 780
 CATALOG_API_KEY = "276e19f127f140623e73e6c160bbd8ed"
-DEFAULT_CATALOG_PATH = r"J:\Shared drives\SECONDSTATE\THE BOOKS\Oliver Current Print Inventory - Cataloging Program.xlsx"
+DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
+DEFAULT_CATALOG_SHEET = "Inventory for June 2026"
+
+# DEFAULT_CATALOG_PATH = r"J:\Shared drives\SECONDSTATE\THE BOOKS\Oliver Current Print Inventory - Cataloging Program.xlsx"
 
 
 def api_headers():
@@ -279,9 +282,6 @@ class ArtCatalogApp:
 
         self._set_status(f"Showing all inventory: {len(self.df)} records.")
 
-
-
-
     def _on_select_row(self, event=None):
         sel = self.tree.selection()
         if not sel or self.current_results is None:
@@ -298,22 +298,50 @@ class ArtCatalogApp:
 
     # -------------- Data Loading --------------
     def _load_excel_from_path(self, path):
-        preview = pd.read_excel(path, header=None, nrows=30)
+        sheet_name = DEFAULT_CATALOG_SHEET
 
-        header_row = None
-        for i in range(len(preview)):
-            row_vals = preview.iloc[i].astype(str).str.strip().tolist()
-            if "Title" in row_vals and "Artist" in row_vals:
-                header_row = i
-                break
+        try:
+            workbook = pd.ExcelFile(path)
+            if sheet_name not in workbook.sheet_names:
+                raise ValueError(
+                    f"Could not find sheet/tab named '{sheet_name}'.\n\n"
+                    f"Available tabs:\n- " + "\n- ".join(workbook.sheet_names)
+                )
 
-        if header_row is None:
-            raise ValueError("Could not find a header row containing both 'Title' and 'Artist'.")
+            preview = pd.read_excel(
+                path,
+                sheet_name=sheet_name,
+                header=None,
+                nrows=30
+            )
 
-        self.df = pd.read_excel(path, header=header_row)
-        self.df.columns = [str(c).strip() for c in self.df.columns]
-        self._clear_results()
-        self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
+            header_row = None
+            for i in range(len(preview)):
+                row_vals = preview.iloc[i].astype(str).str.strip().tolist()
+                if "Title" in row_vals and "Artist" in row_vals:
+                    header_row = i
+                    break
+
+            if header_row is None:
+                raise ValueError(
+                    f"Could not find a header row containing both 'Title' and 'Artist' "
+                    f"on tab '{sheet_name}'."
+                )
+
+            self.df = pd.read_excel(
+                path,
+                sheet_name=sheet_name,
+                header=header_row
+            )
+
+            self.df.columns = [str(c).strip() for c in self.df.columns]
+            self._clear_results()
+            self._set_status(
+                f"Loaded: {os.path.basename(path)} / {sheet_name} — {len(self.df):,} records"
+            )
+
+        except Exception:
+            raise
 
     def load_excel(self):
         path = DEFAULT_CATALOG_PATH
