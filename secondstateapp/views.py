@@ -42,18 +42,6 @@ def delete_sold_piece(request):
         return JsonResponse({"error": str(e)}, status=400)
 
 
-def sold_piece_detail(request, pk):
-    try:
-        sold = SoldPiece.objects.get(id=pk)
-    except SoldPiece.DoesNotExist:
-        return render(request, "404.html")
-    return render(request, "sold_piece_detail.html", {"sold": sold})
-
-
-def healthz(request):
-    return JsonResponse({"ok": True})
-
-
 def schwab_callback(request):
     """Display Schwab OAuth callback values for the desktop cockpit setup.
 
@@ -71,6 +59,10 @@ def schwab_callback(request):
             "error_description": request.GET.get("error_description", ""),
         },
     )
+
+
+def healthz(request):
+    return JsonResponse({"ok": True})
 
 
 def home(request):
@@ -125,7 +117,7 @@ def login_view(request):
             next_url = request.GET.get("next")
             return redirect(next_url or "account_profile")
     else:
-        form = AuthenticationForm()
+        form = AuthenticationForm(request)
 
     return render(request, "accounts/login.html", {"form": form})
 
