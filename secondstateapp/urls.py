@@ -7,7 +7,6 @@ urlpatterns = [
     path("about/", views.about, name="about"),
     path("contact/", views.contact, name="contact"),
     path("gallery/", views.gallery, name="gallery"),
-    path("pieces-sold/<int:pk>/", views.sold_piece_detail, name="sold_piece_detail"),
     path("accounts/register/", views.register, name="register"),
     path("accounts/login/", views.login_view, name="login"),
     path("accounts/logout/", views.logout_view, name="logout"),
@@ -21,5 +20,4 @@ urlpatterns = [
     path("artworks/upload_artwork/", views.upload_artwork, name="upload_artwork"),
     path("artworks/delete_artwork/", views.delete_artwork, name="delete_artwork"),
     path("healthz", views.healthz, name="healthz"),
-    path("pieces-sold/delete/", views.delete_sold_piece, name="delete_sold_piece"),
 ]

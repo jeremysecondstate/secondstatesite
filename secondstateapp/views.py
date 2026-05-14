@@ -13,33 +13,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
 from .forms import RegisterForm, UserProfileForm
-from .models import Artwork, ArtworkImage, SoldPiece, UserProfile
-
-
-@csrf_exempt
-def delete_sold_piece(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "Invalid request method"}, status=405)
-
-    if not _authorized(request):
-        return JsonResponse({"error": "Unauthorized"}, status=401)
-
-    try:
-        payload = json.loads(request.body or "{}")
-        sold_id = payload.get("id")
-
-        if not sold_id:
-            return JsonResponse({"error": "Missing id"}, status=400)
-
-        sp = SoldPiece.objects.filter(id=sold_id).first()
-        if not sp:
-            return JsonResponse({"error": "Not found"}, status=404)
-
-        sp.delete()
-        return JsonResponse({"message": "Deleted"}, status=200)
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400)
+from .models import Artwork, ArtworkImage, UserProfile
 
 
 def schwab_callback(request):
