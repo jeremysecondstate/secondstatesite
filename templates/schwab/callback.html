@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <h1 class="mb-3">Schwab authorization callback</h1>
+
+      {% if error %}
+        <div class="alert alert-danger" role="alert">
+          <strong>Schwab returned an error.</strong>
+          <div class="mt-2"><code>{{ error }}</code></div>
+          {% if error_description %}
+            <p class="mt-2 mb-0">{{ error_description }}</p>
+          {% endif %}
+        </div>
+      {% elif code %}
+        <div class="alert alert-success" role="alert">
+          Schwab authorization code received. Copy this code into Portfolio Risk Cockpit to finish connecting your account.
+        </div>
+
+        <label for="schwab-code" class="form-label">Authorization code</label>
+        <textarea id="schwab-code" class="form-control font-monospace" rows="6" readonly>{{ code }}</textarea>
+
+        <button type="button" class="btn btn-primary mt-3" onclick="copySchwabCode()">
+          Copy code
+        </button>
+
+        {% if state %}
+          <div class="mt-4">
+            <label class="form-label">State</label>
+            <pre class="border rounded p-3 bg-light"><code>{{ state }}</code></pre>
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="alert alert-warning" role="alert">
+          No Schwab authorization code was found in the callback URL.
+        </div>
+      {% endif %}
+
+      <p class="text-muted mt-4">
+        This page only displays the temporary OAuth authorization code. It does not store Schwab credentials, account data, access tokens, or refresh tokens.
+      </p>
+    </div>
+  </div>
+</section>
+
+<script>
+  function copySchwabCode() {
+    const codeBox = document.getElementById("schwab-code");
+    if (!codeBox) return;
+    codeBox.select();
+    codeBox.setSelectionRange(0, 999999);
+    navigator.clipboard.writeText(codeBox.value);
+  }
+</script>
+{% endblock %}
