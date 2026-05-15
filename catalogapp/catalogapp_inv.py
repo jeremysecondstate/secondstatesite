@@ -754,30 +754,31 @@ class ArtCatalogApp:
                 continue
 
             # First: select a single cover photo
-            cover_image = filedialog.askopenfilename(
-                title=f"Select COVER Image for ‘{title}’",
-                filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
-            )
+            images = []
 
-            if not cover_image:
-                continue
-
-            images = [cover_image]
-
-            # Then optionally allow multiple extra photos at once
-            more_photos = messagebox.askyesno(
-                "Upload More Photos?",
-                f"Do you want to upload additional photo(s) for ‘{title}’?"
-            )
-
-            if more_photos:
-                extra_images = filedialog.askopenfilenames(
-                    title=f"Select Additional Image(s) for ‘{title}’",
+            while True:
+                image_path = filedialog.askopenfilename(
+                    title=f"Select Image #{len(images) + 1} for ‘{title}’",
                     filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
                 )
 
-                if extra_images:
-                    images.extend(extra_images)
+                if not image_path:
+                    if not images:
+                        messagebox.showwarning("No Image Selected", "You need to select at least one image.")
+                    break
+
+                images.append(image_path)
+
+                more_photos = messagebox.askyesno(
+                    "Upload More Photos?",
+                    f"{len(images)} image(s) selected for ‘{title}’.\n\nDo you want to add another photo?"
+                )
+
+                if not more_photos:
+                    break
+
+            if not images:
+                continue
 
             # Detect sheet size flag "S" in Height/Width
             raw_height = str(row.get('Height', '')).strip()
