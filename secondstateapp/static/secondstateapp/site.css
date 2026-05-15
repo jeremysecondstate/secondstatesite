@@ -810,3 +810,143 @@ body{
   border: 1px solid rgba(214, 176, 111, 0.22);
   background: rgba(8, 8, 10, 0.72);
 }
+
+/* =========================================================
+   Homepage intro overlay refinement
+   Keep the existing hero/background behavior. Only restyle
+   the intrusive text panel inside the image.
+   ========================================================= */
+
+.hero--clean {
+  min-height: clamp(540px, 72vh, 760px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  text-align: left;
+  padding: clamp(36px, 6vw, 72px);
+}
+
+/* Soft readability gradient over the artwork, instead of a big glass box */
+.hero--clean::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.58) 0%,
+      rgba(0, 0, 0, 0.34) 34%,
+      rgba(0, 0, 0, 0.10) 68%,
+      rgba(0, 0, 0, 0.02) 100%
+    );
+}
+
+/* Remove the awkward floating frosted block */
+.hero-copy {
+  position: relative;
+  z-index: 2;
+  max-width: 560px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  text-align: left;
+}
+
+/* Make the kicker feel like a small editorial label, not a pill button */
+.hero-copy .kicker,
+.kicker {
+  display: inline-block;
+  margin: 0 0 18px;
+  padding: 0 0 8px;
+  border: 0;
+  border-bottom: 1px solid rgba(214, 176, 111, 0.55);
+  border-radius: 0;
+  background: transparent;
+  color: rgba(255, 239, 197, 0.82);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+/* Slightly less huge, more elegant */
+.hero-copy .gallery-title,
+.gallery-title {
+  font-size: clamp(46px, 7vw, 82px);
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  margin: 0;
+  text-shadow:
+    0 2px 2px rgba(0, 0, 0, 0.42),
+    0 14px 34px rgba(0, 0, 0, 0.38);
+}
+
+.hero-copy .gallery-title-line,
+.gallery-title-line {
+  width: 128px;
+  height: 1px;
+  margin: 18px 0 22px;
+  background: linear-gradient(
+    90deg,
+    rgba(214, 176, 111, 0.95),
+    rgba(255, 239, 197, 0.18),
+    transparent
+  );
+  box-shadow: none;
+}
+
+/* More like a caption sitting in the image */
+.hero-copy .tagline {
+  max-width: 42ch;
+  margin: 0;
+  padding-left: 16px;
+  border-left: 1px solid rgba(214, 176, 111, 0.42);
+  color: rgba(255, 255, 255, 0.84);
+  font-family: "Playfair Display", serif;
+  font-size: clamp(15px, 1.4vw, 18px);
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 8px 22px rgba(0, 0, 0, 0.55);
+}
+
+/* The current 7000ms reveal feels broken/laggy */
+.reveal-on-scroll > * {
+  transition:
+    opacity 900ms ease,
+    transform 900ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* Mobile: keep it readable without becoming a giant card again */
+@media (max-width: 700px) {
+  .hero--clean {
+    min-height: 560px;
+    padding: 34px 24px;
+    align-items: flex-end;
+  }
+
+  .hero--clean::after {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.08) 0%,
+        rgba(0, 0, 0, 0.68) 100%
+      );
+  }
+
+  .hero-copy {
+    max-width: 100%;
+  }
+
+  .hero-copy .tagline {
+    max-width: 34ch;
+    font-size: 15px;
+  }
+}
