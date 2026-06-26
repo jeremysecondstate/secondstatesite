@@ -1,8 +1,11 @@
 # secondstateapp/views.py
 import json
 import os
+import urllib.error
+import urllib.request
 
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
@@ -11,9 +14,14 @@ from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
-from .forms import RegisterForm, UserProfileForm
+from .forms import ArtworkForm, RegisterForm, UserProfileForm
 from .models import Artwork, ArtworkImage, UserProfile
+
+
+DESCRIPTION_MODEL_ENV = "OPENAI_DESCRIPTION_MODEL"
+DEFAULT_DESCRIPTION_MODEL = "gpt-4.1"
 
 
 def schwab_callback(request):
@@ -144,12 +152,131 @@ def _authorized(request):
     return request.headers.get("X-API-KEY") == expected
 
 
+def _user_can_manage_catalog(request):
+    user = getattr(request, "user", None)
+    return bool(user and user.is_authenticated and user.is_staff) or _authorized(request)
+
+
+def _delete_artwork_image_file(artwork_image):
+    if artwork_image.image and default_storage.exists(artwork_image.image.name):
+        default_storage.delete(artwork_image.image.name)
+    artwork_image.delete()
+
+
+def _artwork_prompt_fields(artwork):
+    return {
+        "Artist": artwork.artist,
+        "Title": artwork.title,
+        "Year": artwork.year,
+        "Medium": artwork.medium,
+        "Paper type": artwork.paper_type,
+        "Printer": artwork.printer,
+        "Publisher": artwork.publisher,
+        "Edition size": artwork.edition_size,
+        "Image size": artwork.dimensions_text,
+        "Sheet size": artwork.sheet_size,
+        "Literature": artwork.catalog_number,
+        "Notes / signature text": artwork.description,
+        "Current description": artwork.catalog_description,
+    }
+
+
+def _extract_response_text(payload):
+    output_text = payload.get("output_text")
+    if output_text:
+        return output_text.strip()
+
+    text_parts = []
+    for item in payload.get("output", []):
+        for content in item.get("content", []):
+            if content.get("type") in {"output_text", "text"} and content.get("text"):
+                text_parts.append(content["text"])
+    return "\n".join(text_parts).strip()
+
+
+def _generate_catalog_description(artwork, use_web=True):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not configured on the server.")
+
+    facts = "\n".join(
+        f"{label}: {value}"
+        for label, value in _artwork_prompt_fields(artwork).items()
+        if value
+    )
+    prompt = f"""
+Write a polished SecondState artwork catalog description for the print below.
+
+Style requirements:
+- 85 to 140 words.
+- Write in a confident fine-art gallery voice, not hype or sales copy.
+- Mention the artist, title, year, medium, and visual/cultural context when known.
+- If web search finds reliable context, use it quietly to improve accuracy.
+- Do not invent edition details, catalogue raisonné numbers, signatures, provenance, or condition.
+- Return only the description paragraph. Do not include bullets, headings, citations, or price.
+
+Artwork facts:
+{facts}
+""".strip()
+
+    body = {
+        "model": os.environ.get(DESCRIPTION_MODEL_ENV, DEFAULT_DESCRIPTION_MODEL),
+        "input": prompt,
+        "max_output_tokens": 450,
+        "temperature": 0.4,
+    }
+    if use_web:
+        body["tools"] = [{"type": "web_search", "search_context_size": "low"}]
+        body["tool_choice"] = "auto"
+
+    request = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=45) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            message = error_payload.get("error", {}).get("message") or str(error_payload)
+        except Exception:
+            message = str(exc)
+        raise RuntimeError(f"OpenAI request failed: {message}") from exc
+
+    text = _extract_response_text(payload)
+    if not text:
+        raise RuntimeError("OpenAI returned an empty description.")
+    return text
+
+
 def artwork_list(request):
     """Render artwork_list.html for normal browser requests; return JSON only when explicitly requested."""
     artworks = Artwork.objects.all()
     # Check if the request explicitly asks for JSON
     if "format" in request.GET and request.GET["format"] == "json":
-        artwork_data = list(artworks.values("id", "title", "artist", "description", "price"))
+        artwork_data = list(
+            artworks.values(
+                "id",
+                "title",
+                "artist",
+                "year",
+                "medium",
+                "description",
+                "catalog_description",
+                "dimensions_text",
+                "sheet_size",
+                "catalog_number",
+                "price",
+                "is_available",
+            )
+        )
         return JsonResponse({"artworks": artwork_data})
     # Otherwise, render the template
     return render(request, "artworks/artwork_list.html", {"artworks": artworks})
@@ -162,6 +289,83 @@ def artwork_detail(request, pk):
     except Artwork.DoesNotExist:
         return render(request, "404.html")  # Ensure you have a 404.html template
     return render(request, "artworks/artwork_detail.html", {"artwork": artwork})
+
+
+@staff_member_required
+def artwork_edit(request, pk):
+    artwork = get_object_or_404(Artwork, id=pk)
+
+    if request.method == "POST":
+        form = ArtworkForm(request.POST, instance=artwork)
+        if form.is_valid():
+            artwork = form.save()
+
+            for image_id in request.POST.getlist("delete_images"):
+                image = artwork.images.filter(id=image_id).first()
+                if image:
+                    _delete_artwork_image_file(image)
+
+            for uploaded_image in request.FILES.getlist("images"):
+                ArtworkImage.objects.create(artwork=artwork, image=uploaded_image)
+
+            messages.success(request, "Artwork updated.")
+            if "_continue" in request.POST:
+                return redirect("artwork_edit", pk=artwork.id)
+            return redirect("artwork_detail", pk=artwork.id)
+    else:
+        form = ArtworkForm(instance=artwork)
+
+    return render(
+        request,
+        "artworks/artwork_edit.html",
+        {
+            "artwork": artwork,
+            "form": form,
+        },
+    )
+
+
+@csrf_exempt
+@require_POST
+def generate_artwork_description(request, pk):
+    if not _user_can_manage_catalog(request):
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    artwork = get_object_or_404(Artwork, id=pk)
+    payload = {}
+    if request.body:
+        try:
+            payload = json.loads(request.body.decode("utf-8"))
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON body"}, status=400)
+
+    # Let the edit page send unsaved form values so the generation reflects the latest edits.
+    for field in _artwork_prompt_fields(artwork).keys():
+        pass
+    for attr in [
+        "artist",
+        "title",
+        "year",
+        "medium",
+        "paper_type",
+        "printer",
+        "publisher",
+        "edition_size",
+        "dimensions_text",
+        "sheet_size",
+        "catalog_number",
+        "description",
+        "catalog_description",
+    ]:
+        if attr in payload:
+            setattr(artwork, attr, payload.get(attr) or "")
+
+    try:
+        description = _generate_catalog_description(artwork, use_web=payload.get("use_web", True))
+    except Exception as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    return JsonResponse({"description": description})
 
 
 @csrf_exempt
@@ -210,7 +414,8 @@ def upload_artwork(request):
                 dimensions_text=data.get("dimensions_text", ""),
                 sheet_size=data.get("sheet_size", ""),
                 catalog_number=data.get("catalog_number", ""),
-                description=data.get("description", ""),  # This is now the 'Description/Notes' field
+                description=data.get("description", ""),
+                catalog_description=data.get("catalog_description", ""),
                 price=float(data.get("price", 0)),
                 is_available=True,
             )
