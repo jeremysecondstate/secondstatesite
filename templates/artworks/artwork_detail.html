@@ -4,42 +4,35 @@
 {% block content %}
 <div class="container artwork-detail-page">
 
-    <!-- Browse More Artworks Button -->
     <a href="{% url 'artwork_list' %}" class="btn btn-primary back-button">
         ⬅️ Browse More Artworks
     </a>
+    {% if user.is_staff %}
+        <a href="{% url 'artwork_edit' artwork.id %}" class="btn btn-outline-light back-button ms-2">Edit Artwork</a>
+    {% endif %}
     <h1 class="text-center">{{ artwork.title }}</h1>
-    <!-- Fullscreen Image Container (Initially Hidden) -->
+
     <div id="fullscreenOverlay" class="fullscreen-overlay" onclick="closeFullscreen()">
         <img id="fullscreenImage" class="fullscreen-img" src="">
         <button id="closeFullscreenBtn" class="close-btn" onclick="closeFullscreen()">❌</button>
     </div>
-    <!-- Main Image Display -->
+
     {% if artwork.images.all %}
     <div class="text-center image-stage">
         <button class="image-nav image-nav-left" onclick="showPrevImage(event)">&#10094;</button>
-
-        <img id="mainImage"
-             src="{{ artwork.images.first.image.url }}"
-             class="img-fluid main-img"
-             alt="{{ artwork.title }}"
-             onclick="openFullscreen(this)">
-
+        <img id="mainImage" src="{{ artwork.images.first.image.url }}" class="img-fluid main-img" alt="{{ artwork.title }}" onclick="openFullscreen(this)">
         <button class="image-nav image-nav-right" onclick="showNextImage(event)">&#10095;</button>
     </div>
 
     <div class="thumbnails text-center mt-3">
         {% for image in artwork.images.all %}
-            <img src="{{ image.image.url }}"
-                 class="thumbnail-img"
-                 onclick="changeMainImage(this, {{ forloop.counter0 }})">
+            <img src="{{ image.image.url }}" class="thumbnail-img" onclick="changeMainImage(this, {{ forloop.counter0 }})">
         {% endfor %}
     </div>
 {% else %}
     <p class="text-center text-muted">No images available</p>
 {% endif %}
 
-    <!-- Artwork Details -->
     <div class="artwork-info mt-4">
         <p><strong>{{ artwork.artist }}</strong></p>
         <p><i>{{ artwork.title }}</i>{% if artwork.year %}, {{ artwork.year }}{% endif %}</p>
@@ -65,6 +58,9 @@
         {% if artwork.catalog_number %}
             <p><strong>Literature:</strong> {{ artwork.catalog_number }}</p>
         {% endif %}
+        {% if artwork.catalog_description %}
+            <p><strong>Description:</strong> {{ artwork.catalog_description|linebreaksbr }}</p>
+        {% endif %}
         <p>
             {% if artwork.is_available %}
                 <strong>{{ artwork.formatted_price }}</strong>
@@ -74,147 +70,5 @@
         </p>
     </div>
 </div>
-<!-- JavaScript for Image Switching & Fullscreen Mode -->
-<!-- templates/artworks/artwork_detail.html -->
-
-<script>
-    let isZoomed = false;
-    let currentImageIndex = 0;
-    let slideshowInterval = null;
-    let imageSwapTimeout = null;
-    let imageUrls = [];
-
-    const FADE_DURATION = 1111;
-    const SLIDESHOW_DELAY = 6969;
-
-    document.addEventListener("DOMContentLoaded", function () {
-        const fullscreenImage = document.getElementById("fullscreenImage");
-        const overlay = document.getElementById("fullscreenOverlay");
-        const closeBtn = document.getElementById("closeFullscreenBtn");
-        const thumbs = document.querySelectorAll(".thumbnail-img");
-
-        imageUrls = Array.from(thumbs).map(img => img.src);
-
-        if (imageUrls.length > 1) {
-            startSlideshow();
-        }
-
-        fullscreenImage.addEventListener("click", function (event) {
-            event.stopPropagation();
-
-            isZoomed = !isZoomed;
-
-            if (isZoomed) {
-                fullscreenImage.style.transform = "scale(2.5)";
-                fullscreenImage.classList.add("zoomed");
-            } else {
-                fullscreenImage.style.transform = "scale(1)";
-                fullscreenImage.style.transformOrigin = "center center";
-                fullscreenImage.classList.remove("zoomed");
-            }
-        });
-
-        fullscreenImage.addEventListener("mousemove", function (event) {
-            if (!isZoomed) return;
-
-            const rect = fullscreenImage.getBoundingClientRect();
-            const x = ((event.clientX - rect.left) / rect.width) * 100;
-            const y = ((event.clientY - rect.top) / rect.height) * 100;
-
-            fullscreenImage.style.transformOrigin = `${x}% ${y}%`;
-        });
-
-        closeBtn.addEventListener("click", function (event) {
-            event.stopPropagation();
-            closeFullscreen();
-        });
-
-        overlay.addEventListener("click", function () {
-            closeFullscreen();
-        });
-    });
-
-    function updateMainImage(index) {
-        const mainImage = document.getElementById("mainImage");
-        if (!imageUrls.length) return;
-
-        currentImageIndex = (index + imageUrls.length) % imageUrls.length;
-
-        clearTimeout(imageSwapTimeout);
-        mainImage.classList.add("fade-out");
-
-        imageSwapTimeout = setTimeout(() => {
-            mainImage.src = imageUrls[currentImageIndex];
-            requestAnimationFrame(() => {
-                mainImage.classList.remove("fade-out");
-            });
-        }, FADE_DURATION);
-    }
-
-    function changeMainImage(element, index = null) {
-        if (index !== null) {
-            updateMainImage(index);
-        } else {
-            const foundIndex = imageUrls.indexOf(element.src);
-            updateMainImage(foundIndex >= 0 ? foundIndex : 0);
-        }
-        restartSlideshow();
-    }
-
-    function showNextImage(event) {
-        event.stopPropagation();
-        updateMainImage(currentImageIndex + 1);
-        restartSlideshow();
-    }
-
-    function showPrevImage(event) {
-        event.stopPropagation();
-        updateMainImage(currentImageIndex - 1);
-        restartSlideshow();
-    }
-
-    function startSlideshow() {
-        stopSlideshow();
-        slideshowInterval = setInterval(() => {
-            updateMainImage(currentImageIndex + 1);
-        }, SLIDESHOW_DELAY);
-    }
-
-    function stopSlideshow() {
-        if (slideshowInterval) {
-            clearInterval(slideshowInterval);
-            slideshowInterval = null;
-        }
-    }
-
-    function restartSlideshow() {
-        if (imageUrls.length > 1) {
-            startSlideshow();
-        }
-    }
-
-    function openFullscreen(imageElement) {
-        const overlay = document.getElementById('fullscreenOverlay');
-        const fullscreenImage = document.getElementById('fullscreenImage');
-
-        fullscreenImage.src = imageElement.src;
-        fullscreenImage.style.transform = "scale(1)";
-        fullscreenImage.style.transformOrigin = "center center";
-        fullscreenImage.classList.remove("zoomed");
-        isZoomed = false;
-
-        overlay.style.display = "flex";
-    }
-
-    function closeFullscreen() {
-        const overlay = document.getElementById('fullscreenOverlay');
-        const fullscreenImage = document.getElementById('fullscreenImage');
-
-        overlay.style.display = "none";
-        fullscreenImage.style.transform = "scale(1)";
-        fullscreenImage.style.transformOrigin = "center center";
-        fullscreenImage.classList.remove("zoomed");
-        isZoomed = false;
-    }
-</script>
+{% include 'artworks/artwork_detail_scripts.html' %}
 {% endblock %}
