@@ -14,7 +14,8 @@ BASE_URL = "https://secondstate.art"
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1100, 780
 CATALOG_API_KEY = "276e19f127f140623e73e6c160bbd8ed"
-DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
+# DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
+DEFAULT_CATALOG_PATH = r"C:\Users\7980X\Downloads\SUPREME.xlsx"
 DEFAULT_CATALOG_SHEET = "Inventory for June 2026"
 # DEFAULT_CATALOG_PATH = r"J:\Shared drives\SECONDSTATE\THE BOOKS\Oliver Current Print Inventory - Cataloging Program.xlsx"
 
@@ -300,7 +301,14 @@ class ArtCatalogApp:
 
     # -------------- Data Loading --------------
     def _load_excel_from_path(self, path):
-        preview = pd.read_excel(path, header=None, nrows=30)
+        sheet = DEFAULT_CATALOG_SHEET
+
+        preview = pd.read_excel(
+            path,
+            sheet_name=sheet,
+            header=None,
+            nrows=30,
+        )
 
         header_row = None
         for i in range(len(preview)):
@@ -310,9 +318,21 @@ class ArtCatalogApp:
                 break
 
         if header_row is None:
-            raise ValueError("Could not find a header row containing both 'Title' and 'Artist'.")
+            raise ValueError(
+                f"Could not find a header row containing both 'Title' and 'Artist' "
+                f"on sheet '{sheet}'."
+            )
 
-        self.df = pd.read_excel(path, header=header_row)
+        self.df = pd.read_excel(
+            path,
+            sheet_name=sheet,
+            header=header_row,
+        )
+        self.df.columns = [str(c).strip() for c in self.df.columns]
+        self._clear_results()
+        self._set_status(
+            f"Loaded: {os.path.basename(path)} / {sheet}  —  {len(self.df):,} records"
+        )
         self.df.columns = [str(c).strip() for c in self.df.columns]
         self._clear_results()
         self._set_status(f"Loaded: {os.path.basename(path)}  —  {len(self.df):,} records")
