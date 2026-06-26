@@ -17,6 +17,8 @@ urlpatterns = [
     # Artworks
     path("artworks/", views.artwork_list, name="artwork_list"),
     path("artworks/<int:pk>/", views.artwork_detail, name="artwork_detail"),
+    path("artworks/<int:pk>/edit/", views.artwork_edit, name="artwork_edit"),
+    path("artworks/<int:pk>/generate_description/", views.generate_artwork_description, name="generate_artwork_description"),
     path("artworks/upload_artwork/", views.upload_artwork, name="upload_artwork"),
     path("artworks/delete_artwork/", views.delete_artwork, name="delete_artwork"),
     path("healthz", views.healthz, name="healthz"),

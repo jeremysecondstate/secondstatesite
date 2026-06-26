@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4 artwork-edit-page">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="mb-1">Edit Artwork</h1>
+            <p class="text-muted mb-0">{{ artwork.artist }} — <em>{{ artwork.title }}</em></p>
+        </div>
+        <a class="btn btn-outline-light" href="{% url 'artwork_detail' artwork.id %}">View public page</a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" id="artworkEditForm" class="card bg-dark text-light border-secondary p-4">
+        {% csrf_token %}
+
+        <div class="row g-3">
+            {% for field in form %}
+                <div class="col-12 {% if field.name not in 'description catalog_description' %}col-md-6{% endif %}">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}
+                        <div class="form-text text-muted">{{ field.help_text }}</div>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                    {% endfor %}
+
+                    {% if field.name == 'catalog_description' %}
+                        <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+                            <button
+                                type="button"
+                                class="btn btn-outline-info btn-sm"
+                                id="generateDescriptionBtn"
+                                data-url="{% url 'generate_artwork_description' artwork.id %}"
+                            >
+                                Generate Description with OpenAI
+                            </button>
+                            <label class="form-check-label small text-muted">
+                                <input class="form-check-input me-1" type="checkbox" id="useWebSearch" checked>
+                                allow web search
+                            </label>
+                            <span class="small text-muted" id="generateDescriptionStatus"></span>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <hr class="border-secondary my-4">
+
+        <h2 class="h4">Images</h2>
+        {% if artwork.images.all %}
+            <div class="row g-3 mb-3">
+                {% for image in artwork.images.all %}
+                    <div class="col-6 col-md-3">
+                        <div class="card bg-black border-secondary h-100">
+                            <img src="{{ image.image.url }}" class="card-img-top" alt="{{ artwork.title }} image {{ forloop.counter }}">
+                            <div class="card-body py-2">
+                                <label class="form-check-label small">
+                                    <input class="form-check-input me-1" type="checkbox" name="delete_images" value="{{ image.id }}">
+                                    delete this image
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-muted">No images uploaded yet.</p>
+        {% endif %}
+
+        <label class="form-label" for="images">Add images</label>
+        <input class="form-control" type="file" id="images" name="images" accept="image/jpeg,image/png" multiple>
+
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-primary">Save and view</button>
+            <button type="submit" name="_continue" value="1" class="btn btn-outline-light">Save and keep editing</button>
+            <a class="btn btn-outline-secondary" href="{% url 'artwork_detail' artwork.id %}">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    function getCookie(name) {
+        const cookieValue = document.cookie
+            .split('; ')
+            .find(row => row.startsWith(name + '='));
+        return cookieValue ? decodeURIComponent(cookieValue.split('=')[1]) : '';
+    }
+
+    function readField(name) {
+        const field = document.querySelector(`[name="${name}"]`);
+        if (!field) return '';
+        if (field.type === 'checkbox') return field.checked;
+        return field.value || '';
+    }
+
+    document.getElementById('generateDescriptionBtn')?.addEventListener('click', async function () {
+        const button = this;
+        const status = document.getElementById('generateDescriptionStatus');
+        const descriptionField = document.getElementById('id_catalog_description');
+        const fields = [
+            'artist',
+            'title',
+            'year',
+            'medium',
+            'paper_type',
+            'printer',
+            'publisher',
+            'edition_size',
+            'dimensions_text',
+            'sheet_size',
+            'catalog_number',
+            'description',
+            'catalog_description'
+        ];
+        const payload = {use_web: document.getElementById('useWebSearch')?.checked ?? true};
+        fields.forEach(name => payload[name] = readField(name));
+
+        button.disabled = true;
+        status.textContent = 'Generating...';
+
+        try {
+            const response = await fetch(button.dataset.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Description generation failed.');
+            }
+            descriptionField.value = data.description;
+            status.textContent = 'Draft inserted. Review, edit, then save.';
+        } catch (error) {
+            status.textContent = error.message;
+        } finally {
+            button.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

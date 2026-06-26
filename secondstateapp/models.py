@@ -37,6 +37,11 @@ class Artwork(models.Model):
     sheet_size = models.CharField(max_length=255, blank=True, null=True)
     catalog_number = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True)
+    catalog_description = models.TextField(
+        blank=True,
+        default="",
+        help_text="Public-facing description displayed under Literature on the artwork page.",
+    )
     price = models.DecimalField(max_digits=10, decimal_places=2)
     is_available = models.BooleanField(default=True)
 
