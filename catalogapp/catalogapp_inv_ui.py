@@ -14,7 +14,7 @@ APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1180, 820
 CATALOG_API_KEY = os.environ.get("CATALOG_API_KEY", "276e19f127f140623e73e6c160bbd8ed")
 DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
-DEFAULT_CATALOG_SHEET = "Inventory for June 2026"
+DEFAULT_CATALOG_SHEET = "Inventory for Fall 2026"
 
 
 def api_headers(extra=None):
