@@ -72,3 +72,12 @@ class ArtworkForm(forms.ModelForm):
             "description": forms.Textarea(attrs={"rows": 3}),
             "catalog_description": forms.Textarea(attrs={"rows": 7}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs.setdefault("class", "form-check-input")
+            else:
+                existing_classes = field.widget.attrs.get("class", "")
+                field.widget.attrs["class"] = f"{existing_classes} form-control bg-dark text-light border-secondary".strip()
