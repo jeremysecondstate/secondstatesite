@@ -340,8 +340,6 @@ def generate_artwork_description(request, pk):
             return JsonResponse({"error": "Invalid JSON body"}, status=400)
 
     # Let the edit page send unsaved form values so the generation reflects the latest edits.
-    for field in _artwork_prompt_fields(artwork).keys():
-        pass
     for attr in [
         "artist",
         "title",
