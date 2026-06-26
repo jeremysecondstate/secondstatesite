@@ -14,8 +14,8 @@ BASE_URL = "https://secondstate.art"
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1100, 780
 CATALOG_API_KEY = "276e19f127f140623e73e6c160bbd8ed"
-# DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
-DEFAULT_CATALOG_PATH = r"C:\Users\7980X\Downloads\SUPREME.xlsx"
+DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
+# DEFAULT_CATALOG_PATH = r"C:\Users\7980X\Downloads\SUPREME.xlsx"
 DEFAULT_CATALOG_SHEET = "Inventory for June 2026"
 # DEFAULT_CATALOG_PATH = r"J:\Shared drives\SECONDSTATE\THE BOOKS\Oliver Current Print Inventory - Cataloging Program.xlsx"
 
