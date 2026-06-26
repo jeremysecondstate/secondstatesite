@@ -18,6 +18,9 @@
             <p class="artwork-card-medium">{{ artwork.medium|highlight_medium_terms }}</p>
 
             <a href="{% url 'artwork_detail' artwork.id %}" class="btn btn-outline-dark btn-sm">View Details</a>
+            {% if user.is_staff %}
+                <a href="{% url 'artwork_edit' artwork.id %}" class="btn btn-outline-secondary btn-sm ms-1">Edit</a>
+            {% endif %}
         </div>
     </div>
 </div>
