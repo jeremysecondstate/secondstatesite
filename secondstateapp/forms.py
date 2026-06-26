@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import UserProfile
+from .models import Artwork, UserProfile
 
 
 class RegisterForm(UserCreationForm):
@@ -39,4 +39,36 @@ class UserProfileForm(forms.ModelForm):
         widgets = {
             "bio": forms.Textarea(attrs={"rows": 5}),
             "favorite_artists": forms.Textarea(attrs={"rows": 4}),
+        }
+
+
+class ArtworkForm(forms.ModelForm):
+    class Meta:
+        model = Artwork
+        fields = [
+            "artist",
+            "title",
+            "year",
+            "medium",
+            "paper_type",
+            "printer",
+            "publisher",
+            "edition_size",
+            "dimensions_text",
+            "sheet_size",
+            "catalog_number",
+            "description",
+            "catalog_description",
+            "price",
+            "is_available",
+        ]
+        labels = {
+            "description": "Notes / signature text",
+            "catalog_description": "Description",
+            "catalog_number": "Literature",
+            "dimensions_text": "Image size",
+        }
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+            "catalog_description": forms.Textarea(attrs={"rows": 7}),
         }
