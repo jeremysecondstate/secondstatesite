@@ -1,0 +1,2 @@
+Catalog upload backend safety change:
+The upload route now uses upload_safe_views.upload_artwork so image-save warnings do not mask a successful artwork creation.
