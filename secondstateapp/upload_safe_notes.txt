@@ -1,0 +1,4 @@
+Safer upload endpoint notes:
+- Artwork creation errors still return 400.
+- Image creation errors are returned as warnings with HTTP 201 after the artwork is created.
+- This avoids desktop false failure popups when a listing exists but a late image post-processing step raises.
