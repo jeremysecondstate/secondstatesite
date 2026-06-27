@@ -35,20 +35,31 @@
         <p class="partner-pill mb-3">Staff only</p>
         <h1 class="display-5 mb-2">SecondState Capital Dashboard</h1>
         <p class="muted mb-0">Internal capital layout, contributions, retained earnings, and estimated payout visuals from the SUPREME workbook.</p>
+        {% if saved_workbook.exists %}
+          <p class="muted small mt-3 mb-0">Auto-loading saved workbook: <strong>{{ saved_workbook.name }}</strong>{% if saved_workbook.modified_at %} • last updated {{ saved_workbook.modified_at }}{% endif %}</p>
+        {% else %}
+          <p class="muted small mt-3 mb-0">Upload SUPREME.xlsx once and it will be saved privately for future dashboard visits.</p>
+        {% endif %}
       </div>
       <form method="post" enctype="multipart/form-data" class="d-flex flex-column gap-2" style="min-width: 280px;">
         {% csrf_token %}
-        <label class="form-label muted mb-0" for="workbook">Upload SUPREME.xlsx for this session</label>
+        <label class="form-label muted mb-0" for="workbook">Upload and save latest SUPREME.xlsx</label>
         <input class="form-control form-control-sm" type="file" id="workbook" name="workbook" accept=".xlsx,.xlsm">
-        <button class="btn btn-outline-light btn-sm" type="submit">Refresh Dashboard</button>
+        <button class="btn btn-outline-light btn-sm" type="submit">Save + Refresh Dashboard</button>
       </form>
     </div>
   </section>
 
+  {% if saved_message %}
+    <div class="alert alert-success">
+      {{ saved_message }} Future visits will auto-load this workbook.
+    </div>
+  {% endif %}
+
   {% if error %}
     <div class="alert alert-warning">
       <strong>No workbook loaded yet.</strong> {{ error }}
-      <div class="small mt-2">Upload SUPREME.xlsx above, or set <code>SUPREME_WORKBOOK_PATH</code> on the server.</div>
+      <div class="small mt-2">Upload SUPREME.xlsx above. The saved copy is stored outside public media.</div>
     </div>
   {% endif %}
 
