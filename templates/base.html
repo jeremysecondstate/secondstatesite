@@ -23,6 +23,9 @@
       <a href="{% url 'gallery' %}">Gallery</a>
       <a href="{% url 'contact' %}">Contact</a>
       {% if user.is_authenticated %}
+        {% if user.is_staff %}
+          <a href="{% url 'capital_dashboard' %}">Capital Dashboard</a>
+        {% endif %}
         <a href="{% url 'account_profile' %}">My Profile</a>
         <a href="{% url 'public_profile' user.username %}">Public Page</a>
         <a href="{% url 'logout' %}">Log Out</a>
