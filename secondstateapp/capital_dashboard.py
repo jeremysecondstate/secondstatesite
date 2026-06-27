@@ -72,6 +72,17 @@ def _norm(value):
     return _clean(value).lower().replace("\n", " ").replace("  ", " ")
 
 
+def _cell(row, index, default=None):
+    if index is None:
+        return default
+    try:
+        if index < 0:
+            return default
+        return row[index]
+    except (IndexError, TypeError):
+        return default
+
+
 def _money(value):
     if value is None or value == "":
         return Decimal("0")
@@ -139,26 +150,36 @@ def _parse_contributions(ws):
     if not header_row:
         return []
     columns = _column_map(headers)
+    if "amount" not in columns:
+        return []
+
+    date_col = columns.get("date")
+    partner_col = columns.get("partner")
+    type_col = columns.get("type")
+    amount_col = columns.get("amount")
+    notes_col = columns.get("notes")
+
     rows = []
     for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
-        partner_raw = _clean(row[columns.get("partner", -1)] if columns.get("partner") is not None else "")
-        type_raw = _clean(row[columns.get("type", -1)] if columns.get("type") is not None else "")
+        partner_raw = _clean(_cell(row, partner_col, ""))
+        type_raw = _clean(_cell(row, type_col, ""))
         if _norm(partner_raw) == "partner" or _norm(type_raw) == "type":
             continue
         partner = PARTNER_LOOKUP.get(partner_raw.lower())
         if not partner:
             continue
-        amount = _money(row[columns["amount"]])
+        amount = _money(_cell(row, amount_col))
         if amount == 0 and not type_raw:
             continue
+        date_value = _cell(row, date_col)
         rows.append(
             {
-                "date": row[columns.get("date")] if columns.get("date") is not None else None,
-                "month": _date_bucket(row[columns.get("date")] if columns.get("date") is not None else None),
+                "date": date_value,
+                "month": _date_bucket(date_value),
                 "partner": partner,
                 "type": type_raw or "Uncategorized",
                 "amount": amount,
-                "notes": _clean(row[columns.get("notes")] if columns.get("notes") is not None else ""),
+                "notes": _clean(_cell(row, notes_col, "")),
             }
         )
     return rows
@@ -182,13 +203,13 @@ def _parse_liquidation_summary(ws):
                         header_map["liquidation_payout"] = absolute
                 summary = {}
                 for data_row in ws.iter_rows(min_row=row_idx + 1, max_row=row_idx + 12, values_only=True):
-                    partner = PARTNER_LOOKUP.get(_clean(data_row[header_map.get("partner", -1)]).lower())
+                    partner = PARTNER_LOOKUP.get(_clean(_cell(data_row, header_map.get("partner"), "")).lower())
                     if not partner:
                         continue
                     summary[partner] = {
-                        "deal_capital": _money(data_row[header_map.get("deal_capital")]),
-                        "retained_earnings": _money(data_row[header_map.get("retained_earnings")]),
-                        "liquidation_payout": _money(data_row[header_map.get("liquidation_payout")]),
+                        "deal_capital": _money(_cell(data_row, header_map.get("deal_capital"))),
+                        "retained_earnings": _money(_cell(data_row, header_map.get("retained_earnings"))),
+                        "liquidation_payout": _money(_cell(data_row, header_map.get("liquidation_payout"))),
                     }
                 if summary:
                     return summary
