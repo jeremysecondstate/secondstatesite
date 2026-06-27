@@ -9,6 +9,59 @@ from openpyxl import load_workbook
 
 PARTNERS = ("Alex", "Jeremy", "Oliver")
 PARTNER_LOOKUP = {name.lower(): name for name in PARTNERS}
+WORKBOOK_FILENAME = "SUPREME.xlsx"
+
+
+def _base_dir():
+    return Path(__file__).resolve().parent.parent
+
+
+def _private_data_root():
+    configured = os.environ.get("SUPREME_PRIVATE_DATA_ROOT")
+    if configured:
+        return Path(configured)
+    render_disk_root = Path("/var/data")
+    if render_disk_root.exists():
+        return render_disk_root / "private"
+    return _base_dir() / "private_data"
+
+
+def default_saved_workbook_path():
+    configured = os.environ.get("SUPREME_WORKBOOK_PATH")
+    if configured:
+        return Path(configured)
+    return _private_data_root() / "supreme" / WORKBOOK_FILENAME
+
+
+def saved_workbook_info(path=None):
+    workbook_path = Path(path) if path else default_saved_workbook_path()
+    exists = workbook_path.exists()
+    modified_at = None
+    if exists:
+        modified_at = dt.datetime.fromtimestamp(workbook_path.stat().st_mtime).strftime("%Y-%m-%d %I:%M %p")
+    return {
+        "path": str(workbook_path),
+        "name": workbook_path.name,
+        "exists": exists,
+        "modified_at": modified_at,
+    }
+
+
+def save_uploaded_workbook(uploaded_file, path=None):
+    filename = getattr(uploaded_file, "name", "") or ""
+    if filename and not filename.lower().endswith((".xlsx", ".xlsm")):
+        raise ValueError("Please upload an Excel workbook ending in .xlsx or .xlsm.")
+
+    workbook_path = Path(path) if path else default_saved_workbook_path()
+    workbook_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with workbook_path.open("wb") as destination:
+        if hasattr(uploaded_file, "chunks"):
+            for chunk in uploaded_file.chunks():
+                destination.write(chunk)
+        else:
+            destination.write(uploaded_file.read())
+    return workbook_path
 
 
 def _clean(value):
@@ -144,14 +197,16 @@ def _parse_liquidation_summary(ws):
 
 def build_dashboard(workbook_file=None, workbook_path=None):
     source_name = "SUPREME workbook"
+    source_info = None
     if workbook_file:
         source_name = getattr(workbook_file, "name", source_name)
         wb = load_workbook(workbook_file, data_only=True, read_only=True)
     else:
-        workbook_path = workbook_path or os.environ.get("SUPREME_WORKBOOK_PATH")
-        if not workbook_path:
-            raise FileNotFoundError("Upload SUPREME.xlsx or set SUPREME_WORKBOOK_PATH on the server.")
-        source_name = Path(workbook_path).name
+        workbook_path = Path(workbook_path) if workbook_path else default_saved_workbook_path()
+        if not workbook_path.exists():
+            raise FileNotFoundError("Upload and save SUPREME.xlsx, or set SUPREME_WORKBOOK_PATH on the server.")
+        source_name = workbook_path.name
+        source_info = saved_workbook_info(workbook_path)
         wb = load_workbook(workbook_path, data_only=True, read_only=True)
 
     sheet_name = "Contributions" if "Contributions" in wb.sheetnames else wb.sheetnames[0]
@@ -224,6 +279,7 @@ def build_dashboard(workbook_file=None, workbook_path=None):
 
     return {
         "source_name": source_name,
+        "source_info": source_info,
         "sheet_name": sheet_name,
         "row_count": len(rows),
         "partner_cards": partner_cards,
