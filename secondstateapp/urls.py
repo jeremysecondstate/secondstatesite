@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import catalog_api_views, upload_safe_views, views
+from . import capital_dashboard_views, catalog_api_views, upload_safe_views, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -12,6 +12,7 @@ urlpatterns = [
     path("accounts/logout/", views.logout_view, name="logout"),
     path("account/", views.account_profile, name="account_profile"),
     path("u/<str:username>/", views.public_profile, name="public_profile"),
+    path("capital-dashboard/", capital_dashboard_views.capital_dashboard, name="capital_dashboard"),
     path("schwab/callback", views.schwab_callback, name="schwab_callback"),
     path("schwab/callback/", views.schwab_callback, name="schwab_callback_slash"),
     # Artworks
