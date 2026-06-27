@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+  .capital-dashboard { color: #f7f2e8; }
+  .capital-dashboard .muted { color: rgba(247, 242, 232, 0.68); }
+  .capital-hero {
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 22px;
+    padding: 28px;
+    background: radial-gradient(circle at top left, rgba(210,168,92,0.18), rgba(20,20,20,0.92) 45%);
+    margin-bottom: 24px;
+  }
+  .metric-card, .chart-card, .table-card {
+    background: rgba(18,18,18,0.88);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 18px;
+    padding: 18px;
+    height: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+  .metric-label { color: rgba(247,242,232,0.65); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+  .metric-value { font-size: 1.75rem; font-weight: 700; }
+  .partner-pill { border-radius: 999px; padding: 4px 10px; background: rgba(210,168,92,0.15); color: #f6d99a; font-size: .85rem; }
+  .capital-table th, .capital-table td { color: #f7f2e8; border-color: rgba(255,255,255,0.10); }
+  .capital-table th { color: rgba(247,242,232,0.72); font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="capital-dashboard py-4">
+  <section class="capital-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <p class="partner-pill mb-3">Staff only</p>
+        <h1 class="display-5 mb-2">SecondState Capital Dashboard</h1>
+        <p class="muted mb-0">Internal capital layout, contributions, retained earnings, and estimated payout visuals from the SUPREME workbook.</p>
+      </div>
+      <form method="post" enctype="multipart/form-data" class="d-flex flex-column gap-2" style="min-width: 280px;">
+        {% csrf_token %}
+        <label class="form-label muted mb-0" for="workbook">Upload SUPREME.xlsx for this session</label>
+        <input class="form-control form-control-sm" type="file" id="workbook" name="workbook" accept=".xlsx,.xlsm">
+        <button class="btn btn-outline-light btn-sm" type="submit">Refresh Dashboard</button>
+      </form>
+    </div>
+  </section>
+
+  {% if error %}
+    <div class="alert alert-warning">
+      <strong>No workbook loaded yet.</strong> {{ error }}
+      <div class="small mt-2">Upload SUPREME.xlsx above, or set <code>SUPREME_WORKBOOK_PATH</code> on the server.</div>
+    </div>
+  {% endif %}
+
+  {% if dashboard %}
+    <div class="d-flex flex-wrap gap-2 mb-3 muted">
+      <span>Source: <strong>{{ dashboard.source_name }}</strong></span>
+      <span>•</span>
+      <span>Tab: <strong>{{ dashboard.sheet_name }}</strong></span>
+      <span>•</span>
+      <span>Rows parsed: <strong>{{ dashboard.row_count }}</strong></span>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-4"><div class="metric-card"><div class="metric-label">Deal Capital</div><div class="metric-value">{{ dashboard.totals.deal_capital }}</div></div></div>
+      <div class="col-md-4"><div class="metric-card"><div class="metric-label">Profit / Retained Earnings</div><div class="metric-value">{{ dashboard.totals.retained_earnings }}</div></div></div>
+      <div class="col-md-4"><div class="metric-card"><div class="metric-label">Estimated Liquidation Payout</div><div class="metric-value">{{ dashboard.totals.liquidation_payout }}</div></div></div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      {% for partner in dashboard.partner_cards %}
+        <div class="col-lg-4">
+          <div class="metric-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h2 class="h4 mb-0">{{ partner.partner }}</h2>
+              <span class="partner-pill">Partner</span>
+            </div>
+            <div class="metric-label">Deal Capital</div>
+            <div class="h4">{{ partner.deal_capital }}</div>
+            <div class="row mt-3">
+              <div class="col-6"><div class="metric-label">Retained</div><strong>{{ partner.retained_earnings }}</strong></div>
+              <div class="col-6"><div class="metric-label">Payout</div><strong>{{ partner.liquidation_payout }}</strong></div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-lg-4"><div class="chart-card"><h2 class="h5">Deal Capital by Partner</h2><canvas id="dealCapitalChart"></canvas></div></div>
+      <div class="col-lg-4"><div class="chart-card"><h2 class="h5">Estimated Payout by Partner</h2><canvas id="payoutChart"></canvas></div></div>
+      <div class="col-lg-4"><div class="chart-card"><h2 class="h5">Capital Activity by Type</h2><canvas id="typeChart"></canvas></div></div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="chart-card">
+          <h2 class="h5">Monthly Capital Activity</h2>
+          <canvas id="monthChart"></canvas>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="table-card">
+          <h2 class="h5">Top Activity Types</h2>
+          <div class="table-responsive">
+            <table class="table capital-table mb-0">
+              <thead><tr><th>Type</th><th class="text-end">Amount</th></tr></thead>
+              <tbody>
+                {% for row in dashboard.type_rows %}
+                  <tr><td>{{ row.type }}</td><td class="text-end">{{ row.amount }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {{ dashboard.chart_data|json_script:"capital-chart-data" }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+      const data = JSON.parse(document.getElementById('capital-chart-data').textContent);
+      const palette = ['#d6a84f', '#7eb6ff', '#c987ff', '#76d7a5', '#ff9f7e', '#f7d774'];
+      const currency = value => new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(value || 0);
+      const tooltip = { callbacks: { label: ctx => `${ctx.label || ctx.dataset.label}: ${currency(ctx.raw)}` } };
+
+      new Chart(document.getElementById('dealCapitalChart'), { type: 'doughnut', data: { labels: data.partners, datasets: [{ data: data.dealCapital, backgroundColor: palette }] }, options: { plugins: { tooltip } } });
+      new Chart(document.getElementById('payoutChart'), { type: 'doughnut', data: { labels: data.partners, datasets: [{ data: data.liquidationPayout, backgroundColor: palette.slice().reverse() }] }, options: { plugins: { tooltip } } });
+      new Chart(document.getElementById('typeChart'), { type: 'bar', data: { labels: data.types, datasets: [{ label: 'Amount', data: data.typeAmounts, backgroundColor: '#d6a84f' }] }, options: { plugins: { legend: { display: false }, tooltip }, scales: { y: { ticks: { callback: currency } } } } });
+      new Chart(document.getElementById('monthChart'), { type: 'line', data: { labels: data.months, datasets: [{ label: 'Monthly total', data: data.monthAmounts, borderColor: '#d6a84f', backgroundColor: 'rgba(214,168,79,0.18)', tension: 0.35, fill: true }] }, options: { plugins: { tooltip }, scales: { y: { ticks: { callback: currency } } } } });
+    </script>
+  {% endif %}
+</div>
+{% endblock %}
