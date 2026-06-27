@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import catalog_api_views, views
+from . import catalog_api_views, upload_safe_views, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -22,7 +22,7 @@ urlpatterns = [
     path("artworks/<int:pk>/edit/", views.artwork_edit, name="artwork_edit"),
     path("artworks/<int:pk>/generate_description/", views.generate_artwork_description, name="generate_artwork_description"),
     path("artworks/<int:pk>/update_artwork/", catalog_api_views.update_artwork, name="update_artwork"),
-    path("artworks/upload_artwork/", views.upload_artwork, name="upload_artwork"),
+    path("artworks/upload_artwork/", upload_safe_views.upload_artwork, name="upload_artwork"),
     path("artworks/delete_artwork/", views.delete_artwork, name="delete_artwork"),
     path("healthz", views.healthz, name="healthz"),
 ]
