@@ -22,6 +22,8 @@
   .metric-label { color: rgba(247,242,232,0.65); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
   .metric-value { font-size: 1.75rem; font-weight: 700; }
   .partner-pill { border-radius: 999px; padding: 4px 10px; background: rgba(210,168,92,0.15); color: #f6d99a; font-size: .85rem; }
+  .profit-card { background: linear-gradient(160deg, rgba(214,168,79,0.12), rgba(18,18,18,0.90)); }
+  .profit-total-card { background: linear-gradient(160deg, rgba(118,215,165,0.14), rgba(18,18,18,0.90)); }
   .capital-table th, .capital-table td { color: #f7f2e8; border-color: rgba(255,255,255,0.10); }
   .capital-table th { color: rgba(247,242,232,0.72); font-weight: 600; }
 </style>
@@ -97,6 +99,56 @@
           </div>
         </div>
       {% endfor %}
+    </div>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-2">
+      <div>
+        <div class="metric-label">Profit Breakdown</div>
+        <h2 class="h4 mb-0">April + June Profit Detail</h2>
+      </div>
+      <span class="muted small">Read from visible liquidation summaries on Contributions</span>
+    </div>
+    <div class="row g-3 mb-4">
+      {% for row in dashboard.profit_breakdown.partner_rows %}
+        <div class="col-lg-3 col-md-6">
+          <div class="metric-card profit-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h3 class="h5 mb-0">{{ row.partner }}</h3>
+              <span class="partner-pill">Profit</span>
+            </div>
+            {% for profit in row.profits %}
+              <div class="d-flex justify-content-between py-1">
+                <span class="metric-label">{{ profit.label }}</span>
+                <strong>{{ profit.amount }}</strong>
+              </div>
+            {% endfor %}
+            <hr class="border-secondary my-2">
+            <div class="d-flex justify-content-between">
+              <span class="metric-label">Total</span>
+              <strong>{{ row.total }}</strong>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+      <div class="col-lg-3 col-md-6">
+        <div class="metric-card profit-total-card">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h3 class="h5 mb-0">Total Company Profits</h3>
+            <span class="partner-pill">Company</span>
+          </div>
+          {% for row in dashboard.profit_breakdown.company_profit_rows %}
+            <div class="d-flex justify-content-between py-1">
+              <span class="metric-label">{{ row.label }}</span>
+              <strong>{{ row.amount }}</strong>
+            </div>
+          {% endfor %}
+          <hr class="border-secondary my-2">
+          <div class="d-flex justify-content-between">
+            <span class="metric-label">Total</span>
+            <strong>{{ dashboard.profit_breakdown.company_total }}</strong>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="row g-3 mb-4">
