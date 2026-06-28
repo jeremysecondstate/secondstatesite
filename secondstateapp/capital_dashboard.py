@@ -121,6 +121,14 @@ def _date_bucket(value):
         return text[:7] if len(text) >= 7 else text
 
 
+def _summary_period(title, fallback_index):
+    text = _clean(title).upper()
+    for period in ("JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"):
+        if period in text:
+            return period.title()
+    return f"Summary {fallback_index}"
+
+
 def _find_contribution_header(ws):
     for row_index, row in enumerate(ws.iter_rows(values_only=True), start=1):
         normalized = [_norm(cell) for cell in row]
@@ -196,7 +204,7 @@ def _summary_title_above(ws, header_row_idx, start_col_idx):
     return "Liquidation Payout Summary"
 
 
-def _parse_liquidation_summary(ws):
+def _parse_liquidation_summaries(ws):
     summaries = []
     for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
         normalized = [_norm(cell) for cell in row]
@@ -214,8 +222,10 @@ def _parse_liquidation_summary(ws):
                     elif "liquidation" in header or "payout" in header:
                         header_map["liquidation_payout"] = absolute
 
-                summary = {"_title": _summary_title_above(ws, row_idx, col_idx)}
+                title = _summary_title_above(ws, row_idx, col_idx)
+                summary = {"_title": title, "_period": _summary_period(title, len(summaries) + 1)}
                 has_explicit_payout = header_map.get("liquidation_payout") is not None
+                retained_total = Decimal("0")
                 for data_row in ws.iter_rows(min_row=row_idx + 1, max_row=row_idx + 12, values_only=True):
                     partner = PARTNER_LOOKUP.get(_clean(_cell(data_row, header_map.get("partner"), "")).lower())
                     if not partner:
@@ -223,14 +233,46 @@ def _parse_liquidation_summary(ws):
                     deal_capital = _money(_cell(data_row, header_map.get("deal_capital")))
                     retained = _money(_cell(data_row, header_map.get("retained_earnings")))
                     payout = _money(_cell(data_row, header_map.get("liquidation_payout"))) if has_explicit_payout else deal_capital + retained
+                    retained_total += retained
                     summary[partner] = {
                         "deal_capital": deal_capital,
                         "retained_earnings": retained,
                         "liquidation_payout": payout,
                     }
                 if any(partner in summary for partner in PARTNERS):
+                    summary["_retained_total"] = retained_total
                     summaries.append(summary)
-    return summaries[-1] if summaries else {}
+    return summaries
+
+
+def _build_profit_breakdown(summaries):
+    period_summaries = summaries[-2:]
+    period_labels = [summary.get("_period", f"Summary {idx + 1}") for idx, summary in enumerate(period_summaries)]
+
+    partner_rows = []
+    for partner in PARTNERS:
+        profits = []
+        total = Decimal("0")
+        for summary in period_summaries:
+            amount = summary.get(partner, {}).get("retained_earnings", Decimal("0"))
+            total += amount
+            profits.append({"label": summary.get("_period", "Profit"), "amount": _money_display(amount), "value": _money_float(amount)})
+        partner_rows.append({"partner": partner, "profits": profits, "total": _money_display(total), "total_value": _money_float(total)})
+
+    company_profit_rows = []
+    company_total = Decimal("0")
+    for summary in period_summaries:
+        amount = summary.get("_retained_total", Decimal("0"))
+        company_total += amount
+        company_profit_rows.append({"label": summary.get("_period", "Profit"), "amount": _money_display(amount), "value": _money_float(amount)})
+
+    return {
+        "period_labels": period_labels,
+        "partner_rows": partner_rows,
+        "company_profit_rows": company_profit_rows,
+        "company_total": _money_display(company_total),
+        "company_total_value": _money_float(company_total),
+    }
 
 
 def build_dashboard(workbook_file=None, workbook_path=None):
@@ -250,7 +292,9 @@ def build_dashboard(workbook_file=None, workbook_path=None):
     sheet_name = "Contributions" if "Contributions" in wb.sheetnames else wb.sheetnames[0]
     ws = wb[sheet_name]
     rows = _parse_contributions(ws)
-    liquidation_summary = _parse_liquidation_summary(ws)
+    liquidation_summaries = _parse_liquidation_summaries(ws)
+    liquidation_summary = liquidation_summaries[-1] if liquidation_summaries else {}
+    profit_breakdown = _build_profit_breakdown(liquidation_summaries)
 
     totals_by_partner = defaultdict(Decimal)
     deal_capital_by_partner = defaultdict(Decimal)
@@ -309,6 +353,8 @@ def build_dashboard(workbook_file=None, workbook_path=None):
         "typeAmounts": [row["value"] for row in type_rows],
         "months": [row["month"] for row in month_rows],
         "monthAmounts": [row["value"] for row in month_rows],
+        "profitPeriods": profit_breakdown["period_labels"],
+        "companyProfits": [row["value"] for row in profit_breakdown["company_profit_rows"]],
     }
 
     total_deal_capital = sum(Decimal(str(card["deal_capital_value"])) for card in partner_cards)
@@ -322,6 +368,7 @@ def build_dashboard(workbook_file=None, workbook_path=None):
         "sheet_name": sheet_name,
         "row_count": len(rows),
         "partner_cards": partner_cards,
+        "profit_breakdown": profit_breakdown,
         "type_rows": type_rows[:12],
         "month_rows": month_rows[-18:],
         "totals": {
