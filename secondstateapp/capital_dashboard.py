@@ -185,7 +185,19 @@ def _parse_contributions(ws):
     return rows
 
 
+def _summary_title_above(ws, header_row_idx, start_col_idx):
+    min_row = max(1, header_row_idx - 4)
+    for row_idx in range(header_row_idx - 1, min_row - 1, -1):
+        values = next(ws.iter_rows(min_row=row_idx, max_row=row_idx, values_only=True), ())
+        for col_idx in range(max(0, start_col_idx - 1), min(len(values), start_col_idx + 4)):
+            text = _clean(_cell(values, col_idx, ""))
+            if "liquidation payout summary" in text.lower():
+                return text
+    return "Liquidation Payout Summary"
+
+
 def _parse_liquidation_summary(ws):
+    summaries = []
     for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
         normalized = [_norm(cell) for cell in row]
         for col_idx, cell in enumerate(normalized):
@@ -201,19 +213,24 @@ def _parse_liquidation_summary(ws):
                         header_map["retained_earnings"] = absolute
                     elif "liquidation" in header or "payout" in header:
                         header_map["liquidation_payout"] = absolute
-                summary = {}
+
+                summary = {"_title": _summary_title_above(ws, row_idx, col_idx)}
+                has_explicit_payout = header_map.get("liquidation_payout") is not None
                 for data_row in ws.iter_rows(min_row=row_idx + 1, max_row=row_idx + 12, values_only=True):
                     partner = PARTNER_LOOKUP.get(_clean(_cell(data_row, header_map.get("partner"), "")).lower())
                     if not partner:
                         continue
+                    deal_capital = _money(_cell(data_row, header_map.get("deal_capital")))
+                    retained = _money(_cell(data_row, header_map.get("retained_earnings")))
+                    payout = _money(_cell(data_row, header_map.get("liquidation_payout"))) if has_explicit_payout else deal_capital + retained
                     summary[partner] = {
-                        "deal_capital": _money(_cell(data_row, header_map.get("deal_capital"))),
-                        "retained_earnings": _money(_cell(data_row, header_map.get("retained_earnings"))),
-                        "liquidation_payout": _money(_cell(data_row, header_map.get("liquidation_payout"))),
+                        "deal_capital": deal_capital,
+                        "retained_earnings": retained,
+                        "liquidation_payout": payout,
                     }
-                if summary:
-                    return summary
-    return {}
+                if any(partner in summary for partner in PARTNERS):
+                    summaries.append(summary)
+    return summaries[-1] if summaries else {}
 
 
 def build_dashboard(workbook_file=None, workbook_path=None):
@@ -301,6 +318,7 @@ def build_dashboard(workbook_file=None, workbook_path=None):
     return {
         "source_name": source_name,
         "source_info": source_info,
+        "summary_title": liquidation_summary.get("_title", "Liquidation Payout Summary"),
         "sheet_name": sheet_name,
         "row_count": len(rows),
         "partner_cards": partner_cards,
