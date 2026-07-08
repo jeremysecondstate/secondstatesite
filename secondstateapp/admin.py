@@ -10,7 +10,9 @@ class ArtworkImageInline(admin.TabularInline):
 
 @admin.register(Artwork)
 class ArtworkAdmin(admin.ModelAdmin):
-    list_display = ("title", "artist", "price", "is_available")
+    list_display = ("display_order", "title", "artist", "price", "is_available")
+    list_display_links = ("title",)
+    ordering = ("display_order", "id")
     search_fields = ("title", "artist", "catalog_number")
     list_filter = ("is_available", "artist")
     inlines = [ArtworkImageInline]

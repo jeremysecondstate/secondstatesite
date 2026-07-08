@@ -18,6 +18,7 @@ urlpatterns = [
     # Artworks
     path("artworks/", views.artwork_list, name="artwork_list"),
     path("artworks/manage_json/", catalog_api_views.artwork_manage_list, name="artwork_manage_list"),
+    path("artworks/reorder_artworks/", catalog_api_views.reorder_artworks, name="reorder_artworks"),
     path("artworks/generate_description/", catalog_api_views.generate_catalog_description_from_payload, name="generate_catalog_description_from_payload"),
     path("artworks/<int:pk>/", views.artwork_detail, name="artwork_detail"),
     path("artworks/<int:pk>/edit/", views.artwork_edit, name="artwork_edit"),

@@ -1,6 +1,7 @@
 import os
 from decimal import Decimal, InvalidOperation
 
+from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -29,23 +30,25 @@ def upload_artwork(request):
 
     data = request.POST
     try:
-        artwork = Artwork.objects.create(
-            title=data.get("title") or "Untitled",
-            artist=data.get("artist") or "Unknown Artist",
-            year=data.get("year", ""),
-            medium=data.get("medium", ""),
-            paper_type=data.get("paper_type", ""),
-            edition_size=data.get("edition_size", ""),
-            printer=data.get("printer", ""),
-            publisher=data.get("publisher", ""),
-            dimensions_text=data.get("dimensions_text", ""),
-            sheet_size=data.get("sheet_size", ""),
-            catalog_number=data.get("catalog_number", ""),
-            description=data.get("description", ""),
-            catalog_description=data.get("catalog_description", ""),
-            price=_parse_price(data.get("price", 0)),
-            is_available=True,
-        )
+        with transaction.atomic():
+            artwork = Artwork.objects.create(
+                title=data.get("title") or "Untitled",
+                artist=data.get("artist") or "Unknown Artist",
+                year=data.get("year", ""),
+                medium=data.get("medium", ""),
+                paper_type=data.get("paper_type", ""),
+                edition_size=data.get("edition_size", ""),
+                printer=data.get("printer", ""),
+                publisher=data.get("publisher", ""),
+                dimensions_text=data.get("dimensions_text", ""),
+                sheet_size=data.get("sheet_size", ""),
+                catalog_number=data.get("catalog_number", ""),
+                description=data.get("description", ""),
+                catalog_description=data.get("catalog_description", ""),
+                price=_parse_price(data.get("price", 0)),
+                is_available=True,
+                display_order=Artwork.next_display_order(),
+            )
     except Exception as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
