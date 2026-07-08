@@ -10,6 +10,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -61,7 +62,7 @@ def contact(request):
 
 def gallery(request):
     # Show the same content as /artworks/
-    artworks = Artwork.objects.all()
+    artworks = Artwork.objects.prefetch_related("images").order_by("display_order", "id")
     # artworks = Artwork.objects.order_by("-id")
     return render(request, "artworks/artwork_list.html", {"artworks": artworks})
 
@@ -258,7 +259,7 @@ Artwork facts:
 
 def artwork_list(request):
     """Render artwork_list.html for normal browser requests; return JSON only when explicitly requested."""
-    artworks = Artwork.objects.all()
+    artworks = Artwork.objects.prefetch_related("images").order_by("display_order", "id")
     # Check if the request explicitly asks for JSON
     if "format" in request.GET and request.GET["format"] == "json":
         artwork_data = list(
@@ -275,6 +276,7 @@ def artwork_list(request):
                 "catalog_number",
                 "price",
                 "is_available",
+                "display_order",
             )
         )
         return JsonResponse({"artworks": artwork_data})
@@ -400,23 +402,25 @@ def upload_artwork(request):
                 return JsonResponse({"error": "Unauthorized"}, status=401)
             data = request.POST
             # Save artwork to the database using raw fields from Excel
-            artwork = Artwork.objects.create(
-                title=data.get("title"),
-                artist=data.get("artist"),
-                year=data.get("year", ""),
-                medium=data.get("medium", ""),
-                paper_type=data.get("paper_type", ""),
-                edition_size=data.get("edition_size", ""),
-                printer=data.get("printer", ""),
-                publisher=data.get("publisher", ""),
-                dimensions_text=data.get("dimensions_text", ""),
-                sheet_size=data.get("sheet_size", ""),
-                catalog_number=data.get("catalog_number", ""),
-                description=data.get("description", ""),
-                catalog_description=data.get("catalog_description", ""),
-                price=float(data.get("price", 0)),
-                is_available=True,
-            )
+            with transaction.atomic():
+                artwork = Artwork.objects.create(
+                    title=data.get("title"),
+                    artist=data.get("artist"),
+                    year=data.get("year", ""),
+                    medium=data.get("medium", ""),
+                    paper_type=data.get("paper_type", ""),
+                    edition_size=data.get("edition_size", ""),
+                    printer=data.get("printer", ""),
+                    publisher=data.get("publisher", ""),
+                    dimensions_text=data.get("dimensions_text", ""),
+                    sheet_size=data.get("sheet_size", ""),
+                    catalog_number=data.get("catalog_number", ""),
+                    description=data.get("description", ""),
+                    catalog_description=data.get("catalog_description", ""),
+                    price=float(data.get("price", 0)),
+                    is_available=True,
+                    display_order=Artwork.next_display_order(),
+                )
             # Save uploaded images
             for _key, file in request.FILES.items():
                 ArtworkImage.objects.create(artwork=artwork, image=file)

@@ -27,6 +27,24 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
             raise RuntimeError(detail or f"Delete failed with status {response.status_code}")
         return response
 
+    def _save_artwork_order(self, order_ids):
+        response = requests.post(
+            f"{BASE_URL}/artworks/reorder_artworks/",
+            json={"order": [int(artwork_id) for artwork_id in order_ids]},
+            headers=api_headers({"Content-Type": "application/json"}),
+            timeout=30,
+        )
+        if response.status_code >= 400:
+            try:
+                detail = response.json().get("error") or response.text
+            except ValueError:
+                detail = response.text
+            raise RuntimeError(detail or f"Order save failed with status {response.status_code}")
+        try:
+            return response.json().get("artworks", [])
+        except ValueError as exc:
+            raise RuntimeError("Order save returned an invalid response.") from exc
+
     def delete_artwork(self):
         try:
             artworks = self._fetch_website_artworks()
@@ -104,6 +122,7 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
         paned.add(left, weight=1)
         paned.add(right, weight=2)
         ttk.Label(left, text="Website Listings", style="Header.TLabel").pack(anchor="w")
+        ttk.Label(left, text="Drag rows or use Move Up / Move Down, then Save Order.", style="Subtle.TLabel").pack(anchor="w", pady=(4, 0))
         listing_tree = ttk.Treeview(left, columns=("Artist", "Title", "Price"), show="headings")
         for col in ("Artist", "Title", "Price"):
             listing_tree.heading(col, text=col)
@@ -185,6 +204,40 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
             image_status.config(text="")
             status.config(text=f"Editing listing ID {art.get('id')}")
 
+        def replace_artwork(updated):
+            updated_id = str(updated.get("id"))
+            for index, existing in enumerate(artworks):
+                if str(existing.get("id")) == updated_id:
+                    artworks[index] = updated
+                    return
+            artworks.append(updated)
+
+        def refresh_listing_tree(new_artworks, focus_id=None):
+            artworks[:] = new_artworks
+            for item_id in listing_tree.get_children(""):
+                listing_tree.delete(item_id)
+            for art in artworks:
+                listing_tree.insert("", tk.END, iid=str(art.get("id")), values=(art.get("artist", ""), art.get("title", ""), art.get("price", "")))
+
+            target_id = str(focus_id) if focus_id else None
+            if not target_id and artworks:
+                target_id = str(artworks[0].get("id"))
+            if target_id and listing_tree.exists(target_id):
+                listing_tree.selection_set(target_id)
+                listing_tree.focus(target_id)
+                art = next((a for a in artworks if str(a.get("id")) == target_id), None)
+                if art:
+                    populate(art)
+            else:
+                clear_form()
+
+        def current_order_ids():
+            return [int(item_id) for item_id in listing_tree.get_children("")]
+
+        def sync_artworks_from_tree():
+            artwork_by_id = {str(art.get("id")): art for art in artworks}
+            artworks[:] = [artwork_by_id[item_id] for item_id in listing_tree.get_children("") if item_id in artwork_by_id]
+
         def on_select(_event=None):
             sel = listing_tree.selection()
             if sel:
@@ -234,7 +287,9 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
                 response = requests.post(f"{BASE_URL}/artworks/{art.get('id')}/update_artwork/", data=data_items, files=files, headers=api_headers(), timeout=70)
                 response.raise_for_status()
                 updated = response.json().get("artwork", {})
-                listing_tree.item(str(art.get("id")), values=(updated.get("artist", ""), updated.get("title", ""), updated.get("price", "")))
+                updated.setdefault("id", art.get("id"))
+                replace_artwork(updated)
+                listing_tree.item(str(updated.get("id")), values=(updated.get("artist", ""), updated.get("title", ""), updated.get("price", "")))
                 populate(updated)
                 status.config(text="Saved changes to website listing.")
             except Exception as exc:
@@ -264,6 +319,7 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
                 art_id = str(art.get("id"))
                 listing_tree.delete(art_id)
                 artworks.remove(art)
+                sync_artworks_from_tree()
                 clear_form()
                 if artworks:
                     next_id = str(artworks[0].get("id"))
@@ -274,7 +330,75 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
             except Exception as exc:
                 messagebox.showerror("Delete Failed", str(exc), parent=win)
 
+        def mark_order_changed():
+            status.config(text="Order changed. Click Save Order to publish it.")
+
+        def move_item(item_id, index):
+            children = list(listing_tree.get_children(""))
+            if not item_id or item_id not in children:
+                return
+            target_index = max(0, min(index, len(children) - 1))
+            if listing_tree.index(item_id) == target_index:
+                return
+            listing_tree.move(item_id, "", target_index)
+            listing_tree.selection_set(item_id)
+            listing_tree.focus(item_id)
+            sync_artworks_from_tree()
+            mark_order_changed()
+
+        def move_selected(direction):
+            sel = listing_tree.selection()
+            if not sel:
+                messagebox.showwarning("No Selection", "Select a listing to move.", parent=win)
+                return
+            item_id = sel[0]
+            new_index = listing_tree.index(item_id) + direction
+            if new_index < 0 or new_index >= len(listing_tree.get_children("")):
+                return
+            move_item(item_id, new_index)
+
+        drag_state = {"item": None}
+
+        def start_drag(event):
+            item_id = listing_tree.identify_row(event.y)
+            if not item_id:
+                drag_state["item"] = None
+                return
+            drag_state["item"] = item_id
+            listing_tree.selection_set(item_id)
+            listing_tree.focus(item_id)
+
+        def drag_row(event):
+            item_id = drag_state.get("item")
+            target_id = listing_tree.identify_row(event.y)
+            if not item_id or not target_id or item_id == target_id:
+                return
+            move_item(item_id, listing_tree.index(target_id))
+
+        def end_drag(_event=None):
+            drag_state["item"] = None
+
+        def save_order():
+            order_ids = current_order_ids()
+            if not order_ids:
+                return
+            focus_id = selected["art"].get("id") if selected["art"] else None
+            try:
+                refreshed_artworks = self._save_artwork_order(order_ids)
+                refresh_listing_tree(refreshed_artworks, focus_id=focus_id)
+                status.config(text="Saved website listing order.")
+            except Exception as exc:
+                messagebox.showerror("Save Order Failed", str(exc), parent=win)
+
         listing_tree.bind("<<TreeviewSelect>>", on_select)
+        listing_tree.bind("<ButtonPress-1>", start_drag)
+        listing_tree.bind("<B1-Motion>", drag_row)
+        listing_tree.bind("<ButtonRelease-1>", end_drag)
+        order_buttons = ttk.Frame(left)
+        order_buttons.pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(order_buttons, text="Move Up", command=lambda: move_selected(-1)).pack(side=tk.LEFT)
+        ttk.Button(order_buttons, text="Move Down", command=lambda: move_selected(1)).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(order_buttons, text="Save Order", command=save_order, style="Success.TButton").pack(side=tk.RIGHT)
         buttons = ttk.Frame(right)
         buttons.pack(fill=tk.X, pady=(10, 0))
         ttk.Button(buttons, text="Generate Description", command=generate, style="Accent.TButton").pack(side=tk.LEFT)

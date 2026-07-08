@@ -5,6 +5,7 @@ import urllib.request
 from decimal import Decimal, InvalidOperation
 
 from django.core.files.storage import default_storage
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -65,6 +66,7 @@ def _image_url(request, image):
 def _serialize(request, artwork):
     return {
         "id": artwork.id,
+        "display_order": artwork.display_order,
         "artist": artwork.artist,
         "title": artwork.title,
         "year": artwork.year or "",
@@ -83,6 +85,25 @@ def _serialize(request, artwork):
         "is_available": artwork.is_available,
         "images": [{"id": image.id, "url": _image_url(request, image)} for image in artwork.images.all()],
     }
+
+
+def _parse_order_ids(raw_order):
+    if not isinstance(raw_order, list):
+        raise ValueError("Order must be a list of artwork ids.")
+
+    order_ids = []
+    for raw_id in raw_order:
+        if isinstance(raw_id, bool):
+            raise ValueError("Order must contain only artwork ids.")
+        try:
+            order_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            raise ValueError("Order must contain only artwork ids.")
+
+    if len(order_ids) != len(set(order_ids)):
+        raise ValueError("Order contains duplicate artwork ids.")
+
+    return order_ids
 
 
 def _prompt_fields(artwork):
@@ -158,8 +179,53 @@ Artwork facts:
 def artwork_manage_list(request):
     if not _can_manage(request):
         return JsonResponse({"error": "Unauthorized"}, status=401)
-    artworks = Artwork.objects.prefetch_related("images").all()
+    artworks = Artwork.objects.prefetch_related("images").order_by("display_order", "id")
     return JsonResponse({"artworks": [_serialize(request, artwork) for artwork in artworks]})
+
+
+@csrf_exempt
+@require_POST
+def reorder_artworks(request):
+    if not _can_manage(request):
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    try:
+        data = json.loads(request.body.decode("utf-8")) if request.body else {}
+        order_ids = _parse_order_ids(data.get("order"))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON body."}, status=400)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    with transaction.atomic():
+        artworks = list(Artwork.objects.select_for_update().prefetch_related("images").order_by("display_order", "id"))
+        artwork_by_id = {artwork.id: artwork for artwork in artworks}
+        current_ids = set(artwork_by_id)
+        submitted_ids = set(order_ids)
+        unknown_ids = sorted(submitted_ids - current_ids)
+        missing_ids = sorted(current_ids - submitted_ids)
+        if unknown_ids or missing_ids:
+            details = []
+            if unknown_ids:
+                details.append(f"unknown ids: {unknown_ids}")
+            if missing_ids:
+                details.append(f"missing ids: {missing_ids}")
+            return JsonResponse({"error": "Invalid artwork order; " + "; ".join(details)}, status=400)
+
+        ordered_artworks = []
+        for index, artwork_id in enumerate(order_ids):
+            artwork = artwork_by_id[artwork_id]
+            artwork.display_order = index
+            ordered_artworks.append(artwork)
+        Artwork.objects.bulk_update(ordered_artworks, ["display_order"])
+
+    refreshed = Artwork.objects.prefetch_related("images").order_by("display_order", "id")
+    return JsonResponse(
+        {
+            "message": "Artwork order updated.",
+            "artworks": [_serialize(request, artwork) for artwork in refreshed],
+        }
+    )
 
 
 @csrf_exempt

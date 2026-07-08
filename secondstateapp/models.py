@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Max
 from PIL import Image
 from io import BytesIO
 from django.core.files.base import ContentFile
@@ -44,6 +45,29 @@ class Artwork(models.Model):
     )
     price = models.DecimalField(max_digits=10, decimal_places=2)
     is_available = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0, db_index=True)
+
+    class Meta:
+        ordering = ["display_order", "id"]
+
+    def __init__(self, *args, **kwargs):
+        self._display_order_was_set = "display_order" in kwargs
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def next_display_order(cls):
+        max_order = cls.objects.aggregate(max_order=Max("display_order"))["max_order"]
+        return 0 if max_order is None else max_order + 1
+
+    def save(self, *args, **kwargs):
+        if (
+            self._state.adding
+            and not self._display_order_was_set
+            and self.display_order == 0
+            and type(self).objects.exists()
+        ):
+            self.display_order = type(self).next_display_order()
+        super().save(*args, **kwargs)
 
     @property
     def formatted_price(self):
