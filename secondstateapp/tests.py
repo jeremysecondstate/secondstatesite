@@ -3,6 +3,7 @@ import os
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
@@ -11,12 +12,14 @@ from .models import Artwork
 
 @patch.dict(os.environ, {"CATALOG_API_KEY": "test-key"}, clear=False)
 class ArtworkOrderingTests(TestCase):
-    def create_artwork(self, title, display_order):
+    def create_artwork(self, title, display_order, is_available=True):
         return Artwork.objects.create(
             title=title,
             artist="Test Artist",
+            medium="Screenprint",
             price=Decimal("100.00"),
             display_order=display_order,
+            is_available=is_available,
         )
 
     def test_default_queryset_orders_by_display_order_then_id(self):
@@ -87,3 +90,45 @@ class ArtworkOrderingTests(TestCase):
         uploaded = Artwork.objects.get(id=response.json()["id"])
         self.assertEqual(uploaded.display_order, 2)
         self.assertEqual(list(Artwork.objects.values_list("id", flat=True)), [first.id, second.id, uploaded.id])
+
+    def test_gallery_template_keeps_saved_order_with_mosaic_classes(self):
+        third = self.create_artwork("Third", 2)
+        first = self.create_artwork("First", 0)
+        second = self.create_artwork("Second", 1)
+        fifth = self.create_artwork("Fifth", 4, is_available=False)
+        fourth = self.create_artwork("Fourth", 3)
+
+        response = self.client.get(reverse("gallery"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "auction-mosaic-grid")
+        self.assertContains(response, "auction-card--feature")
+        self.assertContains(response, "auction-card--wide")
+        self.assertContains(response, "4 available works")
+        html = response.content.decode()
+        rendered_positions = [
+            html.index(f'data-artwork-id="{artwork.id}"')
+            for artwork in [first, second, third, fourth, fifth]
+        ]
+        self.assertEqual(rendered_positions, sorted(rendered_positions))
+
+    def test_gallery_uses_default_artwork_image_when_image_is_missing(self):
+        self.create_artwork("Missing Image", 0)
+
+        response = self.client.get(reverse("gallery"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "/static/secondstateapp/etching_press.jpg")
+
+    def test_gallery_edit_link_remains_staff_only(self):
+        artwork = self.create_artwork("Staff Editable", 0)
+        edit_url = reverse("artwork_edit", args=[artwork.id])
+
+        response = self.client.get(reverse("gallery"))
+        self.assertNotContains(response, edit_url)
+
+        staff_user = User.objects.create_user(username="staff", password="password", is_staff=True)
+        self.client.force_login(staff_user)
+        response = self.client.get(reverse("gallery"))
+
+        self.assertContains(response, edit_url)

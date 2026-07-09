@@ -60,11 +60,22 @@ def contact(request):
     return render(request, "contact.html")
 
 
+def _ordered_gallery_artworks():
+    return Artwork.objects.prefetch_related("images").order_by("display_order", "id")
+
+
+def _gallery_template_context(artworks):
+    return {
+        "artworks": artworks,
+        "available_count": Artwork.objects.filter(is_available=True).count(),
+    }
+
+
 def gallery(request):
     # Show the same content as /artworks/
-    artworks = Artwork.objects.prefetch_related("images").order_by("display_order", "id")
+    artworks = _ordered_gallery_artworks()
     # artworks = Artwork.objects.order_by("-id")
-    return render(request, "artworks/artwork_list.html", {"artworks": artworks})
+    return render(request, "artworks/artwork_list.html", _gallery_template_context(artworks))
 
 
 def register(request):
@@ -259,7 +270,7 @@ Artwork facts:
 
 def artwork_list(request):
     """Render artwork_list.html for normal browser requests; return JSON only when explicitly requested."""
-    artworks = Artwork.objects.prefetch_related("images").order_by("display_order", "id")
+    artworks = _ordered_gallery_artworks()
     # Check if the request explicitly asks for JSON
     if "format" in request.GET and request.GET["format"] == "json":
         artwork_data = list(
@@ -281,7 +292,7 @@ def artwork_list(request):
         )
         return JsonResponse({"artworks": artwork_data})
     # Otherwise, render the template
-    return render(request, "artworks/artwork_list.html", {"artworks": artworks})
+    return render(request, "artworks/artwork_list.html", _gallery_template_context(artworks))
 
 
 def artwork_detail(request, pk):
