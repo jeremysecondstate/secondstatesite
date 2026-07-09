@@ -1,14 +1,42 @@
 {% extends 'base.html' %}
 {% load static %}
+
+{% block main_class %}gallery-shell{% endblock %}
+
+{% block below_nav %}
+<nav class="gallery-context-bar" aria-label="Gallery context">
+    <div class="gallery-context-bar__inner">
+        <a href="{% url 'gallery' %}" aria-current="page">Gallery</a>
+        <span>Available Works</span>
+        <a href="{% url 'contact' %}">Contact</a>
+        <span class="gallery-context-bar__count">
+            {{ available_count }} available work{{ available_count|pluralize }}
+        </span>
+    </div>
+</nav>
+{% endblock %}
+
 {% block content %}
-<h1 class="text-center">Available Artworks</h1>
-{% if artworks %}
-<div class="row row-cols-1 row-cols-md-3 g-4">
-    {% for artwork in artworks %}
-        {% include 'artworks/artwork_card.html' %}
-    {% endfor %}
-</div>
-{% else %}
-<p class="text-center text-muted">No artworks available at the moment. Please check back later!</p>
-{% endif %}
+<section class="gallery-catalog-page" aria-labelledby="gallery-heading">
+    <div class="gallery-catalog-header">
+        <p class="gallery-catalog-kicker">SecondState Gallery</p>
+        <h1 id="gallery-heading">Available Works</h1>
+    </div>
+
+    {% if artworks %}
+        <div class="auction-mosaic-grid">
+            {% for artwork in artworks %}
+                {% if forloop.first or forloop.counter|divisibleby:8 %}
+                    {% include 'artworks/artwork_card.html' with card_size='feature' %}
+                {% elif forloop.counter|divisibleby:5 or forloop.counter|divisibleby:6 %}
+                    {% include 'artworks/artwork_card.html' with card_size='wide' %}
+                {% else %}
+                    {% include 'artworks/artwork_card.html' with card_size='standard' %}
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="gallery-empty-state">No artworks available at the moment. Please check back later.</p>
+    {% endif %}
+</section>
 {% endblock %}

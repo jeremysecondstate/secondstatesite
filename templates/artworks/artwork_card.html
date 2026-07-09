@@ -1,26 +1,35 @@
 {% load static artwork_filters %}
-<div class="col">
-    <div class="card h-100 shadow-sm">
-        <a href="{% url 'artwork_detail' artwork.id %}">
-            {% if artwork.images.all %}
-                <img src="{{ artwork.images.first.image.url }}" class="card-img-top img-fluid" alt="{{ artwork.title }}">
-            {% else %}
-                <img src="{% static 'images/default-artwork.jpg' %}" class="card-img-top img-fluid" alt="No Image Available">
-            {% endif %}
-        </a>
-        <div class="card-body artwork-card-body">
-            <p class="artwork-card-title">{{ artwork.title }}</p>
+<article
+    class="auction-card auction-card--{{ card_size|default:'standard' }}"
+    data-artwork-id="{{ artwork.id }}"
+    data-gallery-position="{{ forloop.counter }}"
+>
+    <a class="auction-card__image-link" href="{% url 'artwork_detail' artwork.id %}" aria-label="View details for {{ artwork.title }}">
+        <span class="auction-card__image-panel">
+            {% with primary_image=artwork.images.first %}
+                {% if primary_image and primary_image.image %}
+                    <img src="{{ primary_image.image.url }}" class="auction-card__image" alt="{{ artwork.title }}">
+                {% else %}
+                    <img src="{% static 'secondstateapp/etching_press.jpg' %}" class="auction-card__image auction-card__image--fallback" alt="Artwork image placeholder for {{ artwork.title }}">
+                {% endif %}
+            {% endwith %}
+        </span>
+    </a>
 
-            <div class="artwork-card-divider"></div>
+    <div class="auction-card__meta">
+        <p class="artwork-card-title">{{ artwork.title }}</p>
 
-            <p class="artwork-card-artist">{{ artwork.artist }}</p>
+        <div class="artwork-card-divider"></div>
 
-            <p class="artwork-card-medium">{{ artwork.medium|highlight_medium_terms }}</p>
+        <p class="artwork-card-artist">{{ artwork.artist }}</p>
 
-            <a href="{% url 'artwork_detail' artwork.id %}" class="btn btn-outline-dark btn-sm">View Details</a>
+        <p class="artwork-card-medium">{{ artwork.medium|highlight_medium_terms }}</p>
+
+        <div class="auction-card__actions">
+            <a href="{% url 'artwork_detail' artwork.id %}" class="auction-card__action">View Details</a>
             {% if user.is_staff %}
-                <a href="{% url 'artwork_edit' artwork.id %}" class="btn btn-outline-secondary btn-sm ms-1">Edit</a>
+                <a href="{% url 'artwork_edit' artwork.id %}" class="auction-card__action auction-card__action--secondary">Edit</a>
             {% endif %}
         </div>
     </div>
-</div>
+</article>

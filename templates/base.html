@@ -36,7 +36,9 @@
     </nav>
   </header>
 
-  <main class="container">
+  {% block below_nav %}{% endblock %}
+
+  <main class="{% block main_class %}container{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 
