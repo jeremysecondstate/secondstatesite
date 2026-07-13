@@ -212,7 +212,7 @@ class ArtCatalogApp:
             f"{BASE_URL}/artworks/search_upcoming_print_auctions/",
             json=payload,
             headers=api_headers({"Content-Type": "application/json"}),
-            timeout=150,
+            timeout=(10, 930),
         )
         if response.status_code >= 400:
             try:
@@ -262,10 +262,17 @@ class ArtCatalogApp:
 
     def _finish_auction_search_success(self, result):
         markdown = result.get("markdown", "")
-        count = result.get("auction_count", 0)
+        research_meta = result.get("research_meta") if isinstance(result.get("research_meta"), dict) else {}
+        search_count = research_meta.get("search_count", 0)
+        source_count = research_meta.get("source_count", 0)
+        candidate_count = research_meta.get("raw_candidate_count", 0)
+        qualified_count = research_meta.get("qualified_count", result.get("auction_count", 0))
         self.auction_markdown_text.delete("1.0", tk.END)
         self.auction_markdown_text.insert(tk.END, markdown)
-        label = f"Found {count} qualifying auction{'s' if count != 1 else ''}."
+        label = (
+            f"Ran {search_count} searches and opened {source_count} sources; "
+            f"found {candidate_count} candidates and {qualified_count} qualifying auctions."
+        )
         self._set_auction_search_busy(False, label)
         self._set_status(label)
 

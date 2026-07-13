@@ -1,6 +1,7 @@
 import json
 import os
 import socket
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,13 +26,27 @@ TEXT_FIELDS = [
 
 AUCTION_SEARCH_MODEL_ENV = "OPENAI_AUCTION_SEARCH_MODEL"
 DEFAULT_AUCTION_SEARCH_MODEL = "gpt-5.6"
+AUCTION_SEARCH_REASONING_EFFORT_ENV = "OPENAI_AUCTION_SEARCH_REASONING_EFFORT"
+DEFAULT_AUCTION_SEARCH_REASONING_EFFORT = "xhigh"
+AUCTION_SEARCH_RETURN_TOKEN_BUDGET_ENV = "OPENAI_AUCTION_SEARCH_RETURN_TOKEN_BUDGET"
+DEFAULT_AUCTION_SEARCH_RETURN_TOKEN_BUDGET = "unlimited"
+AUCTION_SEARCH_MAX_OUTPUT_TOKENS_ENV = "OPENAI_AUCTION_SEARCH_MAX_OUTPUT_TOKENS"
+DEFAULT_AUCTION_SEARCH_MAX_OUTPUT_TOKENS = 20000
 AUCTION_SEARCH_TIMEOUT_ENV = "OPENAI_AUCTION_SEARCH_TIMEOUT_SECONDS"
-DEFAULT_AUCTION_SEARCH_TIMEOUT = 90
-MAX_AUCTION_SEARCH_TIMEOUT = 180
+DEFAULT_AUCTION_SEARCH_TIMEOUT = 420
+MAX_AUCTION_SEARCH_TIMEOUT = 900
+AUCTION_SEARCH_POLL_INTERVAL_SECONDS = 2
+OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
+ACTIVE_RESPONSE_STATUSES = {"queued", "in_progress"}
+TERMINAL_RESPONSE_STATUSES = {"completed", "failed", "cancelled", "incomplete"}
 
 
 class AuctionSearchError(Exception):
     """Base error for failures while researching upcoming auctions."""
+
+    def __init__(self, message, research_meta=None):
+        super().__init__(message)
+        self.research_meta = research_meta or {}
 
 
 class AuctionSearchTimeout(AuctionSearchError):
@@ -214,14 +229,23 @@ def _auction_search_schema():
     sale_properties = {
         "auction_house": {"type": "string"},
         "sale_title": {"type": "string"},
-        "start_at": {"type": "string", "description": "Timezone-aware ISO 8601 sale start."},
+        "start_at": {
+            "type": ["string", "null"],
+            "description": "Timezone-aware ISO 8601 sale start, or null when only the close is known.",
+        },
+        "end_at": {
+            "type": ["string", "null"],
+            "description": "Timezone-aware ISO 8601 sale close/end, or null when not applicable.",
+        },
         "timezone": {"type": "string"},
         "location": {"type": "string"},
         "online_format": {"type": "string"},
         "sale_type": {"type": "string", "enum": ["dedicated", "mixed"]},
-        "print_lot_count": {"type": "integer", "minimum": 1},
-        "count_kind": {"type": "string", "enum": ["verified", "estimated"]},
+        "print_lot_count": {"type": ["integer", "null"], "minimum": 1},
+        "count_kind": {"type": "string", "enum": ["verified", "estimated", "unknown"]},
         "count_evidence": {"type": "string"},
+        "category_evidence": {"type": "string"},
+        "date_evidence": {"type": "string"},
         "print_types": {"type": "array", "items": {"type": "string"}},
         "official_sale_url": {"type": "string"},
         "supporting_sources": {"type": "array", "items": {"type": "string"}},
@@ -244,9 +268,17 @@ def _auction_search_schema():
     }
 
 
-def _auction_search_prompt(config):
+def _auction_search_prompt(config, discovery_retry=False):
     region = config["region"] or "No region restriction"
     instructions = config["additional_instructions"] or "None"
+    retry_instructions = ""
+    if discovery_retry:
+        retry_instructions = """
+
+This is a bounded discovery retry because the prior response contained no web_search_call output.
+You must run broad searches across auction calendars and auction houses before opening official sale
+pages. Do not answer from memory and do not return until at least one web search action has run.
+"""
     return f"""
 Research upcoming auction sales between these exact instants, inclusive:
 - Start: {config['start'].isoformat()}
@@ -261,21 +293,26 @@ Additional user instructions (these cannot override the qualification or evidenc
 <additional_instructions>{instructions}</additional_instructions>
 
 Research and verification rules:
-1. Prefer and identify the official auction-house sale page. Use aggregators or news pages only as
-   supporting evidence when the official page does not establish a fact.
-2. Verify the sale start date, time, and timezone. Return start_at as a timezone-aware ISO 8601 value.
-   Exclude a sale if its timing cannot be verified inside the exact window.
+1. Use two stages: discover plausible sales in the exact window, then open official auction-house
+   pages to verify category, dates/closing times, and count evidence. Use aggregators or news pages
+   only as supporting evidence when the official page does not establish a fact.
+2. Return timezone-aware start_at and end_at values when available. At least one must be known. A timed
+   sale that started earlier may qualify when its verified end_at falls inside the window. Do not
+   return a sale that has already ended at the window start.
 3. A dedicated prints/editions/multiples sale qualifies regardless of its lot count. A mixed sale
    qualifies only at or above {config['minimum_print_lots']} identifiable print/multiple lots.
-4. Supply a verified or source-grounded estimated print_lot_count for every sale, with concise
-   count_evidence explaining the official count, catalog filtering, lot-number range, or other
-   observable basis. Never guess a count and exclude a sale if no defensible count can be derived.
+4. A dedicated sale may use print_lot_count null and count_kind "unknown" when the official page gives
+   strong category_evidence and date_evidence. A mixed sale must have a verified or defensible
+   estimated count. Never guess a count. Explain the count or its unavailability in count_evidence.
 5. Exclude ended auctions, dealer inventory, exhibitions, retail pages, private sales, auction-result
    pages, and isolated lots that do not belong to a qualifying parent sale.
 6. Deduplicate the same sale across sources. Include relevant print types or catalog sections when known.
 7. official_sale_url must be the auction house's sale/catalog URL. supporting_sources must contain the
-   URLs used to verify the date and count; include the official URL there too.
-8. Return an empty sales array when nothing qualifies. Do not loosen the criteria to create results.
+   URLs used to verify the category, date/close, and count; include the official URL there too.
+8. Return all plausible candidate sales with honest evidence, including mixed sales that may fall below
+   the threshold, so the server can apply deterministic final filtering and report filtering reasons.
+   Return an empty sales array only when discovery finds no plausible candidates.
+{retry_instructions}
 """.strip()
 
 
@@ -287,35 +324,49 @@ def _configured_auction_timeout():
     return max(10, min(configured, MAX_AUCTION_SEARCH_TIMEOUT))
 
 
-def _call_auction_search_api(config):
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise AuctionSearchUpstreamError("OPENAI_API_KEY is not configured on the server.")
+def _configured_auction_search_settings():
+    model = os.environ.get(AUCTION_SEARCH_MODEL_ENV, DEFAULT_AUCTION_SEARCH_MODEL).strip()
+    effort = os.environ.get(
+        AUCTION_SEARCH_REASONING_EFFORT_ENV,
+        DEFAULT_AUCTION_SEARCH_REASONING_EFFORT,
+    ).strip().lower()
+    if effort not in {"none", "low", "medium", "high", "xhigh", "max"}:
+        effort = DEFAULT_AUCTION_SEARCH_REASONING_EFFORT
 
-    body = {
-        "model": os.environ.get(AUCTION_SEARCH_MODEL_ENV, DEFAULT_AUCTION_SEARCH_MODEL),
-        "input": _auction_search_prompt(config),
-        "tools": [{"type": "web_search", "search_context_size": "high"}],
-        "tool_choice": "auto",
-        "include": ["web_search_call.action.sources"],
-        "max_output_tokens": 60000,
-        "text": {
-            "format": {
-                "type": "json_schema",
-                "name": "upcoming_print_auctions",
-                "schema": _auction_search_schema(),
-                "strict": True,
-            }
-        },
+    return_token_budget = os.environ.get(
+        AUCTION_SEARCH_RETURN_TOKEN_BUDGET_ENV,
+        DEFAULT_AUCTION_SEARCH_RETURN_TOKEN_BUDGET,
+    ).strip().lower()
+    if return_token_budget not in {"default", "unlimited"}:
+        return_token_budget = DEFAULT_AUCTION_SEARCH_RETURN_TOKEN_BUDGET
+
+    try:
+        max_output_tokens = int(
+            os.environ.get(
+                AUCTION_SEARCH_MAX_OUTPUT_TOKENS_ENV,
+                DEFAULT_AUCTION_SEARCH_MAX_OUTPUT_TOKENS,
+            )
+        )
+    except (TypeError, ValueError):
+        max_output_tokens = DEFAULT_AUCTION_SEARCH_MAX_OUTPUT_TOKENS
+
+    return {
+        "model": model or DEFAULT_AUCTION_SEARCH_MODEL,
+        "reasoning_effort": effort,
+        "return_token_budget": return_token_budget,
+        "max_output_tokens": max(1000, min(max_output_tokens, 50000)),
     }
+
+
+def _openai_json_request(api_key, method, url, body=None, timeout=60):
     openai_request = urllib.request.Request(
-        "https://api.openai.com/v1/responses",
-        data=json.dumps(body).encode("utf-8"),
+        url,
+        data=json.dumps(body).encode("utf-8") if body is not None else None,
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        method="POST",
+        method=method,
     )
     try:
-        with urllib.request.urlopen(openai_request, timeout=_configured_auction_timeout()) as response:
+        with urllib.request.urlopen(openai_request, timeout=max(1, timeout)) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         try:
@@ -334,6 +385,126 @@ def _call_auction_search_api(config):
         raise AuctionSearchMalformedError("OpenAI returned an unreadable response.") from exc
     except OSError as exc:
         raise AuctionSearchUpstreamError(f"OpenAI request failed: {exc}") from exc
+
+
+def _response_error_message(value):
+    if isinstance(value, dict):
+        return str(value.get("message") or value.get("code") or value)
+    return str(value or "unknown error")
+
+
+def _response_error_meta(payload, settings):
+    diagnostics = _extract_web_search_diagnostics(payload)
+    diagnostics.update(
+        {
+            "response_id": payload.get("id"),
+            "response_status": payload.get("status"),
+            "model": payload.get("model") or settings["model"],
+            "reasoning_effort": settings["reasoning_effort"],
+            "error": payload.get("error"),
+            "incomplete_details": payload.get("incomplete_details"),
+        }
+    )
+    return diagnostics
+
+
+def _call_auction_search_api(config, discovery_retry=False):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise AuctionSearchUpstreamError("OPENAI_API_KEY is not configured on the server.")
+
+    settings = _configured_auction_search_settings()
+    body = {
+        "model": settings["model"],
+        "reasoning": {"effort": settings["reasoning_effort"]},
+        "input": _auction_search_prompt(config, discovery_retry=discovery_retry),
+        "tools": [
+            {
+                "type": "web_search",
+                "search_context_size": "high",
+                "return_token_budget": settings["return_token_budget"],
+            }
+        ],
+        "tool_choice": "required",
+        "include": ["web_search_call.action.sources"],
+        "max_output_tokens": settings["max_output_tokens"],
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "upcoming_print_auctions",
+                "schema": _auction_search_schema(),
+                "strict": True,
+            }
+        },
+        "background": True,
+    }
+
+    timeout_seconds = _configured_auction_timeout()
+    deadline = time.monotonic() + timeout_seconds
+    payload = _openai_json_request(
+        api_key,
+        "POST",
+        OPENAI_RESPONSES_URL,
+        body=body,
+        timeout=min(60, timeout_seconds),
+    )
+    if not isinstance(payload, dict):
+        raise AuctionSearchMalformedError("OpenAI returned an unreadable response.")
+
+    response_id = payload.get("id")
+    status = payload.get("status")
+    if not isinstance(response_id, str) or not response_id.strip():
+        raise AuctionSearchMalformedError("OpenAI returned a background response without an id.")
+
+    while status in ACTIVE_RESPONSE_STATUSES:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            meta = _response_error_meta(payload, settings)
+            meta["response_status"] = "deadline_exceeded"
+            raise AuctionSearchTimeout("OpenAI auction research timed out.", research_meta=meta)
+        time.sleep(min(AUCTION_SEARCH_POLL_INTERVAL_SECONDS, remaining))
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            meta = _response_error_meta(payload, settings)
+            meta["response_status"] = "deadline_exceeded"
+            raise AuctionSearchTimeout("OpenAI auction research timed out.", research_meta=meta)
+        try:
+            payload = _openai_json_request(
+                api_key,
+                "GET",
+                f"{OPENAI_RESPONSES_URL}/{urllib.parse.quote(response_id, safe='')}",
+                timeout=min(60, remaining),
+            )
+        except AuctionSearchError as exc:
+            if not exc.research_meta:
+                exc.research_meta = _response_error_meta(payload, settings)
+            raise
+        if not isinstance(payload, dict):
+            raise AuctionSearchMalformedError("OpenAI returned an unreadable polling response.")
+        status = payload.get("status")
+
+    meta = _response_error_meta(payload, settings)
+    if status not in TERMINAL_RESPONSE_STATUSES:
+        raise AuctionSearchMalformedError(
+            f"OpenAI returned unknown response status: {status or 'missing'}.",
+            research_meta=meta,
+        )
+    if payload.get("error"):
+        raise AuctionSearchUpstreamError(
+            f"OpenAI auction research failed: {_response_error_message(payload['error'])}",
+            research_meta=meta,
+        )
+    if status == "failed":
+        raise AuctionSearchUpstreamError("OpenAI auction research failed.", research_meta=meta)
+    if status == "cancelled":
+        raise AuctionSearchUpstreamError("OpenAI auction research was cancelled.", research_meta=meta)
+    if status == "incomplete" or payload.get("incomplete_details"):
+        details = _response_error_message(payload.get("incomplete_details"))
+        raise AuctionSearchUpstreamError(
+            f"OpenAI auction research was incomplete: {details}",
+            research_meta=meta,
+        )
+    return payload
 
 
 def _valid_web_url(value):
@@ -374,11 +545,89 @@ def _collect_response_urls(value, found=None):
     return found
 
 
+def _extract_web_search_diagnostics(payload):
+    diagnostics = {
+        "web_search_call_count": 0,
+        "search_count": 0,
+        "open_page_count": 0,
+        "find_in_page_count": 0,
+        "queries": [],
+        "sources": [],
+        "source_count": 0,
+        "warnings": [],
+    }
+    if not isinstance(payload, dict):
+        return diagnostics
+
+    raw_warnings = payload.get("warnings")
+    if isinstance(raw_warnings, list):
+        diagnostics["warnings"].extend(raw_warnings)
+    elif raw_warnings:
+        diagnostics["warnings"].append(raw_warnings)
+
+    seen_queries = set()
+    seen_sources = set()
+    output = payload.get("output")
+    if not isinstance(output, list):
+        return diagnostics
+
+    for item in output:
+        if not isinstance(item, dict) or item.get("type") != "web_search_call":
+            continue
+        diagnostics["web_search_call_count"] += 1
+        action = item.get("action") if isinstance(item.get("action"), dict) else {}
+        action_type = action.get("type")
+        counter_name = {
+            "search": "search_count",
+            "open_page": "open_page_count",
+            "find_in_page": "find_in_page_count",
+        }.get(action_type)
+        if counter_name:
+            diagnostics[counter_name] += 1
+
+        query_values = []
+        if isinstance(action.get("query"), str):
+            query_values.append(action["query"])
+        if isinstance(action.get("queries"), list):
+            query_values.extend(value for value in action["queries"] if isinstance(value, str))
+        for query in query_values:
+            query = query.strip()
+            if query and query not in seen_queries:
+                seen_queries.add(query)
+                diagnostics["queries"].append(query)
+
+        sources = action.get("sources")
+        if not isinstance(sources, list):
+            continue
+        for source in sources:
+            source_url = source.get("url") if isinstance(source, dict) else source
+            valid_url = _valid_web_url(source_url)
+            if valid_url:
+                source_key = ("url", _normalized_url_key(valid_url))
+            else:
+                try:
+                    source_key = ("value", json.dumps(source, sort_keys=True))
+                except (TypeError, ValueError):
+                    source_key = ("value", str(source))
+            if source_key not in seen_sources:
+                seen_sources.add(source_key)
+                diagnostics["sources"].append(source)
+
+    diagnostics["source_count"] = len(diagnostics["sources"])
+    return diagnostics
+
+
 def _required_text(sale, field_name):
     value = sale.get(field_name)
     if not isinstance(value, str) or not value.strip():
         raise AuctionSearchMalformedError(f"OpenAI returned a sale without {field_name}.")
     return value.strip()
+
+
+def _parse_optional_aware_timestamp(value, field_name):
+    if value is None:
+        return None
+    return _parse_aware_timestamp(value, field_name)
 
 
 def _normalize_auction_sales(raw_sales, config):
@@ -387,39 +636,111 @@ def _normalize_auction_sales(raw_sales, config):
 
     normalized = []
     seen = set()
-    for raw_sale in raw_sales:
-        if not isinstance(raw_sale, dict):
-            raise AuctionSearchMalformedError("OpenAI returned an invalid sale record.")
+    filtered_counts = {}
+    filtering_reasons = []
 
-        auction_house = _required_text(raw_sale, "auction_house")
-        sale_title = _required_text(raw_sale, "sale_title")
-        timezone_name = _required_text(raw_sale, "timezone")
+    def reject(raw_sale, index, reason, detail):
+        filtered_counts[reason] = filtered_counts.get(reason, 0) + 1
+        filtering_reasons.append(
+            {
+                "candidate_index": index,
+                "sale_title": str(raw_sale.get("sale_title") or "").strip() if isinstance(raw_sale, dict) else "",
+                "official_sale_url": (
+                    _valid_web_url(raw_sale.get("official_sale_url")) if isinstance(raw_sale, dict) else ""
+                ),
+                "reason": reason,
+                "detail": detail,
+            }
+        )
+
+    for index, raw_sale in enumerate(raw_sales):
+        if not isinstance(raw_sale, dict):
+            reject(raw_sale, index, "invalid_candidate", "Candidate was not an object.")
+            continue
+
         try:
-            start_at = _parse_aware_timestamp(raw_sale.get("start_at"), "sale start_at")
+            auction_house = _required_text(raw_sale, "auction_house")
+            sale_title = _required_text(raw_sale, "sale_title")
+            timezone_name = _required_text(raw_sale, "timezone")
+            start_at = _parse_optional_aware_timestamp(raw_sale.get("start_at"), "sale start_at")
+            end_at = _parse_optional_aware_timestamp(raw_sale.get("end_at"), "sale end_at")
         except ValueError as exc:
-            raise AuctionSearchMalformedError(str(exc)) from exc
-        if start_at < config["start"] or start_at > config["end"]:
+            reject(raw_sale, index, "invalid_timing", str(exc))
+            continue
+        except AuctionSearchMalformedError as exc:
+            reject(raw_sale, index, "missing_evidence", str(exc))
+            continue
+
+        if start_at is None and end_at is None:
+            reject(raw_sale, index, "invalid_timing", "Neither a start nor a closing time was provided.")
+            continue
+        if start_at is not None and end_at is not None and end_at < start_at:
+            reject(raw_sale, index, "invalid_timing", "The closing time is earlier than the start time.")
+            continue
+        if end_at is not None and end_at <= config["start"]:
+            reject(raw_sale, index, "ended", "The sale had fully ended before the research window.")
+            continue
+
+        start_in_window = start_at is not None and config["start"] <= start_at <= config["end"]
+        end_in_window = end_at is not None and config["start"] < end_at <= config["end"]
+        if not start_in_window and not end_in_window:
+            reject(raw_sale, index, "outside_window", "Neither the start nor closing time is inside the window.")
             continue
 
         sale_type = raw_sale.get("sale_type")
         if sale_type not in {"dedicated", "mixed"}:
-            raise AuctionSearchMalformedError("OpenAI returned an invalid sale_type.")
-        count = raw_sale.get("print_lot_count")
-        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-            raise AuctionSearchMalformedError("OpenAI returned an invalid print_lot_count.")
-        if sale_type == "mixed" and count < config["minimum_print_lots"]:
+            reject(raw_sale, index, "invalid_candidate", "The sale type was invalid.")
             continue
+
+        try:
+            count_evidence = _required_text(raw_sale, "count_evidence")
+            category_evidence = _required_text(raw_sale, "category_evidence")
+            date_evidence = _required_text(raw_sale, "date_evidence")
+        except AuctionSearchMalformedError as exc:
+            reject(raw_sale, index, "missing_evidence", str(exc))
+            continue
+
+        count = raw_sale.get("print_lot_count")
         count_kind = raw_sale.get("count_kind")
-        if count_kind not in {"verified", "estimated"}:
-            raise AuctionSearchMalformedError("OpenAI returned an invalid count_kind.")
-        count_evidence = _required_text(raw_sale, "count_evidence")
+        if count is not None and (isinstance(count, bool) or not isinstance(count, int) or count < 1):
+            reject(raw_sale, index, "invalid_count", "The print lot count was invalid.")
+            continue
+        if sale_type == "dedicated":
+            valid_count = (count is None and count_kind == "unknown") or (
+                count is not None and count_kind in {"verified", "estimated"}
+            )
+            if not valid_count:
+                reject(raw_sale, index, "invalid_count", "Dedicated-sale count and count kind did not agree.")
+                continue
+        else:
+            if count is None or count_kind == "unknown":
+                reject(
+                    raw_sale,
+                    index,
+                    "mixed_count_unknown",
+                    "Mixed sales require a verified or defensible estimated print lot count.",
+                )
+                continue
+            if count_kind not in {"verified", "estimated"}:
+                reject(raw_sale, index, "invalid_count", "The mixed-sale count kind was invalid.")
+                continue
+            if count < config["minimum_print_lots"]:
+                reject(
+                    raw_sale,
+                    index,
+                    "mixed_below_threshold",
+                    f"The mixed sale had {count} print lots; {config['minimum_print_lots']} are required.",
+                )
+                continue
 
         official_url = _valid_web_url(raw_sale.get("official_sale_url"))
         if not official_url:
-            raise AuctionSearchMalformedError("OpenAI returned a sale without a valid official URL.")
+            reject(raw_sale, index, "missing_official_url", "The candidate lacked a valid official sale URL.")
+            continue
         source_values = raw_sale.get("supporting_sources")
         if not isinstance(source_values, list):
-            raise AuctionSearchMalformedError("OpenAI returned invalid supporting sources.")
+            reject(raw_sale, index, "missing_evidence", "Supporting sources were not a list.")
+            continue
         sources = []
         for value in [official_url, *source_values]:
             url = _valid_web_url(value)
@@ -428,12 +749,15 @@ def _normalize_auction_sales(raw_sales, config):
 
         print_types = raw_sale.get("print_types")
         if not isinstance(print_types, list) or any(not isinstance(value, str) for value in print_types):
-            raise AuctionSearchMalformedError("OpenAI returned invalid print types.")
+            reject(raw_sale, index, "invalid_candidate", "Print types were invalid.")
+            continue
         print_types = [value.strip() for value in print_types if value.strip()]
 
         dedupe_key = _normalized_url_key(official_url)
-        fallback_key = (auction_house.casefold(), sale_title.casefold(), start_at.isoformat())
+        relevant_at = start_at if start_in_window else end_at
+        fallback_key = (auction_house.casefold(), sale_title.casefold(), relevant_at.isoformat())
         if dedupe_key in seen or fallback_key in seen:
+            reject(raw_sale, index, "duplicate", "The same sale was already included.")
             continue
         seen.update({dedupe_key, fallback_key})
         normalized.append(
@@ -441,6 +765,7 @@ def _normalize_auction_sales(raw_sales, config):
                 "auction_house": auction_house,
                 "sale_title": sale_title,
                 "start_at": start_at,
+                "end_at": end_at,
                 "timezone": timezone_name,
                 "location": str(raw_sale.get("location") or "").strip(),
                 "online_format": str(raw_sale.get("online_format") or "").strip(),
@@ -448,19 +773,25 @@ def _normalize_auction_sales(raw_sales, config):
                 "print_lot_count": count,
                 "count_kind": count_kind,
                 "count_evidence": count_evidence,
+                "category_evidence": category_evidence,
+                "date_evidence": date_evidence,
                 "print_types": print_types,
                 "official_sale_url": official_url,
                 "supporting_sources": sources,
+                "relevant_at": relevant_at,
             }
         )
-    return sorted(normalized, key=lambda sale: sale["start_at"])
+    return (
+        sorted(normalized, key=lambda sale: sale["relevant_at"]),
+        {"filtered_counts": filtered_counts, "filtering_reasons": filtering_reasons},
+    )
 
 
 def _markdown_text(value):
     return str(value).replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]").replace("\n", " ").strip()
 
 
-def _render_auction_markdown(sales, config):
+def _render_auction_markdown(sales, config, research_meta):
     lines = [
         "# Upcoming Print Auctions",
         "",
@@ -469,36 +800,110 @@ def _render_auction_markdown(sales, config):
     ]
     if config["region"]:
         lines.append(f"**Region:** {_markdown_text(config['region'])}")
+    lines.extend(
+        [
+            "",
+            "## Research diagnostics",
+            "",
+            (
+                f"Ran {research_meta['search_count']} searches, opened {research_meta['open_page_count']} pages, "
+                f"and used find-in-page {research_meta['find_in_page_count']} times; found "
+                f"{research_meta['raw_candidate_count']} candidates and "
+                f"{research_meta['qualified_count']} qualifying auctions."
+            ),
+            "",
+            f"- **Response:** {_markdown_text(research_meta.get('response_id') or 'Unknown')} "
+            f"({_markdown_text(research_meta.get('response_status') or 'unknown')})",
+            f"- **Model/reasoning:** {_markdown_text(research_meta.get('model') or 'Unknown')} / "
+            f"{_markdown_text(research_meta.get('reasoning_effort') or 'Unknown')}",
+            f"- **Web-search calls/sources:** {research_meta['web_search_call_count']} / "
+            f"{research_meta['source_count']}",
+        ]
+    )
+    if research_meta["filtered_counts"]:
+        filter_summary = ", ".join(
+            f"{reason}: {count}" for reason, count in sorted(research_meta["filtered_counts"].items())
+        )
+        lines.append(f"- **Filtered candidates:** {_markdown_text(filter_summary)}")
+    for warning in research_meta.get("warnings", []):
+        lines.append(f"- **Warning:** {_markdown_text(warning)}")
     lines.append("")
 
     if not sales:
         lines.append("No qualifying upcoming print auctions were found in this window.")
-        return "\n".join(lines)
-
-    for sale in sales:
-        start_at = sale["start_at"]
-        date_heading = start_at.strftime("%Y-%m-%d")
-        format_parts = [part for part in [sale["location"], sale["online_format"]] if part]
-        source_links = [f"[Source {index}]({url})" for index, url in enumerate(sale["supporting_sources"], 1)]
-        lines.extend(
-            [
-                f"## {date_heading} — {_markdown_text(sale['auction_house'])} — {_markdown_text(sale['sale_title'])}",
-                "",
-                f"- **Date/time:** {start_at.strftime('%Y-%m-%d %H:%M %z')} ({_markdown_text(sale['timezone'])})",
-                f"- **Location/format:** {_markdown_text(' / '.join(format_parts) or 'Not stated')}",
-                f"- **Sale type:** {'Dedicated print/multiples sale' if sale['sale_type'] == 'dedicated' else 'Mixed sale'}",
-                f"- **Print/multiple lots:** {sale['print_lot_count']} ({sale['count_kind']}) — {_markdown_text(sale['count_evidence'])}",
-                f"- **Print types/sections:** {_markdown_text(', '.join(sale['print_types']) or 'Not stated')}",
-                f"- **Official sale:** [Auction-house sale page]({sale['official_sale_url']})",
-                f"- **Supporting sources:** {', '.join(source_links)}",
-                "",
+    else:
+        for sale in sales:
+            date_heading = sale["relevant_at"].strftime("%Y-%m-%d")
+            format_parts = [part for part in [sale["location"], sale["online_format"]] if part]
+            source_links = [
+                f"[Source {index}]({url})" for index, url in enumerate(sale["supporting_sources"], 1)
             ]
-        )
+            start_text = (
+                sale["start_at"].strftime("%Y-%m-%d %H:%M %z") if sale["start_at"] else "Not stated"
+            )
+            end_text = sale["end_at"].strftime("%Y-%m-%d %H:%M %z") if sale["end_at"] else "Not stated"
+            count_text = str(sale["print_lot_count"]) if sale["print_lot_count"] is not None else "Unknown"
+            lines.extend(
+                [
+                    f"## {date_heading} — {_markdown_text(sale['auction_house'])} — {_markdown_text(sale['sale_title'])}",
+                    "",
+                    f"- **Starts:** {start_text} ({_markdown_text(sale['timezone'])})",
+                    f"- **Closes/ends:** {end_text} ({_markdown_text(sale['timezone'])})",
+                    f"- **Date evidence:** {_markdown_text(sale['date_evidence'])}",
+                    f"- **Location/format:** {_markdown_text(' / '.join(format_parts) or 'Not stated')}",
+                    f"- **Sale type:** {'Dedicated print/multiples sale' if sale['sale_type'] == 'dedicated' else 'Mixed sale'}",
+                    f"- **Category evidence:** {_markdown_text(sale['category_evidence'])}",
+                    f"- **Print/multiple lots:** {count_text} ({sale['count_kind']}) — {_markdown_text(sale['count_evidence'])}",
+                    f"- **Print types/sections:** {_markdown_text(', '.join(sale['print_types']) or 'Not stated')}",
+                    f"- **Official sale:** [Auction-house sale page]({sale['official_sale_url']})",
+                    f"- **Supporting sources:** {', '.join(source_links)}",
+                    "",
+                ]
+            )
+
+    if research_meta.get("source_urls"):
+        lines.extend(["## Web-search sources", ""])
+        for index, url in enumerate(research_meta["source_urls"], 1):
+            lines.append(f"- [Research source {index}]({url})")
+        lines.append("")
     return "\n".join(lines).rstrip()
 
 
 def _research_upcoming_print_auctions(config):
-    response_payload = _call_auction_search_api(config)
+    retry_warning = None
+    response_payload = None
+    web_diagnostics = None
+    for attempt in range(2):
+        response_payload = _call_auction_search_api(config, discovery_retry=bool(attempt))
+        if not isinstance(response_payload, dict):
+            raise AuctionSearchMalformedError("OpenAI returned an unreadable response.")
+        web_diagnostics = _extract_web_search_diagnostics(response_payload)
+        if web_diagnostics["web_search_call_count"]:
+            break
+        retry_warning = "The initial response reported no web-search activity, so discovery was retried once."
+    else:
+        settings = _configured_auction_search_settings()
+        web_diagnostics.update(
+            {
+                "response_id": response_payload.get("id"),
+                "response_status": response_payload.get("status"),
+                "model": response_payload.get("model") or settings["model"],
+                "reasoning_effort": settings["reasoning_effort"],
+                "raw_candidate_count": 0,
+                "qualified_count": 0,
+                "filtered_counts": {},
+                "filtering_reasons": [],
+                "attempt_count": 2,
+            }
+        )
+        web_diagnostics["warnings"].append(
+            "No web_search_call occurred in either the initial response or the bounded retry."
+        )
+        raise AuctionSearchUpstreamError(
+            "OpenAI returned no web-search activity after one bounded retry.",
+            research_meta=web_diagnostics,
+        )
+
     if not isinstance(response_payload, dict):
         raise AuctionSearchMalformedError("OpenAI returned an unreadable response.")
     try:
@@ -514,14 +919,41 @@ def _research_upcoming_print_auctions(config):
     if not isinstance(structured, dict):
         raise AuctionSearchMalformedError("OpenAI returned malformed auction data.")
 
-    sales = _normalize_auction_sales(structured.get("sales"), config)
+    raw_sales = structured.get("sales")
+    sales, filtering = _normalize_auction_sales(raw_sales, config)
     cited_urls = _collect_response_urls(response_payload)
     source_urls = []
     for value in [*cited_urls, *(url for sale in sales for url in sale["supporting_sources"])]:
         key = _normalized_url_key(value)
         if key not in {_normalized_url_key(item) for item in source_urls}:
             source_urls.append(value)
-    return sales, source_urls
+
+    settings = _configured_auction_search_settings()
+    web_diagnostics.update(
+        {
+            "response_id": response_payload.get("id"),
+            "response_status": response_payload.get("status"),
+            "model": response_payload.get("model") or settings["model"],
+            "reasoning_effort": settings["reasoning_effort"],
+            "raw_candidate_count": len(raw_sales),
+            "qualified_count": len(sales),
+            "filtered_counts": filtering["filtered_counts"],
+            "filtering_reasons": filtering["filtering_reasons"],
+            "source_urls": source_urls,
+            "attempt_count": 2 if retry_warning else 1,
+        }
+    )
+    if retry_warning:
+        web_diagnostics["warnings"].append(retry_warning)
+    return sales, source_urls, web_diagnostics
+
+
+def _serialize_auction_sale(sale):
+    return {
+        key: (value.isoformat() if key in {"start_at", "end_at"} and value is not None else value)
+        for key, value in sale.items()
+        if key != "relevant_at"
+    }
 
 
 def _generate_description(artwork, use_web=True):
@@ -541,7 +973,7 @@ Artwork facts:
     body = {
         "model": os.environ.get("OPENAI_DESCRIPTION_MODEL", "gpt-5.6"),
         "input": prompt,
-        "max_output_tokens": 45000,
+        "max_output_tokens": 450,
         "temperature": 0.4,
     }
     if use_web:
@@ -650,17 +1082,26 @@ def search_upcoming_print_auctions(request):
         return JsonResponse({"error": str(exc)}, status=400)
 
     try:
-        sales, source_urls = _research_upcoming_print_auctions(config)
-    except AuctionSearchTimeout:
-        return JsonResponse({"error": "Auction research timed out. Please try again."}, status=504)
+        sales, source_urls, research_meta = _research_upcoming_print_auctions(config)
+    except AuctionSearchTimeout as exc:
+        error_payload = {"error": "Auction research timed out. Please try again."}
+        if exc.research_meta:
+            error_payload["research_meta"] = exc.research_meta
+        return JsonResponse(error_payload, status=504)
     except AuctionSearchMalformedError as exc:
-        return JsonResponse({"error": str(exc)}, status=502)
+        error_payload = {"error": str(exc)}
+        if exc.research_meta:
+            error_payload["research_meta"] = exc.research_meta
+        return JsonResponse(error_payload, status=502)
     except AuctionSearchUpstreamError as exc:
-        return JsonResponse({"error": str(exc)}, status=502)
+        error_payload = {"error": str(exc)}
+        if exc.research_meta:
+            error_payload["research_meta"] = exc.research_meta
+        return JsonResponse(error_payload, status=502)
 
     return JsonResponse(
         {
-            "markdown": _render_auction_markdown(sales, config),
+            "markdown": _render_auction_markdown(sales, config, research_meta),
             "window": {
                 "start": config["start"].isoformat(),
                 "end": config["end"].isoformat(),
@@ -670,7 +1111,9 @@ def search_upcoming_print_auctions(request):
             "minimum_print_lots": config["minimum_print_lots"],
             "region": config["region"],
             "auction_count": len(sales),
+            "sales": [_serialize_auction_sale(sale) for sale in sales],
             "source_urls": source_urls,
+            "research_meta": research_meta,
         }
     )
 
