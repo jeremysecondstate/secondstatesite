@@ -1,0 +1,403 @@
+import importlib
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+from django.apps import apps
+from django.conf import settings
+from django.test import SimpleTestCase, TestCase
+from django.urls import NoReverseMatch, reverse
+
+from catalogapp.bookmark_watchlist import (
+    BookmarkEntry,
+    artist_source_counts,
+    canonicalize_bookmark_url,
+    load_bookmarks_file,
+    parse_bookmarks_html,
+    repeatedly_decode,
+)
+from catalogapp.watchlist_adapters import InvaluableAdapter
+from catalogapp.watchlist_cache import WatchlistCache
+from catalogapp.watchlist_enrichment import OpenAIEnricher
+from catalogapp.watchlist_exports import render_csv, render_ics, render_markdown
+from catalogapp.watchlist_fetch import HttpPageFetcher, SourceAccessError
+from catalogapp.watchlist_models import NormalizedLot, mark_cross_source_duplicates
+from catalogapp.watchlist_service import WatchlistService
+
+
+FIXTURES = Path(__file__).parent / "test_fixtures" / "watchlist"
+
+
+def fixture(name):
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+def sample_lot(**overrides):
+    payload = {
+        "source": "Invaluable",
+        "source_lot_id": "inv-24",
+        "artist": "Rufino Tamayo",
+        "artist_watchlist_name": "Rufino Tamayo",
+        "title": "Mixografía",
+        "medium": "Color mixografía on paper",
+        "auction_house": "House A",
+        "sale_title": "Modern Prints",
+        "lot_number": "24",
+        "end_at": "2026-07-18T17:00:00-04:00",
+        "estimate_low": 2000,
+        "estimate_high": 3000,
+        "currency": "USD",
+        "lot_url": "https://www.invaluable.com/auction-lot/tamayo-mixografia-24",
+        "sale_url": "https://www.invaluable.com/catalog/modern-prints",
+    }
+    payload.update(overrides)
+    return NormalizedLot(**payload)
+
+
+class BookmarkParserTests(SimpleTestCase):
+    def test_selected_folder_allowed_domains_icon_ignored_and_deduplicated(self):
+        entries = load_bookmarks_file(FIXTURES / "bookmarks.html", selected_folders=["ARTISTS INVALUABLE"])
+
+        self.assertEqual(len(entries), 2)
+        self.assertEqual({entry.artist for entry in entries}, {"Rufino Tamayo", "Thomas Hart Benton"})
+        self.assertTrue(all(entry.source == "Invaluable" for entry in entries))
+        self.assertNotIn("PRIVATE-ICON-DATA", repr(entries))
+        self.assertNotIn("drive.google.com", repr(entries))
+
+    def test_repeated_url_decoding_and_nested_artist_query(self):
+        self.assertEqual(repeatedly_decode("Rufino%252520Tamayo"), "Rufino Tamayo")
+        entries = load_bookmarks_file(FIXTURES / "bookmarks.html")
+        self.assertIn("Joan Miró", {entry.artist for entry in entries})
+
+    def test_folder_and_domain_filters_reject_private_urls(self):
+        entries = load_bookmarks_file(FIXTURES / "bookmarks.html", selected_folders=["PRIVATE"])
+        self.assertEqual(entries, [])
+
+        html = '<DL><DT><H3>ARTISTS INVALUABLE</H3><DL><DT><A HREF="javascript:alert(1)">Bad</A></DL></DL>'
+        self.assertEqual(parse_bookmarks_html(html), [])
+
+    def test_canonical_url_deduplication_removes_tracking_and_sorts_query(self):
+        first = canonicalize_bookmark_url(
+            "HTTPS://WWW.INVALUABLE.COM/search/?utm_source=x&sort=end&keyword=Rufino%20Tamayo#results"
+        )
+        second = canonicalize_bookmark_url(
+            "https://www.invaluable.com/search?keyword=Rufino%20Tamayo&sort=end"
+        )
+        self.assertEqual(first, second)
+
+    def test_artist_preview_reports_source_counts(self):
+        counts = artist_source_counts(load_bookmarks_file(FIXTURES / "bookmarks.html"))
+        self.assertEqual(counts["Rufino Tamayo"], {"Invaluable": 1})
+        self.assertEqual(counts["Joan Miró"], {"LiveAuctioneers": 1})
+
+
+class InvaluableAdapterTests(SimpleTestCase):
+    def setUp(self):
+        self.adapter = InvaluableAdapter()
+        self.url = "https://www.invaluable.com/search?keyword=Rufino+Tamayo"
+
+    def test_parses_dom_cards_and_embedded_json(self):
+        page = fixture("invaluable_search.html")
+        lots = self.adapter.parse_search_page(page, self.url, "Rufino Tamayo")
+
+        self.assertEqual({lot.source_lot_id for lot in lots}, {"inv-24", "inv-81"})
+        card = next(lot for lot in lots if lot.source_lot_id == "inv-24")
+        self.assertEqual(card.estimate_low, 2000)
+        self.assertEqual(card.current_bid, 1500)
+        self.assertEqual(card.end_at, "2026-07-18T17:00:00-04:00")
+        self.assertEqual(card.sale_url, "https://www.invaluable.com/catalog/modern-prints")
+        self.assertIn("https://www.invaluable.com/auction-lot/", self.adapter.extract_lot_links(page, self.url)[0])
+
+    def test_detail_normalization_fills_missing_fields(self):
+        detail = self.adapter.parse_lot_detail(
+            fixture("invaluable_detail.html"),
+            "https://www.invaluable.com/auction-lot/tamayo-lithograph-81",
+            "Rufino Tamayo",
+        )
+        self.assertIsNotNone(detail)
+        self.assertEqual(detail.medium, "Lithograph on wove paper")
+        self.assertEqual(detail.auction_house, "House A")
+        self.assertFalse(self.adapter.needs_detail(detail))
+
+    def test_extracts_pagination(self):
+        next_url = self.adapter.extract_next_page_url(fixture("invaluable_page_1.html"), self.url)
+        self.assertEqual(next_url, "https://www.invaluable.com/search?keyword=Rufino+Tamayo&page=2")
+        self.assertEqual(self.adapter.extract_next_page_url(fixture("invaluable_page_2.html"), next_url), "")
+
+
+class _Response:
+    def __init__(self, status_code, text="", payload=None, headers=None, url=""):
+        self.status_code = status_code
+        self.text = text
+        self._payload = payload
+        self.headers = headers or {"Content-Type": "text/html"}
+        self.url = url
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+    def json(self):
+        return self._payload
+
+
+class _HttpSession:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = []
+
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return self.responses.pop(0)
+
+
+class FetcherTests(SimpleTestCase):
+    def test_retries_transient_error_and_rate_limit_is_injected(self):
+        sleeps = []
+        session = _HttpSession([_Response(500), _Response(200, "<html>ok</html>")])
+        fetcher = HttpPageFetcher(
+            session=session,
+            min_interval_seconds=0,
+            max_retries=1,
+            sleeper=sleeps.append,
+        )
+
+        page = fetcher.fetch("https://www.invaluable.com/search?q=test")
+
+        self.assertEqual(page, "<html>ok</html>")
+        self.assertEqual(fetcher.pages_fetched, 1)
+        self.assertEqual(fetcher.http_attempts, 2)
+        self.assertEqual(sleeps, [1.0])
+
+    def test_rejects_redirect_outside_the_domain_allowlist(self):
+        session = _HttpSession([_Response(200, "private", url="http://127.0.0.1/private")])
+        fetcher = HttpPageFetcher(session=session, min_interval_seconds=0, max_retries=0)
+        with self.assertRaises(SourceAccessError):
+            fetcher.fetch("https://www.invaluable.com/search?q=test")
+
+
+class CacheAndServiceTests(SimpleTestCase):
+    def test_cache_new_changed_unchanged_and_ended_transitions(self):
+        with WatchlistCache(":memory:") as cache:
+            watch_url = "https://www.invaluable.com/search?q=tamayo"
+            first = sample_lot()
+            self.assertEqual(cache.upsert(first, watch_url=watch_url, search_hash="card-a"), "new")
+
+            same = sample_lot()
+            self.assertEqual(cache.upsert(same, watch_url=watch_url, search_hash="card-a"), "unchanged")
+            self.assertIsNotNone(cache.lookup(same))
+
+            changed = sample_lot(current_bid=1750)
+            self.assertEqual(cache.upsert(changed, watch_url=watch_url, search_hash="card-b"), "changed")
+            ended = cache.mark_missing_ended(watch_url, [])
+            self.assertEqual([lot.status for lot in ended], ["ended"])
+
+    def test_incremental_refresh_skips_unchanged_details_and_marks_removed_lot_ended(self):
+        search_url = "https://www.invaluable.com/search?keyword=Rufino+Tamayo"
+        detail_url = "https://www.invaluable.com/auction-lot/tamayo-lithograph-81"
+        entry = BookmarkEntry(
+            ("ARTISTS INVALUABLE",),
+            "Rufino Tamayo",
+            search_url,
+            artist="Rufino Tamayo",
+            source="Invaluable",
+        )
+
+        class Fetcher:
+            def __init__(self, search_page):
+                self.search_page = search_page
+                self.pages_fetched = 0
+                self.urls = []
+
+            def fetch(self, url):
+                self.pages_fetched += 1
+                self.urls.append(url)
+                if url == search_url:
+                    return self.search_page
+                if url == detail_url:
+                    return fixture("invaluable_detail.html")
+                raise AssertionError(f"Unexpected URL: {url}")
+
+        fixed_now = lambda: datetime(2026, 7, 13, 12, tzinfo=timezone.utc)
+        with WatchlistCache(":memory:") as cache:
+            first_fetcher = Fetcher(fixture("invaluable_search.html"))
+            first = WatchlistService(cache, fetcher=first_fetcher, now=fixed_now).refresh(
+                [entry], selected_artists=["Rufino Tamayo"], zero_ai=True
+            )
+            self.assertEqual(first.metrics.new_lots, 2)
+            self.assertEqual(first.metrics.pages_fetched, 2)
+            self.assertIn(detail_url, first_fetcher.urls)
+
+            second_fetcher = Fetcher(fixture("invaluable_search.html"))
+            second = WatchlistService(cache, fetcher=second_fetcher, now=fixed_now).refresh(
+                [entry], selected_artists=["Rufino Tamayo"], zero_ai=True
+            )
+            self.assertEqual(second.metrics.pages_fetched, 1)
+            self.assertEqual(second.metrics.cache_hits, 2)
+            self.assertNotIn(detail_url, second_fetcher.urls)
+
+            changed_fetcher = Fetcher(fixture("invaluable_search_changed.html"))
+            changed = WatchlistService(cache, fetcher=changed_fetcher, now=fixed_now).refresh(
+                [entry], selected_artists=["Rufino Tamayo"], zero_ai=True
+            )
+            self.assertEqual(changed.metrics.changed_lots, 1)
+
+            one_lot_page = fixture("invaluable_search_changed.html").split('<script id="__NEXT_DATA__"')[0] + "</body></html>"
+            ended_fetcher = Fetcher(one_lot_page)
+            ended = WatchlistService(cache, fetcher=ended_fetcher, now=fixed_now).refresh(
+                [entry], selected_artists=["Rufino Tamayo"], zero_ai=True, new_changed_only=True
+            )
+            self.assertEqual(ended.metrics.ended_lots, 1)
+            self.assertIn("ended", {lot.status for lot in ended.lots})
+
+    def test_service_follows_bounded_pagination(self):
+        first_url = "https://www.invaluable.com/search?keyword=Rufino+Tamayo"
+        second_url = "https://www.invaluable.com/search?keyword=Rufino+Tamayo&page=2"
+        entry = BookmarkEntry(("ARTISTS INVALUABLE",), "Rufino Tamayo", first_url, artist="Rufino Tamayo", source="Invaluable")
+
+        class Fetcher:
+            pages_fetched = 0
+
+            def fetch(self, url):
+                self.pages_fetched += 1
+                return fixture("invaluable_page_1.html" if url == first_url else "invaluable_page_2.html")
+
+        with WatchlistCache(":memory:") as cache:
+            result = WatchlistService(
+                cache,
+                fetcher=Fetcher(),
+                now=lambda: datetime(2026, 7, 13, tzinfo=timezone.utc),
+            ).refresh([entry], selected_artists=["Rufino Tamayo"])
+        self.assertEqual(result.metrics.pages_fetched, 2)
+        self.assertEqual(len(result.lots), 2)
+
+
+class ExportTests(SimpleTestCase):
+    def test_markdown_csv_and_sale_grouped_ics(self):
+        first = sample_lot()
+        second = sample_lot(source_lot_id="inv-81", lot_number="81", title="Lithograph", lot_url="https://www.invaluable.com/auction-lot/81")
+
+        markdown = render_markdown([second, first])
+        csv_text = render_csv([first, second])
+        ics = render_ics([first, second], generated_at=datetime(2026, 7, 13, tzinfo=timezone.utc))
+
+        self.assertIn("## 2026-07-18", markdown)
+        self.assertIn("### Rufino Tamayo", markdown)
+        self.assertEqual(csv_text.count("\n"), 3)
+        self.assertEqual(ics.count("BEGIN:VEVENT"), 1)
+        self.assertIn("SUMMARY:Invaluable — 2 watched print lots", ics)
+        self.assertTrue(ics.endswith("END:VCALENDAR\r\n"))
+        self.assertNotIn("\n", ics.replace("\r\n", ""))
+
+    def test_date_only_becomes_all_day_with_unverified_label(self):
+        lot = sample_lot(end_at="2026-07-18")
+        ics = render_ics([lot], generated_at=datetime(2026, 7, 13, tzinfo=timezone.utc))
+        self.assertIn("DTSTART;VALUE=DATE:20260718", ics)
+        self.assertIn("time is unverified", ics)
+
+    def test_cross_source_duplicates_are_marked_not_hidden(self):
+        first = sample_lot()
+        second = sample_lot(source="Other", source_lot_id="other-1", lot_url="https://drouot.com/l/1")
+        lots = mark_cross_source_duplicates([first, second])
+        self.assertEqual(len(lots), 2)
+        self.assertEqual(second.duplicate_of, first.cache_key)
+
+
+class _OpenAISession:
+    def __init__(self):
+        self.calls = []
+
+    def post(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        payload = {
+            "output_text": json.dumps(
+                {
+                    "records": [
+                        {
+                            "index": index,
+                            "normalized_artist": "Rufino Tamayo",
+                            "is_print": True,
+                            "medium": "Lithograph",
+                            "end_at": "2026-07-18T17:00:00-04:00",
+                            "duplicate_group": None,
+                            "confidence": 0.97,
+                        }
+                        for index in range(len(kwargs["json"]["input"][1]["content"][0]["text"]) and 2)
+                    ]
+                }
+            ),
+            "usage": {"input_tokens": 120, "output_tokens": 40, "total_tokens": 160},
+        }
+        return _Response(200, payload=payload, headers={"Content-Type": "application/json"})
+
+
+class EnrichmentTests(SimpleTestCase):
+    def ambiguous_lots(self):
+        return [
+            sample_lot(source_lot_id="a", medium="", ambiguities=["print_classification"]),
+            sample_lot(source_lot_id="b", lot_url="https://www.invaluable.com/auction-lot/b", medium="", ambiguities=["print_classification"]),
+        ]
+
+    def test_zero_ai_mode_makes_no_request(self):
+        session = _OpenAISession()
+        with WatchlistCache(":memory:") as cache:
+            metrics = OpenAIEnricher(cache, api_key="test", enabled=True, session=session).enrich(
+                self.ambiguous_lots(), zero_ai=True
+            )
+        self.assertEqual(session.calls, [])
+        self.assertEqual(metrics.records_enriched, 0)
+
+    def test_compact_strict_batch_is_cached_by_content_hash(self):
+        session = _OpenAISession()
+        with WatchlistCache(":memory:") as cache:
+            enricher = OpenAIEnricher(cache, api_key="test", enabled=True, session=session)
+            lots = self.ambiguous_lots()
+            metrics = enricher.enrich(lots, zero_ai=False)
+            self.assertEqual(metrics.records_enriched, 2)
+            self.assertEqual(metrics.total_tokens, 160)
+            self.assertEqual(len(session.calls), 1)
+            body = session.calls[0][1]["json"]
+            body_text = json.dumps(body)
+            self.assertTrue(body["text"]["format"]["strict"])
+            self.assertNotIn("web_search", body_text)
+            self.assertNotIn("lot_url", body_text)
+            self.assertNotIn("bookmark", body["input"][1]["content"][0]["text"].casefold())
+
+            cached_lots = self.ambiguous_lots()
+            cached_metrics = enricher.enrich(cached_lots, zero_ai=False)
+            self.assertEqual(len(session.calls), 1)
+            self.assertEqual(cached_metrics.cache_hits, 2)
+
+
+class LegacyRemovalRegressionTests(TestCase):
+    def test_legacy_routes_are_not_registered(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse("search_upcoming_print_auctions")
+        response = self.client.get("/artworks/search_upcoming_print_auctions/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_job_model_is_removed_from_runtime_and_delete_migration_is_additive(self):
+        self.assertNotIn("AuctionSearchJob", {model.__name__ for model in apps.get_models()})
+        old_migration = importlib.import_module("secondstateapp.migrations.0012_auctionsearchjob")
+        delete_migration = importlib.import_module("secondstateapp.migrations.0013_delete_auctionsearchjob")
+        self.assertEqual(old_migration.Migration.operations[0].name, "AuctionSearchJob")
+        self.assertEqual(delete_migration.Migration.dependencies, [("secondstateapp", "0012_auctionsearchjob")])
+        self.assertEqual(delete_migration.Migration.operations[0].name, "AuctionSearchJob")
+
+    def test_old_desktop_and_backend_entry_points_are_gone(self):
+        root = Path(settings.BASE_DIR)
+        ui_source = (root / "catalogapp" / "catalogapp_inv_ui.py").read_text(encoding="utf-8")
+        api_source = (root / "secondstateapp" / "catalog_api_views.py").read_text(encoding="utf-8")
+        urls_source = (root / "secondstateapp" / "urls.py").read_text(encoding="utf-8")
+        models_source = (root / "secondstateapp" / "models.py").read_text(encoding="utf-8")
+
+        self.assertIn("Artist Watchlist", ui_source)
+        self.assertNotIn("Auction Search", ui_source)
+        self.assertNotIn("request_upcoming_auction_search", ui_source)
+        self.assertNotIn("search_upcoming_print_auctions", api_source + urls_source)
+        self.assertNotIn("AuctionSearchJob", api_source + models_source)
+
+    def test_watchlist_modules_have_no_hosted_search_tool(self):
+        root = Path(settings.BASE_DIR) / "catalogapp"
+        sources = "\n".join(path.read_text(encoding="utf-8") for path in root.glob("watchlist_*.py"))
+        self.assertNotIn('"type": "web_search"', sources)

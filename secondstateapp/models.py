@@ -5,7 +5,6 @@ from PIL import Image
 from io import BytesIO
 from django.core.files.base import ContentFile
 import os
-import uuid
 
 
 class SoldPiece(models.Model):
@@ -133,35 +132,3 @@ class UserProfile(models.Model):
     def favorite_artists_list(self):
         raw_value = (self.favorite_artists or "").replace("\n", ",")
         return [item.strip() for item in raw_value.split(",") if item.strip()]
-
-
-class AuctionSearchJob(models.Model):
-    class State(models.TextChoices):
-        PENDING = "pending", "Pending"
-        COMPLETED = "completed", "Completed"
-        FAILED = "failed", "Failed"
-        TIMED_OUT = "timed_out", "Timed out"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    correlation_id = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True)
-    requester_fingerprint = models.CharField(max_length=80, db_index=True)
-    state = models.CharField(max_length=20, choices=State.choices, default=State.PENDING, db_index=True)
-    openai_response_id = models.CharField(max_length=255)
-    openai_status = models.CharField(max_length=32, blank=True)
-    config = models.JSONField()
-    openai_settings = models.JSONField()
-    attempt_count = models.PositiveSmallIntegerField(default=1)
-    retry_warning = models.TextField(blank=True)
-    timeout_seconds = models.PositiveIntegerField()
-    attempt_deadline_at = models.DateTimeField(db_index=True)
-    last_polled_at = models.DateTimeField(blank=True, null=True)
-    result = models.JSONField(blank=True, null=True)
-    error = models.JSONField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"Auction search {self.id} ({self.state})"
