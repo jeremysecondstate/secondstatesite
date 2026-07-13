@@ -234,7 +234,7 @@ Artwork facts:
     body = {
         "model": os.environ.get(DESCRIPTION_MODEL_ENV, DEFAULT_DESCRIPTION_MODEL),
         "input": prompt,
-        "max_output_tokens": 450,
+        "max_output_tokens": 45000,
         "temperature": 0.4,
     }
     if use_web:

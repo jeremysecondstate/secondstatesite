@@ -298,7 +298,7 @@ def _call_auction_search_api(config):
         "tools": [{"type": "web_search", "search_context_size": "high"}],
         "tool_choice": "auto",
         "include": ["web_search_call.action.sources"],
-        "max_output_tokens": 6000,
+        "max_output_tokens": 60000,
         "text": {
             "format": {
                 "type": "json_schema",
@@ -541,7 +541,7 @@ Artwork facts:
     body = {
         "model": os.environ.get("OPENAI_DESCRIPTION_MODEL", "gpt-4.1"),
         "input": prompt,
-        "max_output_tokens": 450,
+        "max_output_tokens": 45000,
         "temperature": 0.4,
     }
     if use_web:
