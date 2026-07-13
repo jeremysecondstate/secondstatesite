@@ -20,6 +20,7 @@ urlpatterns = [
     path("artworks/manage_json/", catalog_api_views.artwork_manage_list, name="artwork_manage_list"),
     path("artworks/reorder_artworks/", catalog_api_views.reorder_artworks, name="reorder_artworks"),
     path("artworks/generate_description/", catalog_api_views.generate_catalog_description_from_payload, name="generate_catalog_description_from_payload"),
+    path("artworks/search_upcoming_print_auctions/", catalog_api_views.search_upcoming_print_auctions, name="search_upcoming_print_auctions"),
     path("artworks/<int:pk>/", views.artwork_detail, name="artwork_detail"),
     path("artworks/<int:pk>/edit/", views.artwork_edit, name="artwork_edit"),
     path("artworks/<int:pk>/generate_description/", views.generate_artwork_description, name="generate_artwork_description"),

@@ -1,5 +1,7 @@
 import os
+import threading
 import webbrowser
+from datetime import datetime
 from functools import partial
 
 import pandas as pd
@@ -113,9 +115,11 @@ class ArtCatalogApp:
         tab_results = ttk.Frame(notebook, padding=10)
         tab_details = ttk.Frame(notebook, padding=10)
         tab_preview = ttk.Frame(notebook, padding=10)
+        tab_auction_search = ttk.Frame(notebook, padding=10)
         notebook.add(tab_results, text="Results")
         notebook.add(tab_details, text="Details")
         notebook.add(tab_preview, text="Preview Text")
+        notebook.add(tab_auction_search, text="Auction Search")
 
         cols = ("Artist", "Title", "Year", "Medium", "Catalog #")
         self.tree = ttk.Treeview(tab_results, columns=cols, show="headings", style="Catalog.Treeview", selectmode="extended")
@@ -134,8 +138,167 @@ class ArtCatalogApp:
         self.text_display = scrolledtext.ScrolledText(tab_preview, wrap=tk.WORD, font=("Segoe UI", 11))
         self.text_display.pack(fill=tk.BOTH, expand=True)
         self.text_display.configure(state=tk.DISABLED)
+        self._build_auction_search_tab(tab_auction_search)
         self.status = ttk.Label(self.master, text="Loading shared catalog database...", anchor="w", padding=(16, 6))
         self.status.pack(fill=tk.X)
+
+    def _build_auction_search_tab(self, tab):
+        tab.columnconfigure(0, weight=1)
+        tab.rowconfigure(3, weight=1)
+
+        ttk.Label(tab, text="Upcoming Print Auction Web Research", style="Header.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            tab,
+            text="Find qualifying print and multiples sales in the next 3 or 7 days. Research runs securely through the SecondState server.",
+            style="Subtle.TLabel",
+            wraplength=850,
+        ).grid(row=1, column=0, sticky="ew", pady=(2, 10))
+
+        controls = ttk.LabelFrame(tab, text="Search criteria", padding=10)
+        controls.grid(row=2, column=0, sticky="ew", pady=(0, 10))
+        controls.columnconfigure(3, weight=1)
+
+        self.auction_horizon_var = tk.IntVar(value=7)
+        self.auction_minimum_var = tk.StringVar(value="10")
+        self.auction_region_var = tk.StringVar()
+
+        ttk.Label(controls, text="Horizon").grid(row=0, column=0, sticky="w", padx=(0, 8))
+        ttk.Radiobutton(controls, text="3 days", variable=self.auction_horizon_var, value=3).grid(row=0, column=1, sticky="w")
+        ttk.Radiobutton(controls, text="7 days", variable=self.auction_horizon_var, value=7).grid(row=0, column=2, sticky="w", padx=(0, 18))
+        ttk.Label(controls, text="Minimum print lots in a mixed sale").grid(row=0, column=3, sticky="e", padx=(0, 8))
+        ttk.Entry(controls, textvariable=self.auction_minimum_var, width=8).grid(row=0, column=4, sticky="w")
+
+        ttk.Label(controls, text="Region (optional)").grid(row=1, column=0, sticky="w", pady=(8, 0), padx=(0, 8))
+        ttk.Entry(controls, textvariable=self.auction_region_var).grid(row=1, column=1, columnspan=4, sticky="ew", pady=(8, 0))
+        ttk.Label(controls, text="Additional instructions (optional)").grid(row=2, column=0, sticky="nw", pady=(8, 0), padx=(0, 8))
+        self.auction_instructions_text = tk.Text(controls, height=3, wrap=tk.WORD, font=("Segoe UI", 10))
+        self.auction_instructions_text.grid(row=2, column=1, columnspan=4, sticky="ew", pady=(8, 0))
+
+        action_row = ttk.Frame(controls)
+        action_row.grid(row=3, column=0, columnspan=5, sticky="ew", pady=(10, 0))
+        action_row.columnconfigure(2, weight=1)
+        self.auction_search_button = ttk.Button(
+            action_row,
+            text="Search",
+            command=self.search_upcoming_auctions,
+            style="Accent.TButton",
+        )
+        self.auction_search_button.grid(row=0, column=0, sticky="w")
+        self.auction_progress = ttk.Progressbar(action_row, mode="indeterminate", length=150)
+        self.auction_progress.grid(row=0, column=1, sticky="w", padx=(10, 0))
+        self.auction_status = ttk.Label(action_row, text="Ready.", style="Subtle.TLabel")
+        self.auction_status.grid(row=0, column=2, sticky="w", padx=(10, 0))
+
+        output_frame = ttk.LabelFrame(tab, text="Markdown output", padding=8)
+        output_frame.grid(row=3, column=0, sticky="nsew")
+        self.auction_markdown_text = scrolledtext.ScrolledText(output_frame, wrap=tk.WORD, font=("Consolas", 10))
+        self.auction_markdown_text.pack(fill=tk.BOTH, expand=True)
+
+        output_buttons = ttk.Frame(tab)
+        output_buttons.grid(row=4, column=0, sticky="ew", pady=(10, 0))
+        ttk.Button(output_buttons, text="Copy Markdown", command=self.copy_auction_markdown).pack(side=tk.LEFT)
+        ttk.Button(output_buttons, text="Save Markdown", command=self.save_auction_markdown).pack(side=tk.LEFT, padx=(8, 0))
+
+    def _set_auction_search_busy(self, busy, status_text):
+        self.auction_search_button.config(state=tk.DISABLED if busy else tk.NORMAL)
+        self.auction_status.config(text=status_text)
+        if busy:
+            self.auction_progress.start(12)
+        else:
+            self.auction_progress.stop()
+
+    def _request_upcoming_auction_search(self, payload):
+        response = requests.post(
+            f"{BASE_URL}/artworks/search_upcoming_print_auctions/",
+            json=payload,
+            headers=api_headers({"Content-Type": "application/json"}),
+            timeout=150,
+        )
+        if response.status_code >= 400:
+            try:
+                detail = response.json().get("error") or response.text
+            except ValueError:
+                detail = response.text
+            raise RuntimeError(detail or f"Auction search failed with status {response.status_code}.")
+        try:
+            result = response.json()
+        except ValueError as exc:
+            raise RuntimeError("The server returned an invalid auction-search response.") from exc
+        if not isinstance(result.get("markdown"), str):
+            raise RuntimeError("The server response did not include Markdown output.")
+        return result
+
+    def search_upcoming_auctions(self):
+        try:
+            minimum_count = int(self.auction_minimum_var.get().strip())
+        except ValueError:
+            messagebox.showwarning("Invalid Minimum", "Minimum print lots must be a whole number from 1 to 500.")
+            return
+        if not 1 <= minimum_count <= 500:
+            messagebox.showwarning("Invalid Minimum", "Minimum print lots must be a whole number from 1 to 500.")
+            return
+
+        payload = {
+            "horizon_days": self.auction_horizon_var.get(),
+            "minimum_print_lots": minimum_count,
+            "region": self.auction_region_var.get().strip(),
+            "additional_instructions": self.auction_instructions_text.get("1.0", tk.END).strip(),
+            "client_now": datetime.now().astimezone().isoformat(timespec="seconds"),
+        }
+        self.auction_markdown_text.delete("1.0", tk.END)
+        self._set_auction_search_busy(True, "Researching official auction sources…")
+        self._set_status("Auction web research is running.")
+
+        def worker():
+            try:
+                result = self._request_upcoming_auction_search(payload)
+            except Exception as exc:
+                error_message = str(exc)
+                self.master.after(0, lambda: self._finish_auction_search_error(error_message))
+                return
+            self.master.after(0, lambda: self._finish_auction_search_success(result))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_auction_search_success(self, result):
+        markdown = result.get("markdown", "")
+        count = result.get("auction_count", 0)
+        self.auction_markdown_text.delete("1.0", tk.END)
+        self.auction_markdown_text.insert(tk.END, markdown)
+        label = f"Found {count} qualifying auction{'s' if count != 1 else ''}."
+        self._set_auction_search_busy(False, label)
+        self._set_status(label)
+
+    def _finish_auction_search_error(self, error_message):
+        self._set_auction_search_busy(False, "Search failed.")
+        self._set_status("Auction web research failed.")
+        messagebox.showerror("Auction Search Failed", error_message)
+
+    def copy_auction_markdown(self):
+        markdown = self.auction_markdown_text.get("1.0", tk.END).strip()
+        if not markdown:
+            messagebox.showwarning("Nothing to Copy", "Run an auction search first.")
+            return
+        self.master.clipboard_clear()
+        self.master.clipboard_append(markdown)
+        self.auction_status.config(text="Markdown copied to clipboard.")
+
+    def save_auction_markdown(self):
+        markdown = self.auction_markdown_text.get("1.0", tk.END).strip()
+        if not markdown:
+            messagebox.showwarning("Nothing to Save", "Run an auction search first.")
+            return
+        file_path = filedialog.asksaveasfilename(
+            title="Save auction research",
+            defaultextension=".md",
+            initialfile=f"upcoming-print-auctions-{datetime.now():%Y-%m-%d}.md",
+            filetypes=[("Markdown", "*.md"), ("Text", "*.txt"), ("All Files", "*.*")],
+        )
+        if not file_path:
+            return
+        with open(file_path, "w", encoding="utf-8", newline="\n") as output_file:
+            output_file.write(markdown + "\n")
+        self.auction_status.config(text=f"Saved {os.path.basename(file_path)}.")
 
     def _set_status(self, text):
         self.status.config(text=text)
