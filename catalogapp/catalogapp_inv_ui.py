@@ -1,5 +1,7 @@
 import os
 import threading
+import time
+import urllib.parse
 import webbrowser
 from datetime import datetime
 from functools import partial
@@ -17,6 +19,10 @@ APP_MIN_W, APP_MIN_H = 1180, 820
 CATALOG_API_KEY = os.environ.get("CATALOG_API_KEY", "276e19f127f140623e73e6c160bbd8ed")
 DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
 DEFAULT_CATALOG_SHEET = "Inventory for July 2026"
+AUCTION_SEARCH_START_PATH = "/artworks/search_upcoming_print_auctions/"
+AUCTION_SEARCH_ACTIVE_STATUSES = {"queued", "in_progress", "retrying"}
+AUCTION_SEARCH_POLL_INTERVAL_SECONDS = 2
+DEFAULT_AUCTION_SEARCH_CLIENT_TIMEOUT_SECONDS = 1900
 
 
 def api_headers(extra=None):
@@ -24,6 +30,134 @@ def api_headers(extra=None):
     if extra:
         headers.update(extra)
     return headers
+
+
+class AuctionSearchClientError(RuntimeError):
+    pass
+
+
+def _auction_client_timeout_seconds():
+    try:
+        configured = int(
+            os.environ.get(
+                "SECONDSTATE_AUCTION_SEARCH_TIMEOUT_SECONDS",
+                DEFAULT_AUCTION_SEARCH_CLIENT_TIMEOUT_SECONDS,
+            )
+        )
+    except (TypeError, ValueError):
+        configured = DEFAULT_AUCTION_SEARCH_CLIENT_TIMEOUT_SECONDS
+    return max(60, min(configured, 2400))
+
+
+def _auction_response_correlation_id(response, payload=None):
+    if isinstance(payload, dict) and payload.get("correlation_id"):
+        return str(payload["correlation_id"])
+    headers = getattr(response, "headers", {}) or {}
+    return str(headers.get("X-Correlation-ID") or "").strip()
+
+
+def _safe_auction_error_detail(value, fallback):
+    if not isinstance(value, str):
+        return fallback
+    detail = " ".join(value.split()).strip()
+    lowered = detail.lower()
+    if not detail or "<html" in lowered or "<!doctype" in lowered or "</body" in lowered:
+        return fallback
+    return detail[:500]
+
+
+def _auction_client_error(message, correlation_id=""):
+    if correlation_id:
+        message = f"{message} Reference: {correlation_id}."
+    return AuctionSearchClientError(message)
+
+
+def _decode_auction_json_response(response, operation):
+    status_code = int(getattr(response, "status_code", 0) or 0)
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        correlation_id = _auction_response_correlation_id(response)
+        if status_code >= 400:
+            message = f"{operation} failed with HTTP {status_code}; the server returned a non-JSON error response."
+        else:
+            message = f"{operation} returned an invalid non-JSON response."
+        raise _auction_client_error(message, correlation_id) from exc
+
+    correlation_id = _auction_response_correlation_id(response, payload)
+    if not isinstance(payload, dict):
+        raise _auction_client_error(f"{operation} returned an invalid JSON response.", correlation_id)
+    if status_code >= 400:
+        fallback = f"{operation} failed with HTTP {status_code}."
+        detail = _safe_auction_error_detail(payload.get("error"), fallback)
+        raise _auction_client_error(detail, correlation_id)
+    return payload
+
+
+def request_upcoming_auction_search(
+    payload,
+    *,
+    request_client=requests,
+    progress_callback=None,
+    sleep_fn=time.sleep,
+    monotonic_fn=time.monotonic,
+    poll_interval=AUCTION_SEARCH_POLL_INTERVAL_SECONDS,
+    timeout_seconds=None,
+):
+    start_response = request_client.post(
+        f"{BASE_URL}{AUCTION_SEARCH_START_PATH}",
+        json=payload,
+        headers=api_headers({"Content-Type": "application/json"}),
+        timeout=(10, 75),
+    )
+    start_payload = _decode_auction_json_response(start_response, "Auction search start")
+    if start_response.status_code != 202:
+        correlation_id = _auction_response_correlation_id(start_response, start_payload)
+        raise _auction_client_error("Auction search start did not return HTTP 202.", correlation_id)
+
+    job_id = start_payload.get("job_id")
+    if not isinstance(job_id, str) or not job_id.strip() or len(job_id) > 200:
+        correlation_id = _auction_response_correlation_id(start_response, start_payload)
+        raise _auction_client_error("Auction search start did not return a valid job ID.", correlation_id)
+    job_id = job_id.strip()
+    status_url = (
+        f"{BASE_URL}{AUCTION_SEARCH_START_PATH}"
+        f"{urllib.parse.quote(job_id, safe='')}/status/"
+    )
+    if progress_callback:
+        progress_callback(start_payload)
+
+    deadline = monotonic_fn() + (timeout_seconds or _auction_client_timeout_seconds())
+    while True:
+        if monotonic_fn() >= deadline:
+            correlation_id = str(start_payload.get("correlation_id") or "")
+            raise _auction_client_error("Auction search polling timed out.", correlation_id)
+
+        status_response = request_client.get(
+            status_url,
+            headers=api_headers(),
+            timeout=(10, 35),
+        )
+        status_payload = _decode_auction_json_response(status_response, "Auction search status")
+        status = status_payload.get("status")
+        if progress_callback:
+            progress_callback(status_payload)
+
+        if status == "completed":
+            if not isinstance(status_payload.get("markdown"), str):
+                correlation_id = _auction_response_correlation_id(status_response, status_payload)
+                raise _auction_client_error(
+                    "The completed auction-search response did not include Markdown output.",
+                    correlation_id,
+                )
+            return status_payload
+        if status not in AUCTION_SEARCH_ACTIVE_STATUSES:
+            correlation_id = _auction_response_correlation_id(status_response, status_payload)
+            raise _auction_client_error(
+                f"Auction search returned an unknown status: {status or 'missing'}.",
+                correlation_id,
+            )
+        sleep_fn(max(0.1, float(poll_interval)))
 
 
 class ArtCatalogApp:
@@ -208,25 +342,27 @@ class ArtCatalogApp:
             self.auction_progress.stop()
 
     def _request_upcoming_auction_search(self, payload):
-        response = requests.post(
-            f"{BASE_URL}/artworks/search_upcoming_print_auctions/",
-            json=payload,
-            headers=api_headers({"Content-Type": "application/json"}),
-            timeout=(10, 930),
+        return request_upcoming_auction_search(
+            payload,
+            progress_callback=self._schedule_auction_search_progress,
         )
-        if response.status_code >= 400:
-            try:
-                detail = response.json().get("error") or response.text
-            except ValueError:
-                detail = response.text
-            raise RuntimeError(detail or f"Auction search failed with status {response.status_code}.")
-        try:
-            result = response.json()
-        except ValueError as exc:
-            raise RuntimeError("The server returned an invalid auction-search response.") from exc
-        if not isinstance(result.get("markdown"), str):
-            raise RuntimeError("The server response did not include Markdown output.")
-        return result
+
+    def _schedule_auction_search_progress(self, payload):
+        status = payload.get("status") if isinstance(payload, dict) else ""
+        attempt = payload.get("attempt_count", 1) if isinstance(payload, dict) else 1
+        labels = {
+            "queued": f"Auction research queued (attempt {attempt} of 2)…",
+            "in_progress": f"Researching official auction sources (attempt {attempt} of 2)…",
+            "retrying": "Retrying discovery with required web search (attempt 2 of 2)…",
+        }
+        status_text = labels.get(status)
+        if not status_text:
+            return
+        self.master.after(0, lambda text=status_text: self._update_auction_search_progress(text))
+
+    def _update_auction_search_progress(self, status_text):
+        self.auction_status.config(text=status_text)
+        self._set_status(status_text)
 
     def search_upcoming_auctions(self):
         try:

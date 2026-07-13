@@ -1,21 +1,27 @@
+import hashlib
+import hmac
 import json
+import logging
 import os
 import socket
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings as django_settings
 from django.core.files.storage import default_storage
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import Artwork, ArtworkImage
+from .models import Artwork, ArtworkImage, AuctionSearchJob
 
 
 TEXT_FIELDS = [
@@ -36,9 +42,16 @@ AUCTION_SEARCH_TIMEOUT_ENV = "OPENAI_AUCTION_SEARCH_TIMEOUT_SECONDS"
 DEFAULT_AUCTION_SEARCH_TIMEOUT = 420
 MAX_AUCTION_SEARCH_TIMEOUT = 900
 AUCTION_SEARCH_POLL_INTERVAL_SECONDS = 2
+AUCTION_SEARCH_REQUEST_TIMEOUT_SECONDS = 60
+AUCTION_SEARCH_STATUS_FETCH_TIMEOUT_SECONDS = 25
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 ACTIVE_RESPONSE_STATUSES = {"queued", "in_progress"}
 TERMINAL_RESPONSE_STATUSES = {"completed", "failed", "cancelled", "incomplete"}
+AUCTION_SEARCH_RETRY_WARNING = (
+    "The initial response reported no web-search activity, so discovery was retried once."
+)
+
+logger = logging.getLogger(__name__)
 
 
 class AuctionSearchError(Exception):
@@ -69,6 +82,29 @@ def _authorized(request):
 def _can_manage(request):
     user = getattr(request, "user", None)
     return bool(user and user.is_authenticated and user.is_staff) or _authorized(request)
+
+
+def _catalog_api_requester_fingerprint():
+    expected = os.environ.get("CATALOG_API_KEY")
+    if not expected:
+        return ""
+    digest = hmac.new(
+        django_settings.SECRET_KEY.encode("utf-8"),
+        expected.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"catalog:{digest}"
+
+
+def _auction_requester_fingerprint(request):
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated and user.is_staff:
+        return f"user:{user.pk}"
+    expected = os.environ.get("CATALOG_API_KEY")
+    provided = request.headers.get("X-API-KEY") or ""
+    if expected and hmac.compare_digest(provided, expected):
+        return _catalog_api_requester_fingerprint()
+    return ""
 
 
 def _bool(value):
@@ -358,6 +394,61 @@ def _configured_auction_search_settings():
     }
 
 
+def _auction_config_for_storage(config):
+    return {
+        "horizon_days": config["horizon_days"],
+        "minimum_print_lots": config["minimum_print_lots"],
+        "region": config["region"],
+        "additional_instructions": config["additional_instructions"],
+        "start": config["start"].isoformat(),
+        "end": config["end"].isoformat(),
+    }
+
+
+def _auction_config_from_storage(value):
+    if not isinstance(value, dict):
+        raise AuctionSearchMalformedError("Stored auction-search configuration is invalid.")
+    try:
+        return {
+            "horizon_days": int(value["horizon_days"]),
+            "minimum_print_lots": int(value["minimum_print_lots"]),
+            "region": str(value.get("region") or ""),
+            "additional_instructions": str(value.get("additional_instructions") or ""),
+            "start": _parse_aware_timestamp(value["start"], "stored start"),
+            "end": _parse_aware_timestamp(value["end"], "stored end"),
+        }
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AuctionSearchMalformedError("Stored auction-search configuration is invalid.") from exc
+
+
+def _auction_search_request_body(config, settings, discovery_retry=False):
+    return {
+        "model": settings["model"],
+        "reasoning": {"effort": settings["reasoning_effort"]},
+        "input": _auction_search_prompt(config, discovery_retry=discovery_retry),
+        "tools": [
+            {
+                "type": "web_search",
+                "search_context_size": "high",
+                "return_token_budget": settings["return_token_budget"],
+            }
+        ],
+        "tool_choice": "required",
+        "include": ["web_search_call.action.sources"],
+        "max_output_tokens": settings["max_output_tokens"],
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "upcoming_print_auctions",
+                "schema": _auction_search_schema(),
+                "strict": True,
+            }
+        },
+        "background": True,
+        "store": True,
+    }
+
+
 def _openai_json_request(api_key, method, url, body=None, timeout=60):
     openai_request = urllib.request.Request(
         url,
@@ -408,81 +499,48 @@ def _response_error_meta(payload, settings):
     return diagnostics
 
 
-def _call_auction_search_api(config, discovery_retry=False):
+def _create_auction_search_response(config, settings=None, discovery_retry=False, timeout=None):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise AuctionSearchUpstreamError("OPENAI_API_KEY is not configured on the server.")
 
-    settings = _configured_auction_search_settings()
-    body = {
-        "model": settings["model"],
-        "reasoning": {"effort": settings["reasoning_effort"]},
-        "input": _auction_search_prompt(config, discovery_retry=discovery_retry),
-        "tools": [
-            {
-                "type": "web_search",
-                "search_context_size": "high",
-                "return_token_budget": settings["return_token_budget"],
-            }
-        ],
-        "tool_choice": "required",
-        "include": ["web_search_call.action.sources"],
-        "max_output_tokens": settings["max_output_tokens"],
-        "text": {
-            "format": {
-                "type": "json_schema",
-                "name": "upcoming_print_auctions",
-                "schema": _auction_search_schema(),
-                "strict": True,
-            }
-        },
-        "background": True,
-    }
-
-    timeout_seconds = _configured_auction_timeout()
-    deadline = time.monotonic() + timeout_seconds
+    settings = settings or _configured_auction_search_settings()
     payload = _openai_json_request(
         api_key,
         "POST",
         OPENAI_RESPONSES_URL,
-        body=body,
-        timeout=min(60, timeout_seconds),
+        body=_auction_search_request_body(config, settings, discovery_retry=discovery_retry),
+        timeout=timeout or AUCTION_SEARCH_REQUEST_TIMEOUT_SECONDS,
     )
     if not isinstance(payload, dict):
         raise AuctionSearchMalformedError("OpenAI returned an unreadable response.")
 
     response_id = payload.get("id")
-    status = payload.get("status")
     if not isinstance(response_id, str) or not response_id.strip():
         raise AuctionSearchMalformedError("OpenAI returned a background response without an id.")
+    return payload
 
-    while status in ACTIVE_RESPONSE_STATUSES:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            meta = _response_error_meta(payload, settings)
-            meta["response_status"] = "deadline_exceeded"
-            raise AuctionSearchTimeout("OpenAI auction research timed out.", research_meta=meta)
-        time.sleep(min(AUCTION_SEARCH_POLL_INTERVAL_SECONDS, remaining))
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            meta = _response_error_meta(payload, settings)
-            meta["response_status"] = "deadline_exceeded"
-            raise AuctionSearchTimeout("OpenAI auction research timed out.", research_meta=meta)
-        try:
-            payload = _openai_json_request(
-                api_key,
-                "GET",
-                f"{OPENAI_RESPONSES_URL}/{urllib.parse.quote(response_id, safe='')}",
-                timeout=min(60, remaining),
-            )
-        except AuctionSearchError as exc:
-            if not exc.research_meta:
-                exc.research_meta = _response_error_meta(payload, settings)
-            raise
-        if not isinstance(payload, dict):
-            raise AuctionSearchMalformedError("OpenAI returned an unreadable polling response.")
-        status = payload.get("status")
 
+def _retrieve_auction_search_response(response_id, timeout=AUCTION_SEARCH_STATUS_FETCH_TIMEOUT_SECONDS):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise AuctionSearchUpstreamError("OPENAI_API_KEY is not configured on the server.")
+    payload = _openai_json_request(
+        api_key,
+        "GET",
+        f"{OPENAI_RESPONSES_URL}/{urllib.parse.quote(response_id, safe='')}",
+        timeout=timeout,
+    )
+    if not isinstance(payload, dict):
+        raise AuctionSearchMalformedError("OpenAI returned an unreadable polling response.")
+    returned_id = payload.get("id")
+    if returned_id != response_id:
+        raise AuctionSearchMalformedError("OpenAI returned a mismatched background response.")
+    return payload
+
+
+def _validate_terminal_auction_response(payload, settings):
+    status = payload.get("status")
     meta = _response_error_meta(payload, settings)
     if status not in TERMINAL_RESPONSE_STATUSES:
         raise AuctionSearchMalformedError(
@@ -504,7 +562,6 @@ def _call_auction_search_api(config, discovery_retry=False):
             f"OpenAI auction research was incomplete: {details}",
             research_meta=meta,
         )
-    return payload
 
 
 def _valid_web_url(value):
@@ -869,43 +926,43 @@ def _render_auction_markdown(sales, config, research_meta):
     return "\n".join(lines).rstrip()
 
 
-def _research_upcoming_print_auctions(config):
-    retry_warning = None
-    response_payload = None
-    web_diagnostics = None
-    for attempt in range(2):
-        response_payload = _call_auction_search_api(config, discovery_retry=bool(attempt))
-        if not isinstance(response_payload, dict):
-            raise AuctionSearchMalformedError("OpenAI returned an unreadable response.")
-        web_diagnostics = _extract_web_search_diagnostics(response_payload)
-        if web_diagnostics["web_search_call_count"]:
-            break
-        retry_warning = "The initial response reported no web-search activity, so discovery was retried once."
-    else:
-        settings = _configured_auction_search_settings()
-        web_diagnostics.update(
-            {
-                "response_id": response_payload.get("id"),
-                "response_status": response_payload.get("status"),
-                "model": response_payload.get("model") or settings["model"],
-                "reasoning_effort": settings["reasoning_effort"],
-                "raw_candidate_count": 0,
-                "qualified_count": 0,
-                "filtered_counts": {},
-                "filtering_reasons": [],
-                "attempt_count": 2,
-            }
-        )
-        web_diagnostics["warnings"].append(
-            "No web_search_call occurred in either the initial response or the bounded retry."
-        )
-        raise AuctionSearchUpstreamError(
-            "OpenAI returned no web-search activity after one bounded retry.",
-            research_meta=web_diagnostics,
-        )
+def _missing_web_search_meta(response_payload, settings, attempt_count, retry_warning=""):
+    web_diagnostics = _extract_web_search_diagnostics(response_payload)
+    web_diagnostics.update(
+        {
+            "response_id": response_payload.get("id"),
+            "response_status": response_payload.get("status"),
+            "model": response_payload.get("model") or settings["model"],
+            "reasoning_effort": settings["reasoning_effort"],
+            "raw_candidate_count": 0,
+            "qualified_count": 0,
+            "filtered_counts": {},
+            "filtering_reasons": [],
+            "attempt_count": attempt_count,
+        }
+    )
+    if retry_warning:
+        web_diagnostics["warnings"].append(retry_warning)
+    web_diagnostics["warnings"].append(
+        "No web_search_call occurred in either the initial response or the bounded retry."
+    )
+    return web_diagnostics
 
+
+def _build_auction_search_result(response_payload, config, settings, attempt_count=1, retry_warning=""):
     if not isinstance(response_payload, dict):
         raise AuctionSearchMalformedError("OpenAI returned an unreadable response.")
+    web_diagnostics = _extract_web_search_diagnostics(response_payload)
+    if not web_diagnostics["web_search_call_count"]:
+        raise AuctionSearchUpstreamError(
+            "OpenAI returned no web-search activity.",
+            research_meta=_missing_web_search_meta(
+                response_payload,
+                settings,
+                attempt_count,
+                retry_warning=retry_warning,
+            ),
+        )
     try:
         text = _extract_text(response_payload)
     except (AttributeError, TypeError) as exc:
@@ -928,7 +985,6 @@ def _research_upcoming_print_auctions(config):
         if key not in {_normalized_url_key(item) for item in source_urls}:
             source_urls.append(value)
 
-    settings = _configured_auction_search_settings()
     web_diagnostics.update(
         {
             "response_id": response_payload.get("id"),
@@ -940,12 +996,26 @@ def _research_upcoming_print_auctions(config):
             "filtered_counts": filtering["filtered_counts"],
             "filtering_reasons": filtering["filtering_reasons"],
             "source_urls": source_urls,
-            "attempt_count": 2 if retry_warning else 1,
+            "attempt_count": attempt_count,
         }
     )
     if retry_warning:
         web_diagnostics["warnings"].append(retry_warning)
-    return sales, source_urls, web_diagnostics
+    return {
+        "markdown": _render_auction_markdown(sales, config, web_diagnostics),
+        "window": {
+            "start": config["start"].isoformat(),
+            "end": config["end"].isoformat(),
+            "horizon_days": config["horizon_days"],
+            "timezone": str(config["start"].tzinfo),
+        },
+        "minimum_print_lots": config["minimum_print_lots"],
+        "region": config["region"],
+        "auction_count": len(sales),
+        "sales": [_serialize_auction_sale(sale) for sale in sales],
+        "source_urls": source_urls,
+        "research_meta": web_diagnostics,
+    }
 
 
 def _serialize_auction_sale(sale):
@@ -998,6 +1068,123 @@ Artwork facts:
     if not text:
         raise RuntimeError("OpenAI returned an empty description.")
     return text
+
+
+def _auction_json_response(payload, status, correlation_id):
+    body = dict(payload)
+    body["correlation_id"] = str(correlation_id)
+    response = JsonResponse(body, status=status)
+    response["X-Correlation-ID"] = str(correlation_id)
+    return response
+
+
+def _auction_error_response(
+    message,
+    status,
+    correlation_id,
+    *,
+    job_id=None,
+    research_meta=None,
+    log_level=logging.WARNING,
+    exc_info=False,
+):
+    logger.log(
+        log_level,
+        "auction_search_error correlation_id=%s job_id=%s http_status=%s error=%s",
+        correlation_id,
+        job_id or "-",
+        status,
+        message,
+        exc_info=exc_info,
+    )
+    payload = {"error": message}
+    if job_id:
+        payload["job_id"] = str(job_id)
+    if research_meta:
+        payload["research_meta"] = research_meta
+    return _auction_json_response(payload, status, correlation_id)
+
+
+def _auction_exception_details(exc):
+    if isinstance(exc, AuctionSearchTimeout):
+        return 504, "Auction research timed out. Please try again."
+    return 502, str(exc)
+
+
+def _record_auction_job_error(job, message, http_status, research_meta=None, *, timed_out=False):
+    job.state = AuctionSearchJob.State.TIMED_OUT if timed_out else AuctionSearchJob.State.FAILED
+    job.error = {"error": message, "http_status": http_status}
+    if research_meta:
+        job.error["research_meta"] = research_meta
+    job.save()
+
+
+def _auction_job_status_payload(job, public_status=None):
+    payload = {
+        "job_id": str(job.id),
+        "status": public_status or job.openai_status or "queued",
+        "provider_status": job.openai_status or None,
+        "attempt_count": job.attempt_count,
+        "poll_after_seconds": AUCTION_SEARCH_POLL_INTERVAL_SECONDS,
+    }
+    if job.retry_warning:
+        payload["warnings"] = [job.retry_warning]
+    return payload
+
+
+def _completed_auction_job_payload(job):
+    payload = dict(job.result or {})
+    payload.update(
+        {
+            "job_id": str(job.id),
+            "status": "completed",
+            "attempt_count": job.attempt_count,
+        }
+    )
+    return payload
+
+
+def _stored_auction_job_error_response(job):
+    error = dict(job.error or {})
+    message = error.pop("error", "Auction research failed.")
+    http_status = int(error.pop("http_status", 502))
+    research_meta = error.pop("research_meta", None)
+    return _auction_error_response(
+        message,
+        http_status,
+        job.correlation_id,
+        job_id=job.id,
+        research_meta=research_meta,
+    )
+
+
+def _auction_job_research_meta(job, response_status=None):
+    settings = job.openai_settings
+    meta = _response_error_meta(
+        {
+            "id": job.openai_response_id,
+            "status": response_status or job.openai_status or "unknown",
+            "model": settings.get("model"),
+            "output": [],
+        },
+        settings,
+    )
+    meta.update(
+        {
+            "attempt_count": job.attempt_count,
+            "raw_candidate_count": 0,
+            "qualified_count": 0,
+            "filtered_counts": {},
+            "filtering_reasons": [],
+        }
+    )
+    if job.retry_warning:
+        meta["warnings"].append(job.retry_warning)
+    return meta
+
+
+def _auction_job_timeout_meta(job):
+    return _auction_job_research_meta(job, response_status="deadline_exceeded")
 
 
 @require_GET
@@ -1068,54 +1255,242 @@ def generate_catalog_description_from_payload(request):
 
 
 @csrf_exempt
-@require_POST
 def search_upcoming_print_auctions(request):
-    if not _can_manage(request):
-        return JsonResponse({"error": "Unauthorized"}, status=401)
+    correlation_id = uuid.uuid4()
+    if request.method != "POST":
+        response = _auction_error_response(
+            "Method not allowed. Use POST to start an auction search.",
+            405,
+            correlation_id,
+        )
+        response["Allow"] = "POST"
+        return response
+    requester_fingerprint = _auction_requester_fingerprint(request)
+    if not requester_fingerprint:
+        return _auction_error_response("Unauthorized", 401, correlation_id)
 
     try:
         data = json.loads(request.body.decode("utf-8")) if request.body else {}
         config = _validate_auction_search_request(data)
     except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON body."}, status=400)
+        return _auction_error_response("Invalid JSON body.", 400, correlation_id)
     except ValueError as exc:
-        return JsonResponse({"error": str(exc)}, status=400)
+        return _auction_error_response(str(exc), 400, correlation_id)
 
     try:
-        sales, source_urls, research_meta = _research_upcoming_print_auctions(config)
-    except AuctionSearchTimeout as exc:
-        error_payload = {"error": "Auction research timed out. Please try again."}
-        if exc.research_meta:
-            error_payload["research_meta"] = exc.research_meta
-        return JsonResponse(error_payload, status=504)
-    except AuctionSearchMalformedError as exc:
-        error_payload = {"error": str(exc)}
-        if exc.research_meta:
-            error_payload["research_meta"] = exc.research_meta
-        return JsonResponse(error_payload, status=502)
-    except AuctionSearchUpstreamError as exc:
-        error_payload = {"error": str(exc)}
-        if exc.research_meta:
-            error_payload["research_meta"] = exc.research_meta
-        return JsonResponse(error_payload, status=502)
+        settings = _configured_auction_search_settings()
+        timeout_seconds = _configured_auction_timeout()
+        response_payload = _create_auction_search_response(
+            config,
+            settings=settings,
+            timeout=min(AUCTION_SEARCH_REQUEST_TIMEOUT_SECONDS, timeout_seconds),
+        )
+        job = AuctionSearchJob.objects.create(
+            correlation_id=correlation_id,
+            requester_fingerprint=requester_fingerprint,
+            openai_response_id=response_payload["id"],
+            openai_status=str(response_payload.get("status") or ""),
+            config=_auction_config_for_storage(config),
+            openai_settings=settings,
+            timeout_seconds=timeout_seconds,
+            attempt_deadline_at=timezone.now() + timedelta(seconds=timeout_seconds),
+        )
+    except AuctionSearchError as exc:
+        http_status, message = _auction_exception_details(exc)
+        return _auction_error_response(
+            message,
+            http_status,
+            correlation_id,
+            research_meta=exc.research_meta,
+        )
+    except Exception:
+        return _auction_error_response(
+            "Auction search could not be started. Please try again.",
+            500,
+            correlation_id,
+            log_level=logging.ERROR,
+            exc_info=True,
+        )
 
-    return JsonResponse(
-        {
-            "markdown": _render_auction_markdown(sales, config, research_meta),
-            "window": {
-                "start": config["start"].isoformat(),
-                "end": config["end"].isoformat(),
-                "horizon_days": config["horizon_days"],
-                "timezone": str(config["start"].tzinfo),
-            },
-            "minimum_print_lots": config["minimum_print_lots"],
-            "region": config["region"],
-            "auction_count": len(sales),
-            "sales": [_serialize_auction_sale(sale) for sale in sales],
-            "source_urls": source_urls,
-            "research_meta": research_meta,
-        }
+    logger.info(
+        "auction_search_started correlation_id=%s job_id=%s openai_response_id=%s provider_status=%s attempt=1",
+        correlation_id,
+        job.id,
+        job.openai_response_id,
+        job.openai_status or "unknown",
     )
+    payload = _auction_job_status_payload(job)
+    payload["status_url"] = reverse("search_upcoming_print_auctions_status", args=[job.id])
+    return _auction_json_response(payload, 202, correlation_id)
+
+
+@csrf_exempt
+def search_upcoming_print_auctions_status(request, job_id):
+    correlation_id = uuid.uuid4()
+    if request.method != "GET":
+        response = _auction_error_response(
+            "Method not allowed. Use GET to check auction-search status.",
+            405,
+            correlation_id,
+            job_id=job_id,
+        )
+        response["Allow"] = "GET"
+        return response
+    requester_fingerprint = _auction_requester_fingerprint(request)
+    if not requester_fingerprint:
+        return _auction_error_response("Unauthorized", 401, correlation_id, job_id=job_id)
+
+    try:
+        with transaction.atomic():
+            try:
+                job = AuctionSearchJob.objects.select_for_update().get(pk=job_id)
+            except AuctionSearchJob.DoesNotExist:
+                return _auction_error_response(
+                    "Auction-search job not found.",
+                    404,
+                    correlation_id,
+                    job_id=job_id,
+                )
+
+            if not hmac.compare_digest(job.requester_fingerprint, requester_fingerprint):
+                return _auction_error_response(
+                    "Auction-search job not found.",
+                    404,
+                    correlation_id,
+                    job_id=job_id,
+                )
+
+            correlation_id = job.correlation_id
+            if job.state == AuctionSearchJob.State.COMPLETED:
+                return _auction_json_response(_completed_auction_job_payload(job), 200, correlation_id)
+            if job.state in {AuctionSearchJob.State.FAILED, AuctionSearchJob.State.TIMED_OUT}:
+                return _stored_auction_job_error_response(job)
+
+            now = timezone.now()
+            remaining = (job.attempt_deadline_at - now).total_seconds()
+            if remaining <= 0:
+                research_meta = _auction_job_timeout_meta(job)
+                message = "Auction research timed out. Please try again."
+                _record_auction_job_error(job, message, 504, research_meta, timed_out=True)
+                return _auction_error_response(
+                    message,
+                    504,
+                    correlation_id,
+                    job_id=job.id,
+                    research_meta=research_meta,
+                )
+
+            try:
+                response_payload = _retrieve_auction_search_response(
+                    job.openai_response_id,
+                    timeout=max(1, min(AUCTION_SEARCH_STATUS_FETCH_TIMEOUT_SECONDS, int(remaining))),
+                )
+                job.last_polled_at = timezone.now()
+                job.openai_status = str(response_payload.get("status") or "")
+                logger.info(
+                    "auction_search_polled correlation_id=%s job_id=%s openai_response_id=%s "
+                    "provider_status=%s attempt=%s",
+                    correlation_id,
+                    job.id,
+                    job.openai_response_id,
+                    job.openai_status or "unknown",
+                    job.attempt_count,
+                )
+
+                if job.openai_status in ACTIVE_RESPONSE_STATUSES:
+                    job.save()
+                    return _auction_json_response(_auction_job_status_payload(job), 200, correlation_id)
+
+                _validate_terminal_auction_response(response_payload, job.openai_settings)
+                web_diagnostics = _extract_web_search_diagnostics(response_payload)
+                if not web_diagnostics["web_search_call_count"]:
+                    if job.attempt_count < 2:
+                        config = _auction_config_from_storage(job.config)
+                        retry_payload = _create_auction_search_response(
+                            config,
+                            settings=job.openai_settings,
+                            discovery_retry=True,
+                            timeout=min(AUCTION_SEARCH_REQUEST_TIMEOUT_SECONDS, job.timeout_seconds),
+                        )
+                        job.openai_response_id = retry_payload["id"]
+                        job.openai_status = str(retry_payload.get("status") or "")
+                        job.attempt_count = 2
+                        job.retry_warning = AUCTION_SEARCH_RETRY_WARNING
+                        job.attempt_deadline_at = timezone.now() + timedelta(seconds=job.timeout_seconds)
+                        job.save()
+                        logger.info(
+                            "auction_search_retry_started correlation_id=%s job_id=%s openai_response_id=%s "
+                            "provider_status=%s attempt=2",
+                            correlation_id,
+                            job.id,
+                            job.openai_response_id,
+                            job.openai_status or "unknown",
+                        )
+                        return _auction_json_response(
+                            _auction_job_status_payload(job, public_status="retrying"),
+                            200,
+                            correlation_id,
+                        )
+
+                    research_meta = _missing_web_search_meta(
+                        response_payload,
+                        job.openai_settings,
+                        job.attempt_count,
+                        retry_warning=job.retry_warning,
+                    )
+                    raise AuctionSearchUpstreamError(
+                        "OpenAI returned no web-search activity after one bounded retry.",
+                        research_meta=research_meta,
+                    )
+
+                config = _auction_config_from_storage(job.config)
+                job.result = _build_auction_search_result(
+                    response_payload,
+                    config,
+                    job.openai_settings,
+                    attempt_count=job.attempt_count,
+                    retry_warning=job.retry_warning,
+                )
+                job.state = AuctionSearchJob.State.COMPLETED
+                job.error = None
+                job.save()
+                logger.info(
+                    "auction_search_completed correlation_id=%s job_id=%s openai_response_id=%s "
+                    "provider_status=%s attempt=%s auctions=%s",
+                    correlation_id,
+                    job.id,
+                    job.openai_response_id,
+                    job.openai_status,
+                    job.attempt_count,
+                    job.result.get("auction_count", 0),
+                )
+                return _auction_json_response(_completed_auction_job_payload(job), 200, correlation_id)
+            except AuctionSearchError as exc:
+                http_status, message = _auction_exception_details(exc)
+                research_meta = exc.research_meta or _auction_job_research_meta(job)
+                _record_auction_job_error(
+                    job,
+                    message,
+                    http_status,
+                    research_meta,
+                    timed_out=isinstance(exc, AuctionSearchTimeout),
+                )
+                return _auction_error_response(
+                    message,
+                    http_status,
+                    correlation_id,
+                    job_id=job.id,
+                    research_meta=research_meta,
+                )
+    except Exception:
+        return _auction_error_response(
+            "Auction-search status could not be checked. Please try again.",
+            500,
+            correlation_id,
+            job_id=job_id,
+            log_level=logging.ERROR,
+            exc_info=True,
+        )
 
 
 @csrf_exempt
