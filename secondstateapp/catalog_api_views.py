@@ -24,7 +24,7 @@ TEXT_FIELDS = [
 ]
 
 AUCTION_SEARCH_MODEL_ENV = "OPENAI_AUCTION_SEARCH_MODEL"
-DEFAULT_AUCTION_SEARCH_MODEL = "gpt-4.1"
+DEFAULT_AUCTION_SEARCH_MODEL = "gpt-5.6"
 AUCTION_SEARCH_TIMEOUT_ENV = "OPENAI_AUCTION_SEARCH_TIMEOUT_SECONDS"
 DEFAULT_AUCTION_SEARCH_TIMEOUT = 90
 MAX_AUCTION_SEARCH_TIMEOUT = 180
@@ -539,7 +539,7 @@ Artwork facts:
 {facts}
 """.strip()
     body = {
-        "model": os.environ.get("OPENAI_DESCRIPTION_MODEL", "gpt-4.1"),
+        "model": os.environ.get("OPENAI_DESCRIPTION_MODEL", "gpt-5.6"),
         "input": prompt,
         "max_output_tokens": 45000,
         "temperature": 0.4,
