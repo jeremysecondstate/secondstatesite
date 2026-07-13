@@ -31,7 +31,7 @@ TEXT_FIELDS = [
 ]
 
 AUCTION_SEARCH_MODEL_ENV = "OPENAI_AUCTION_SEARCH_MODEL"
-DEFAULT_AUCTION_SEARCH_MODEL = "gpt-5.6-sol"
+DEFAULT_AUCTION_SEARCH_MODEL = "gpt-5.6"
 AUCTION_SEARCH_REASONING_EFFORT_ENV = "OPENAI_AUCTION_SEARCH_REASONING_EFFORT"
 DEFAULT_AUCTION_SEARCH_REASONING_EFFORT = "xhigh"
 AUCTION_SEARCH_RETURN_TOKEN_BUDGET_ENV = "OPENAI_AUCTION_SEARCH_RETURN_TOKEN_BUDGET"
@@ -1041,7 +1041,7 @@ Artwork facts:
 {facts}
 """.strip()
     body = {
-        "model": os.environ.get("OPENAI_DESCRIPTION_MODEL", "gpt-5.6-sol"),
+        "model": os.environ.get("OPENAI_DESCRIPTION_MODEL", "gpt-5.6"),
         "input": prompt,
         "max_output_tokens": 450,
         "temperature": 0.4,

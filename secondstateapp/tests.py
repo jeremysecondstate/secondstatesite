@@ -243,7 +243,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         return {
             "id": response_id,
             "status": status,
-            "model": "gpt-5.6-sol",
+            "model": "gpt-5.6",
             "output_text": json.dumps({"sales": sales}),
             "output": output,
         }
@@ -328,7 +328,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         mock_create.return_value = {
             "id": "resp_server_only",
             "status": "queued",
-            "model": "gpt-5.6-sol",
+            "model": "gpt-5.6",
             "output": [],
         }
 
@@ -350,7 +350,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         self.assertEqual(job.requester_fingerprint, catalog_api_views._catalog_api_requester_fingerprint())
         self.assertEqual(job.attempt_count, 1)
         self.assertEqual(job.config["minimum_print_lots"], 10)
-        self.assertEqual(job.openai_settings["model"], "gpt-5.6-sol")
+        self.assertEqual(job.openai_settings["model"], "gpt-5.6")
         self.assertEqual(str(job.correlation_id), result["correlation_id"])
         mock_create.assert_called_once()
         self.assertFalse(mock_create.call_args.kwargs.get("discovery_retry", False))
@@ -393,7 +393,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         mock_retrieve.return_value = {
             "id": job.openai_response_id,
             "status": "queued",
-            "model": "gpt-5.6-sol",
+            "model": "gpt-5.6",
             "output": [],
         }
 
@@ -407,7 +407,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         mock_retrieve.return_value = {
             "id": job.openai_response_id,
             "status": "in_progress",
-            "model": "gpt-5.6-sol",
+            "model": "gpt-5.6",
             "output": [],
         }
         in_progress_response = self.poll(job)
@@ -481,7 +481,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         self.assertEqual(result["research_meta"]["filtered_counts"]["mixed_below_threshold"], 1)
         self.assertEqual(result["research_meta"]["filtered_counts"]["ended"], 1)
         self.assertEqual(result["research_meta"]["filtered_counts"]["duplicate"], 1)
-        self.assertEqual(result["research_meta"]["model"], "gpt-5.6-sol")
+        self.assertEqual(result["research_meta"]["model"], "gpt-5.6")
         self.assertIn("https://research-source.test/calendar", result["source_urls"])
 
         job.refresh_from_db()
@@ -534,7 +534,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         mock_create.return_value = {
             "id": "resp_retry",
             "status": "queued",
-            "model": "gpt-5.6-sol",
+            "model": "gpt-5.6",
             "output": [],
         }
 
@@ -599,7 +599,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
                 mock_retrieve.return_value = {
                     "id": job.openai_response_id,
                     "status": status,
-                    "model": "gpt-5.6-sol",
+                    "model": "gpt-5.6",
                     "output": [],
                     "error": error,
                     "incomplete_details": incomplete_details,
@@ -655,7 +655,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
     @patch("secondstateapp.catalog_api_views.urllib.request.urlopen")
     def test_openai_create_preserves_sol_required_search_strict_schema_and_background(self, mock_urlopen):
         mock_urlopen.return_value = self.http_response(
-            {"id": "resp_created", "status": "queued", "model": "gpt-5.6-sol", "output": []}
+            {"id": "resp_created", "status": "queued", "model": "gpt-5.6", "output": []}
         )
         config = catalog_api_views._validate_auction_search_request(self.payload())
         env = {
@@ -673,7 +673,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         openai_request = mock_urlopen.call_args.args[0]
         request_body = json.loads(openai_request.data.decode("utf-8"))
         self.assertEqual(openai_request.get_method(), "POST")
-        self.assertEqual(request_body["model"], "gpt-5.6-sol")
+        self.assertEqual(request_body["model"], "gpt-5.6")
         self.assertEqual(request_body["reasoning"], {"effort": "xhigh"})
         self.assertEqual(
             request_body["tools"],
