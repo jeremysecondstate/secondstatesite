@@ -22,7 +22,7 @@ from .models import Artwork, ArtworkImage, UserProfile
 
 
 DESCRIPTION_MODEL_ENV = "OPENAI_DESCRIPTION_MODEL"
-DEFAULT_DESCRIPTION_MODEL = "gpt-5.6"
+DEFAULT_DESCRIPTION_MODEL = "gpt-5.6-sol"
 
 
 def schwab_callback(request):

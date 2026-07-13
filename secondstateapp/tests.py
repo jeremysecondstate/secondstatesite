@@ -239,7 +239,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         return {
             "id": response_id,
             "status": status,
-            "model": "gpt-5.6",
+            "model": "gpt-5.6-sol",
             "output_text": json.dumps({"sales": sales}),
             "output": output,
         }
@@ -336,7 +336,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         self.assertEqual(result["research_meta"]["sources"][0]["snippet"], "Upcoming sales")
         self.assertEqual(result["research_meta"]["response_id"], "resp_test")
         self.assertEqual(result["research_meta"]["response_status"], "completed")
-        self.assertEqual(result["research_meta"]["model"], "gpt-5.6")
+        self.assertEqual(result["research_meta"]["model"], "gpt-5.6-sol")
         self.assertEqual(result["research_meta"]["reasoning_effort"], "xhigh")
         self.assertEqual(result["research_meta"]["warnings"], [])
         called_config = mock_openai.call_args.args[0]
@@ -483,7 +483,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
 
         openai_request = mock_urlopen.call_args.args[0]
         request_body = json.loads(openai_request.data.decode("utf-8"))
-        self.assertEqual(request_body["model"], "gpt-5.6")
+        self.assertEqual(request_body["model"], "gpt-5.6-sol")
         self.assertEqual(request_body["reasoning"], {"effort": "xhigh"})
         self.assertEqual(
             request_body["tools"],
@@ -531,9 +531,9 @@ class UpcomingPrintAuctionSearchTests(TestCase):
     def test_background_response_polls_queued_and_in_progress_until_completed(self, mock_urlopen, mock_sleep):
         response_id = "resp_background"
         mock_urlopen.side_effect = [
-            self.http_response({"id": response_id, "status": "queued", "model": "gpt-5.6", "output": []}),
+            self.http_response({"id": response_id, "status": "queued", "model": "gpt-5.6-sol", "output": []}),
             self.http_response(
-                {"id": response_id, "status": "in_progress", "model": "gpt-5.6", "output": []}
+                {"id": response_id, "status": "in_progress", "model": "gpt-5.6-sol", "output": []}
             ),
             self.http_response(self.openai_payload([], response_id=response_id)),
         ]
@@ -560,7 +560,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
                 payload = {
                     "id": f"resp_{status}",
                     "status": status,
-                    "model": "gpt-5.6",
+                    "model": "gpt-5.6-sol",
                     "output": [],
                     "error": error,
                     "incomplete_details": incomplete_details,
