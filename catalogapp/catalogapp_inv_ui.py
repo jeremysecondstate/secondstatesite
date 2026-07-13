@@ -1,9 +1,5 @@
 import os
-import threading
-import time
-import urllib.parse
 import webbrowser
-from datetime import datetime
 from functools import partial
 
 import pandas as pd
@@ -13,16 +9,14 @@ from docx import Document
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from tkinter import scrolledtext
 
+from catalogapp.watchlist_ui import ArtistWatchlistPanel
+
 BASE_URL = os.environ.get("SECONDSTATE_BASE_URL", "https://secondstate.art").rstrip("/")
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1180, 820
 CATALOG_API_KEY = os.environ.get("CATALOG_API_KEY", "276e19f127f140623e73e6c160bbd8ed")
 DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
 DEFAULT_CATALOG_SHEET = "Inventory for July 2026"
-AUCTION_SEARCH_START_PATH = "/artworks/search_upcoming_print_auctions/"
-AUCTION_SEARCH_ACTIVE_STATUSES = {"queued", "in_progress", "retrying"}
-AUCTION_SEARCH_POLL_INTERVAL_SECONDS = 2
-DEFAULT_AUCTION_SEARCH_CLIENT_TIMEOUT_SECONDS = 1900
 
 
 def api_headers(extra=None):
@@ -30,134 +24,6 @@ def api_headers(extra=None):
     if extra:
         headers.update(extra)
     return headers
-
-
-class AuctionSearchClientError(RuntimeError):
-    pass
-
-
-def _auction_client_timeout_seconds():
-    try:
-        configured = int(
-            os.environ.get(
-                "SECONDSTATE_AUCTION_SEARCH_TIMEOUT_SECONDS",
-                DEFAULT_AUCTION_SEARCH_CLIENT_TIMEOUT_SECONDS,
-            )
-        )
-    except (TypeError, ValueError):
-        configured = DEFAULT_AUCTION_SEARCH_CLIENT_TIMEOUT_SECONDS
-    return max(60, min(configured, 2400))
-
-
-def _auction_response_correlation_id(response, payload=None):
-    if isinstance(payload, dict) and payload.get("correlation_id"):
-        return str(payload["correlation_id"])
-    headers = getattr(response, "headers", {}) or {}
-    return str(headers.get("X-Correlation-ID") or "").strip()
-
-
-def _safe_auction_error_detail(value, fallback):
-    if not isinstance(value, str):
-        return fallback
-    detail = " ".join(value.split()).strip()
-    lowered = detail.lower()
-    if not detail or "<html" in lowered or "<!doctype" in lowered or "</body" in lowered:
-        return fallback
-    return detail[:500]
-
-
-def _auction_client_error(message, correlation_id=""):
-    if correlation_id:
-        message = f"{message} Reference: {correlation_id}."
-    return AuctionSearchClientError(message)
-
-
-def _decode_auction_json_response(response, operation):
-    status_code = int(getattr(response, "status_code", 0) or 0)
-    try:
-        payload = response.json()
-    except ValueError as exc:
-        correlation_id = _auction_response_correlation_id(response)
-        if status_code >= 400:
-            message = f"{operation} failed with HTTP {status_code}; the server returned a non-JSON error response."
-        else:
-            message = f"{operation} returned an invalid non-JSON response."
-        raise _auction_client_error(message, correlation_id) from exc
-
-    correlation_id = _auction_response_correlation_id(response, payload)
-    if not isinstance(payload, dict):
-        raise _auction_client_error(f"{operation} returned an invalid JSON response.", correlation_id)
-    if status_code >= 400:
-        fallback = f"{operation} failed with HTTP {status_code}."
-        detail = _safe_auction_error_detail(payload.get("error"), fallback)
-        raise _auction_client_error(detail, correlation_id)
-    return payload
-
-
-def request_upcoming_auction_search(
-    payload,
-    *,
-    request_client=requests,
-    progress_callback=None,
-    sleep_fn=time.sleep,
-    monotonic_fn=time.monotonic,
-    poll_interval=AUCTION_SEARCH_POLL_INTERVAL_SECONDS,
-    timeout_seconds=None,
-):
-    start_response = request_client.post(
-        f"{BASE_URL}{AUCTION_SEARCH_START_PATH}",
-        json=payload,
-        headers=api_headers({"Content-Type": "application/json"}),
-        timeout=(10, 75),
-    )
-    start_payload = _decode_auction_json_response(start_response, "Auction search start")
-    if start_response.status_code != 202:
-        correlation_id = _auction_response_correlation_id(start_response, start_payload)
-        raise _auction_client_error("Auction search start did not return HTTP 202.", correlation_id)
-
-    job_id = start_payload.get("job_id")
-    if not isinstance(job_id, str) or not job_id.strip() or len(job_id) > 200:
-        correlation_id = _auction_response_correlation_id(start_response, start_payload)
-        raise _auction_client_error("Auction search start did not return a valid job ID.", correlation_id)
-    job_id = job_id.strip()
-    status_url = (
-        f"{BASE_URL}{AUCTION_SEARCH_START_PATH}"
-        f"{urllib.parse.quote(job_id, safe='')}/status/"
-    )
-    if progress_callback:
-        progress_callback(start_payload)
-
-    deadline = monotonic_fn() + (timeout_seconds or _auction_client_timeout_seconds())
-    while True:
-        if monotonic_fn() >= deadline:
-            correlation_id = str(start_payload.get("correlation_id") or "")
-            raise _auction_client_error("Auction search polling timed out.", correlation_id)
-
-        status_response = request_client.get(
-            status_url,
-            headers=api_headers(),
-            timeout=(10, 35),
-        )
-        status_payload = _decode_auction_json_response(status_response, "Auction search status")
-        status = status_payload.get("status")
-        if progress_callback:
-            progress_callback(status_payload)
-
-        if status == "completed":
-            if not isinstance(status_payload.get("markdown"), str):
-                correlation_id = _auction_response_correlation_id(status_response, status_payload)
-                raise _auction_client_error(
-                    "The completed auction-search response did not include Markdown output.",
-                    correlation_id,
-                )
-            return status_payload
-        if status not in AUCTION_SEARCH_ACTIVE_STATUSES:
-            correlation_id = _auction_response_correlation_id(status_response, status_payload)
-            raise _auction_client_error(
-                f"Auction search returned an unknown status: {status or 'missing'}.",
-                correlation_id,
-            )
-        sleep_fn(max(0.1, float(poll_interval)))
 
 
 class ArtCatalogApp:
@@ -249,11 +115,11 @@ class ArtCatalogApp:
         tab_results = ttk.Frame(notebook, padding=10)
         tab_details = ttk.Frame(notebook, padding=10)
         tab_preview = ttk.Frame(notebook, padding=10)
-        tab_auction_search = ttk.Frame(notebook, padding=10)
         notebook.add(tab_results, text="Results")
         notebook.add(tab_details, text="Details")
         notebook.add(tab_preview, text="Preview Text")
-        notebook.add(tab_auction_search, text="Auction Search")
+        self.watchlist_panel = ArtistWatchlistPanel(notebook, status_callback=self._set_status)
+        notebook.add(self.watchlist_panel, text="Artist Watchlist")
 
         cols = ("Artist", "Title", "Year", "Medium", "Catalog #")
         self.tree = ttk.Treeview(tab_results, columns=cols, show="headings", style="Catalog.Treeview", selectmode="extended")
@@ -272,176 +138,8 @@ class ArtCatalogApp:
         self.text_display = scrolledtext.ScrolledText(tab_preview, wrap=tk.WORD, font=("Segoe UI", 11))
         self.text_display.pack(fill=tk.BOTH, expand=True)
         self.text_display.configure(state=tk.DISABLED)
-        self._build_auction_search_tab(tab_auction_search)
         self.status = ttk.Label(self.master, text="Loading shared catalog database...", anchor="w", padding=(16, 6))
         self.status.pack(fill=tk.X)
-
-    def _build_auction_search_tab(self, tab):
-        tab.columnconfigure(0, weight=1)
-        tab.rowconfigure(3, weight=1)
-
-        ttk.Label(tab, text="Upcoming Print Auction Web Research", style="Header.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(
-            tab,
-            text="Find qualifying print and multiples sales in the next 3 or 7 days. Research runs securely through the SecondState server.",
-            style="Subtle.TLabel",
-            wraplength=850,
-        ).grid(row=1, column=0, sticky="ew", pady=(2, 10))
-
-        controls = ttk.LabelFrame(tab, text="Search criteria", padding=10)
-        controls.grid(row=2, column=0, sticky="ew", pady=(0, 10))
-        controls.columnconfigure(3, weight=1)
-
-        self.auction_horizon_var = tk.IntVar(value=7)
-        self.auction_minimum_var = tk.StringVar(value="10")
-        self.auction_region_var = tk.StringVar()
-
-        ttk.Label(controls, text="Horizon").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        ttk.Radiobutton(controls, text="3 days", variable=self.auction_horizon_var, value=3).grid(row=0, column=1, sticky="w")
-        ttk.Radiobutton(controls, text="7 days", variable=self.auction_horizon_var, value=7).grid(row=0, column=2, sticky="w", padx=(0, 18))
-        ttk.Label(controls, text="Minimum print lots in a mixed sale").grid(row=0, column=3, sticky="e", padx=(0, 8))
-        ttk.Entry(controls, textvariable=self.auction_minimum_var, width=8).grid(row=0, column=4, sticky="w")
-
-        ttk.Label(controls, text="Region (optional)").grid(row=1, column=0, sticky="w", pady=(8, 0), padx=(0, 8))
-        ttk.Entry(controls, textvariable=self.auction_region_var).grid(row=1, column=1, columnspan=4, sticky="ew", pady=(8, 0))
-        ttk.Label(controls, text="Additional instructions (optional)").grid(row=2, column=0, sticky="nw", pady=(8, 0), padx=(0, 8))
-        self.auction_instructions_text = tk.Text(controls, height=3, wrap=tk.WORD, font=("Segoe UI", 10))
-        self.auction_instructions_text.grid(row=2, column=1, columnspan=4, sticky="ew", pady=(8, 0))
-
-        action_row = ttk.Frame(controls)
-        action_row.grid(row=3, column=0, columnspan=5, sticky="ew", pady=(10, 0))
-        action_row.columnconfigure(2, weight=1)
-        self.auction_search_button = ttk.Button(
-            action_row,
-            text="Search",
-            command=self.search_upcoming_auctions,
-            style="Accent.TButton",
-        )
-        self.auction_search_button.grid(row=0, column=0, sticky="w")
-        self.auction_progress = ttk.Progressbar(action_row, mode="indeterminate", length=150)
-        self.auction_progress.grid(row=0, column=1, sticky="w", padx=(10, 0))
-        self.auction_status = ttk.Label(action_row, text="Ready.", style="Subtle.TLabel")
-        self.auction_status.grid(row=0, column=2, sticky="w", padx=(10, 0))
-
-        output_frame = ttk.LabelFrame(tab, text="Markdown output", padding=8)
-        output_frame.grid(row=3, column=0, sticky="nsew")
-        self.auction_markdown_text = scrolledtext.ScrolledText(output_frame, wrap=tk.WORD, font=("Consolas", 10))
-        self.auction_markdown_text.pack(fill=tk.BOTH, expand=True)
-
-        output_buttons = ttk.Frame(tab)
-        output_buttons.grid(row=4, column=0, sticky="ew", pady=(10, 0))
-        ttk.Button(output_buttons, text="Copy Markdown", command=self.copy_auction_markdown).pack(side=tk.LEFT)
-        ttk.Button(output_buttons, text="Save Markdown", command=self.save_auction_markdown).pack(side=tk.LEFT, padx=(8, 0))
-
-    def _set_auction_search_busy(self, busy, status_text):
-        self.auction_search_button.config(state=tk.DISABLED if busy else tk.NORMAL)
-        self.auction_status.config(text=status_text)
-        if busy:
-            self.auction_progress.start(12)
-        else:
-            self.auction_progress.stop()
-
-    def _request_upcoming_auction_search(self, payload):
-        return request_upcoming_auction_search(
-            payload,
-            progress_callback=self._schedule_auction_search_progress,
-        )
-
-    def _schedule_auction_search_progress(self, payload):
-        status = payload.get("status") if isinstance(payload, dict) else ""
-        attempt = payload.get("attempt_count", 1) if isinstance(payload, dict) else 1
-        labels = {
-            "queued": f"Auction research queued (attempt {attempt} of 2)…",
-            "in_progress": f"Researching official auction sources (attempt {attempt} of 2)…",
-            "retrying": "Retrying discovery with required web search (attempt 2 of 2)…",
-        }
-        status_text = labels.get(status)
-        if not status_text:
-            return
-        self.master.after(0, lambda text=status_text: self._update_auction_search_progress(text))
-
-    def _update_auction_search_progress(self, status_text):
-        self.auction_status.config(text=status_text)
-        self._set_status(status_text)
-
-    def search_upcoming_auctions(self):
-        try:
-            minimum_count = int(self.auction_minimum_var.get().strip())
-        except ValueError:
-            messagebox.showwarning("Invalid Minimum", "Minimum print lots must be a whole number from 1 to 500.")
-            return
-        if not 1 <= minimum_count <= 500:
-            messagebox.showwarning("Invalid Minimum", "Minimum print lots must be a whole number from 1 to 500.")
-            return
-
-        payload = {
-            "horizon_days": self.auction_horizon_var.get(),
-            "minimum_print_lots": minimum_count,
-            "region": self.auction_region_var.get().strip(),
-            "additional_instructions": self.auction_instructions_text.get("1.0", tk.END).strip(),
-            "client_now": datetime.now().astimezone().isoformat(timespec="seconds"),
-        }
-        self.auction_markdown_text.delete("1.0", tk.END)
-        self._set_auction_search_busy(True, "Researching official auction sources…")
-        self._set_status("Auction web research is running.")
-
-        def worker():
-            try:
-                result = self._request_upcoming_auction_search(payload)
-            except Exception as exc:
-                error_message = str(exc)
-                self.master.after(0, lambda: self._finish_auction_search_error(error_message))
-                return
-            self.master.after(0, lambda: self._finish_auction_search_success(result))
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _finish_auction_search_success(self, result):
-        markdown = result.get("markdown", "")
-        research_meta = result.get("research_meta") if isinstance(result.get("research_meta"), dict) else {}
-        search_count = research_meta.get("search_count", 0)
-        source_count = research_meta.get("source_count", 0)
-        candidate_count = research_meta.get("raw_candidate_count", 0)
-        qualified_count = research_meta.get("qualified_count", result.get("auction_count", 0))
-        self.auction_markdown_text.delete("1.0", tk.END)
-        self.auction_markdown_text.insert(tk.END, markdown)
-        label = (
-            f"Ran {search_count} searches and opened {source_count} sources; "
-            f"found {candidate_count} candidates and {qualified_count} qualifying auctions."
-        )
-        self._set_auction_search_busy(False, label)
-        self._set_status(label)
-
-    def _finish_auction_search_error(self, error_message):
-        self._set_auction_search_busy(False, "Search failed.")
-        self._set_status("Auction web research failed.")
-        messagebox.showerror("Auction Search Failed", error_message)
-
-    def copy_auction_markdown(self):
-        markdown = self.auction_markdown_text.get("1.0", tk.END).strip()
-        if not markdown:
-            messagebox.showwarning("Nothing to Copy", "Run an auction search first.")
-            return
-        self.master.clipboard_clear()
-        self.master.clipboard_append(markdown)
-        self.auction_status.config(text="Markdown copied to clipboard.")
-
-    def save_auction_markdown(self):
-        markdown = self.auction_markdown_text.get("1.0", tk.END).strip()
-        if not markdown:
-            messagebox.showwarning("Nothing to Save", "Run an auction search first.")
-            return
-        file_path = filedialog.asksaveasfilename(
-            title="Save auction research",
-            defaultextension=".md",
-            initialfile=f"upcoming-print-auctions-{datetime.now():%Y-%m-%d}.md",
-            filetypes=[("Markdown", "*.md"), ("Text", "*.txt"), ("All Files", "*.*")],
-        )
-        if not file_path:
-            return
-        with open(file_path, "w", encoding="utf-8", newline="\n") as output_file:
-            output_file.write(markdown + "\n")
-        self.auction_status.config(text=f"Saved {os.path.basename(file_path)}.")
 
     def _set_status(self, text):
         self.status.config(text=text)
