@@ -1,13 +1,13 @@
 import json
 import os
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from . import catalog_api_views
+from . import catalog_api_views, views
 from .models import Artwork
 
 
@@ -155,6 +155,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
             "auction_house": "Example Auctions",
             "sale_title": "Prints & Multiples",
             "start_at": "2026-07-15T10:00:00-04:00",
+            "end_at": None,
             "timezone": "America/New_York",
             "location": "New York",
             "online_format": "Live and online",
@@ -162,6 +163,8 @@ class UpcomingPrintAuctionSearchTests(TestCase):
             "print_lot_count": 24,
             "count_kind": "verified",
             "count_evidence": "The official catalog lists lots 1 through 24.",
+            "category_evidence": "The official page is titled Prints & Multiples.",
+            "date_evidence": "The official page lists the sale date and time.",
             "print_types": ["etchings", "screenprints"],
             "official_sale_url": "https://example-auctions.test/sales/prints",
             "supporting_sources": ["https://example-auctions.test/sales/prints"],
@@ -169,23 +172,83 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         data.update(overrides)
         return data
 
-    def openai_payload(self, sales, citation_url="https://research-source.test/calendar"):
-        return {
-            "output_text": json.dumps({"sales": sales}),
-            "output": [
-                {
-                    "type": "message",
-                    "content": [
-                        {
-                            "type": "output_text",
-                            "annotations": [
-                                {"type": "url_citation", "url": citation_url, "title": "Calendar"}
+    def openai_payload(self, sales, *, web_search=True, response_id="resp_test", status="completed"):
+        output = []
+        if web_search:
+            output.extend(
+                [
+                    {
+                        "type": "web_search_call",
+                        "id": "ws_search",
+                        "status": "completed",
+                        "action": {
+                            "type": "search",
+                            "queries": ["upcoming print auctions", "prints multiples auction calendar"],
+                            "sources": [
+                                {
+                                    "type": "url",
+                                    "url": "https://research-source.test/calendar",
+                                    "title": "Auction calendar",
+                                    "snippet": "Upcoming sales",
+                                }
                             ],
-                        }
-                    ],
-                }
-            ],
+                        },
+                    },
+                    {
+                        "type": "web_search_call",
+                        "id": "ws_open",
+                        "status": "completed",
+                        "action": {
+                            "type": "open_page",
+                            "url": "https://example-auctions.test/sales/prints",
+                            "sources": [
+                                {
+                                    "type": "url",
+                                    "url": "https://example-auctions.test/sales/prints",
+                                    "title": "Prints & Multiples",
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "type": "web_search_call",
+                        "id": "ws_find",
+                        "status": "completed",
+                        "action": {"type": "find_in_page", "pattern": "prints"},
+                    },
+                ]
+            )
+        output.append(
+            {
+                "type": "message",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": json.dumps({"sales": sales}),
+                        "annotations": [
+                            {
+                                "type": "url_citation",
+                                "url": "https://research-source.test/calendar",
+                                "title": "Calendar",
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        return {
+            "id": response_id,
+            "status": status,
+            "model": "gpt-5.6",
+            "output_text": json.dumps({"sales": sales}),
+            "output": output,
         }
+
+    def http_response(self, payload):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = json.dumps(payload).encode("utf-8")
+        return response
 
     def post(self, payload=None, authenticated=True):
         headers = {"HTTP_X_API_KEY": "test-key"} if authenticated else {}
@@ -202,7 +265,7 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         self.assertEqual(response.status_code, 401)
 
     @patch("secondstateapp.catalog_api_views._call_auction_search_api")
-    def test_search_computes_exact_window_filters_deduplicates_and_sorts(self, mock_openai):
+    def test_search_filters_deduplicates_sorts_and_returns_diagnostics(self, mock_openai):
         later_dedicated = self.sale()
         earlier_mixed = self.sale(
             auction_house="Pacific Auctions",
@@ -226,7 +289,8 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         )
         ended = self.sale(
             sale_title="Already Ended",
-            start_at="2026-07-12T17:59:59-07:00",
+            start_at="2026-07-10T12:00:00-07:00",
+            end_at="2026-07-12T17:59:59-07:00",
             official_sale_url="https://example-auctions.test/sales/ended",
             supporting_sources=["https://example-auctions.test/sales/ended"],
         )
@@ -255,21 +319,96 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         self.assertNotIn("Mixed Art", result["markdown"])
         self.assertLess(result["markdown"].index("Pacific Auctions"), result["markdown"].index("Example Auctions"))
         self.assertIn("https://research-source.test/calendar", result["source_urls"])
+        self.assertEqual(result["research_meta"]["web_search_call_count"], 3)
+        self.assertEqual(result["research_meta"]["search_count"], 1)
+        self.assertEqual(result["research_meta"]["open_page_count"], 1)
+        self.assertEqual(result["research_meta"]["find_in_page_count"], 1)
+        self.assertEqual(result["research_meta"]["raw_candidate_count"], 5)
+        self.assertEqual(result["research_meta"]["qualified_count"], 2)
+        self.assertEqual(result["research_meta"]["filtered_counts"]["mixed_below_threshold"], 1)
+        self.assertEqual(result["research_meta"]["filtered_counts"]["ended"], 1)
+        self.assertEqual(result["research_meta"]["filtered_counts"]["duplicate"], 1)
+        self.assertEqual(
+            result["research_meta"]["queries"],
+            ["upcoming print auctions", "prints multiples auction calendar"],
+        )
+        self.assertEqual(result["research_meta"]["source_count"], 2)
+        self.assertEqual(result["research_meta"]["sources"][0]["snippet"], "Upcoming sales")
+        self.assertEqual(result["research_meta"]["response_id"], "resp_test")
+        self.assertEqual(result["research_meta"]["response_status"], "completed")
+        self.assertEqual(result["research_meta"]["model"], "gpt-5.6")
+        self.assertEqual(result["research_meta"]["reasoning_effort"], "xhigh")
+        self.assertEqual(result["research_meta"]["warnings"], [])
         called_config = mock_openai.call_args.args[0]
         self.assertEqual(called_config["minimum_print_lots"], 10)
         self.assertEqual(called_config["region"], "North America")
 
     @patch("secondstateapp.catalog_api_views._call_auction_search_api")
-    def test_dedicated_sale_qualifies_below_mixed_sale_threshold(self, mock_openai):
-        mock_openai.return_value = self.openai_payload([self.sale(print_lot_count=4)])
+    def test_dedicated_sale_with_unknown_count_and_strong_evidence_qualifies(self, mock_openai):
+        mock_openai.return_value = self.openai_payload(
+            [
+                self.sale(
+                    print_lot_count=None,
+                    count_kind="unknown",
+                    count_evidence="The official page does not publish a lot count yet.",
+                )
+            ]
+        )
 
         response = self.post()
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["auction_count"], 1)
+        self.assertIsNone(response.json()["sales"][0]["print_lot_count"])
+        self.assertIn("Unknown (unknown)", response.json()["markdown"])
 
     @patch("secondstateapp.catalog_api_views._call_auction_search_api")
-    def test_no_results_returns_deterministic_markdown(self, mock_openai):
+    def test_mixed_sale_with_unknown_count_is_rejected(self, mock_openai):
+        mock_openai.return_value = self.openai_payload(
+            [
+                self.sale(
+                    sale_type="mixed",
+                    print_lot_count=None,
+                    count_kind="unknown",
+                    count_evidence="No defensible count was available.",
+                )
+            ]
+        )
+
+        response = self.post()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["auction_count"], 0)
+        self.assertEqual(response.json()["research_meta"]["filtered_counts"]["mixed_count_unknown"], 1)
+
+    @patch("secondstateapp.catalog_api_views._call_auction_search_api")
+    def test_earlier_started_sale_closing_in_window_qualifies_and_ended_sale_does_not(self, mock_openai):
+        closing_in_window = self.sale(
+            sale_title="Timed Prints",
+            start_at="2026-07-10T10:00:00-07:00",
+            end_at="2026-07-14T10:00:00-07:00",
+        )
+        ended = self.sale(
+            sale_title="Closed Prints",
+            start_at="2026-07-09T10:00:00-07:00",
+            end_at="2026-07-12T17:00:00-07:00",
+            official_sale_url="https://example-auctions.test/sales/closed",
+            supporting_sources=["https://example-auctions.test/sales/closed"],
+        )
+        mock_openai.return_value = self.openai_payload([closing_in_window, ended])
+
+        response = self.post()
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["auction_count"], 1)
+        self.assertEqual(result["sales"][0]["end_at"], "2026-07-14T10:00:00-07:00")
+        self.assertIn("Timed Prints", result["markdown"])
+        self.assertNotIn("Closed Prints", result["markdown"])
+        self.assertEqual(result["research_meta"]["filtered_counts"]["ended"], 1)
+
+    @patch("secondstateapp.catalog_api_views._call_auction_search_api")
+    def test_legitimate_zero_after_real_web_search_returns_deterministic_markdown(self, mock_openai):
         mock_openai.return_value = self.openai_payload([])
 
         response = self.post(self.payload(horizon_days=3, region=""))
@@ -279,6 +418,38 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         self.assertEqual(result["auction_count"], 0)
         self.assertEqual(result["window"]["end"], "2026-07-15T18:00:00-07:00")
         self.assertIn("No qualifying upcoming print auctions were found", result["markdown"])
+        self.assertEqual(result["research_meta"]["web_search_call_count"], 3)
+
+    @patch("secondstateapp.catalog_api_views._call_auction_search_api")
+    def test_missing_web_search_retries_once_then_succeeds_with_warning(self, mock_openai):
+        mock_openai.side_effect = [
+            self.openai_payload([], web_search=False, response_id="resp_first"),
+            self.openai_payload([], response_id="resp_retry"),
+        ]
+
+        response = self.post()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_openai.call_count, 2)
+        self.assertFalse(mock_openai.call_args_list[0].kwargs["discovery_retry"])
+        self.assertTrue(mock_openai.call_args_list[1].kwargs["discovery_retry"])
+        self.assertEqual(response.json()["research_meta"]["attempt_count"], 2)
+        self.assertIn("retried once", response.json()["research_meta"]["warnings"][0])
+
+    @patch("secondstateapp.catalog_api_views._call_auction_search_api")
+    def test_missing_web_search_after_bounded_retry_returns_research_error(self, mock_openai):
+        mock_openai.side_effect = [
+            self.openai_payload([], web_search=False, response_id="resp_first"),
+            self.openai_payload([], web_search=False, response_id="resp_retry"),
+        ]
+
+        response = self.post()
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(mock_openai.call_count, 2)
+        self.assertIn("no web-search activity", response.json()["error"].lower())
+        self.assertEqual(response.json()["research_meta"]["web_search_call_count"], 0)
+        self.assertNotIn("auction_count", response.json())
 
     def test_request_validation_rejects_invalid_horizon_count_and_naive_timestamp(self):
         invalid_payloads = [
@@ -296,26 +467,117 @@ class UpcomingPrintAuctionSearchTests(TestCase):
                     self.assertEqual(response.status_code, 400)
             mock_openai.assert_not_called()
 
-    @patch.dict(os.environ, {"OPENAI_AUCTION_SEARCH_MODEL": "gpt-auction-test"}, clear=False)
     @patch("secondstateapp.catalog_api_views.urllib.request.urlopen")
-    def test_openai_request_uses_configured_model_web_search_and_schema(self, mock_urlopen):
-        mock_response = mock_urlopen.return_value.__enter__.return_value
-        mock_response.read.return_value = json.dumps(self.openai_payload([])).encode("utf-8")
+    def test_openai_request_defaults_to_gpt_5_6_required_search_and_strict_schema(self, mock_urlopen):
+        mock_urlopen.return_value = self.http_response(self.openai_payload([]))
+        config = catalog_api_views._validate_auction_search_request(self.payload())
+        env = {
+            "OPENAI_AUCTION_SEARCH_MODEL": "",
+            "OPENAI_AUCTION_SEARCH_REASONING_EFFORT": "",
+            "OPENAI_AUCTION_SEARCH_RETURN_TOKEN_BUDGET": "",
+            "OPENAI_AUCTION_SEARCH_MAX_OUTPUT_TOKENS": "",
+        }
+
+        with patch.dict(os.environ, env, clear=False):
+            catalog_api_views._call_auction_search_api(config)
+
+        openai_request = mock_urlopen.call_args.args[0]
+        request_body = json.loads(openai_request.data.decode("utf-8"))
+        self.assertEqual(request_body["model"], "gpt-5.6")
+        self.assertEqual(request_body["reasoning"], {"effort": "xhigh"})
+        self.assertEqual(
+            request_body["tools"],
+            [{"type": "web_search", "search_context_size": "high", "return_token_budget": "unlimited"}],
+        )
+        self.assertEqual(request_body["tool_choice"], "required")
+        self.assertEqual(request_body["include"], ["web_search_call.action.sources"])
+        self.assertEqual(request_body["max_output_tokens"], 20000)
+        self.assertTrue(request_body["background"])
+        self.assertEqual(request_body["text"]["format"]["type"], "json_schema")
+        self.assertTrue(request_body["text"]["format"]["strict"])
+        schema = request_body["text"]["format"]["schema"]
+        self.assertFalse(schema["additionalProperties"])
+        self.assertEqual(schema["properties"]["sales"]["items"]["properties"]["end_at"]["type"], ["string", "null"])
+        self.assertEqual(
+            schema["properties"]["sales"]["items"]["properties"]["print_lot_count"]["type"],
+            ["integer", "null"],
+        )
+
+    @patch.dict(
+        os.environ,
+        {
+            "OPENAI_AUCTION_SEARCH_MODEL": "gpt-auction-test",
+            "OPENAI_AUCTION_SEARCH_REASONING_EFFORT": "high",
+            "OPENAI_AUCTION_SEARCH_RETURN_TOKEN_BUDGET": "default",
+            "OPENAI_AUCTION_SEARCH_MAX_OUTPUT_TOKENS": "12345",
+        },
+        clear=False,
+    )
+    @patch("secondstateapp.catalog_api_views.urllib.request.urlopen")
+    def test_openai_request_supports_model_reasoning_budget_and_output_overrides(self, mock_urlopen):
+        mock_urlopen.return_value = self.http_response(self.openai_payload([]))
         config = catalog_api_views._validate_auction_search_request(self.payload())
 
         catalog_api_views._call_auction_search_api(config)
 
-        openai_request = mock_urlopen.call_args.args[0]
-        request_body = json.loads(openai_request.data.decode("utf-8"))
+        request_body = json.loads(mock_urlopen.call_args.args[0].data.decode("utf-8"))
         self.assertEqual(request_body["model"], "gpt-auction-test")
-        self.assertEqual(request_body["tools"], [{"type": "web_search", "search_context_size": "high"}])
-        self.assertEqual(request_body["include"], ["web_search_call.action.sources"])
-        self.assertEqual(request_body["text"]["format"]["type"], "json_schema")
-        self.assertTrue(request_body["text"]["format"]["strict"])
+        self.assertEqual(request_body["reasoning"]["effort"], "high")
+        self.assertEqual(request_body["tools"][0]["return_token_budget"], "default")
+        self.assertEqual(request_body["max_output_tokens"], 12345)
+
+    @patch("secondstateapp.catalog_api_views.time.sleep")
+    @patch("secondstateapp.catalog_api_views.urllib.request.urlopen")
+    def test_background_response_polls_queued_and_in_progress_until_completed(self, mock_urlopen, mock_sleep):
+        response_id = "resp_background"
+        mock_urlopen.side_effect = [
+            self.http_response({"id": response_id, "status": "queued", "model": "gpt-5.6", "output": []}),
+            self.http_response(
+                {"id": response_id, "status": "in_progress", "model": "gpt-5.6", "output": []}
+            ),
+            self.http_response(self.openai_payload([], response_id=response_id)),
+        ]
+        config = catalog_api_views._validate_auction_search_request(self.payload())
+
+        result = catalog_api_views._call_auction_search_api(config)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(mock_urlopen.call_count, 3)
+        self.assertEqual(mock_urlopen.call_args_list[0].args[0].get_method(), "POST")
+        self.assertEqual(mock_urlopen.call_args_list[1].args[0].get_method(), "GET")
+        self.assertEqual(mock_urlopen.call_args_list[2].args[0].full_url, f"https://api.openai.com/v1/responses/{response_id}")
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    def test_failed_cancelled_and_incomplete_background_responses_are_errors(self):
+        config = catalog_api_views._validate_auction_search_request(self.payload())
+        cases = [
+            ("failed", {"message": "provider failed"}, None, "failed"),
+            ("cancelled", None, None, "cancelled"),
+            ("incomplete", None, {"reason": "max_output_tokens"}, "incomplete"),
+        ]
+        for status, error, incomplete_details, expected_text in cases:
+            with self.subTest(status=status):
+                payload = {
+                    "id": f"resp_{status}",
+                    "status": status,
+                    "model": "gpt-5.6",
+                    "output": [],
+                    "error": error,
+                    "incomplete_details": incomplete_details,
+                }
+                with patch(
+                    "secondstateapp.catalog_api_views._openai_json_request",
+                    return_value=payload,
+                ):
+                    with self.assertRaises(catalog_api_views.AuctionSearchUpstreamError) as context:
+                        catalog_api_views._call_auction_search_api(config)
+                self.assertIn(expected_text, str(context.exception).lower())
+                self.assertEqual(context.exception.research_meta["response_status"], status)
 
     @patch("secondstateapp.catalog_api_views._call_auction_search_api")
     def test_malformed_model_output_returns_bad_gateway(self, mock_openai):
-        mock_openai.return_value = {"output_text": "not-json"}
+        mock_openai.return_value = self.openai_payload([])
+        mock_openai.return_value["output_text"] = "not-json"
 
         response = self.post()
 
@@ -333,3 +595,32 @@ class UpcomingPrintAuctionSearchTests(TestCase):
         upstream_response = self.post()
         self.assertEqual(upstream_response.status_code, 502)
         self.assertEqual(upstream_response.json()["error"], "provider unavailable")
+
+
+@patch.dict(os.environ, {"OPENAI_API_KEY": "not-used-in-tests"}, clear=False)
+class DescriptionOutputLimitTests(TestCase):
+    def response(self):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = json.dumps({"output_text": "Description."}).encode("utf-8")
+        return response
+
+    def artwork(self):
+        return Artwork(
+            artist="Test Artist",
+            title="Test Print",
+            medium="Screenprint",
+            price=Decimal("100.00"),
+        )
+
+    def test_description_requests_restore_450_token_limit(self):
+        with patch("secondstateapp.catalog_api_views.urllib.request.urlopen", return_value=self.response()) as mock_api:
+            catalog_api_views._generate_description(self.artwork(), use_web=False)
+        api_body = json.loads(mock_api.call_args.args[0].data.decode("utf-8"))
+
+        with patch("secondstateapp.views.urllib.request.urlopen", return_value=self.response()) as mock_view:
+            views._generate_catalog_description(self.artwork(), use_web=False)
+        view_body = json.loads(mock_view.call_args.args[0].data.decode("utf-8"))
+
+        self.assertEqual(api_body["max_output_tokens"], 450)
+        self.assertEqual(view_body["max_output_tokens"], 450)
