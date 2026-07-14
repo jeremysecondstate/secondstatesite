@@ -48,7 +48,7 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def _build(self) -> None:
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(4, weight=1)
+        self.rowconfigure(3, weight=1)
 
         ttk.Label(self, text="Artist Watchlist", style="Header.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(
@@ -74,12 +74,33 @@ class ArtistWatchlistPanel(ttk.Frame):
             row=1, column=0, columnspan=2, sticky="w", pady=(5, 0)
         )
 
-        selection = ttk.Panedwindow(self, orient=tk.HORIZONTAL)
-        selection.grid(row=3, column=0, sticky="nsew", pady=(8, 8))
+        # Keep the two data-heavy sections in a vertical paned window so the
+        # artist picker or the agenda can use as much of the tab as the user
+        # needs.  The nested horizontal pane does the same for folders/artists.
+        workspace = tk.PanedWindow(
+            self,
+            orient=tk.VERTICAL,
+            borderwidth=0,
+            relief=tk.FLAT,
+            sashwidth=8,
+            sashrelief=tk.RAISED,
+        )
+        workspace.grid(row=3, column=0, sticky="nsew", pady=(8, 0))
+        self.workspace_pane = workspace
+
+        selection = tk.PanedWindow(
+            workspace,
+            orient=tk.HORIZONTAL,
+            borderwidth=0,
+            relief=tk.FLAT,
+            sashwidth=8,
+            sashrelief=tk.RAISED,
+        )
+        self.selection_pane = selection
         folders = ttk.LabelFrame(selection, text="Detected folders", padding=8, width=300)
         artists = ttk.LabelFrame(selection, text="Artists", padding=8)
-        selection.add(folders, weight=1)
-        selection.add(artists, weight=2)
+        selection.add(folders, minsize=160, stretch="always")
+        selection.add(artists, minsize=280, stretch="always")
         self.folder_controls = ttk.Frame(folders)
         self.folder_controls.pack(fill=tk.BOTH, expand=True)
         ttk.Label(
@@ -96,11 +117,17 @@ class ArtistWatchlistPanel(ttk.Frame):
         ttk.Entry(artist_search, textvariable=self.artist_filter_var).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 8))
         ttk.Button(artist_search, text="Select All", command=self._select_all_artists).pack(side=tk.LEFT)
         ttk.Button(artist_search, text="Select None", command=self._select_no_artists).pack(side=tk.LEFT, padx=(6, 0))
+        artist_table = ttk.Frame(artists)
+        artist_table.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        artist_table.columnconfigure(0, weight=1)
+        artist_table.rowconfigure(0, weight=1)
         self.artist_tree = ttk.Treeview(
-            artists,
+            artist_table,
             columns=("watch", "artist", "sources", "urls"),
             show="headings",
-            height=3,
+            # This is only the comfortable starting size; the pane sash can
+            # still shrink the table to its configured minimum.
+            height=8,
             selectmode="browse",
         )
         for key, title, width in (
@@ -111,13 +138,22 @@ class ArtistWatchlistPanel(ttk.Frame):
         ):
             self.artist_tree.heading(key, text=title)
             self.artist_tree.column(key, width=width, stretch=key in {"artist", "sources"})
-        self.artist_tree.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        self.artist_tree.grid(row=0, column=0, sticky="nsew")
+        artist_scroll_y = ttk.Scrollbar(artist_table, orient=tk.VERTICAL, command=self.artist_tree.yview)
+        artist_scroll_y.grid(row=0, column=1, sticky="ns")
+        artist_scroll_x = ttk.Scrollbar(artist_table, orient=tk.HORIZONTAL, command=self.artist_tree.xview)
+        artist_scroll_x.grid(row=1, column=0, sticky="ew")
+        self.artist_tree.configure(
+            yscrollcommand=artist_scroll_y.set,
+            xscrollcommand=artist_scroll_x.set,
+        )
         self.artist_tree.bind("<Double-1>", self._toggle_artist)
 
-        results = ttk.LabelFrame(self, text="2. Refresh and agenda", padding=8)
-        results.grid(row=4, column=0, sticky="nsew")
+        results = ttk.LabelFrame(workspace, text="2. Refresh and agenda", padding=8)
         results.columnconfigure(0, weight=1)
         results.rowconfigure(1, weight=1)
+        workspace.add(selection, minsize=100, stretch="always")
+        workspace.add(results, minsize=140, stretch="always")
         controls = ttk.Frame(results)
         controls.grid(row=0, column=0, sticky="ew", pady=(0, 7))
         ttk.Label(controls, text="Date horizon").pack(side=tk.LEFT)
@@ -148,7 +184,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         agenda_tab.columnconfigure(0, weight=1)
         agenda_tab.rowconfigure(0, weight=1)
         columns = ("time", "sale", "lot", "title", "estimate", "bid", "status")
-        self.agenda_tree = ttk.Treeview(agenda_tab, columns=columns, show="tree headings", height=10)
+        self.agenda_tree = ttk.Treeview(agenda_tab, columns=columns, show="tree headings", height=6)
         self.agenda_tree.heading("#0", text="Date / Artist")
         self.agenda_tree.column("#0", width=200, stretch=True)
         widths = {"time": 60, "sale": 180, "lot": 55, "title": 220, "estimate": 105, "bid": 75, "status": 70}
@@ -158,7 +194,12 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.agenda_tree.grid(row=0, column=0, sticky="nsew")
         agenda_scroll = ttk.Scrollbar(agenda_tab, orient=tk.VERTICAL, command=self.agenda_tree.yview)
         agenda_scroll.grid(row=0, column=1, sticky="ns")
-        self.agenda_tree.configure(yscrollcommand=agenda_scroll.set)
+        agenda_scroll_x = ttk.Scrollbar(agenda_tab, orient=tk.HORIZONTAL, command=self.agenda_tree.xview)
+        agenda_scroll_x.grid(row=1, column=0, sticky="ew")
+        self.agenda_tree.configure(
+            yscrollcommand=agenda_scroll.set,
+            xscrollcommand=agenda_scroll_x.set,
+        )
         self.agenda_tree.tag_configure("date_group", font=("Segoe UI Semibold", 10))
         self.agenda_tree.tag_configure("artist_group", font=("Segoe UI Semibold", 10))
         self.agenda_tree.tag_configure("new", foreground="#117a37")
@@ -170,7 +211,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.calendar_text.configure(state=tk.DISABLED)
 
         footer = ttk.Frame(self)
-        footer.grid(row=5, column=0, sticky="ew", pady=(7, 0))
+        footer.grid(row=4, column=0, sticky="ew", pady=(7, 0))
         self.metrics_var = tk.StringVar(
             value="Pages fetched: 0 · Cache hits: 0 · Changed: 0 · AI-enriched: 0 · Tokens: 0"
         )
@@ -263,15 +304,25 @@ class ArtistWatchlistPanel(ttk.Frame):
             self.selected_artists.remove(item)
         else:
             self.selected_artists.add(item)
-        self._fill_artist_tree()
+        self._refresh_artist_watch_marks()
+        self.artist_tree.selection_set(item)
+        self.artist_tree.focus(item)
 
     def _select_all_artists(self) -> None:
         self.selected_artists = set(artist_source_counts(self.active_entries))
-        self._fill_artist_tree()
+        self._refresh_artist_watch_marks()
 
     def _select_no_artists(self) -> None:
         self.selected_artists.clear()
-        self._fill_artist_tree()
+        self._refresh_artist_watch_marks()
+
+    def _refresh_artist_watch_marks(self) -> None:
+        """Update watch marks without rebuilding the tree or losing its scroll position."""
+        for item in self.artist_tree.get_children(""):
+            values = list(self.artist_tree.item(item, "values"))
+            if values:
+                values[0] = "Yes" if item in self.selected_artists else ""
+                self.artist_tree.item(item, values=values)
 
     def refresh_watchlist(self) -> None:
         if self.worker and self.worker.is_alive():
