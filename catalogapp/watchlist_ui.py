@@ -23,6 +23,9 @@ from catalogapp.watchlist_models import NormalizedLot, parse_lot_datetime
 from catalogapp.watchlist_service import WatchlistResult, WatchlistService
 
 
+DEFAULT_BOOKMARK_PATH = Path(r"I:\Shared drives\SECONDSTATE\ARTAPP\INVALUABLE-BM.html")
+
+
 def local_watchlist_directory() -> Path:
     root = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / ".secondstate"))
     return root / "SecondState" / "ArtistWatchlist"
@@ -44,7 +47,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self._settings_path = local_watchlist_directory() / "settings.json"
         self._cache_path = local_watchlist_directory() / "watchlist.sqlite3"
         self._build()
-        self._load_settings_hint()
+        self._load_initial_bookmarks()
 
     def _build(self) -> None:
         self.columnconfigure(0, weight=1)
@@ -231,17 +234,18 @@ class ArtistWatchlistPanel(ttk.Frame):
         if path:
             self.load_bookmarks(path)
 
-    def load_bookmarks(self, path: str | Path) -> None:
+    def load_bookmarks(self, path: str | Path) -> bool:
         try:
             entries = load_bookmarks_file(path)
         except Exception as exc:
             messagebox.showerror("Bookmark Import Failed", str(exc), parent=self)
-            return
+            return False
         self.all_entries = entries
         self.bookmark_path_var.set(str(Path(path).resolve()))
         self._save_settings_hint()
         self._build_folder_controls()
         self._update_active_entries(select_all=True)
+        return True
 
     def _build_folder_controls(self) -> None:
         for child in self.folder_controls.winfo_children():
@@ -471,15 +475,28 @@ class ArtistWatchlistPanel(ttk.Frame):
     def _set_status(self, text: str) -> None:
         self.status_callback(text)
 
-    def _load_settings_hint(self) -> None:
+    def _remembered_bookmark_path(self) -> Path | None:
         try:
             payload = json.loads(self._settings_path.read_text(encoding="utf-8"))
             path = payload.get("last_bookmark_path", "")
-            if path:
-                self.bookmark_path_var.set(path)
-                self.import_summary_var.set("Last bookmark path remembered locally. Click Import to reload or choose another file.")
         except (OSError, ValueError, TypeError):
-            return
+            return None
+        return Path(path) if path else None
+
+    def _load_initial_bookmarks(self) -> None:
+        remembered_path = self._remembered_bookmark_path()
+        candidates = [DEFAULT_BOOKMARK_PATH]
+        if remembered_path and remembered_path != DEFAULT_BOOKMARK_PATH:
+            candidates.append(remembered_path)
+
+        for path in candidates:
+            if path.is_file() and self.load_bookmarks(path):
+                return
+
+        self.bookmark_path_var.set(str(DEFAULT_BOOKMARK_PATH))
+        self.import_summary_var.set(
+            "Default bookmark file is unavailable. Connect the shared drive or click Import to choose another file."
+        )
 
     def _save_settings_hint(self) -> None:
         self._settings_path.parent.mkdir(parents=True, exist_ok=True)
