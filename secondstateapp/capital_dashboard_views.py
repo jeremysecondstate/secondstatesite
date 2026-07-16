@@ -1,7 +1,8 @@
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
 
-from .capital_dashboard import build_dashboard, save_uploaded_workbook, saved_workbook_info
+from .capital_dashboard import save_uploaded_workbook, saved_workbook_info
+from .capital_dashboard_supreme import build_dashboard
 
 
 @staff_member_required
@@ -13,7 +14,7 @@ def capital_dashboard(request):
     if request.method == "POST" and request.FILES.get("workbook"):
         try:
             saved_path = save_uploaded_workbook(request.FILES["workbook"])
-            saved_message = f"Saved SUPREME workbook to private storage and refreshed the dashboard."
+            saved_message = "Saved SUPREME workbook to private storage and refreshed the dashboard."
             dashboard = build_dashboard(workbook_path=saved_path)
         except Exception as exc:
             error = str(exc)
@@ -25,7 +26,7 @@ def capital_dashboard(request):
 
     return render(
         request,
-        "capital/dashboard.html",
+        "capital/dashboard_supreme.html",
         {
             "dashboard": dashboard,
             "error": error,
