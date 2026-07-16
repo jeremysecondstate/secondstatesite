@@ -1,7 +1,7 @@
 import sys
 import tkinter as tk
 
-from artpricelinkgen_v2.app import App
+from artpricelinkgen.app import App
 
 
 def main():

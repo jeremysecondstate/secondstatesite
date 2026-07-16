@@ -1,7 +1,7 @@
 import tkinter as tk
 import webbrowser
 
-from artpricelinkgen_v2.config import GOLD_3, GOLD_4, GOLD_SHADOW, LINK_BLUE, TEXT
+from artpricelinkgen.config import GOLD_3, GOLD_4, GOLD_SHADOW, LINK_BLUE, TEXT
 
 
 class HyperlinkText(tk.Text):

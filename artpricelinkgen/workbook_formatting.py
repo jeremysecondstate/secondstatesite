@@ -2,7 +2,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from artpricelinkgen_v2.config import STATUS_COLUMN, UNKNOWN_ARTIST_MESSAGE
+from artpricelinkgen.config import STATUS_COLUMN, UNKNOWN_ARTIST_MESSAGE
 
 
 def format_output_workbook(path: str, link_header: str):

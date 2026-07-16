@@ -2,7 +2,7 @@ import re
 import shutil
 import unicodedata
 
-from artpricelinkgen_v2.models import ExtractedListing
+from artpricelinkgen.models import ExtractedListing
 
 try:
     from PIL import Image

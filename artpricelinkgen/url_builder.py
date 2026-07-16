@@ -2,7 +2,7 @@ import re
 import unicodedata
 from urllib.parse import quote, urlencode
 
-from artpricelinkgen_v2.config import DEFAULT_CATEGORY_ID, DEFAULT_DATE_FROM, DEFAULT_SORT
+from artpricelinkgen.config import DEFAULT_CATEGORY_ID, DEFAULT_DATE_FROM, DEFAULT_SORT
 
 
 class ArtpriceURLBuilder:

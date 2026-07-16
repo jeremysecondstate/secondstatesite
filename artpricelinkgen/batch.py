@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from artpricelinkgen_v2.artist_id_resolver import ArtpriceArtistIdResolver
-from artpricelinkgen_v2.artist_id_store import ArtistIdWorkbookStore
-from artpricelinkgen_v2.config import (
+from artpricelinkgen.artist_id_resolver import ArtpriceArtistIdResolver
+from artpricelinkgen.artist_id_store import ArtistIdWorkbookStore
+from artpricelinkgen.config import (
     ARTPRICE_LINK_COLUMN,
     ARTIST_COLUMN,
     ARTIST_ID_COLUMN,
@@ -15,9 +15,9 @@ from artpricelinkgen_v2.config import (
     TITLE_COLUMN,
     UNKNOWN_ARTIST_MESSAGE,
 )
-from artpricelinkgen_v2.models import ExtractedListing
-from artpricelinkgen_v2.url_builder import ArtpriceURLBuilder
-from artpricelinkgen_v2.workbook_formatting import format_output_workbook
+from artpricelinkgen.models import ExtractedListing
+from artpricelinkgen.url_builder import ArtpriceURLBuilder
+from artpricelinkgen.workbook_formatting import format_output_workbook
 
 
 class BatchProcessor:
