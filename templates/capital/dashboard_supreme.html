@@ -1,0 +1,256 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+  .capital-dashboard { color: #f7f2e8; }
+  .capital-dashboard .muted { color: rgba(247, 242, 232, 0.68); }
+  .capital-hero {
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 22px;
+    padding: 28px;
+    background: radial-gradient(circle at top left, rgba(210,168,92,0.18), rgba(20,20,20,0.92) 45%);
+    margin-bottom: 24px;
+  }
+  .metric-card, .chart-card, .table-card {
+    background: rgba(18,18,18,0.88);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 18px;
+    padding: 18px;
+    height: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+  .metric-label { color: rgba(247,242,232,0.65); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+  .metric-value { font-size: 1.75rem; font-weight: 700; }
+  .partner-pill { border-radius: 999px; padding: 4px 10px; background: rgba(210,168,92,0.15); color: #f6d99a; font-size: .85rem; }
+  .profit-card, .sales-card { background: linear-gradient(160deg, rgba(214,168,79,0.12), rgba(18,18,18,0.90)); }
+  .profit-total-card { background: linear-gradient(160deg, rgba(118,215,165,0.14), rgba(18,18,18,0.90)); }
+  .capital-table th, .capital-table td { color: #f7f2e8; border-color: rgba(255,255,255,0.10); }
+  .capital-table th { color: rgba(247,242,232,0.72); font-weight: 600; }
+  .partner-stat { min-width: 0; }
+  .partner-stat strong { display: block; overflow-wrap: anywhere; }
+  .sale-work { max-width: 340px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="capital-dashboard py-4">
+  <section class="capital-hero">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <p class="partner-pill mb-3">Staff only</p>
+        <h1 class="display-5 mb-2">SecondState Capital Dashboard</h1>
+        <p class="muted mb-0">Headline sales, company profit, contributions, retained earnings, and payout metrics from the SUPREME workbook.</p>
+        {% if saved_workbook.exists %}
+          <p class="muted small mt-3 mb-0">Auto-loading saved workbook: <strong>{{ saved_workbook.name }}</strong>{% if saved_workbook.modified_at %} • last updated {{ saved_workbook.modified_at }}{% endif %}</p>
+        {% else %}
+          <p class="muted small mt-3 mb-0">Upload SUPREME.xlsx once and it will be saved privately for future dashboard visits.</p>
+        {% endif %}
+      </div>
+      <form method="post" enctype="multipart/form-data" class="d-flex flex-column gap-2" style="min-width: 280px;">
+        {% csrf_token %}
+        <label class="form-label muted mb-0" for="workbook">Upload and save latest SUPREME.xlsx</label>
+        <input class="form-control form-control-sm" type="file" id="workbook" name="workbook" accept=".xlsx,.xlsm">
+        <button class="btn btn-outline-light btn-sm" type="submit">Save + Refresh Dashboard</button>
+      </form>
+    </div>
+  </section>
+
+  {% if saved_message %}
+    <div class="alert alert-success">
+      {{ saved_message }} Future visits will auto-load this workbook.
+    </div>
+  {% endif %}
+
+  {% if error %}
+    <div class="alert alert-warning">
+      <strong>No workbook loaded yet.</strong> {{ error }}
+      <div class="small mt-2">Upload SUPREME.xlsx above. The saved copy is stored outside public media.</div>
+    </div>
+  {% endif %}
+
+  {% if dashboard %}
+    <div class="d-flex flex-wrap gap-2 mb-3 muted">
+      <span>Source: <strong>{{ dashboard.source_name }}</strong></span>
+      <span>•</span>
+      <span>Tabs read: <strong>{{ dashboard.source_tab_count }}</strong></span>
+      <span>•</span>
+      <span>Current summary: <strong>{{ dashboard.summary_title }}</strong></span>
+      <span>•</span>
+      <span>Sales recorded: <strong>{{ dashboard.totals.sales_count }}</strong></span>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-xl-3 col-md-6"><div class="metric-card"><div class="metric-label">Net Sales — All Recorded Sales</div><div class="metric-value">{{ dashboard.totals.net_sales }}</div></div></div>
+      <div class="col-xl-3 col-md-6"><div class="metric-card"><div class="metric-label">Total Company Profit</div><div class="metric-value">{{ dashboard.totals.company_profit }}</div></div></div>
+      <div class="col-xl-3 col-md-6"><div class="metric-card"><div class="metric-label">Current Deal Capital</div><div class="metric-value">{{ dashboard.totals.deal_capital }}</div></div></div>
+      <div class="col-xl-3 col-md-6"><div class="metric-card"><div class="metric-label">Estimated Liquidation Payout</div><div class="metric-value">{{ dashboard.totals.liquidation_payout }}</div></div></div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      {% for partner in dashboard.partner_cards %}
+        <div class="col-lg-4">
+          <div class="metric-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h2 class="h4 mb-0">{{ partner.partner }}</h2>
+              <span class="partner-pill">Partner</span>
+            </div>
+            <div class="metric-label">Current Deal Capital</div>
+            <div class="h4">{{ partner.deal_capital }}</div>
+            <div class="row g-3 mt-1">
+              <div class="col-6 partner-stat"><div class="metric-label">{{ dashboard.latest_period }} Profit</div><strong>{{ partner.retained_earnings }}</strong></div>
+              <div class="col-6 partner-stat"><div class="metric-label">Total Profit</div><strong>{{ partner.cumulative_profit }}</strong></div>
+              <div class="col-6 partner-stat"><div class="metric-label">Est. Payout</div><strong>{{ partner.liquidation_payout }}</strong></div>
+              <div class="col-6 partner-stat"><div class="metric-label">Logged Payouts</div><strong>{{ partner.logged_payouts }}</strong></div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if dashboard.sales.periods %}
+      <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-2">
+        <div>
+          <div class="metric-label">Sales Overview</div>
+          <h2 class="h4 mb-0">Recorded Sales by Period</h2>
+        </div>
+        <span class="muted small">Read from {{ dashboard.sales.sheet_count }} sales tabs in SUPREME</span>
+      </div>
+      <div class="row g-3 mb-4">
+        {% for sale in dashboard.sales.periods %}
+          <div class="col-lg-4">
+            <div class="metric-card sales-card">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h5 mb-0">{{ sale.period }}</h3>
+                <span class="partner-pill">{{ sale.sale_count }} sale{{ sale.sale_count|pluralize }}</span>
+              </div>
+              <div class="d-flex justify-content-between py-1"><span class="metric-label">Gross Sales</span><strong>{{ sale.gross_sales }}</strong></div>
+              <div class="d-flex justify-content-between py-1"><span class="metric-label">Net Sales</span><strong>{{ sale.net_sales }}</strong></div>
+              <div class="d-flex justify-content-between py-1"><span class="metric-label">Company Profit</span><strong>{{ sale.profit }}</strong></div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="table-card mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+          <h2 class="h5 mb-0">Recent Recorded Sales</h2>
+          <span class="muted small">Net sales after seller commission</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table capital-table mb-0 align-middle">
+            <thead><tr><th>Period</th><th>Work</th><th>Auction</th><th class="text-end">Net Sale</th><th class="text-end">Profit</th></tr></thead>
+            <tbody>
+              {% for sale in dashboard.sales.recent_sales %}
+                <tr>
+                  <td>{{ sale.period }}</td>
+                  <td class="sale-work"><strong>{{ sale.artist }}</strong><div class="muted small">{{ sale.piece }}</div></td>
+                  <td>{{ sale.sale_location|default:"—" }}</td>
+                  <td class="text-end">{{ sale.net_sales }}</td>
+                  <td class="text-end">{{ sale.profit }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-2">
+      <div>
+        <div class="metric-label">Profit Breakdown</div>
+        <h2 class="h4 mb-0">{{ dashboard.profit_breakdown.title }}</h2>
+      </div>
+      <span class="muted small">Read from visible liquidation summaries on Contributions</span>
+    </div>
+    <div class="row g-3 mb-4">
+      {% for row in dashboard.profit_breakdown.partner_rows %}
+        <div class="col-lg-3 col-md-6">
+          <div class="metric-card profit-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h3 class="h5 mb-0">{{ row.partner }}</h3>
+              <span class="partner-pill">Profit</span>
+            </div>
+            {% for profit in row.profits %}
+              <div class="d-flex justify-content-between py-1">
+                <span class="metric-label">{{ profit.label }}</span>
+                <strong>{{ profit.amount }}</strong>
+              </div>
+            {% endfor %}
+            <hr class="border-secondary my-2">
+            <div class="d-flex justify-content-between">
+              <span class="metric-label">Total</span>
+              <strong>{{ row.total }}</strong>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+      <div class="col-lg-3 col-md-6">
+        <div class="metric-card profit-total-card">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h3 class="h5 mb-0">Total Company Profits</h3>
+            <span class="partner-pill">Company</span>
+          </div>
+          {% for row in dashboard.profit_breakdown.company_profit_rows %}
+            <div class="d-flex justify-content-between py-1">
+              <span class="metric-label">{{ row.label }}</span>
+              <strong>{{ row.amount }}</strong>
+            </div>
+          {% endfor %}
+          <hr class="border-secondary my-2">
+          <div class="d-flex justify-content-between">
+            <span class="metric-label">Total</span>
+            <strong>{{ dashboard.profit_breakdown.company_total }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-lg-4"><div class="chart-card"><h2 class="h5">Deal Capital by Partner</h2><canvas id="dealCapitalChart"></canvas></div></div>
+      <div class="col-lg-4"><div class="chart-card"><h2 class="h5">Estimated Payout by Partner</h2><canvas id="payoutChart"></canvas></div></div>
+      <div class="col-lg-4"><div class="chart-card"><h2 class="h5">Net Sales & Profit by Period</h2><canvas id="salesChart"></canvas></div></div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="chart-card">
+          <h2 class="h5">Monthly Capital Activity</h2>
+          <canvas id="monthChart"></canvas>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="table-card">
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+            <h2 class="h5 mb-0">Top Activity Types</h2>
+            <span class="muted small">Logged payouts: {{ dashboard.totals.logged_payouts }}</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table capital-table mb-0">
+              <thead><tr><th>Type</th><th class="text-end">Amount</th></tr></thead>
+              <tbody>
+                {% for row in dashboard.type_rows %}
+                  <tr><td>{{ row.type }}</td><td class="text-end">{{ row.amount }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {{ dashboard.chart_data|json_script:"capital-chart-data" }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+      const data = JSON.parse(document.getElementById('capital-chart-data').textContent);
+      const palette = ['#d6a84f', '#7eb6ff', '#c987ff', '#76d7a5', '#ff9f7e', '#f7d774'];
+      const currency = value => new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(value || 0);
+      const tooltip = { callbacks: { label: ctx => `${ctx.dataset.label || ctx.label}: ${currency(ctx.raw)}` } };
+
+      new Chart(document.getElementById('dealCapitalChart'), { type: 'doughnut', data: { labels: data.partners, datasets: [{ data: data.dealCapital, backgroundColor: palette }] }, options: { plugins: { tooltip } } });
+      new Chart(document.getElementById('payoutChart'), { type: 'doughnut', data: { labels: data.partners, datasets: [{ data: data.liquidationPayout, backgroundColor: palette.slice().reverse() }] }, options: { plugins: { tooltip } } });
+      new Chart(document.getElementById('salesChart'), { type: 'bar', data: { labels: data.salesPeriods, datasets: [{ label: 'Net Sales', data: data.netSales, backgroundColor: '#d6a84f' }, { label: 'Profit', data: data.salesProfits, backgroundColor: '#76d7a5' }] }, options: { plugins: { tooltip }, scales: { y: { ticks: { callback: currency } } } } });
+      new Chart(document.getElementById('monthChart'), { type: 'line', data: { labels: data.months, datasets: [{ label: 'Monthly total', data: data.monthAmounts, borderColor: '#d6a84f', backgroundColor: 'rgba(214,168,79,0.18)', tension: 0.35, fill: true }] }, options: { plugins: { tooltip }, scales: { y: { ticks: { callback: currency } } } } });
+    </script>
+  {% endif %}
+</div>
+{% endblock %}
