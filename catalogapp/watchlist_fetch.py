@@ -54,6 +54,42 @@ class HttpPageFetcher:
         self.http_attempts = 0
 
     def fetch(self, url: str) -> str:
+        response = self._request(
+            "get",
+            url,
+            headers={
+                "User-Agent": "SecondState-Artist-Watchlist/1.0 (+local bookmark monitor)",
+                "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+            },
+        )
+        content_type = (response.headers.get("Content-Type") or "").casefold()
+        if content_type and not any(item in content_type for item in ("html", "json", "text")):
+            raise SourceAccessError(f"{urlsplit(url).hostname or 'The source'} returned an unsupported content type.")
+        return response.text
+
+    def post_json(self, url: str, payload: object, *, referer: str = "") -> object:
+        """POST to a public allowlisted JSON endpoint using the same safeguards as page fetches."""
+
+        headers = {
+            "User-Agent": "SecondState-Artist-Watchlist/1.0 (+local bookmark monitor)",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        origin = urlsplit(url)
+        if origin.scheme and origin.netloc:
+            headers["Origin"] = f"{origin.scheme}://{origin.netloc}"
+        if referer and _allowed_url(referer):
+            headers["Referer"] = referer
+        response = self._request("post", url, headers=headers, json=payload)
+        content_type = (response.headers.get("Content-Type") or "").casefold()
+        if content_type and "json" not in content_type:
+            raise SourceAccessError(f"{urlsplit(url).hostname or 'The source'} returned a non-JSON response.")
+        try:
+            return response.json()
+        except (TypeError, ValueError) as exc:
+            raise SourceAccessError(f"{urlsplit(url).hostname or 'The source'} returned invalid JSON.") from exc
+
+    def _request(self, method: str, url: str, *, headers: dict[str, str], **kwargs):
         if not _allowed_url(url):
             raise SourceAccessError("Refusing to fetch a URL outside the explicit watchlist domain allowlist.")
         host = (urlsplit(url).hostname or "").casefold()
@@ -62,14 +98,13 @@ class HttpPageFetcher:
             self._throttle(host)
             self.http_attempts += 1
             try:
-                response = self.session.get(
+                request = getattr(self.session, method)
+                response = request(
                     url,
-                    headers={
-                        "User-Agent": "SecondState-Artist-Watchlist/1.0 (+local bookmark monitor)",
-                        "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
-                    },
+                    headers=headers,
                     timeout=self.timeout,
                     allow_redirects=True,
+                    **kwargs,
                 )
             except requests.RequestException as exc:
                 if attempt >= self.max_retries:
@@ -93,11 +128,8 @@ class HttpPageFetcher:
                 response.raise_for_status()
             except requests.RequestException as exc:
                 raise SourceAccessError(f"{host} returned HTTP {response.status_code}.") from exc
-            content_type = (response.headers.get("Content-Type") or "").casefold()
-            if content_type and not any(item in content_type for item in ("html", "json", "text")):
-                raise SourceAccessError(f"{host} returned an unsupported content type.")
             self.pages_fetched += 1
-            return response.text
+            return response
         raise SourceAccessError(f"Could not fetch {host}.")
 
     def _check_stopped(self) -> None:

@@ -17,7 +17,7 @@ Synthetic agenda with efficiency metrics and export controls:
 ```text
 local bookmark HTML
   -> selected folders + explicit domain allowlist
-  -> Invaluable deterministic HTML/embedded-JSON adapter
+  -> Invaluable public catalog JSON adapter (HTML fallback for saved fixtures)
   -> normalized lot records
   -> local SQLite content-hash cache and diff
   -> optional compact ambiguous-record enrichment
@@ -27,7 +27,7 @@ local bookmark HTML
 The implementation is split by responsibility:
 
 - `catalogapp/bookmark_watchlist.py`: Netscape bookmark parsing, nested URL decoding, folder/domain filtering, artist labels, and URL deduplication.
-- `catalogapp/watchlist_adapters.py`: adapter interface plus deterministic Invaluable card, embedded JSON, detail, and pagination parsing.
+- `catalogapp/watchlist_adapters.py`: adapter interface plus deterministic Invaluable catalog-result, card, embedded JSON, detail, and pagination parsing. Invaluable's `/search` page is a JavaScript shell, so live refreshes use the same public `/catResults` JSON request as the page itself.
 - `catalogapp/watchlist_fetch.py`: conservative HTTP retries/rate limiting and an explicit opt-in Playwright profile fallback.
 - `catalogapp/watchlist_models.py`: stable normalized lot schema and local duplicate markers.
 - `catalogapp/watchlist_cache.py`: SQLite lot, membership, source-run, and AI-enrichment caches.
@@ -41,7 +41,7 @@ The implementation is split by responsibility:
 - The bookmark file is read locally and is never copied into the repository or website database.
 - The complete bookmark HTML and full scraped pages are never sent to OpenAI.
 - Only entries in a user-selected folder and the explicit `invaluable.com`, `liveauctioneers.com`, or `drouot.com` allowlist are imported. Private Google Drive and unrelated URLs are rejected.
-- Normal HTTP retrieval is the default. Optional Playwright use requires both `WATCHLIST_USE_PLAYWRIGHT=1` and a user-selected `WATCHLIST_PLAYWRIGHT_PROFILE` directory.
+- Normal HTTP retrieval is the default. Invaluable catalog requests do not use browser cookies, a member token, or a logged-in profile. Optional Playwright use requires both `WATCHLIST_USE_PLAYWRIGHT=1` and a user-selected `WATCHLIST_PLAYWRIGHT_PROFILE` directory.
 - The fetchers do not enter credentials, solve CAPTCHAs, bypass paywalls, or work around HTTP 401/403/429 controls.
 - Local settings and cache data live under `%LOCALAPPDATA%\SecondState\ArtistWatchlist`, outside the repository.
 - Zero-AI mode is enabled in the UI by default. Optional enrichment also requires `OPENAI_WATCHLIST_ENRICHMENT_ENABLED=1`.
@@ -99,3 +99,7 @@ Historical migration `0012_auctionsearchjob.py` is retained because it may alrea
 ```
 
 The synthetic tests cover bookmark safety, repeated decoding, adapters, pagination, retries, caching/diffs, duplicate marking, timezone/all-day ICS behavior, zero-AI mode, strict compact batching, enrichment caching, legacy removal, and preserved website regressions. No test contacts an auction site or OpenAI.
+
+## Invaluable troubleshooting
+
+A successful `GET /search` is not proof that auction data was returned: Invaluable currently responds with HTTP 200 and an empty JavaScript application shell. The live adapter therefore posts only the bookmark's public artist/category/search filters to `/catResults`, validates the JSON schema, and reports a source error if the endpoint returns HTML or an unexpected response. This prevents an empty shell from being recorded as a successful zero-result refresh.

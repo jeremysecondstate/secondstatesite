@@ -124,6 +124,78 @@ class InvaluableAdapterTests(SimpleTestCase):
         self.assertEqual(next_url, "https://www.invaluable.com/search?keyword=Rufino+Tamayo&page=2")
         self.assertEqual(self.adapter.extract_next_page_url(fixture("invaluable_page_2.html"), next_url), "")
 
+    def test_uses_public_catalog_feed_and_normalizes_results(self):
+        search_url = (
+            "https://www.invaluable.com/search?artistName=Rufino+Tamayo&"
+            "Fine+Art=Prints&keyword=fine+art&query=fine+art&sort=endDateAsc"
+        )
+        response = {
+            "results": [
+                {
+                    "page": 0,
+                    "nbPages": 2,
+                    "nbHits": 1,
+                    "hits": [
+                        {
+                            "objectID": "205299494",
+                            "lotRef": "FD04340A1D",
+                            "lotNumber": "47",
+                            "lotTitle": "Rufino Tamayo; Galaxia (Galaxy)",
+                            "artistName": "Rufino Tamayo",
+                            "lotDescription": "Mixografia in colors on wove paper",
+                            "houseName": "Bonhams",
+                            "catalogRef": "8NR19L2CW9",
+                            "dateTimeUTCUnix": 1785355200,
+                            "endTimeUTCUnix": 0,
+                            "estimateLow": 10000,
+                            "estimateHigh": 15000,
+                            "currentBid": 10000,
+                            "currencyCode": "USD",
+                        }
+                    ],
+                }
+            ]
+        }
+
+        class CatalogFetcher:
+            def __init__(self):
+                self.calls = []
+
+            def post_json(self, url, payload, *, referer=""):
+                self.calls.append((url, payload, referer))
+                return response
+
+        fetcher = CatalogFetcher()
+        page = self.adapter.fetch_search_page(search_url, fetcher)
+        lots = self.adapter.parse_search_page(page, search_url, "Rufino Tamayo")
+
+        self.assertEqual(fetcher.calls[0][0], "https://www.invaluable.com/catResults")
+        self.assertEqual(fetcher.calls[0][2], search_url)
+        request = fetcher.calls[0][1]["requests"][0]
+        self.assertEqual(request["indexName"], "upcoming_lots_dateTimeUTCUnix_asc_prod")
+        self.assertEqual(
+            request["params"]["facetFilters"],
+            [["artistName:Rufino Tamayo"], ["Fine Art:Prints"]],
+        )
+        self.assertNotIn("userToken", request["params"])
+        self.assertEqual(len(lots), 1)
+        lot = lots[0]
+        self.assertEqual(lot.source_lot_id, "205299494")
+        self.assertEqual(lot.medium, "Mixografia")
+        self.assertEqual(lot.auction_house, "Bonhams")
+        self.assertEqual(lot.estimate_high, 15000)
+        self.assertEqual(lot.end_at, "2026-07-29T20:00:00+00:00")
+        self.assertEqual(lot.sale_url, "https://www.invaluable.com/catalog/8NR19L2CW9")
+        self.assertEqual(
+            lot.lot_url,
+            "https://www.invaluable.com/auction-lot/rufino-tamayo-galaxia-galaxy-47-c-fd04340a1d",
+        )
+        self.assertFalse(self.adapter.needs_detail(lot))
+        self.assertEqual(
+            self.adapter.extract_next_page_url(page, search_url),
+            "https://www.invaluable.com/search?artistName=Rufino+Tamayo&Fine+Art=Prints&keyword=fine+art&page=2&query=fine+art&sort=endDateAsc",
+        )
+
 
 class _Response:
     def __init__(self, status_code, text="", payload=None, headers=None, url=""):
@@ -147,6 +219,10 @@ class _HttpSession:
         self.calls = []
 
     def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return self.responses.pop(0)
+
+    def post(self, url, **kwargs):
         self.calls.append((url, kwargs))
         return self.responses.pop(0)
 
@@ -174,6 +250,27 @@ class FetcherTests(SimpleTestCase):
         fetcher = HttpPageFetcher(session=session, min_interval_seconds=0, max_retries=0)
         with self.assertRaises(SourceAccessError):
             fetcher.fetch("https://www.invaluable.com/search?q=test")
+
+    def test_posts_json_with_the_same_allowlist_and_response_validation(self):
+        payload = {"results": [{"hits": []}]}
+        session = _HttpSession(
+            [_Response(200, payload=payload, headers={"Content-Type": "application/json"})]
+        )
+        fetcher = HttpPageFetcher(session=session, min_interval_seconds=0, max_retries=0)
+
+        result = fetcher.post_json(
+            "https://www.invaluable.com/catResults",
+            {"requests": []},
+            referer="https://www.invaluable.com/search?q=test",
+        )
+
+        self.assertEqual(result, payload)
+        self.assertEqual(fetcher.pages_fetched, 1)
+        self.assertEqual(session.calls[0][1]["json"], {"requests": []})
+        self.assertEqual(
+            session.calls[0][1]["headers"]["Referer"],
+            "https://www.invaluable.com/search?q=test",
+        )
 
 
 class CacheAndServiceTests(SimpleTestCase):

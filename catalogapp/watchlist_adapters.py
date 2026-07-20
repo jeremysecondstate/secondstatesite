@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import re
 from typing import Any, Iterable, Protocol
+import unicodedata
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
@@ -18,6 +19,8 @@ from catalogapp.watchlist_models import NormalizedLot
 
 class PageFetcher(Protocol):
     def fetch(self, url: str) -> str: ...
+
+    def post_json(self, url: str, payload: object, *, referer: str = "") -> object: ...
 
 
 class BookmarkSourceAdapter(ABC):
@@ -74,14 +77,92 @@ class _Money:
 class InvaluableAdapter(BookmarkSourceAdapter):
     source = "Invaluable"
     domains = ("invaluable.com",)
+    _catalog_path = "/catResults"
+    _catalog_filters = (
+        "banned:false AND channelIDs:1 AND unlotted:false AND onlineOnly:false "
+        "AND closed:false AND NOT subcategoryRef:7IA742QGM5"
+    )
+    _catalog_attributes = (
+        "artistName",
+        "bidCount",
+        "catalogRef",
+        "countryName",
+        "currencyCode",
+        "currencySymbol",
+        "currentBid",
+        "dateTimeLocal",
+        "dateTimeUTCUnix",
+        "endTimeUTCUnix",
+        "estimateHigh",
+        "estimateLow",
+        "houseName",
+        "location",
+        "lotDescription",
+        "lotNumber",
+        "lotRef",
+        "lotTitle",
+        "objectID",
+        "photoPath",
+        "stateName",
+        "subcategoryName",
+        "supercategoryName",
+    )
+    _sort_indexes = {
+        "enddateasc": "upcoming_lots_dateTimeUTCUnix_asc_prod",
+        "newlylisted": "upcoming_lots_postDateTime_desc_prod",
+        "postdatetimedesc": "upcoming_lots_postDateTime_desc_prod",
+        "priceasc": "upcoming_lots_currentBid_asc_prod",
+        "pricedesc": "upcoming_lots_currentBid_desc_prod",
+        "bidcountasc": "upcoming_lots_bidCount_asc_prod",
+        "bidcountdesc": "upcoming_lots_bidCount_desc_prod",
+    }
+    _category_facets = frozenset(
+        {
+            "asian art",
+            "collectibles",
+            "decorative art",
+            "fine art",
+            "furniture",
+            "jewelry",
+        }
+    )
     _lot_href = re.compile(r"/(?:auction-lot|lot)/", re.IGNORECASE)
     _print_terms = re.compile(
         r"\b(etching|engraving|lithograph|linocut|screenprint|serigraph|woodcut|woodblock|"
-        r"aquatint|mezzotint|monotype|print|multiple|mixograf|gicl[eé]e)\b",
+        r"aquatint|mezzotint|monotype|print|multiple|mixograf\w*|gicl(?:ee|ée))\b",
         re.IGNORECASE,
     )
 
+    def fetch_search_page(self, url: str, fetcher: PageFetcher) -> str:
+        """Use the same public JSON feed as Invaluable's JavaScript search page.
+
+        A normal GET of ``/search`` now returns an empty application shell. The
+        catalog feed is both smaller and deterministic, and does not need browser
+        cookies or a logged-in profile. Fixture/browser fetchers without
+        ``post_json`` retain the HTML parsing fallback.
+        """
+
+        post_json = getattr(fetcher, "post_json", None)
+        if urlsplit(url).path.rstrip("/").casefold() != "/search" or not callable(post_json):
+            return super().fetch_search_page(url, fetcher)
+        parts = urlsplit(url)
+        endpoint = urlunsplit((parts.scheme, parts.netloc, self._catalog_path, "", ""))
+        payload = post_json(endpoint, self._catalog_request_payload(url), referer=url)
+        if self._catalog_result(payload) is None:
+            raise RuntimeError("Invaluable returned an unexpected catalog-search response.")
+        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
     def extract_lot_links(self, page: str, page_url: str) -> list[str]:
+        catalog_result = self._catalog_result(page)
+        if catalog_result is not None:
+            links: list[str] = []
+            for hit in catalog_result.get("hits", []):
+                if not isinstance(hit, dict):
+                    continue
+                lot_url = self._catalog_lot_url(hit, page_url)
+                if lot_url and lot_url not in links:
+                    links.append(lot_url)
+            return links
         soup = BeautifulSoup(page or "", "html.parser")
         links: list[str] = []
         seen: set[str] = set()
@@ -101,6 +182,14 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         return links
 
     def parse_search_page(self, page: str, page_url: str, watchlist_artist: str) -> list[NormalizedLot]:
+        catalog_result = self._catalog_result(page)
+        if catalog_result is not None:
+            raw_lots = [
+                self._raw_from_catalog_hit(hit, page_url, watchlist_artist)
+                for hit in catalog_result.get("hits", [])
+                if isinstance(hit, dict)
+            ]
+            return self._normalize_and_deduplicate(raw_lots, page_url, watchlist_artist)
         soup = BeautifulSoup(page or "", "html.parser")
         raw_lots: list[dict[str, Any]] = list(self._embedded_lot_dicts(soup))
         selectors = (
@@ -131,6 +220,21 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         return normalized[0] if normalized else None
 
     def extract_next_page_url(self, page: str, page_url: str) -> str:
+        catalog_result = self._catalog_result(page)
+        if catalog_result is not None:
+            try:
+                page_index = int(catalog_result.get("page", 0))
+                page_count = int(catalog_result.get("nbPages", 0))
+            except (TypeError, ValueError):
+                return ""
+            if page_index + 1 >= page_count:
+                return ""
+            current = urlsplit(page_url)
+            query = [(key, value) for key, value in parse_qsl(current.query, keep_blank_values=True) if key.casefold() != "page"]
+            query.append(("page", str(page_index + 2)))
+            return canonicalize_bookmark_url(
+                urlunsplit((current.scheme, current.netloc, current.path, urlencode(query), ""))
+            )
         soup = BeautifulSoup(page or "", "html.parser")
         candidates = [
             soup.find("link", rel=lambda value: value and "next" in value),
@@ -152,6 +256,138 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             canonical = canonicalize_bookmark_url(resolved)
             if canonical and self.supports(canonical):
                 return canonical
+        return ""
+
+    def _catalog_request_payload(self, page_url: str) -> dict[str, Any]:
+        query_items = parse_qsl(urlsplit(page_url).query, keep_blank_values=True)
+        folded: dict[str, list[str]] = {}
+        for key, value in query_items:
+            folded.setdefault(key.casefold(), []).append(value)
+
+        def first(*keys: str) -> str:
+            for key in keys:
+                values = folded.get(key.casefold(), [])
+                if values and values[0].strip():
+                    return values[0].strip()
+            return ""
+
+        artist_name = first("artistName", "artist")
+        search_text = first("query", "keyword", "q")
+        sort_value = first("sort").casefold()
+        index_name = self._sort_indexes.get(sort_value, "upcoming_lots_prod")
+        try:
+            page_number = max(1, int(first("page") or "1"))
+        except ValueError:
+            page_number = 1
+
+        facet_filters: list[list[str]] = []
+        if artist_name:
+            facet_filters.append([f"artistName:{artist_name}"])
+        for key, value in query_items:
+            if key.casefold() in self._category_facets and value.strip():
+                facet_filters.append([f"{key}:{value.strip()}"])
+
+        return {
+            "requests": [
+                {
+                    "indexName": index_name,
+                    "params": {
+                        "analytics": False,
+                        "attributesToRetrieve": list(self._catalog_attributes),
+                        "clickAnalytics": False,
+                        "facetFilters": facet_filters,
+                        "facets": [],
+                        "filters": self._catalog_filters,
+                        "getRankingInfo": False,
+                        "hitsPerPage": 96,
+                        "page": page_number - 1,
+                        "query": search_text,
+                    },
+                }
+            ],
+            "isCatalogPageRequest": False,
+        }
+
+    @staticmethod
+    def _catalog_result(payload: object) -> dict[str, Any] | None:
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except (TypeError, ValueError):
+                return None
+        if not isinstance(payload, dict):
+            return None
+        results = payload.get("results")
+        if not isinstance(results, list) or not results or not isinstance(results[0], dict):
+            return None
+        if not isinstance(results[0].get("hits"), list):
+            return None
+        return results[0]
+
+    def _raw_from_catalog_hit(
+        self,
+        hit: dict[str, Any],
+        page_url: str,
+        watchlist_artist: str,
+    ) -> dict[str, Any]:
+        title = self._text_value(hit, "lotTitle", "title")
+        description = self._text_value(hit, "lotDescription", "description")
+        medium_match = self._print_terms.search(f"{title} {description}")
+        medium = medium_match.group(0).capitalize() if medium_match else "Print"
+        catalog_ref = self._text_value(hit, "catalogRef")
+        location = self._text_value(hit, "location")
+        if not location:
+            location = ", ".join(
+                value for value in (self._text_value(hit, "stateName"), self._text_value(hit, "countryName")) if value
+            )
+        return {
+            "lotId": self._text_value(hit, "objectID", "lotRef"),
+            "lotUrl": self._catalog_lot_url(hit, page_url),
+            "title": title,
+            "artist": self._text_value(hit, "artistName") or watchlist_artist,
+            "medium": medium,
+            "auctionHouse": self._text_value(hit, "houseName"),
+            "lotNumber": self._text_value(hit, "lotNumber"),
+            "estimateLow": self._value(hit, "estimateLow"),
+            "estimateHigh": self._value(hit, "estimateHigh"),
+            "currentBid": self._value(hit, "currentBid"),
+            "currency": self._text_value(hit, "currencyCode"),
+            "endAt": self._catalog_datetime(hit),
+            "location": location,
+            "saleUrl": urljoin(page_url, f"/catalog/{catalog_ref}") if catalog_ref else "",
+        }
+
+    @classmethod
+    def _catalog_lot_url(cls, hit: dict[str, Any], page_url: str) -> str:
+        lot_ref = cls._text_value(hit, "lotRef")
+        if not lot_ref:
+            return ""
+        title_slug = cls._slugify(cls._text_value(hit, "lotTitle", "title")) or "lot"
+        number_slug = cls._slugify(cls._text_value(hit, "lotNumber"))
+        suffix = "-".join(value for value in (title_slug, number_slug, "c", lot_ref.casefold()) if value)
+        return canonicalize_bookmark_url(urljoin(page_url, f"/auction-lot/{suffix}"))
+
+    @staticmethod
+    def _slugify(value: str) -> str:
+        ascii_value = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii")
+        return re.sub(r"[^a-z0-9]+", "-", ascii_value.casefold()).strip("-")
+
+    @classmethod
+    def _catalog_datetime(cls, hit: dict[str, Any]) -> str:
+        for key in ("endTimeUTCUnix", "dateTimeUTCUnix"):
+            value = cls._value(hit, key)
+            try:
+                timestamp = float(value)
+            except (TypeError, ValueError):
+                continue
+            if timestamp <= 0:
+                continue
+            if timestamp > 10_000_000_000:
+                timestamp /= 1000
+            try:
+                return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+            except (OverflowError, OSError, ValueError):
+                continue
         return ""
 
     def _normalize_and_deduplicate(
