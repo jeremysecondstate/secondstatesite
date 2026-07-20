@@ -209,3 +209,37 @@ class AuctionReminderDelivery(models.Model):
 
     def __str__(self):
         return f"{self.target_date} ({self.days_before}d) to {self.recipient_display or 'recipient'}"
+
+
+class AuctionReminderControl(models.Model):
+    """Singleton operational switch and audit summary for auction reminder delivery."""
+
+    singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
+    active = models.BooleanField(default=False)
+    started_at = models.DateTimeField(blank=True, null=True)
+    paused_at = models.DateTimeField(blank=True, null=True)
+    updated_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    last_run_at = models.DateTimeField(blank=True, null=True)
+    last_run_source = models.CharField(max_length=24, blank=True)
+    last_run_status = models.CharField(max_length=24, blank=True)
+    last_run_summary = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "auction reminder control"
+        verbose_name_plural = "auction reminder control"
+
+    @classmethod
+    def load(cls) -> "AuctionReminderControl":
+        control, _created = cls.objects.get_or_create(singleton_key=1)
+        return control
+
+    def __str__(self):
+        return "Auction reminder texts: active" if self.active else "Auction reminder texts: paused"

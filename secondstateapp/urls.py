@@ -15,6 +15,16 @@ urlpatterns = [
     path("capital-dashboard/", capital_dashboard_views.capital_dashboard, name="capital_dashboard"),
     path("calendar/", calendar_views.auction_calendar, name="auction_calendar"),
     path("calendar/sync/", calendar_views.sync_auction_calendar, name="auction_calendar_sync"),
+    path(
+        "calendar/reminders/control/",
+        calendar_views.manage_auction_reminders,
+        name="auction_reminder_control",
+    ),
+    path(
+        "calendar/reminders/send/",
+        calendar_views.send_due_auction_reminders,
+        name="auction_reminder_send",
+    ),
     path("schwab/callback", views.schwab_callback, name="schwab_callback"),
     path("schwab/callback/", views.schwab_callback, name="schwab_callback_slash"),
     # Artworks

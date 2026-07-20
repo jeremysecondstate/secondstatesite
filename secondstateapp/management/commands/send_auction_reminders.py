@@ -1,11 +1,13 @@
 from datetime import date
-from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from django.utils import timezone
 
-from secondstateapp.auction_reminders import ReminderConfigurationError, run_auction_reminders
+from secondstateapp.auction_reminders import (
+    ReminderConfigurationError,
+    dispatch_active_auction_reminders,
+    reminder_today,
+    run_auction_reminders,
+)
 
 
 class Command(BaseCommand):
@@ -17,20 +19,27 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = bool(options["dry_run"])
-        if not dry_run and not settings.TWILIO_SMS_ENABLED:
-            raise CommandError("SMS is disabled. Set TWILIO_SMS_ENABLED=true only after sender and recipients are verified.")
         if options.get("date"):
             try:
                 today = date.fromisoformat(options["date"])
             except ValueError as exc:
                 raise CommandError("--date must use YYYY-MM-DD format.") from exc
         else:
-            today = timezone.localtime(timezone.now(), ZoneInfo(settings.CALENDAR_TIME_ZONE)).date()
+            today = reminder_today()
 
-        try:
-            result = run_auction_reminders(today=today, dry_run=dry_run)
-        except ReminderConfigurationError as exc:
-            raise CommandError(str(exc)) from exc
+        if dry_run:
+            try:
+                result = run_auction_reminders(today=today, dry_run=True)
+            except ReminderConfigurationError as exc:
+                raise CommandError(str(exc)) from exc
+        else:
+            outcome = dispatch_active_auction_reminders(source="scheduler", today=today)
+            if outcome.status == "paused":
+                self.stdout.write(self.style.WARNING(outcome.summary))
+                return
+            if outcome.result is None:
+                raise CommandError(outcome.summary)
+            result = outcome.result
 
         if not result.digests:
             self.stdout.write(self.style.WARNING(f"No auction reminders are due for the run date {today}."))

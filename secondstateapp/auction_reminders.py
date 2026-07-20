@@ -12,7 +12,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .models import AuctionReminderDelivery, AuctionWatchLot
+from .models import AuctionReminderControl, AuctionReminderDelivery, AuctionWatchLot
 
 
 E164_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
@@ -55,6 +55,30 @@ class ReminderRunResult:
     skipped: int = 0
     failed: int = 0
     errors: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class ReminderDispatchOutcome:
+    status: str
+    summary: str
+    control_active: bool
+    master_enabled: bool
+    attempted: bool = False
+    result: ReminderRunResult | None = None
+
+    def as_dict(self) -> dict:
+        result = self.result or ReminderRunResult()
+        return {
+            "status": self.status,
+            "summary": self.summary,
+            "active": self.control_active,
+            "master_enabled": self.master_enabled,
+            "attempted": self.attempted,
+            "due_digests": len(result.digests),
+            "sent": result.sent,
+            "skipped": result.skipped,
+            "failed": result.failed,
+        }
 
 
 class TwilioSmsSender:
@@ -150,6 +174,24 @@ def parse_recipients(raw: str) -> list[str]:
     if not recipients:
         raise ReminderConfigurationError("AUCTION_REMINDER_TO_NUMBERS must contain at least one opted-in phone number.")
     return recipients
+
+
+def masked_reminder_recipients() -> list[str]:
+    try:
+        recipients = parse_recipients(settings.AUCTION_REMINDER_TO_NUMBERS)
+    except ReminderConfigurationError:
+        return []
+    return [_masked_recipient(recipient) for recipient in recipients]
+
+
+def validate_live_reminder_configuration() -> tuple[list[str], TwilioSmsSender]:
+    recipients = parse_recipients(settings.AUCTION_REMINDER_TO_NUMBERS)
+    return recipients, TwilioSmsSender.from_settings()
+
+
+def reminder_today() -> date:
+    zone = ZoneInfo(settings.CALENDAR_TIME_ZONE)
+    return timezone.localtime(timezone.now(), zone).date()
 
 
 def _utc_bounds(target_date: date, zone: ZoneInfo) -> tuple[datetime, datetime]:
@@ -303,3 +345,84 @@ def run_auction_reminders(
             )
             result.sent += 1
     return result
+
+
+def _record_control_run(*, source: str, status: str, summary: str) -> None:
+    now = timezone.now()
+    control = AuctionReminderControl.load()
+    AuctionReminderControl.objects.filter(pk=control.pk).update(
+        last_run_at=now,
+        last_run_source=(source or "manual")[:24],
+        last_run_status=status[:24],
+        last_run_summary=" ".join(summary.split())[:500],
+        updated_at=now,
+    )
+
+
+def dispatch_active_auction_reminders(
+    *,
+    source: str,
+    today: date | None = None,
+) -> ReminderDispatchOutcome:
+    """Run live reminders only when both the persisted control and Render safety switch allow it."""
+
+    control = AuctionReminderControl.load()
+    master_enabled = bool(settings.TWILIO_SMS_ENABLED)
+    if not control.active:
+        return ReminderDispatchOutcome(
+            status="paused",
+            summary="Reminder texts are paused.",
+            control_active=False,
+            master_enabled=master_enabled,
+        )
+    if not master_enabled:
+        return ReminderDispatchOutcome(
+            status="disabled",
+            summary="The Render SMS safety switch is off.",
+            control_active=True,
+            master_enabled=False,
+        )
+
+    try:
+        recipients, sender = validate_live_reminder_configuration()
+    except ReminderConfigurationError as exc:
+        summary = f"Reminder configuration error: {exc}"
+        _record_control_run(source=source, status="configuration_error", summary=summary)
+        return ReminderDispatchOutcome(
+            status="configuration_error",
+            summary=summary,
+            control_active=True,
+            master_enabled=True,
+            attempted=True,
+        )
+
+    result = run_auction_reminders(
+        today=today or reminder_today(),
+        recipients=recipients,
+        sender=sender,
+    )
+    if not result.digests:
+        status = "no_due"
+        summary = "No 3-, 2-, or 1-day reminder texts are due."
+    elif result.failed and result.sent:
+        status = "partial_failure"
+        summary = f"Reminder catch-up sent {result.sent}, skipped {result.skipped}, and failed {result.failed}."
+    elif result.failed:
+        status = "failed"
+        summary = f"Reminder catch-up failed for {result.failed} delivery attempt(s)."
+    elif result.sent:
+        status = "sent"
+        summary = f"Reminder catch-up sent {result.sent} text(s) and skipped {result.skipped} already covered."
+    else:
+        status = "up_to_date"
+        summary = f"All due reminder texts were already covered ({result.skipped} skipped)."
+
+    _record_control_run(source=source, status=status, summary=summary)
+    return ReminderDispatchOutcome(
+        status=status,
+        summary=summary,
+        control_active=True,
+        master_enabled=True,
+        attempted=True,
+        result=result,
+    )

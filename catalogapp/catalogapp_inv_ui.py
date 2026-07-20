@@ -10,11 +10,13 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from tkinter import scrolledtext
 
 from catalogapp.watchlist_ui import ArtistWatchlistPanel
+from secondstate.environment import load_project_environment
 
+load_project_environment()
 BASE_URL = os.environ.get("SECONDSTATE_BASE_URL", "https://secondstate.art").rstrip("/")
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1180, 820
-CATALOG_API_KEY = os.environ.get("CATALOG_API_KEY", "276e19f127f140623e73e6c160bbd8ed")
+CATALOG_API_KEY = os.environ.get("CATALOG_API_KEY", "").strip()
 DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
 DEFAULT_CATALOG_SHEET = "Inventory for July 2026"
 

@@ -13,13 +13,16 @@ from django.urls import reverse
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_sync import CalendarSyncError, sync_watchlist_lots
 from secondstateapp.auction_reminders import (
+    ReminderDispatchOutcome,
     ReminderConfigurationError,
+    ReminderRunResult,
     TwilioSendResult,
     TwilioSmsSender,
     build_due_digests,
+    dispatch_active_auction_reminders,
     run_auction_reminders,
 )
-from secondstateapp.models import AuctionReminderDelivery, AuctionWatchLot
+from secondstateapp.models import AuctionReminderControl, AuctionReminderDelivery, AuctionWatchLot
 
 
 CALENDAR_ZONE = ZoneInfo("America/Los_Angeles")
@@ -84,6 +87,100 @@ class AuctionCalendarViewTests(TestCase):
         response = self.client.get(reverse("auction_calendar"), {"month": "not-a-month"})
         self.assertEqual(response.status_code, 200)
 
+    def test_calendar_renders_the_paused_reminder_controls_and_preview(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        self.assertContains(response, "Start Reminder Texts")
+        self.assertContains(response, "Preview due texts")
+        self.assertFalse(response.context["reminder_control"].active)
+
+    def test_reminder_control_endpoints_are_staff_only(self):
+        ordinary = get_user_model().objects.create_user("reminder-ordinary", password="test-pass")
+        self.client.force_login(ordinary)
+        for endpoint in ("auction_reminder_control", "auction_reminder_send"):
+            response = self.client.post(reverse(endpoint), {"action": "start", "month": "2026-07"})
+            self.assertEqual(response.status_code, 302)
+            self.assertIn("login", response.url)
+
+
+@override_settings(
+    CALENDAR_TIME_ZONE="America/Los_Angeles",
+    TWILIO_SMS_ENABLED=True,
+    TWILIO_ACCOUNT_SID="AC" + "1" * 32,
+    TWILIO_API_KEY_SID="SK" + "2" * 32,
+    TWILIO_API_KEY_SECRET="test-secret",
+    TWILIO_FROM_NUMBER="+12065550123",
+    TWILIO_MESSAGING_SERVICE_SID="",
+    AUCTION_REMINDER_TO_NUMBERS="+12065550124",
+)
+class AuctionReminderControlViewTests(TestCase):
+    def setUp(self):
+        self.staff = get_user_model().objects.create_user("reminder-admin", password="test-pass", is_staff=True)
+        self.client.force_login(self.staff)
+
+    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")
+    def test_start_activates_and_immediately_runs_catch_up(self, dispatch):
+        dispatch.return_value = ReminderDispatchOutcome(
+            status="no_due",
+            summary="Nothing due.",
+            control_active=True,
+            master_enabled=True,
+            attempted=True,
+            result=ReminderRunResult(),
+        )
+
+        response = self.client.post(
+            reverse("auction_reminder_control"),
+            {"action": "start", "month": "2026-07"},
+        )
+
+        self.assertRedirects(response, "/calendar/?month=2026-07", fetch_redirect_response=False)
+        control = AuctionReminderControl.load()
+        self.assertTrue(control.active)
+        self.assertEqual(control.updated_by, self.staff)
+        dispatch.assert_called_once_with(source="start")
+
+    @override_settings(TWILIO_SMS_ENABLED=False)
+    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")
+    def test_start_refuses_when_the_render_safety_switch_is_off(self, dispatch):
+        response = self.client.post(reverse("auction_reminder_control"), {"action": "start"})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AuctionReminderControl.load().active)
+        dispatch.assert_not_called()
+
+    def test_pause_blocks_send_due_now(self):
+        control = AuctionReminderControl.load()
+        control.active = True
+        control.save(update_fields=("active", "updated_at"))
+
+        response = self.client.post(reverse("auction_reminder_control"), {"action": "pause"})
+        self.assertEqual(response.status_code, 302)
+        control.refresh_from_db()
+        self.assertFalse(control.active)
+
+        response = self.client.post(reverse("auction_reminder_send"))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AuctionReminderControl.load().active)
+
+    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")
+    def test_send_due_now_uses_the_same_idempotent_dispatcher(self, dispatch):
+        control = AuctionReminderControl.load()
+        control.active = True
+        control.save(update_fields=("active", "updated_at"))
+        dispatch.return_value = ReminderDispatchOutcome(
+            status="up_to_date",
+            summary="Already covered.",
+            control_active=True,
+            master_enabled=True,
+            attempted=True,
+            result=ReminderRunResult(skipped=1),
+        )
+
+        response = self.client.post(reverse("auction_reminder_send"), {"month": "2026-07"})
+
+        self.assertRedirects(response, "/calendar/?month=2026-07", fetch_redirect_response=False)
+        dispatch.assert_called_once_with(source="manual")
+
 
 @override_settings(CALENDAR_TIME_ZONE="America/Los_Angeles")
 class CalendarSyncApiTests(TestCase):
@@ -145,6 +242,46 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(response.json()["ended"], 1)
         self.assertEqual(lot.title, "Galaxia (updated)")
         self.assertFalse(lot.active)
+        self.assertEqual(response.json()["reminders"]["status"], "paused")
+
+    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_successful_sync_runs_and_reports_the_reminder_catch_up(self, dispatch):
+        dispatch.return_value = ReminderDispatchOutcome(
+            status="sent",
+            summary="Reminder catch-up sent 1 text.",
+            control_active=True,
+            master_enabled=True,
+            attempted=True,
+            result=ReminderRunResult(sent=1),
+        )
+
+        response = self.client.post(
+            self.endpoint,
+            data=json.dumps(self._payload()),
+            content_type="application/json",
+            HTTP_X_API_KEY="sync-test-key",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["reminders"]["status"], "sent")
+        self.assertEqual(response.json()["reminders"]["sent"], 1)
+        dispatch.assert_called_once_with(source="sync")
+
+    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders", side_effect=RuntimeError("boom"))
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_reminder_error_does_not_roll_back_a_successful_calendar_sync(self, _dispatch):
+        with patch("secondstateapp.calendar_views.logger.exception"):
+            response = self.client.post(
+                self.endpoint,
+                data=json.dumps(self._payload()),
+                content_type="application/json",
+                HTTP_X_API_KEY="sync-test-key",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["reminders"]["status"], "error")
+        self.assertEqual(AuctionWatchLot.objects.count(), 1)
 
     @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
     def test_date_only_sale_is_all_day_and_bad_data_is_atomic(self):
@@ -280,6 +417,55 @@ class AuctionReminderTests(TestCase):
         self.assertIn("1-day digest", stdout.getvalue())
         self.assertEqual(AuctionReminderDelivery.objects.count(), 0)
 
+    def test_live_command_exits_cleanly_while_reminders_are_paused(self):
+        self._event(1)
+        stdout = StringIO()
+        call_command("send_auction_reminders", "--date", "2026-07-20", stdout=stdout)
+        self.assertIn("paused", stdout.getvalue().lower())
+        self.assertEqual(AuctionReminderDelivery.objects.count(), 0)
+
+    @override_settings(
+        TWILIO_SMS_ENABLED=True,
+        TWILIO_ACCOUNT_SID="AC" + "1" * 32,
+        TWILIO_API_KEY_SID="SK" + "2" * 32,
+        TWILIO_API_KEY_SECRET="test-secret",
+        TWILIO_FROM_NUMBER="+12065550123",
+        TWILIO_MESSAGING_SERVICE_SID="",
+        AUCTION_REMINDER_TO_NUMBERS="+12065550124",
+    )
+    @patch("secondstateapp.auction_reminders.TwilioSmsSender.from_settings")
+    def test_active_dispatch_sends_once_and_records_the_run(self, sender_from_settings):
+        self._event(2)
+        sender = _FakeSender()
+        sender_from_settings.return_value = sender
+        control = AuctionReminderControl.load()
+        control.active = True
+        control.save(update_fields=("active", "updated_at"))
+
+        first = dispatch_active_auction_reminders(source="sync", today=self.today)
+        second = dispatch_active_auction_reminders(source="scheduler", today=self.today)
+
+        self.assertEqual(first.status, "sent")
+        self.assertEqual(first.result.sent, 1)
+        self.assertEqual(second.status, "up_to_date")
+        self.assertEqual(second.result.skipped, 1)
+        self.assertEqual(len(sender.calls), 1)
+        control.refresh_from_db()
+        self.assertEqual(control.last_run_source, "scheduler")
+        self.assertEqual(control.last_run_status, "up_to_date")
+
+    @override_settings(TWILIO_SMS_ENABLED=False)
+    def test_active_control_still_obeys_the_render_safety_switch(self):
+        control = AuctionReminderControl.load()
+        control.active = True
+        control.save(update_fields=("active", "updated_at"))
+
+        outcome = dispatch_active_auction_reminders(source="sync", today=self.today)
+
+        self.assertEqual(outcome.status, "disabled")
+        self.assertFalse(outcome.attempted)
+        self.assertEqual(AuctionReminderDelivery.objects.count(), 0)
+
 
 class _JsonResponse:
     def __init__(self, status_code, payload):
@@ -348,7 +534,23 @@ class DesktopCalendarSyncTests(SimpleTestCase):
             ambiguities=["example"],
         )
         session = _RecordingSession(
-            _JsonResponse(200, {"ok": True, "received": 1, "created": 1, "updated": 0, "ended": 0})
+            _JsonResponse(
+                200,
+                {
+                    "ok": True,
+                    "received": 1,
+                    "created": 1,
+                    "updated": 0,
+                    "ended": 0,
+                    "reminders": {
+                        "status": "sent",
+                        "summary": "Reminder catch-up sent 1 text.",
+                        "sent": 1,
+                        "skipped": 0,
+                        "failed": 0,
+                    },
+                },
+            )
         )
 
         result = sync_watchlist_lots(
@@ -366,6 +568,9 @@ class DesktopCalendarSyncTests(SimpleTestCase):
         self.assertNotIn("image_url", sent_lot)
         self.assertNotIn("ambiguities", sent_lot)
         self.assertNotIn("content_hash", sent_lot)
+        self.assertEqual(result.reminder_status, "sent")
+        self.assertEqual(result.reminder_sent, 1)
+        self.assertIn("Reminder catch-up sent 1 text.", result.summary())
 
     def test_remote_plain_http_is_rejected(self):
         with self.assertRaises(CalendarSyncError):

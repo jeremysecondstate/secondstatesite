@@ -3,8 +3,7 @@ from pathlib import Path
 import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-insecure-change-me")
-DEBUG = True
-# DEBUG = os.environ.get("DEBUG", "false").lower() == "True"
+DEBUG = os.environ.get("DEBUG", "false").strip().lower() in {"1", "true", "yes", "on"}
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
     "localhost,127.0.0.1"

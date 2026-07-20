@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     Artwork,
     ArtworkImage,
+    AuctionReminderControl,
     AuctionReminderDelivery,
     AuctionWatchLot,
     SoldPiece,
@@ -70,3 +71,27 @@ class AuctionReminderDeliveryAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
+
+
+@admin.register(AuctionReminderControl)
+class AuctionReminderControlAdmin(admin.ModelAdmin):
+    list_display = ("active", "started_at", "paused_at", "updated_by", "last_run_status", "last_run_at")
+    readonly_fields = (
+        "singleton_key",
+        "active",
+        "started_at",
+        "paused_at",
+        "updated_by",
+        "last_run_at",
+        "last_run_source",
+        "last_run_status",
+        "last_run_summary",
+        "created_at",
+        "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return not AuctionReminderControl.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

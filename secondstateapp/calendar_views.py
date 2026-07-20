@@ -3,6 +3,7 @@ from __future__ import annotations
 import calendar as month_calendar
 import hashlib
 import json
+import logging
 import os
 import secrets
 from collections import defaultdict
@@ -12,20 +13,30 @@ from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .models import AuctionWatchLot
+from .auction_reminders import (
+    ReminderConfigurationError,
+    build_due_digests,
+    dispatch_active_auction_reminders,
+    masked_reminder_recipients,
+    validate_live_reminder_configuration,
+)
+from .models import AuctionReminderControl, AuctionWatchLot
 
 
 MAX_SYNC_LOTS = 1000
 MAX_SYNC_BYTES = 2_000_000
+logger = logging.getLogger(__name__)
 
 
 def _calendar_zone() -> ZoneInfo:
@@ -208,6 +219,19 @@ def auction_calendar(request):
         upcoming_groups.append(group)
     upcoming_groups.sort(key=lambda item: (item["date_iso"], item["sort_at"], item["auction_house"]))
 
+    reminder_control = AuctionReminderControl.load()
+    reminder_configuration_error = ""
+    try:
+        validate_live_reminder_configuration()
+    except ReminderConfigurationError as exc:
+        reminder_configuration_error = str(exc)
+    if reminder_control.active and settings.TWILIO_SMS_ENABLED:
+        reminder_status_label = "Active"
+    elif reminder_control.active:
+        reminder_status_label = "Safety lock on"
+    else:
+        reminder_status_label = "Paused"
+
     context = {
         "month_title": selected_month.strftime("%B %Y"),
         "month_value": selected_month.strftime("%Y-%m"),
@@ -219,8 +243,82 @@ def auction_calendar(request):
         "upcoming_groups": upcoming_groups[:10],
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
         "synced_lot_count": AuctionWatchLot.objects.count(),
+        "reminder_control": reminder_control,
+        "reminder_status_label": reminder_status_label,
+        "reminder_master_enabled": settings.TWILIO_SMS_ENABLED,
+        "reminder_configuration_error": reminder_configuration_error,
+        "reminder_can_start": bool(settings.TWILIO_SMS_ENABLED and not reminder_configuration_error),
+        "reminder_recipients": masked_reminder_recipients(),
+        "due_reminder_digests": build_due_digests(now_local.date()),
     }
     return render(request, "calendar/calendar.html", context)
+
+
+def _calendar_redirect(request):
+    month_value = _month_start(request.POST.get("month"), _calendar_zone_today()).strftime("%Y-%m")
+    return redirect(f"{reverse('auction_calendar')}?month={month_value}")
+
+
+def _calendar_zone_today() -> date:
+    return timezone.localtime(timezone.now(), _calendar_zone()).date()
+
+
+def _add_dispatch_message(request, outcome) -> None:
+    if outcome.status in {"disabled", "failed", "partial_failure", "configuration_error"}:
+        messages.error(request, outcome.summary)
+    elif outcome.status in {"no_due", "paused", "up_to_date"}:
+        messages.info(request, outcome.summary)
+    else:
+        messages.success(request, outcome.summary)
+
+
+@staff_member_required
+@require_POST
+def manage_auction_reminders(request):
+    action = request.POST.get("action", "").strip().lower()
+    control = AuctionReminderControl.load()
+    now = timezone.now()
+
+    if action == "pause":
+        control.active = False
+        control.paused_at = now
+        control.updated_by = request.user
+        control.save(update_fields=("active", "paused_at", "updated_by", "updated_at"))
+        messages.success(request, "Reminder texts are paused. Already queued Twilio messages cannot be recalled.")
+        return _calendar_redirect(request)
+
+    if action != "start":
+        messages.error(request, "Unknown reminder control action.")
+        return _calendar_redirect(request)
+    if not settings.TWILIO_SMS_ENABLED:
+        messages.error(request, "The Render SMS safety switch is off. Enable it only after Twilio approval.")
+        return _calendar_redirect(request)
+    try:
+        validate_live_reminder_configuration()
+    except ReminderConfigurationError as exc:
+        messages.error(request, f"Reminder configuration error: {exc}")
+        return _calendar_redirect(request)
+
+    control.active = True
+    control.started_at = now
+    control.paused_at = None
+    control.updated_by = request.user
+    control.save(update_fields=("active", "started_at", "paused_at", "updated_by", "updated_at"))
+    outcome = dispatch_active_auction_reminders(source="start")
+    _add_dispatch_message(request, outcome)
+    return _calendar_redirect(request)
+
+
+@staff_member_required
+@require_POST
+def send_due_auction_reminders(request):
+    control = AuctionReminderControl.load()
+    if not control.active:
+        messages.error(request, "Start reminder texts before using Send Due Now.")
+        return _calendar_redirect(request)
+    outcome = dispatch_active_auction_reminders(source="manual")
+    _add_dispatch_message(request, outcome)
+    return _calendar_redirect(request)
 
 
 def _sync_authorized(request) -> bool:
@@ -363,6 +461,27 @@ def sync_auction_calendar(request):
             updated_count += int(not created)
             ended_count += int(not defaults["active"])
 
+    reminder_payload = {
+        "status": "not_run",
+        "summary": "No reminder catch-up was needed.",
+        "active": False,
+        "master_enabled": bool(settings.TWILIO_SMS_ENABLED),
+        "attempted": False,
+        "due_digests": 0,
+        "sent": 0,
+        "skipped": 0,
+        "failed": 0,
+    }
+    if prepared:
+        try:
+            reminder_payload = dispatch_active_auction_reminders(source="sync").as_dict()
+        except Exception:
+            logger.exception("Auction reminder catch-up failed after calendar sync")
+            reminder_payload.update(
+                status="error",
+                summary="Calendar data synced, but the reminder catch-up could not run.",
+            )
+
     return JsonResponse(
         {
             "ok": True,
@@ -370,5 +489,6 @@ def sync_auction_calendar(request):
             "created": created_count,
             "updated": updated_count,
             "ended": ended_count,
+            "reminders": reminder_payload,
         }
     )

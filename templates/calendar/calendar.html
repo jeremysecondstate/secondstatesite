@@ -9,6 +9,14 @@
 
 {% block content %}
 <section class="auction-calendar" aria-labelledby="calendar-title">
+  {% if messages %}
+    <div class="calendar-alerts" aria-live="polite">
+      {% for message in messages %}
+        <p class="calendar-alert is-{{ message.tags|default:'info' }}">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <header class="calendar-hero">
     <div>
       <p class="calendar-kicker">Artist Watchlist</p>
@@ -20,6 +28,98 @@
       {{ synced_lot_count }} synced lot{{ synced_lot_count|pluralize }}
     </div>
   </header>
+
+  <section class="reminder-control-card" aria-labelledby="reminder-control-title">
+    <div class="reminder-control-heading">
+      <div>
+        <p class="calendar-kicker">Text reminders</p>
+        <h2 id="reminder-control-title">
+          <span class="reminder-status-dot{% if reminder_control.active and reminder_master_enabled %} is-active{% elif reminder_control.active %} is-locked{% endif %}" aria-hidden="true"></span>
+          {{ reminder_status_label }}
+        </h2>
+        {% if reminder_control.active and reminder_master_enabled %}
+          <p>Successful Artist Watchlist syncs now send any newly due 3-, 2-, or 1-day reminders.</p>
+        {% elif reminder_control.active %}
+          <p>The reminder plan is active, but Render's master SMS safety switch is currently off.</p>
+        {% else %}
+          <p>Preview safely, then start delivery after Twilio approval. Previously covered sales stay skipped.</p>
+        {% endif %}
+      </div>
+
+      <div class="reminder-actions">
+        {% if reminder_control.active %}
+          <form method="post" action="{% url 'auction_reminder_control' %}">
+            {% csrf_token %}
+            <input type="hidden" name="month" value="{{ month_value }}">
+            <input type="hidden" name="action" value="pause">
+            <button class="reminder-button is-secondary" type="submit">Pause Reminder Texts</button>
+          </form>
+          <form method="post" action="{% url 'auction_reminder_send' %}">
+            {% csrf_token %}
+            <input type="hidden" name="month" value="{{ month_value }}">
+            <button
+              class="reminder-button"
+              type="submit"
+              {% if not reminder_master_enabled %}disabled{% endif %}
+              onclick="return confirm('Send any currently due reminder texts now? Already covered sales will be skipped.');"
+            >Send Due Now</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'auction_reminder_control' %}">
+            {% csrf_token %}
+            <input type="hidden" name="month" value="{{ month_value }}">
+            <input type="hidden" name="action" value="start">
+            <button
+              class="reminder-button"
+              type="submit"
+              {% if not reminder_can_start %}disabled{% endif %}
+              onclick="return confirm('Start reminder texts and immediately send any currently due, previously unsent digests?');"
+            >Start Reminder Texts</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="reminder-control-meta">
+      <div>
+        <span>Render safety switch</span>
+        <strong>{% if reminder_master_enabled %}Enabled{% else %}Disabled{% endif %}</strong>
+      </div>
+      <div>
+        <span>Recipients</span>
+        <strong>
+          {% for recipient in reminder_recipients %}{{ recipient }}{% if not forloop.last %}, {% endif %}{% empty %}Not configured{% endfor %}
+        </strong>
+      </div>
+      <div>
+        <span>Last reminder run</span>
+        <strong>{% if reminder_control.last_run_at %}{{ reminder_control.last_run_at|date:"M j, Y g:i A" }}{% else %}Not run yet{% endif %}</strong>
+      </div>
+    </div>
+
+    {% if reminder_configuration_error %}
+      <p class="reminder-configuration-warning">{{ reminder_configuration_error }}</p>
+    {% elif not reminder_master_enabled %}
+      <p class="reminder-configuration-warning">Live delivery remains locked until <code>TWILIO_SMS_ENABLED=true</code> in Render.</p>
+    {% endif %}
+    {% if reminder_control.last_run_summary %}
+      <p class="reminder-last-run">{{ reminder_control.last_run_summary }} <span>Source: {{ reminder_control.last_run_source|default:"manual" }}</span></p>
+    {% endif %}
+
+    <details class="reminder-preview">
+      <summary>Preview due texts <span>{{ due_reminder_digests|length }}</span></summary>
+      <div class="reminder-preview-list">
+        {% for digest in due_reminder_digests %}
+          <article>
+            <p>{{ digest.days_before }}-day reminder &middot; {{ digest.sale_count }} sale{{ digest.sale_count|pluralize }} &middot; {{ digest.lot_count }} lot{{ digest.lot_count|pluralize }}</p>
+            <pre>{{ digest.body }}</pre>
+          </article>
+        {% empty %}
+          <p class="sidebar-empty">No reminder texts are due today.</p>
+        {% endfor %}
+      </div>
+    </details>
+  </section>
 
   <div class="calendar-layout">
     <div class="calendar-board">

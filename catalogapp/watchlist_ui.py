@@ -440,6 +440,8 @@ class ArtistWatchlistPanel(ttk.Frame):
                 f"The local watchlist refreshed successfully, but the website calendar did not sync.\n\n{sync_error}",
                 parent=self,
             )
+        if sync_result:
+            self._show_reminder_sync_warning(sync_result)
         label = "Watchlist refresh stopped." if result.stopped else result.metrics.summary()
         if sync_result:
             label = sync_result.summary()
@@ -491,6 +493,16 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.refresh_button.configure(state=tk.NORMAL)
         self._set_calendar_sync_button_state()
         self._set_status(result.summary())
+        self._show_reminder_sync_warning(result)
+
+    def _show_reminder_sync_warning(self, result: CalendarSyncResult) -> None:
+        if result.reminder_status not in {"error", "failed", "partial_failure", "configuration_error"}:
+            return
+        messagebox.showwarning(
+            "Calendar Synced; Reminder Catch-up Needs Attention",
+            result.reminder_summary or "The website could not complete its reminder catch-up.",
+            parent=self,
+        )
 
     def _finish_calendar_sync_error(self, message: str) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
