@@ -62,6 +62,10 @@ TWILIO_SMS_ENABLED='false'
 
 Do not paste the API key secret into code, screenshots, Git, or the desktop UI. Twilio trial accounts can send only to verified recipient numbers. Follow Twilio's current [SMS compliance and consent guidance](https://www.twilio.com/docs/messaging/onboarding/sms-foundations) before adding a recipient.
 
+For a U.S. `+1` local number, keep `TWILIO_SMS_ENABLED=false` while Twilio Console shows **Messaging disabled**. Complete A2P 10DLC Brand and Campaign registration, associate the number with the approved Messaging Service sender pool, and wait until the campaign is verified. Then copy the real `MG...` SID into the runtime environment. Leave `TWILIO_MESSAGING_SERVICE_SID` empty—not `???`—until that SID exists. Unregistered U.S. 10DLC traffic is blocked by Twilio with error 30034.
+
+`.env.example` is committed documentation only. Keep real credentials and phone numbers in Render's secret environment settings and, for local use, in the process environment or an ignored `.env` loaded by the launch configuration. This project does not automatically load `.env.example`.
+
 ## Reminder behavior
 
 Run a preview after the calendar has data:

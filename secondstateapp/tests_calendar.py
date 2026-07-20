@@ -13,6 +13,7 @@ from django.urls import reverse
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_sync import CalendarSyncError, sync_watchlist_lots
 from secondstateapp.auction_reminders import (
+    ReminderConfigurationError,
     TwilioSendResult,
     TwilioSmsSender,
     build_due_digests,
@@ -302,20 +303,36 @@ class _RecordingSession:
 class TwilioSenderTests(SimpleTestCase):
     def test_api_key_auth_and_messaging_service_are_sent_to_twilio(self):
         session = _RecordingSession(_JsonResponse(201, {"sid": "SM123", "status": "queued"}))
+        account_sid = "AC" + "1" * 32
+        api_key_sid = "SK" + "2" * 32
+        messaging_service_sid = "MG" + "3" * 32
         sender = TwilioSmsSender(
-            account_sid="AC123",
-            api_key_sid="SK123",
+            account_sid=account_sid,
+            api_key_sid=api_key_sid,
             api_key_secret="secret",
-            messaging_service_sid="MG123",
+            messaging_service_sid=messaging_service_sid,
             session=session,
         )
 
         result = sender.send("+12065550123", "Reminder")
 
         self.assertEqual(result.message_sid, "SM123")
-        self.assertEqual(session.calls[0][1]["auth"], ("SK123", "secret"))
-        self.assertEqual(session.calls[0][1]["data"]["MessagingServiceSid"], "MG123")
+        self.assertEqual(session.calls[0][1]["auth"], (api_key_sid, "secret"))
+        self.assertEqual(session.calls[0][1]["data"]["MessagingServiceSid"], messaging_service_sid)
         self.assertNotIn("From", session.calls[0][1]["data"])
+
+    def test_placeholder_messaging_service_sid_fails_before_a_request(self):
+        with self.assertRaisesMessage(
+            ReminderConfigurationError,
+            "TWILIO_MESSAGING_SERVICE_SID must be empty or a valid MG-prefixed Messaging Service SID.",
+        ):
+            TwilioSmsSender(
+                account_sid="AC" + "1" * 32,
+                api_key_sid="SK" + "2" * 32,
+                api_key_secret="secret",
+                from_number="+12065550123",
+                messaging_service_sid="???",
+            )
 
 
 class DesktopCalendarSyncTests(SimpleTestCase):

@@ -16,6 +16,9 @@ from .models import AuctionReminderDelivery, AuctionWatchLot
 
 
 E164_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
+ACCOUNT_SID_PATTERN = re.compile(r"^AC[0-9a-fA-F]{32}$")
+API_KEY_SID_PATTERN = re.compile(r"^SK[0-9a-fA-F]{32}$")
+MESSAGING_SERVICE_SID_PATTERN = re.compile(r"^MG[0-9a-fA-F]{32}$")
 REMINDER_DAYS = (3, 2, 1)
 MAX_MESSAGE_LENGTH = 1500
 
@@ -70,12 +73,20 @@ class TwilioSmsSender:
             raise ReminderConfigurationError(
                 "TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, and TWILIO_API_KEY_SECRET are required."
             )
+        if not ACCOUNT_SID_PATTERN.fullmatch(account_sid):
+            raise ReminderConfigurationError("TWILIO_ACCOUNT_SID must be a valid AC-prefixed Twilio Account SID.")
+        if not API_KEY_SID_PATTERN.fullmatch(api_key_sid):
+            raise ReminderConfigurationError("TWILIO_API_KEY_SID must be a valid SK-prefixed Twilio API Key SID.")
         if not from_number and not messaging_service_sid:
             raise ReminderConfigurationError(
                 "Set TWILIO_FROM_NUMBER or TWILIO_MESSAGING_SERVICE_SID before enabling SMS."
             )
         if from_number and not E164_PATTERN.fullmatch(from_number):
             raise ReminderConfigurationError("TWILIO_FROM_NUMBER must use E.164 format, such as +12065550123.")
+        if messaging_service_sid and not MESSAGING_SERVICE_SID_PATTERN.fullmatch(messaging_service_sid):
+            raise ReminderConfigurationError(
+                "TWILIO_MESSAGING_SERVICE_SID must be empty or a valid MG-prefixed Messaging Service SID."
+            )
         self.account_sid = account_sid
         self.api_key_sid = api_key_sid
         self.api_key_secret = api_key_secret
