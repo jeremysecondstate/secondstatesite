@@ -132,3 +132,80 @@ class UserProfile(models.Model):
     def favorite_artists_list(self):
         raw_value = (self.favorite_artists or "").replace("\n", ",")
         return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+
+class AuctionWatchLot(models.Model):
+    """A normalized auction lot synced from the desktop Artist Watchlist."""
+
+    source = models.CharField(max_length=80)
+    source_lot_id = models.CharField(max_length=255)
+    artist = models.CharField(max_length=255, blank=True)
+    artist_watchlist_name = models.CharField(max_length=255, blank=True)
+    title = models.CharField(max_length=500, blank=True)
+    medium = models.CharField(max_length=500, blank=True)
+    auction_house = models.CharField(max_length=255, blank=True)
+    sale_title = models.CharField(max_length=500, blank=True)
+    lot_number = models.CharField(max_length=80, blank=True)
+    location = models.CharField(max_length=255, blank=True)
+    event_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    is_all_day = models.BooleanField(default=False)
+    estimate_low = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    estimate_high = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    currency = models.CharField(max_length=8, blank=True)
+    current_bid = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    lot_url = models.URLField(max_length=2000, blank=True)
+    sale_url = models.URLField(max_length=2000, blank=True)
+    source_status = models.CharField(max_length=24, blank=True, default="unchanged")
+    active = models.BooleanField(default=True, db_index=True)
+    source_first_seen_at = models.DateTimeField(blank=True, null=True)
+    source_last_seen_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    synced_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["event_at", "auction_house", "artist", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source", "source_lot_id"),
+                name="unique_auction_watch_source_lot",
+            )
+        ]
+
+    def __str__(self):
+        label = self.artist_watchlist_name or self.artist or "Unknown artist"
+        return f"{label} - {self.title or self.source_lot_id}"
+
+
+class AuctionReminderDelivery(models.Model):
+    """Idempotency and delivery audit record for one daily reminder digest."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SENT = "sent", "Sent"
+        FAILED = "failed", "Failed"
+
+    target_date = models.DateField(db_index=True)
+    days_before = models.PositiveSmallIntegerField()
+    recipient_hash = models.CharField(max_length=64)
+    recipient_display = models.CharField(max_length=32, blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    twilio_message_sid = models.CharField(max_length=64, blank=True)
+    twilio_status = models.CharField(max_length=32, blank=True)
+    covered_sale_hashes = models.JSONField(default=list, blank=True)
+    error = models.TextField(blank=True)
+    attempted_at = models.DateTimeField(blank=True, null=True)
+    sent_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-target_date", "days_before", "recipient_display"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("target_date", "days_before", "recipient_hash"),
+                name="unique_auction_reminder_digest",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.target_date} ({self.days_before}d) to {self.recipient_display or 'recipient'}"

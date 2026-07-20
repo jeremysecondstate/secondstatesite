@@ -25,6 +25,7 @@
       {% if user.is_authenticated %}
         {% if user.is_staff %}
           <a href="{% url 'capital_dashboard' %}">Capital Dashboard</a>
+          <a href="{% url 'auction_calendar' %}">Auction Calendar</a>
         {% endif %}
         <a href="{% url 'account_profile' %}">My Profile</a>
         <a href="{% url 'public_profile' user.username %}">Public Page</a>

@@ -21,6 +21,7 @@ from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_exports import render_calendar_preview, render_csv, render_ics, render_markdown
 from catalogapp.watchlist_models import NormalizedLot, parse_lot_datetime
 from catalogapp.watchlist_service import WatchlistResult, WatchlistService
+from catalogapp.watchlist_sync import CalendarSyncResult, sync_watchlist_lots
 
 
 DEFAULT_BOOKMARK_PATH = Path(r"I:\Shared drives\SECONDSTATE\ARTAPP\INVALUABLE-BM.html")
@@ -32,10 +33,22 @@ def local_watchlist_directory() -> Path:
 
 
 class ArtistWatchlistPanel(ttk.Frame):
-    def __init__(self, master, *, status_callback=None, service_factory=None) -> None:
+    def __init__(
+        self,
+        master,
+        *,
+        status_callback=None,
+        service_factory=None,
+        calendar_base_url: str = "",
+        calendar_api_key: str = "",
+        calendar_syncer=None,
+    ) -> None:
         super().__init__(master, padding=10)
         self.status_callback = status_callback or (lambda _text: None)
         self.service_factory = service_factory
+        self.calendar_base_url = calendar_base_url
+        self.calendar_api_key = calendar_api_key
+        self.calendar_syncer = calendar_syncer or sync_watchlist_lots
         self.all_entries: list[BookmarkEntry] = []
         self.active_entries: list[BookmarkEntry] = []
         self.selected_artists: set[str] = set()
@@ -219,6 +232,13 @@ class ArtistWatchlistPanel(ttk.Frame):
             value="Pages fetched: 0 · Cache hits: 0 · Changed: 0 · AI-enriched: 0 · Tokens: 0"
         )
         ttk.Label(footer, textvariable=self.metrics_var, style="Subtle.TLabel").pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.calendar_sync_button = ttk.Button(
+            footer,
+            text="Sync Website Calendar",
+            command=self.sync_website_calendar,
+            state=tk.DISABLED,
+        )
+        self.calendar_sync_button.pack(side=tk.LEFT, padx=(0, 6))
         ttk.Button(footer, text="Export Markdown", command=lambda: self._export("md")).pack(side=tk.LEFT)
         ttk.Button(footer, text="Export CSV", command=lambda: self._export("csv")).pack(side=tk.LEFT, padx=(6, 0))
         ttk.Button(footer, text="Export ICS", command=lambda: self._export("ics")).pack(side=tk.LEFT, padx=(6, 0))
@@ -361,7 +381,26 @@ class ArtistWatchlistPanel(ttk.Frame):
                         stop_event=self.stop_event,
                         progress=lambda text: self.after(0, lambda value=text: self._set_status(value)),
                     )
-                self.after(0, lambda: self._finish_refresh(result))
+                sync_result = None
+                sync_error = ""
+                if not result.stopped and self._calendar_sync_configured():
+                    self.after(0, lambda: self._set_status("Watchlist refreshed. Syncing the website calendar..."))
+                    try:
+                        sync_result = self.calendar_syncer(
+                            result.lots,
+                            base_url=self.calendar_base_url,
+                            api_key=self.calendar_api_key,
+                        )
+                    except Exception as exc:
+                        sync_error = " ".join(str(exc).split())[:500]
+                self.after(
+                    0,
+                    lambda result=result, sync_result=sync_result, sync_error=sync_error: self._finish_refresh(
+                        result,
+                        sync_result=sync_result,
+                        sync_error=sync_error,
+                    ),
+                )
             except Exception as exc:
                 message = " ".join(str(exc).split())[:500]
                 self.after(0, lambda: self._finish_refresh_error(message))
@@ -373,15 +412,39 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.stop_event.set()
         self._set_status("Stopping after the current safe fetch…")
 
-    def _finish_refresh(self, result: WatchlistResult) -> None:
+    def _calendar_sync_configured(self) -> bool:
+        return bool(self.calendar_base_url and self.calendar_api_key)
+
+    def _set_calendar_sync_button_state(self) -> None:
+        enabled = bool(self.current_lots and self._calendar_sync_configured())
+        self.calendar_sync_button.configure(state=tk.NORMAL if enabled else tk.DISABLED)
+
+    def _finish_refresh(
+        self,
+        result: WatchlistResult,
+        *,
+        sync_result: CalendarSyncResult | None = None,
+        sync_error: str = "",
+    ) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
         self.stop_button.configure(state=tk.DISABLED)
         self.current_lots = result.lots
+        self._set_calendar_sync_button_state()
         self.metrics_var.set(result.metrics.summary())
         self._fill_agenda()
         if result.errors:
             messagebox.showwarning("Watchlist Finished with Source Issues", "\n".join(result.errors[:8]), parent=self)
+        if sync_error:
+            messagebox.showwarning(
+                "Website Calendar Sync Failed",
+                f"The local watchlist refreshed successfully, but the website calendar did not sync.\n\n{sync_error}",
+                parent=self,
+            )
         label = "Watchlist refresh stopped." if result.stopped else result.metrics.summary()
+        if sync_result:
+            label = sync_result.summary()
+        elif sync_error:
+            label = "Local watchlist refreshed; website calendar sync failed. Use Sync Website Calendar to retry."
         self._set_status(label)
 
     def _finish_refresh_error(self, message: str) -> None:
@@ -389,6 +452,51 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.stop_button.configure(state=tk.DISABLED)
         self._set_status("Watchlist refresh failed.")
         messagebox.showerror("Watchlist Refresh Failed", message, parent=self)
+
+    def sync_website_calendar(self) -> None:
+        if self.worker and self.worker.is_alive():
+            return
+        if not self.current_lots:
+            messagebox.showwarning("Nothing to Sync", "Refresh the watchlist first.", parent=self)
+            return
+        if not self._calendar_sync_configured():
+            messagebox.showwarning(
+                "Calendar Sync Not Configured",
+                "SECONDSTATE_BASE_URL and CATALOG_API_KEY are required.",
+                parent=self,
+            )
+            return
+
+        self.refresh_button.configure(state=tk.DISABLED)
+        self.calendar_sync_button.configure(state=tk.DISABLED)
+        self._set_status("Syncing current watchlist results to the website calendar...")
+        lots = list(self.current_lots)
+
+        def run() -> None:
+            try:
+                result = self.calendar_syncer(
+                    lots,
+                    base_url=self.calendar_base_url,
+                    api_key=self.calendar_api_key,
+                )
+                self.after(0, lambda: self._finish_calendar_sync(result))
+            except Exception as exc:
+                message = " ".join(str(exc).split())[:500]
+                self.after(0, lambda: self._finish_calendar_sync_error(message))
+
+        self.worker = threading.Thread(target=run, name="artist-watchlist-calendar-sync", daemon=True)
+        self.worker.start()
+
+    def _finish_calendar_sync(self, result: CalendarSyncResult) -> None:
+        self.refresh_button.configure(state=tk.NORMAL)
+        self._set_calendar_sync_button_state()
+        self._set_status(result.summary())
+
+    def _finish_calendar_sync_error(self, message: str) -> None:
+        self.refresh_button.configure(state=tk.NORMAL)
+        self._set_calendar_sync_button_state()
+        self._set_status("Website calendar sync failed.")
+        messagebox.showerror("Website Calendar Sync Failed", message, parent=self)
 
     def _fill_agenda(self) -> None:
         for item in self.agenda_tree.get_children(""):

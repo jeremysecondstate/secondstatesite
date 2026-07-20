@@ -84,6 +84,20 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
+CALENDAR_TIME_ZONE = os.environ.get("CALENDAR_TIME_ZONE", "America/Los_Angeles")
+SECONDSTATE_PUBLIC_URL = os.environ.get("SECONDSTATE_PUBLIC_URL", "https://secondstate.art").rstrip("/")
+TWILIO_SMS_ENABLED = os.environ.get("TWILIO_SMS_ENABLED", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_API_KEY_SID = os.environ.get("TWILIO_API_KEY_SID", "")
+TWILIO_API_KEY_SECRET = os.environ.get("TWILIO_API_KEY_SECRET", "")
+TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
+TWILIO_MESSAGING_SERVICE_SID = os.environ.get("TWILIO_MESSAGING_SERVICE_SID", "")
+AUCTION_REMINDER_TO_NUMBERS = os.environ.get("AUCTION_REMINDER_TO_NUMBERS", "")
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path("/var/data/media")   # <-- inside your Render disk mount
 # WHITENOISE_ALLOW_ALL_ORIGINS = True

@@ -22,6 +22,7 @@ local bookmark HTML
   -> local SQLite content-hash cache and diff
   -> optional compact ambiguous-record enrichment
   -> date/artist agenda + Markdown/CSV/ICS exports
+  -> private website calendar sync + optional SMS reminder digests
 ```
 
 The implementation is split by responsibility:
@@ -34,6 +35,7 @@ The implementation is split by responsibility:
 - `catalogapp/watchlist_service.py`: incremental refresh, detail-fetch decisions, ended-item detection, horizons, and efficiency metrics.
 - `catalogapp/watchlist_enrichment.py`: optional strict structured-output batching for ambiguous compact records.
 - `catalogapp/watchlist_exports.py`: agenda Markdown, CSV, and RFC 5545 ICS generation.
+- `catalogapp/watchlist_sync.py`: authenticated upload of normalized results to the staff-only website calendar.
 - `catalogapp/watchlist_ui.py`: bookmark/folder/artist selection, refresh/stop controls, agenda/calendar views, and exports.
 
 ## Local data and privacy
@@ -46,6 +48,7 @@ The implementation is split by responsibility:
 - Local settings and cache data live under `%LOCALAPPDATA%\SecondState\ArtistWatchlist`, outside the repository.
 - Zero-AI mode is enabled in the UI by default. Optional enrichment also requires `OPENAI_WATCHLIST_ENRICHMENT_ENABLED=1`.
 - Enrichment sends only allowlisted normalized fields. URLs, bookmark data, page HTML, cookies, and credentials are excluded.
+- Website calendar sync sends only normalized sale/lot fields. It excludes the bookmark file, page HTML, cookies, cache internals, images, and credentials.
 - The Responses API request has no tools and uses a strict JSON schema. Ambiguous records are batched and cached by deterministic content hash.
 
 Optional local environment settings:
@@ -73,6 +76,8 @@ Every refresh reports:
 ## Calendar behavior
 
 ICS output defaults to one event per auction sale. Matched artists and lots are grouped in the description. A timezone-aware source time is converted to UTC. A source date without a time becomes an all-day event and the description marks the time as unverified. Event-per-lot and reminders are supported by the export function but are intentionally not the noisy UI default.
+
+The private web calendar at `/calendar/` is populated automatically after a successful refresh and can be retried with **Sync Website Calendar**. See [`auction-calendar.md`](auction-calendar.md) for authentication, deployment, and Twilio reminder setup.
 
 ## Migration note
 

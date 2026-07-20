@@ -118,7 +118,12 @@ class ArtCatalogApp:
         notebook.add(tab_results, text="Results")
         notebook.add(tab_details, text="Details")
         notebook.add(tab_preview, text="Preview Text")
-        self.watchlist_panel = ArtistWatchlistPanel(notebook, status_callback=self._set_status)
+        self.watchlist_panel = ArtistWatchlistPanel(
+            notebook,
+            status_callback=self._set_status,
+            calendar_base_url=BASE_URL,
+            calendar_api_key=CATALOG_API_KEY,
+        )
         notebook.add(self.watchlist_panel, text="Artist Watchlist")
 
         cols = ("Artist", "Title", "Year", "Medium", "Catalog #")

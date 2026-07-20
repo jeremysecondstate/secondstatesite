@@ -16,6 +16,7 @@ private_data/
 # Env / secrets
 .env
 .env.*
+!.env.example
 *.pem
 
 # OS / editor

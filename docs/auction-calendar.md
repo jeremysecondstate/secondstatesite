@@ -1,0 +1,108 @@
+# Private Auction Calendar and SMS Reminders
+
+The desktop Artist Watchlist can now synchronize its normalized results to the staff-only calendar at `/calendar/`. The route uses the same Django staff login protection as `/capital-dashboard/`; ordinary and logged-out visitors are redirected to the admin login.
+
+## Data flow
+
+```text
+Artist Watchlist refresh
+  -> local normalized lots shown in the desktop Calendar tab
+  -> POST /calendar/sync/ with X-API-KEY
+  -> AuctionWatchLot upsert by source + source lot ID
+  -> staff-only monthly calendar and selected-day detail panel
+  -> daily 3/2/1-day reminder digest job
+  -> Twilio Messages API
+```
+
+Only normalized auction fields are uploaded. The bookmark HTML, browser state, cookies, local cache, source page HTML, image URLs, ambiguity flags, and API credentials are not included. A successful desktop refresh automatically attempts the sync; **Sync Website Calendar** retries the current result without fetching auction sites again.
+
+## Website configuration
+
+The desktop app and website must use the same `CATALOG_API_KEY`. Production sync requires HTTPS; plain HTTP is accepted only for a localhost development server.
+
+```dotenv
+# Website (Render) and desktop process
+CATALOG_API_KEY='use-the-same-long-random-value-in-both-places'
+
+# Desktop only; this defaults to the production URL
+SECONDSTATE_BASE_URL='https://secondstate.art'
+
+# Website calendar display and reminder date boundaries
+CALENDAR_TIME_ZONE='America/Los_Angeles'
+SECONDSTATE_PUBLIC_URL='https://secondstate.art'
+```
+
+Run the database migration during deployment:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+The existing Render build/start scripts already run migrations, so a normal deploy applies migration `0014` automatically.
+
+## Twilio configuration
+
+API-key authentication uses the account SID in the Messages endpoint and the API key SID/secret for HTTP Basic authentication. Sending also requires either a Twilio phone number or a Messaging Service SID, plus at least one opted-in recipient. Twilio documents these requirements in its [API key overview](https://www.twilio.com/docs/iam/api-keys) and [Messages resource reference](https://www.twilio.com/docs/messaging/api/message-resource).
+
+```dotenv
+TWILIO_ACCOUNT_SID='AC...'
+TWILIO_API_KEY_SID='SK...'
+TWILIO_API_KEY_SECRET='store-only-in-the-host-secret-manager'
+
+# Choose one sender option. A Messaging Service takes precedence if both exist.
+TWILIO_FROM_NUMBER='+12065550123'
+TWILIO_MESSAGING_SERVICE_SID=''
+
+# Comma-separated recipients in E.164 format. Every recipient must have opted in.
+AUCTION_REMINDER_TO_NUMBERS='+12065550124,+12065550125'
+
+# Leave false until the sender and recipients have been tested.
+TWILIO_SMS_ENABLED='false'
+```
+
+Do not paste the API key secret into code, screenshots, Git, or the desktop UI. Twilio trial accounts can send only to verified recipient numbers. Follow Twilio's current [SMS compliance and consent guidance](https://www.twilio.com/docs/messaging/onboarding/sms-foundations) before adding a recipient.
+
+## Reminder behavior
+
+Run a preview after the calendar has data:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py send_auction_reminders --dry-run
+```
+
+An explicit date is useful for verification without changing the system clock:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py send_auction_reminders --dry-run --date 2026-07-20
+```
+
+Once the preview is correct, set `TWILIO_SMS_ENABLED=true` and configure the hosting scheduler to run this command hourly:
+
+```text
+python manage.py send_auction_reminders
+```
+
+The command uses `CALENDAR_TIME_ZONE` to decide which sales are exactly three, two, or one calendar day away. A sale first discovered two days before receives only the two- and one-day reminders; a sale first discovered one day before receives only the one-day reminder. Each run sends one compact digest per recipient and target date, even when a sale contains many watched lots. Hourly scheduling catches a sale synced after the morning run; idempotency still prevents repeated hourly texts.
+
+Delivery rows prevent repeated runs from sending the same digest twice. If a genuinely new sale is synced after that date's digest was sent, the next run sends one supplemental digest containing only the newly discovered sale or sales. Full recipient phone numbers are not stored in the database: only a keyed hash and masked last four digits are retained. Failed deliveries are recorded and may be retried; already-covered or still-pending deliveries are skipped. If a worker is interrupted and leaves a row pending, a staff administrator can change that row's status to **Failed** in Django admin to permit a deliberate retry.
+
+## Operational checklist
+
+1. Deploy and confirm `/calendar/` redirects a logged-out browser to the staff login.
+2. Log in as a staff user and confirm the calendar loads.
+3. Set the same `CATALOG_API_KEY` for the website and desktop process.
+4. Refresh a small Artist Watchlist selection and confirm the desktop status says the website calendar synced.
+5. Confirm the correct artist, title, auction house, estimate, lot number, and local sale time appear on the chosen day.
+6. Configure a Twilio sender and one opted-in test recipient.
+7. Run the reminder command with `--dry-run` and inspect the digest.
+8. Enable SMS, run once manually, and verify delivery in Twilio before adding the daily scheduler.
+9. Add further opted-in recipients only after the single-recipient test succeeds.
+
+## Automated verification
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test secondstateapp.tests_calendar
+.\.venv\Scripts\python.exe manage.py test
+```
+
+Tests use fake HTTP sessions; they do not contact Twilio, Invaluable, or the production website.

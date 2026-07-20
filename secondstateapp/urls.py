@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import capital_dashboard_views, catalog_api_views, upload_safe_views, views
+from . import calendar_views, capital_dashboard_views, catalog_api_views, upload_safe_views, views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -13,6 +13,8 @@ urlpatterns = [
     path("account/", views.account_profile, name="account_profile"),
     path("u/<str:username>/", views.public_profile, name="public_profile"),
     path("capital-dashboard/", capital_dashboard_views.capital_dashboard, name="capital_dashboard"),
+    path("calendar/", calendar_views.auction_calendar, name="auction_calendar"),
+    path("calendar/sync/", calendar_views.sync_auction_calendar, name="auction_calendar_sync"),
     path("schwab/callback", views.schwab_callback, name="schwab_callback"),
     path("schwab/callback/", views.schwab_callback, name="schwab_callback_slash"),
     # Artworks
