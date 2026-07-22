@@ -28,6 +28,27 @@ def api_headers(extra=None):
     return headers
 
 
+def raise_for_api_error(response, action):
+    """Raise an error that preserves the API's useful JSON message."""
+
+    if response.status_code < 400:
+        return
+
+    detail = ""
+    try:
+        payload = response.json()
+        if isinstance(payload, dict):
+            detail = payload.get("error") or payload.get("detail") or payload.get("message") or ""
+            if isinstance(detail, dict):
+                detail = detail.get("message") or str(detail)
+    except ValueError:
+        pass
+
+    if not detail:
+        detail = (response.text or "").strip()
+    raise RuntimeError(detail or f"{action} failed with status {response.status_code}.")
+
+
 class ArtCatalogApp:
     EDIT_FIELDS = [
         ("artist", "Artist"), ("title", "Title"), ("year", "Year"), ("medium", "Medium"),
@@ -290,7 +311,7 @@ class ArtCatalogApp:
 
     def _generate_description(self, payload):
         response = requests.post(f"{BASE_URL}/artworks/generate_description/", json=payload, headers=api_headers({"Content-Type": "application/json"}), timeout=70)
-        response.raise_for_status()
+        raise_for_api_error(response, "Generate description")
         description = response.json().get("description", "").strip()
         if not description:
             raise ValueError("Website returned an empty generated description.")
@@ -468,7 +489,7 @@ class ArtCatalogApp:
                 data = payload()
                 data["use_web"] = True
                 response = requests.post(f"{BASE_URL}/artworks/{art.get('id')}/generate_description/", json=data, headers=api_headers({"Content-Type": "application/json"}), timeout=70)
-                response.raise_for_status()
+                raise_for_api_error(response, "Generate description")
                 desc_text.delete("1.0", tk.END)
                 desc_text.insert(tk.END, response.json().get("description", ""))
                 status.config(text="Draft inserted. Review/edit, then Save Changes.")

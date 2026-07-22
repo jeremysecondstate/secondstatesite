@@ -145,12 +145,14 @@ Return only the description paragraph.
 Artwork facts:
 {facts}
 """.strip()
+    model = os.environ.get("OPENAI_DESCRIPTION_MODEL", "gpt-5.6")
     body = {
-        "model": os.environ.get("OPENAI_DESCRIPTION_MODEL", "gpt-5.6"),
+        "model": model,
         "input": prompt,
         "max_output_tokens": 450,
-        "temperature": 0.4,
     }
+    if model == "gpt-5.6" or model.startswith("gpt-5.6-"):
+        body["reasoning"] = {"effort": "none"}
     if use_web:
         body["tools"] = [{"type": "web_search", "search_context_size": "low"}]
         body["tool_choice"] = "auto"

@@ -6,9 +6,9 @@ from tkinter import scrolledtext
 import requests
 
 try:
-    from catalogapp.catalogapp_inv_ui import ArtCatalogApp, BASE_URL, api_headers
+    from catalogapp.catalogapp_inv_ui import ArtCatalogApp, BASE_URL, api_headers, raise_for_api_error
 except ImportError:
-    from catalogapp_inv_ui import ArtCatalogApp, BASE_URL, api_headers
+    from catalogapp_inv_ui import ArtCatalogApp, BASE_URL, api_headers, raise_for_api_error
 
 
 class ArtCatalogAppWithDelete(ArtCatalogApp):
@@ -258,7 +258,7 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
                 data = payload()
                 data["use_web"] = True
                 response = requests.post(f"{BASE_URL}/artworks/{art.get('id')}/generate_description/", json=data, headers=api_headers({"Content-Type": "application/json"}), timeout=70)
-                response.raise_for_status()
+                raise_for_api_error(response, "Generate description")
                 desc_text.delete("1.0", tk.END)
                 desc_text.insert(tk.END, response.json().get("description", ""))
                 status.config(text="Draft inserted. Review/edit, then Save Changes.")

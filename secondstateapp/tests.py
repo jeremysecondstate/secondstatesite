@@ -136,7 +136,7 @@ class ArtworkOrderingTests(TestCase):
 
 
 @patch.dict(os.environ, {"OPENAI_API_KEY": "not-used-in-tests"}, clear=False)
-class DescriptionOutputLimitTests(TestCase):
+class DescriptionRequestCompatibilityTests(TestCase):
     def response(self):
         response = MagicMock()
         response.__enter__.return_value = response
@@ -151,7 +151,8 @@ class DescriptionOutputLimitTests(TestCase):
             price=Decimal("100.00"),
         )
 
-    def test_description_requests_restore_450_token_limit(self):
+    @patch.dict(os.environ, {"OPENAI_DESCRIPTION_MODEL": "gpt-5.6"}, clear=False)
+    def test_description_requests_use_gpt_5_6_compatible_parameters(self):
         with patch("secondstateapp.catalog_api_views.urllib.request.urlopen", return_value=self.response()) as mock_api:
             catalog_api_views._generate_description(self.artwork(), use_web=False)
         api_body = json.loads(mock_api.call_args.args[0].data.decode("utf-8"))
@@ -162,3 +163,26 @@ class DescriptionOutputLimitTests(TestCase):
 
         self.assertEqual(api_body["max_output_tokens"], 450)
         self.assertEqual(view_body["max_output_tokens"], 450)
+        self.assertEqual(api_body["model"], "gpt-5.6")
+        self.assertEqual(view_body["model"], "gpt-5.6")
+        self.assertEqual(api_body["reasoning"], {"effort": "none"})
+        self.assertEqual(view_body["reasoning"], {"effort": "none"})
+        self.assertNotIn("temperature", api_body)
+        self.assertNotIn("temperature", view_body)
+
+    @patch.dict(os.environ, {"OPENAI_DESCRIPTION_MODEL": "gpt-4.1"}, clear=False)
+    def test_description_requests_keep_older_model_override_compatible(self):
+        with patch("secondstateapp.catalog_api_views.urllib.request.urlopen", return_value=self.response()) as mock_api:
+            catalog_api_views._generate_description(self.artwork(), use_web=False)
+        api_body = json.loads(mock_api.call_args.args[0].data.decode("utf-8"))
+
+        with patch("secondstateapp.views.urllib.request.urlopen", return_value=self.response()) as mock_view:
+            views._generate_catalog_description(self.artwork(), use_web=False)
+        view_body = json.loads(mock_view.call_args.args[0].data.decode("utf-8"))
+
+        self.assertEqual(api_body["model"], "gpt-4.1")
+        self.assertEqual(view_body["model"], "gpt-4.1")
+        self.assertNotIn("reasoning", api_body)
+        self.assertNotIn("reasoning", view_body)
+        self.assertNotIn("temperature", api_body)
+        self.assertNotIn("temperature", view_body)
