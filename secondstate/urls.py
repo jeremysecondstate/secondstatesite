@@ -1,11 +1,13 @@
 from pathlib import Path
 
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import FileResponse, Http404
 from django.urls import include
 from django.urls import path
+# from django.conf.urls.static import static
+from django.urls import re_path
+from django.views.static import serve as serve_media
 
 
 def twilio_domain_verification(request):
@@ -33,4 +35,10 @@ urlpatterns = [
 ]
 
 # Serve media via Django (OK for small traffic, not best-practice)
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+urlpatterns += [
+    re_path(
+        r"^media/(?P<path>.*)$",
+        serve_media,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
+]
