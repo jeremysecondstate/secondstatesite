@@ -16,6 +16,11 @@ urlpatterns = [
     path("calendar/", calendar_views.auction_calendar, name="auction_calendar"),
     path("calendar/sync/", calendar_views.sync_auction_calendar, name="auction_calendar_sync"),
     path(
+        "calendar/lots/<int:lot_id>/artprice-link/",
+        calendar_views.update_auction_lot_artprice_link,
+        name="auction_lot_artprice_link",
+    ),
+    path(
         "calendar/reminders/control/",
         calendar_views.manage_auction_reminders,
         name="auction_reminder_control",

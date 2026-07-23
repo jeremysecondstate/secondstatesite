@@ -17,6 +17,8 @@ Artist Watchlist refresh
 
 Only normalized auction fields are uploaded. The bookmark HTML, browser state, cookies, local cache, source page HTML, image URLs, ambiguity flags, and API credentials are not included. A successful desktop refresh automatically attempts the sync; **Sync Website Calendar** retries the current result without fetching auction sites again.
 
+Staff can paste a secure `artprice.com` URL into the **Artprice link** field beneath any lot in the selected-day panel. The saved link is attached to that calendar lot, can be opened or removed from the same panel, and is intentionally preserved when later Artist Watchlist syncs update the auction details.
+
 ## Website configuration
 
 The desktop app and website must use the same `CATALOG_API_KEY`. Production sync requires HTTPS; plain HTTP is accepted only for a localhost development server. Older desktop code contained a fallback value, so rotate that key in Render and the ignored local `.env` before enabling sync-triggered texts; the desktop now refuses calendar sync when the environment value is missing.

@@ -42,7 +42,7 @@ class UserProfileAdmin(admin.ModelAdmin):
 @admin.register(AuctionWatchLot)
 class AuctionWatchLotAdmin(admin.ModelAdmin):
     list_display = ("artist_label", "title", "auction_house", "event_at", "source_status", "active")
-    search_fields = ("artist", "artist_watchlist_name", "title", "auction_house", "sale_title")
+    search_fields = ("artist", "artist_watchlist_name", "title", "auction_house", "sale_title", "artprice_url")
     list_filter = ("active", "source_status", "source", "auction_house")
     date_hierarchy = "event_at"
     readonly_fields = ("created_at", "synced_at")

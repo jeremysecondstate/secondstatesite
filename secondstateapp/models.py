@@ -155,6 +155,7 @@ class AuctionWatchLot(models.Model):
     current_bid = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
     lot_url = models.URLField(max_length=2000, blank=True)
     sale_url = models.URLField(max_length=2000, blank=True)
+    artprice_url = models.URLField(max_length=2000, blank=True)
     source_status = models.CharField(max_length=24, blank=True, default="unchanged")
     active = models.BooleanField(default=True, db_index=True)
     source_first_seen_at = models.DateTimeField(blank=True, null=True)

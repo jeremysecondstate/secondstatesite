@@ -15,9 +15,11 @@ from zoneinfo import ZoneInfo
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
@@ -140,6 +142,7 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
 
 def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo) -> dict:
     return {
+        "id": lot.pk,
         "artist": _artist_label(lot),
         "title": lot.title or "Untitled lot",
         "auction_house": lot.auction_house or lot.source or "Auction",
@@ -150,6 +153,8 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo) -> dict:
         "estimate": _estimate_label(lot),
         "time": _time_label(lot, zone),
         "url": lot.lot_url or lot.sale_url,
+        "artprice_url": lot.artprice_url,
+        "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
         "ended": not lot.active,
     }
 
@@ -261,6 +266,52 @@ def _calendar_redirect(request):
 
 def _calendar_zone_today() -> date:
     return timezone.localtime(timezone.now(), _calendar_zone()).date()
+
+
+def _validated_artprice_url(value: object) -> str:
+    candidate = str(value or "").strip()
+    if not candidate:
+        return ""
+    if len(candidate) > 2000:
+        raise ValueError("The Artprice link is too long.")
+    try:
+        URLValidator(schemes=("https",))(candidate)
+        parsed = urlparse(candidate)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        port = parsed.port
+    except (ValidationError, ValueError):
+        raise ValueError("Enter a valid secure artprice.com link.") from None
+    if (
+        parsed.scheme.lower() != "https"
+        or not (host == "artprice.com" or host.endswith(".artprice.com"))
+        or parsed.username
+        or parsed.password
+        or port not in (None, 443)
+    ):
+        raise ValueError("Enter a valid secure artprice.com link.")
+    return candidate
+
+
+@staff_member_required
+@require_POST
+def update_auction_lot_artprice_link(request, lot_id: int):
+    lot = get_object_or_404(AuctionWatchLot, pk=lot_id)
+    try:
+        artprice_url = _validated_artprice_url(request.POST.get("artprice_url"))
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+    if lot.artprice_url != artprice_url:
+        lot.artprice_url = artprice_url
+        lot.save(update_fields=("artprice_url",))
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "artprice_url": artprice_url,
+            "message": "Artprice link saved." if artprice_url else "Artprice link removed.",
+        }
+    )
 
 
 def _add_dispatch_message(request, outcome) -> None:

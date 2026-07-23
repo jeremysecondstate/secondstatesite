@@ -169,6 +169,7 @@
       <section class="sidebar-card selected-day-card" aria-live="polite">
         <p class="sidebar-label">Selected day</p>
         <h2 id="selected-day-title">Choose a date</h2>
+        <span id="calendar-csrf-token" data-token="{{ csrf_token }}" hidden></span>
         <div id="selected-day-lots" class="selected-day-lots">
           <p class="sidebar-empty">Select a calendar day to see its lots.</p>
         </div>
@@ -202,6 +203,7 @@
   const title = document.getElementById("selected-day-title");
   const list = document.getElementById("selected-day-lots");
   const dayButtons = Array.from(document.querySelectorAll(".calendar-day"));
+  const csrfToken = document.getElementById("calendar-csrf-token").dataset.token;
 
   const appendText = (parent, tag, className, value) => {
     if (!value) return;
@@ -209,6 +211,143 @@
     node.className = className;
     node.textContent = value;
     parent.appendChild(node);
+  };
+
+  const externalLink = (href, className, label) => {
+    const link = document.createElement("a");
+    link.className = className;
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = label;
+    return link;
+  };
+
+  const appendArtpriceEditor = (item, lot, actionLinks) => {
+    const form = document.createElement("form");
+    const inputId = `artprice-link-${lot.id}`;
+    const statusId = `artprice-status-${lot.id}`;
+    form.className = "artprice-form";
+
+    const label = document.createElement("label");
+    label.className = "artprice-label";
+    label.htmlFor = inputId;
+    label.textContent = "Artprice link";
+
+    const editor = document.createElement("div");
+    editor.className = "artprice-editor";
+
+    const input = document.createElement("input");
+    input.id = inputId;
+    input.name = "artprice_url";
+    input.type = "url";
+    input.inputMode = "url";
+    input.autocomplete = "url";
+    input.placeholder = "Paste artprice.com link";
+    input.value = lot.artprice_url || "";
+    input.setAttribute("aria-describedby", statusId);
+
+    const saveButton = document.createElement("button");
+    saveButton.type = "submit";
+    saveButton.textContent = "Save";
+
+    const removeButton = document.createElement("button");
+    removeButton.className = "artprice-remove";
+    removeButton.type = "button";
+    removeButton.textContent = "Remove";
+    removeButton.hidden = !lot.artprice_url;
+
+    const status = document.createElement("p");
+    status.id = statusId;
+    status.className = "artprice-status";
+    status.setAttribute("aria-live", "polite");
+
+    const updateArtpriceLink = (url) => {
+      let link = actionLinks.querySelector(".lot-artprice-link");
+      if (!url) {
+        link?.remove();
+        removeButton.hidden = true;
+        return;
+      }
+      if (!link) {
+        link = externalLink(url, "lot-artprice-link", "View on Artprice ↗");
+        actionLinks.appendChild(link);
+      } else {
+        link.href = url;
+      }
+      removeButton.hidden = false;
+    };
+
+    input.addEventListener("input", () => {
+      input.setCustomValidity("");
+      status.textContent = "";
+      status.classList.remove("is-error", "is-success");
+    });
+
+    removeButton.addEventListener("click", () => {
+      input.value = "";
+      form.requestSubmit();
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      input.setCustomValidity("");
+      if (!input.reportValidity()) return;
+
+      const previousButtonText = saveButton.textContent;
+      input.disabled = true;
+      saveButton.disabled = true;
+      removeButton.disabled = true;
+      saveButton.textContent = "Saving…";
+      status.textContent = "";
+      status.classList.remove("is-error", "is-success");
+
+      try {
+        const response = await fetch(lot.artprice_update_url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "X-CSRFToken": csrfToken,
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: new URLSearchParams({artprice_url: input.value.trim()}),
+        });
+        const responseType = response.headers.get("content-type") || "";
+        const payload = responseType.includes("application/json") ? await response.json() : {};
+        if (!response.ok || !payload.ok) {
+          const fallback = response.redirected
+            ? "Your session expired. Refresh the page and sign in again."
+            : "The Artprice link could not be saved.";
+          throw new Error(payload.error || fallback);
+        }
+
+        lot.artprice_url = payload.artprice_url;
+        input.value = payload.artprice_url;
+        updateArtpriceLink(payload.artprice_url);
+        status.textContent = payload.message;
+        status.classList.add("is-success");
+        saveButton.textContent = "Saved";
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "The Artprice link could not be saved.";
+        input.setCustomValidity(message);
+        status.textContent = message;
+        status.classList.add("is-error");
+        saveButton.textContent = previousButtonText;
+      } finally {
+        input.disabled = false;
+        saveButton.disabled = false;
+        removeButton.disabled = false;
+        if (saveButton.textContent === "Saving…") saveButton.textContent = previousButtonText;
+        window.setTimeout(() => {
+          if (saveButton.textContent === "Saved") saveButton.textContent = previousButtonText;
+        }, 1400);
+      }
+    });
+
+    editor.append(input, saveButton, removeButton);
+    form.append(label, editor, status);
+    item.appendChild(form);
   };
 
   const showDay = (isoDate) => {
@@ -238,14 +377,16 @@
       appendText(item, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
       const facts = [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.estimate, lot.medium].filter(Boolean);
       appendText(item, "p", "lot-facts", facts.join(" · "));
+      const actionLinks = document.createElement("div");
+      actionLinks.className = "lot-action-links";
       if (lot.url) {
-        const link = document.createElement("a");
-        link.href = lot.url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = "View auction lot ↗";
-        item.appendChild(link);
+        actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "View auction lot ↗"));
       }
+      if (lot.artprice_url) {
+        actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
+      }
+      item.appendChild(actionLinks);
+      appendArtpriceEditor(item, lot, actionLinks);
       list.appendChild(item);
     });
   };

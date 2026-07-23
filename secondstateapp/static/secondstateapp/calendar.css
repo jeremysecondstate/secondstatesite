@@ -538,12 +538,127 @@
   color: rgba(255, 255, 255, .78);
 }
 
-.day-lot a {
-  display: inline-block;
+.lot-action-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  align-items: center;
   margin-top: 10px;
+}
+
+.lot-action-links:empty {
+  display: none;
+}
+
+.day-lot .lot-action-links a {
+  display: inline-block;
   color: var(--calendar-gold);
   font-size: 12px;
   text-decoration: none;
+}
+
+.day-lot .lot-artprice-link {
+  padding-left: 12px;
+  border-left: 1px solid var(--calendar-line);
+}
+
+.artprice-form {
+  margin-top: 13px;
+}
+
+.artprice-label {
+  display: block;
+  color: var(--calendar-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.artprice-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.artprice-editor:has(.artprice-remove:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.artprice-editor input {
+  min-width: 0;
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--calendar-line);
+  border-radius: 3px;
+  outline: 0;
+  padding: 0 9px;
+  color: rgba(255, 255, 255, .92);
+  background: rgba(255, 255, 255, .045);
+  font: inherit;
+  font-size: 11px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.artprice-editor input::placeholder {
+  color: rgba(255, 255, 255, .38);
+}
+
+.artprice-editor input:focus {
+  border-color: var(--calendar-gold);
+  box-shadow: 0 0 0 2px var(--calendar-gold-soft);
+}
+
+.artprice-editor button {
+  min-height: 34px;
+  border: 1px solid var(--calendar-gold);
+  border-radius: 3px;
+  padding: 0 10px;
+  color: var(--calendar-gold);
+  background: transparent;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.artprice-editor button:hover,
+.artprice-editor button:focus-visible {
+  color: #101214;
+  background: var(--calendar-gold);
+}
+
+.artprice-editor button:disabled,
+.artprice-editor input:disabled {
+  cursor: wait;
+  opacity: .58;
+}
+
+.artprice-editor .artprice-remove {
+  border-color: var(--calendar-line);
+  color: var(--calendar-muted);
+}
+
+.artprice-status {
+  margin: 6px 0 0;
+  color: var(--calendar-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.artprice-status:empty {
+  display: none;
+}
+
+.artprice-status.is-success {
+  color: #6fcf97;
+}
+
+.artprice-status.is-error {
+  color: #eb7777;
 }
 
 .upcoming-sale {

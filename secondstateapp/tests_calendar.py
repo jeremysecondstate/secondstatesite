@@ -68,7 +68,11 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_calendar_groups_lots_and_exposes_details_for_staff(self):
-        watch_lot()
+        artprice_url = (
+            "https://www.artprice.com/artist/15266/rockwell-kent/lots/pasts"
+            "?idcategory=2&keyword=Starry%20Night&p=1&signed=1&sort=datesale_desc"
+        )
+        saved_lot = watch_lot(artprice_url=artprice_url)
         watch_lot(source_lot_id="inv-101", artist="Henri Matisse", artist_watchlist_name="Henri Matisse")
         self.client.force_login(self.staff)
 
@@ -80,6 +84,9 @@ class AuctionCalendarViewTests(TestCase):
         self.assertContains(response, "Joan Miró")
         self.assertContains(response, "Henri Matisse")
         self.assertEqual(response.context["calendar_data"]["2026-07-25"][0]["estimate"], "$2,000–3,000 estimate")
+        lot_details = response.context["calendar_data"]["2026-07-25"]
+        saved_detail = next(item for item in lot_details if item["id"] == saved_lot.pk)
+        self.assertEqual(saved_detail["artprice_url"], artprice_url)
         self.assertEqual(response.context["weeks"][0][0]["date"].weekday(), 0)
 
     def test_invalid_month_falls_back_without_error(self):
@@ -101,6 +108,60 @@ class AuctionCalendarViewTests(TestCase):
             response = self.client.post(reverse(endpoint), {"action": "start", "month": "2026-07"})
             self.assertEqual(response.status_code, 302)
             self.assertIn("login", response.url)
+
+
+class AuctionArtpriceLinkViewTests(TestCase):
+    def setUp(self):
+        self.staff = get_user_model().objects.create_user("artprice-admin", password="test-pass", is_staff=True)
+        self.lot = watch_lot()
+        self.endpoint = reverse("auction_lot_artprice_link", args=(self.lot.pk,))
+        self.artprice_url = (
+            "https://www.artprice.com/artist/15266/rockwell-kent/lots/pasts"
+            "?idcategory=2&keyword=Starry%20Night&p=1&signed=1&sort=datesale_desc"
+        )
+
+    def test_artprice_link_editor_is_staff_only(self):
+        ordinary = get_user_model().objects.create_user("artprice-ordinary", password="test-pass")
+        self.client.force_login(ordinary)
+
+        response = self.client.post(self.endpoint, {"artprice_url": self.artprice_url})
+
+        self.assertEqual(response.status_code, 302)
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.artprice_url, "")
+
+    def test_staff_can_save_and_remove_an_artprice_link(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.post(self.endpoint, {"artprice_url": self.artprice_url})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["artprice_url"], self.artprice_url)
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.artprice_url, self.artprice_url)
+
+        response = self.client.post(self.endpoint, {"artprice_url": ""})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "Artprice link removed.")
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.artprice_url, "")
+
+    def test_non_artprice_and_insecure_links_are_rejected(self):
+        self.client.force_login(self.staff)
+
+        for invalid_url in (
+            "https://www.artprice.com.evil.example/artist/15266",
+            "http://www.artprice.com/artist/15266",
+            "https://user:password@www.artprice.com/artist/15266",
+        ):
+            with self.subTest(invalid_url=invalid_url):
+                response = self.client.post(self.endpoint, {"artprice_url": invalid_url})
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["error"], "Enter a valid secure artprice.com link.")
+
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.artprice_url, "")
 
 
 @override_settings(
@@ -230,6 +291,8 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(lot.title, "Galaxia")
         self.assertEqual(lot.event_at.astimezone(CALENDAR_ZONE).hour, 13)
         self.assertTrue(lot.active)
+        lot.artprice_url = "https://www.artprice.com/artist/1/example/lots/pasts"
+        lot.save(update_fields=("artprice_url",))
 
         response = self.client.post(
             self.endpoint,
@@ -242,6 +305,7 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(response.json()["ended"], 1)
         self.assertEqual(lot.title, "Galaxia (updated)")
         self.assertFalse(lot.active)
+        self.assertEqual(lot.artprice_url, "https://www.artprice.com/artist/1/example/lots/pasts")
         self.assertEqual(response.json()["reminders"]["status"], "paused")
 
     @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")
