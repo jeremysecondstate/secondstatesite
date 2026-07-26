@@ -17,7 +17,7 @@ Synthetic agenda with efficiency metrics and export controls:
 ```text
 local bookmark HTML
   -> selected folders + explicit domain allowlist
-  -> Invaluable public catalog JSON adapter (HTML fallback for saved fixtures)
+  -> batched Invaluable public catalog JSON adapter (HTML fallback for saved fixtures)
   -> normalized lot records
   -> local SQLite content-hash cache and diff
   -> optional compact ambiguous-record enrichment
@@ -28,7 +28,7 @@ local bookmark HTML
 The implementation is split by responsibility:
 
 - `catalogapp/bookmark_watchlist.py`: Netscape bookmark parsing, nested URL decoding, folder/domain filtering, artist labels, and URL deduplication.
-- `catalogapp/watchlist_adapters.py`: adapter interface plus deterministic Invaluable catalog-result, card, embedded JSON, detail, and pagination parsing. Invaluable's `/search` page is a JavaScript shell, so live refreshes use the same public `/catResults` JSON request as the page itself.
+- `catalogapp/watchlist_adapters.py`: adapter interface plus deterministic Invaluable catalog-result, card, embedded JSON, detail, and pagination parsing. Invaluable's `/search` page is a JavaScript shell, so live refreshes use the same public `/catResults` JSON request as the page itself. Compatible selected artists are combined into an OR-facet request and split back into their individual bookmark memberships locally.
 - `catalogapp/watchlist_fetch.py`: conservative HTTP retries/rate limiting and an explicit opt-in Playwright profile fallback.
 - `catalogapp/watchlist_models.py`: stable normalized lot schema and local duplicate markers.
 - `catalogapp/watchlist_cache.py`: SQLite lot, membership, source-run, and AI-enrichment caches.
@@ -64,6 +64,8 @@ WATCHLIST_PLAYWRIGHT_PROFILE=
 ## Incremental behavior and metrics
 
 Each lot is keyed by source plus source lot ID, falling back to its canonical URL. The cache stores a search-card hash and a normalized visible-content hash. An unchanged complete card is served from cache without fetching its detail page. New, changed, or still-incomplete cards may retrieve details. Successfully refreshed bookmark memberships that disappear are marked ended.
+
+If a source is temporarily unavailable, the refresh keeps the last known active lots for that bookmark in the agenda and reports that cached data is being shown. It never marks lots ended from an incomplete or failed source refresh.
 
 Every refresh reports:
 
@@ -107,4 +109,4 @@ The synthetic tests cover bookmark safety, repeated decoding, adapters, paginati
 
 ## Invaluable troubleshooting
 
-A successful `GET /search` is not proof that auction data was returned: Invaluable currently responds with HTTP 200 and an empty JavaScript application shell. The live adapter therefore posts only the bookmark's public artist/category/search filters to `/catResults`, validates the JSON schema, and reports a source error if the endpoint returns HTML or an unexpected response. This prevents an empty shell from being recorded as a successful zero-result refresh.
+A successful `GET /search` is not proof that auction data was returned: Invaluable currently responds with HTTP 200 and an empty JavaScript application shell. The live adapter therefore posts only the bookmarks' public artist/category/search filters to `/catResults`, combines compatible artist facets to reduce request volume, validates the JSON schema, and reports a source error if the endpoint returns HTML or an unexpected response. This prevents an empty shell from being recorded as a successful zero-result refresh. A temporary 401/403/429 is not bypassed; the agenda retains last-known cached lots and the user can retry later.

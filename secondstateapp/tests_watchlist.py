@@ -196,6 +196,86 @@ class InvaluableAdapterTests(SimpleTestCase):
             "https://www.invaluable.com/search?artistName=Rufino+Tamayo&Fine+Art=Prints&keyword=fine+art&page=2&query=fine+art&sort=endDateAsc",
         )
 
+    def test_batches_compatible_artist_searches_and_splits_paginated_hits(self):
+        tamayo_url = (
+            "https://www.invaluable.com/search?artistName=Rufino+Tamayo&"
+            "Fine+Art=Prints&keyword=fine+art&query=fine+art&sort=endDateAsc"
+        )
+        haring_url = (
+            "https://www.invaluable.com/search?artistName=Keith+Haring&"
+            "Fine+Art=Prints&keyword=fine+art&query=fine+art&sort=priceDesc"
+        )
+
+        def hit(object_id, lot_ref, artist, lot_number):
+            return {
+                "objectID": object_id,
+                "lotRef": lot_ref,
+                "lotNumber": lot_number,
+                "lotTitle": f"{artist} screenprint",
+                "artistName": artist,
+                "lotDescription": "Color screenprint on paper",
+                "houseName": "House A",
+                "dateTimeUTCUnix": 1785355200,
+                "currencyCode": "USD",
+            }
+
+        class BatchFetcher:
+            def __init__(self):
+                self.calls = []
+                self.pages_fetched = 0
+                self.responses = [
+                    {
+                        "results": [
+                            {
+                                "page": 0,
+                                "nbPages": 2,
+                                "nbHits": 3,
+                                "hits": [
+                                    hit("tamayo-1", "TAMAYO1", "Rufino Tamayo", "1"),
+                                    hit("haring-1", "HARING1", "Keith Haring", "2"),
+                                ],
+                            }
+                        ]
+                    },
+                    {
+                        "results": [
+                            {
+                                "page": 1,
+                                "nbPages": 2,
+                                "nbHits": 3,
+                                "hits": [hit("haring-2", "HARING2", "Keith Haring", "3")],
+                            }
+                        ]
+                    },
+                ]
+
+            def post_json(self, url, payload, *, referer=""):
+                self.calls.append((url, payload, referer))
+                self.pages_fetched += 1
+                return self.responses.pop(0)
+
+        fetcher = BatchFetcher()
+        pages = self.adapter.fetch_search_batch(
+            [(tamayo_url, "Rufino Tamayo"), (haring_url, "Keith Haring")],
+            fetcher,
+            max_pages=10,
+        )
+
+        self.assertEqual(len(fetcher.calls), 2)
+        first_request = fetcher.calls[0][1]["requests"][0]
+        self.assertEqual(first_request["indexName"], "upcoming_lots_dateTimeUTCUnix_asc_prod")
+        self.assertEqual(
+            first_request["params"]["facetFilters"][0],
+            ["artistName:Rufino Tamayo", "artistName:Keith Haring"],
+        )
+        self.assertEqual(fetcher.calls[1][1]["requests"][0]["params"]["page"], 1)
+        tamayo_lots = self.adapter.parse_search_page(pages[tamayo_url].page, tamayo_url, "Rufino Tamayo")
+        haring_lots = self.adapter.parse_search_page(pages[haring_url].page, haring_url, "Keith Haring")
+        self.assertEqual([lot.source_lot_id for lot in tamayo_lots], ["tamayo-1"])
+        self.assertEqual({lot.source_lot_id for lot in haring_lots}, {"haring-1", "haring-2"})
+        self.assertTrue(pages[tamayo_url].complete)
+        self.assertTrue(pages[haring_url].complete)
+
 
 class _Response:
     def __init__(self, status_code, text="", payload=None, headers=None, url=""):
@@ -367,6 +447,97 @@ class CacheAndServiceTests(SimpleTestCase):
             ).refresh([entry], selected_artists=["Rufino Tamayo"])
         self.assertEqual(result.metrics.pages_fetched, 2)
         self.assertEqual(len(result.lots), 2)
+
+    def test_service_uses_one_batched_request_for_multiple_artists(self):
+        tamayo_url = "https://www.invaluable.com/search?artistName=Rufino+Tamayo&query=fine+art"
+        haring_url = "https://www.invaluable.com/search?artistName=Keith+Haring&query=fine+art"
+        entries = [
+            BookmarkEntry(
+                ("ARTISTS INVALUABLE",),
+                artist,
+                url,
+                artist=artist,
+                source="Invaluable",
+            )
+            for artist, url in (("Rufino Tamayo", tamayo_url), ("Keith Haring", haring_url))
+        ]
+
+        class BatchFetcher:
+            pages_fetched = 0
+
+            def __init__(self):
+                self.calls = []
+
+            def post_json(self, url, payload, *, referer=""):
+                self.calls.append((url, payload, referer))
+                self.pages_fetched += 1
+                hits = []
+                for object_id, lot_ref, artist in (
+                    ("tamayo-1", "TAMAYO1", "Rufino Tamayo"),
+                    ("haring-1", "HARING1", "Keith Haring"),
+                ):
+                    hits.append(
+                        {
+                            "objectID": object_id,
+                            "lotRef": lot_ref,
+                            "lotNumber": "1",
+                            "lotTitle": f"{artist} screenprint",
+                            "artistName": artist,
+                            "lotDescription": "Color screenprint on paper",
+                            "houseName": "House A",
+                            "dateTimeUTCUnix": 1785355200,
+                            "currencyCode": "USD",
+                        }
+                    )
+                return {"results": [{"page": 0, "nbPages": 1, "nbHits": 2, "hits": hits}]}
+
+        fetcher = BatchFetcher()
+        with WatchlistCache(":memory:") as cache:
+            result = WatchlistService(
+                cache,
+                fetcher=fetcher,
+                now=lambda: datetime(2026, 7, 26, tzinfo=timezone.utc),
+            ).refresh(entries, selected_artists=["Rufino Tamayo", "Keith Haring"])
+
+        self.assertEqual(len(fetcher.calls), 1)
+        self.assertEqual(result.metrics.pages_fetched, 1)
+        self.assertEqual({lot.artist_watchlist_name for lot in result.lots}, {"Rufino Tamayo", "Keith Haring"})
+        self.assertEqual(result.errors, [])
+
+    def test_source_failure_keeps_last_known_active_lots(self):
+        tamayo_url = "https://www.invaluable.com/search?artistName=Rufino+Tamayo&query=fine+art"
+        haring_url = "https://www.invaluable.com/search?artistName=Keith+Haring&query=fine+art"
+        entries = [
+            BookmarkEntry(
+                ("ARTISTS INVALUABLE",),
+                artist,
+                url,
+                artist=artist,
+                source="Invaluable",
+            )
+            for artist, url in (("Rufino Tamayo", tamayo_url), ("Keith Haring", haring_url))
+        ]
+
+        class BlockedFetcher:
+            pages_fetched = 0
+
+            def post_json(self, _url, _payload, *, referer=""):
+                raise SourceAccessError("www.invaluable.com returned a temporary HTTP 403.")
+
+        with WatchlistCache(":memory:") as cache:
+            cache.upsert(sample_lot(), watch_url=tamayo_url, search_hash="cached")
+            result = WatchlistService(
+                cache,
+                fetcher=BlockedFetcher(),
+                now=lambda: datetime(2026, 7, 13, tzinfo=timezone.utc),
+            ).refresh(entries, selected_artists=["Rufino Tamayo", "Keith Haring"])
+
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].source_lot_id, "inv-24")
+        self.assertEqual(result.metrics.cache_hits, 1)
+        self.assertEqual(len(result.errors), 1)
+        self.assertIn("2 artists", result.errors[0])
+        self.assertIn("Showing 1 cached lots", result.errors[0])
 
 
 class ExportTests(SimpleTestCase):

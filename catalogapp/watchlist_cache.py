@@ -106,6 +106,24 @@ class WatchlistCache:
             ).fetchone()
         return NormalizedLot.from_dict(json.loads(row["payload_json"])) if row else None
 
+    def active_lots_for_watch_url(self, watch_url: str) -> list[NormalizedLot]:
+        """Return the last known active lots for a bookmark after a source outage."""
+
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT lots.payload_json
+                FROM watch_memberships
+                JOIN lots ON lots.cache_key = watch_memberships.cache_key
+                WHERE watch_memberships.watch_url = ?
+                  AND watch_memberships.active = 1
+                  AND lots.active = 1
+                ORDER BY lots.last_seen_at, lots.cache_key
+                """,
+                (watch_url,),
+            ).fetchall()
+        return [NormalizedLot.from_dict(json.loads(row["payload_json"])) for row in rows]
+
     def upsert(
         self,
         lot: NormalizedLot,

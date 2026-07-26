@@ -74,6 +74,12 @@ class _Money:
     currency: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class BatchedSearchPage:
+    page: str
+    complete: bool = True
+
+
 class InvaluableAdapter(BookmarkSourceAdapter):
     source = "Invaluable"
     domains = ("invaluable.com",)
@@ -151,6 +157,133 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         if self._catalog_result(payload) is None:
             raise RuntimeError("Invaluable returned an unexpected catalog-search response.")
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+    def fetch_search_batch(
+        self,
+        searches: Iterable[tuple[str, str]],
+        fetcher: PageFetcher,
+        *,
+        max_pages: int = 10,
+    ) -> dict[str, BatchedSearchPage]:
+        """Fetch compatible artist searches with one OR-facet request per page.
+
+        Invaluable accepts an Algolia-style OR group for artist facets. Combining
+        selected artists avoids a burst of near-identical requests while keeping
+        each bookmark's cache membership separate after the response is split.
+        """
+
+        items = [(url, artist) for url, artist in searches if url and artist]
+        post_json = getattr(fetcher, "post_json", None)
+        if len(items) < 2 or not callable(post_json):
+            return {}
+        if any(urlsplit(url).path.rstrip("/").casefold() != "/search" for url, _artist in items):
+            return {}
+
+        grouped: dict[str, list[tuple[str, str, str]]] = {}
+        request_templates: dict[str, dict[str, Any]] = {}
+        for url, watchlist_artist in items:
+            artist_name = self._catalog_artist_name(url) or watchlist_artist
+            request = self._catalog_request_payload(url)["requests"][0]
+            params = dict(request["params"])
+            params["page"] = 0
+            params["facetFilters"] = [
+                list(group)
+                for group in params.get("facetFilters", [])
+                if not self._is_artist_facet_group(group)
+            ]
+            template = {
+                "indexName": self._sort_indexes["enddateasc"],
+                "params": params,
+            }
+            signature = json.dumps(template, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            request_templates[signature] = template
+            grouped.setdefault(signature, []).append((url, watchlist_artist, artist_name))
+
+        pages: dict[str, BatchedSearchPage] = {}
+        page_limit = max(1, min(int(max_pages), 25))
+        for signature, group in grouped.items():
+            if len(group) < 2:
+                continue
+            template = request_templates[signature]
+            artist_names = list(dict.fromkeys(item[2] for item in group))
+            params_template = dict(template["params"])
+            params_template["facetFilters"] = [
+                [f"artistName:{artist_name}" for artist_name in artist_names],
+                *params_template.get("facetFilters", []),
+            ]
+            first_url = group[0][0]
+            parts = urlsplit(first_url)
+            endpoint = urlunsplit((parts.scheme, parts.netloc, self._catalog_path, "", ""))
+            hits: list[dict[str, Any]] = []
+            seen_hits: set[str] = set()
+            complete = True
+            page_index = 0
+            result_template: dict[str, Any] = {}
+
+            while page_index < page_limit:
+                page_params = dict(params_template)
+                page_params["page"] = page_index
+                payload = post_json(
+                    endpoint,
+                    {
+                        "requests": [{"indexName": template["indexName"], "params": page_params}],
+                        "isCatalogPageRequest": False,
+                    },
+                    referer=first_url,
+                )
+                catalog_result = self._catalog_result(payload)
+                if catalog_result is None:
+                    raise RuntimeError("Invaluable returned an unexpected batched catalog-search response.")
+                result_template = {
+                    key: value
+                    for key, value in catalog_result.items()
+                    if key not in {"hits", "page", "nbPages", "nbHits", "hitsPerPage"}
+                }
+                for hit in catalog_result.get("hits", []):
+                    if not isinstance(hit, dict):
+                        continue
+                    identity = self._text_value(hit, "objectID", "lotRef")
+                    identity = identity or json.dumps(hit, ensure_ascii=False, sort_keys=True, default=str)
+                    if identity in seen_hits:
+                        continue
+                    seen_hits.add(identity)
+                    hits.append(hit)
+                try:
+                    page_count = max(0, int(catalog_result.get("nbPages", 0)))
+                except (TypeError, ValueError):
+                    page_count = 0
+                if page_index + 1 >= page_count:
+                    break
+                page_index += 1
+            else:
+                complete = False
+
+            if page_index + 1 < page_count:
+                complete = False
+            hits_by_artist: dict[str, list[dict[str, Any]]] = {}
+            for hit in hits:
+                key = self._artist_match_key(self._text_value(hit, "artistName", "artist"))
+                if key:
+                    hits_by_artist.setdefault(key, []).append(hit)
+            for url, _watchlist_artist, artist_name in group:
+                artist_hits = hits_by_artist.get(self._artist_match_key(artist_name), [])
+                per_artist_result = {
+                    **result_template,
+                    "hits": artist_hits,
+                    "page": 0,
+                    "nbPages": 1,
+                    "nbHits": len(artist_hits),
+                    "hitsPerPage": max(1, len(artist_hits)),
+                }
+                pages[url] = BatchedSearchPage(
+                    json.dumps(
+                        {"results": [per_artist_result]},
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                    complete=complete,
+                )
+        return pages
 
     def extract_lot_links(self, page: str, page_url: str) -> list[str]:
         catalog_result = self._catalog_result(page)
@@ -307,6 +440,23 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             ],
             "isCatalogPageRequest": False,
         }
+
+    @staticmethod
+    def _is_artist_facet_group(group: object) -> bool:
+        return isinstance(group, list) and bool(group) and all(
+            str(value).casefold().startswith("artistname:") for value in group
+        )
+
+    @staticmethod
+    def _catalog_artist_name(page_url: str) -> str:
+        for key, value in parse_qsl(urlsplit(page_url).query, keep_blank_values=True):
+            if key.casefold() in {"artistname", "artist"} and value.strip():
+                return value.strip()
+        return ""
+
+    @staticmethod
+    def _artist_match_key(value: str) -> str:
+        return " ".join(unicodedata.normalize("NFKC", value or "").casefold().split())
 
     @staticmethod
     def _catalog_result(payload: object) -> dict[str, Any] | None:

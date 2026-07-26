@@ -8,7 +8,7 @@ import threading
 from typing import Callable, Iterable
 
 from catalogapp.bookmark_watchlist import BookmarkEntry
-from catalogapp.watchlist_adapters import BookmarkSourceAdapter, adapter_for_url
+from catalogapp.watchlist_adapters import BatchedSearchPage, BookmarkSourceAdapter, adapter_for_url
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_enrichment import OpenAIEnricher
 from catalogapp.watchlist_fetch import WatchlistStopped, page_fetcher_from_environment
@@ -102,10 +102,57 @@ class WatchlistService:
         if profile_directory and progress:
             progress(f"Using the explicitly selected browser profile: {profile_directory}")
 
+        batched_pages: dict[str, BatchedSearchPage] = {}
+        batch_failed_urls: set[str] = set()
+        entries_by_adapter: dict[BookmarkSourceAdapter, list[BookmarkEntry]] = {}
+        for entry in chosen:
+            adapter = adapter_for_url(entry.url)
+            if adapter is not None:
+                entries_by_adapter.setdefault(adapter, []).append(entry)
+        for adapter, adapter_entries in entries_by_adapter.items():
+            batcher = getattr(adapter, "fetch_search_batch", None)
+            if len(adapter_entries) < 2 or not callable(batcher):
+                continue
+            if progress:
+                progress(
+                    f"Fetching {len(adapter_entries)} {adapter.source} artists in a rate-safe batchâ€¦"
+                )
+            try:
+                batched_pages.update(
+                    batcher(
+                        [(entry.url, entry.artist) for entry in adapter_entries],
+                        fetcher,
+                        max_pages=self.max_pages_per_bookmark,
+                    )
+                )
+            except WatchlistStopped:
+                stopped = True
+                break
+            except Exception as exc:
+                message = " ".join(str(exc).split())[:500]
+                cached_count = 0
+                for entry in adapter_entries:
+                    batch_failed_urls.add(entry.url)
+                    cached = self._cached_lots_for_entry(entry)
+                    cached_count += len(cached)
+                    refreshed_lots.extend(cached)
+                    metrics.cache_hits += len(cached)
+                    self.cache.record_source_error(entry.url, message, observed_at)
+                suffix = f" Showing {cached_count} cached lots." if cached_count else ""
+                errors.append(
+                    f"{adapter.source} ({len(adapter_entries)} artists): {message}{suffix}"
+                )
+
+        if stopped:
+            metrics.pages_fetched = max(0, int(getattr(fetcher, "pages_fetched", 0)) - started_pages)
+            return WatchlistResult(lots=[], metrics=metrics, errors=errors, stopped=True)
+
         for entry in chosen:
             if stop.is_set():
                 stopped = True
                 break
+            if entry.url in batch_failed_urls:
+                continue
             adapter = adapter_for_url(entry.url)
             if adapter is None:
                 errors.append(f"{entry.source or 'Unsupported source'} adapter is not available yet: {entry.artist}")
@@ -120,6 +167,7 @@ class WatchlistService:
                     stop,
                     metrics,
                     observed_at,
+                    preloaded_search=batched_pages.get(entry.url),
                 )
                 refreshed_lots.extend(lots)
                 if complete:
@@ -131,7 +179,11 @@ class WatchlistService:
                 break
             except Exception as exc:
                 message = " ".join(str(exc).split())[:500]
-                errors.append(f"{entry.artist} ({entry.source}): {message}")
+                cached = self._cached_lots_for_entry(entry)
+                refreshed_lots.extend(cached)
+                metrics.cache_hits += len(cached)
+                suffix = f" Showing {len(cached)} cached lots." if cached else ""
+                errors.append(f"{entry.artist} ({entry.source}): {message}{suffix}")
                 self.cache.record_source_error(entry.url, message, observed_at)
 
         metrics.pages_fetched = max(0, int(getattr(fetcher, "pages_fetched", 0)) - started_pages)
@@ -165,12 +217,14 @@ class WatchlistService:
         stop: threading.Event,
         metrics: WatchlistMetrics,
         observed_at: datetime,
+        preloaded_search: BatchedSearchPage | None = None,
     ) -> tuple[list[NormalizedLot], list[NormalizedLot], bool]:
         page_url = entry.url
         visited_pages: set[str] = set()
         observed_keys: set[str] = set()
         lots: list[NormalizedLot] = []
         complete = True
+        use_preloaded_search = preloaded_search is not None
         while page_url and page_url not in visited_pages:
             if len(visited_pages) >= self.max_pages_per_bookmark:
                 complete = False
@@ -178,7 +232,12 @@ class WatchlistService:
             if stop.is_set():
                 raise WatchlistStopped("Watchlist refresh stopped by the user.")
             visited_pages.add(page_url)
-            page = adapter.fetch_search_page(page_url, fetcher)
+            if use_preloaded_search:
+                page = preloaded_search.page
+                complete = complete and preloaded_search.complete
+                use_preloaded_search = False
+            else:
+                page = adapter.fetch_search_page(page_url, fetcher)
             cards = adapter.parse_search_page(page, page_url, entry.artist)
             for card in cards:
                 if card.cache_key in observed_keys:
@@ -217,6 +276,12 @@ class WatchlistService:
             page_url = next_url
         ended = self.cache.mark_missing_ended(entry.url, observed_keys, observed_at) if complete else []
         return lots, ended, complete
+
+    def _cached_lots_for_entry(self, entry: BookmarkEntry) -> list[NormalizedLot]:
+        lots = self.cache.active_lots_for_watch_url(entry.url)
+        for lot in lots:
+            lot.artist_watchlist_name = entry.artist
+        return lots
 
 
 def _agenda_sort_key(lot: NormalizedLot) -> tuple[str, str, str, str]:
