@@ -21,6 +21,11 @@ urlpatterns = [
         name="auction_lot_artprice_link",
     ),
     path(
+        "calendar/lots/<int:lot_id>/artprice-analysis/",
+        calendar_views.auction_lot_artprice_analysis,
+        name="auction_lot_artprice_analysis",
+    ),
+    path(
         "calendar/reminders/control/",
         calendar_views.manage_auction_reminders,
         name="auction_reminder_control",

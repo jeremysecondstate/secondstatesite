@@ -1,17 +1,30 @@
 import json
 import os
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from io import StringIO
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_sync import CalendarSyncError, sync_watchlist_lots
+from secondstateapp.artprice_max_bid import (
+    analyze_artprice_comparables,
+    analyze_artprice_html,
+    calculate_bid_rows,
+    choose_resale_value,
+    extract_preloaded_state,
+    money_to_decimal,
+    parse_auction_results,
+)
+from secondstateapp.calendar_views import _uploaded_artprice_html
 from secondstateapp.auction_reminders import (
     ReminderDispatchOutcome,
     ReminderConfigurationError,
@@ -22,10 +35,88 @@ from secondstateapp.auction_reminders import (
     dispatch_active_auction_reminders,
     run_auction_reminders,
 )
-from secondstateapp.models import AuctionReminderControl, AuctionReminderDelivery, AuctionWatchLot
+from secondstateapp.models import (
+    AuctionMaxBidAnalysis,
+    AuctionReminderControl,
+    AuctionReminderDelivery,
+    AuctionWatchLot,
+)
 
 
 CALENDAR_ZONE = ZoneInfo("America/Los_Angeles")
+ARTPRICE_UPLOAD_LIMIT = 5 * 1024 * 1024
+
+
+def artprice_html(lots=None, *, currency="usd", suffix=""):
+    if lots is None:
+        lots = [
+            {
+                "id": "result-1",
+                "title": "Sanitized comparable",
+                "price": "$ 1,205",
+                "saleDtStart": "26 Mar 2026",
+                "auctioneerName": "Dawson's Auctioneers & Valuers",
+                "number": "42",
+                "lotstatus": 1,
+                "estimation": {"low": "$ 1,000", "high": "$ 1,500"},
+            }
+        ]
+    state = {
+        "preferences": {"currency": currency},
+        "search": {"lots": {str(index): lot for index, lot in enumerate(lots)}},
+    }
+    return f"<html><script>window.__PRELOADED_STATE__ = {json.dumps(state)};</script>{suffix}</html>"
+
+
+def artprice_upload(filename="saved-results.html", *, lots=None, currency="usd", suffix=""):
+    return SimpleUploadedFile(
+        filename,
+        artprice_html(lots, currency=currency, suffix=suffix).encode("utf-8"),
+        content_type="application/octet-stream",
+    )
+
+
+def stored_analysis(lot, *, created_by=None):
+    return AuctionMaxBidAnalysis.objects.create(
+        lot=lot,
+        source_filename="saved-results.html",
+        currency="USD",
+        resale_method="median",
+        manual_resale_value=None,
+        recent_count=3,
+        expected_resale_hammer=Decimal("1205.00"),
+        net_resale_proceeds=Decimal("1205.00"),
+        inbound_shipping=Decimal("200.00"),
+        target_profit=Decimal("100.00"),
+        seller_commission_pct=Decimal("0.00"),
+        outbound_shipping=Decimal("0.00"),
+        other_resale_costs=Decimal("0.00"),
+        premium_min=23,
+        premium_max=35,
+        sold_records_count=1,
+        comparables=[
+            {
+                "sale_date": "26 Mar 2026",
+                "hammer_price": "1205.00",
+                "auction_house": "Dawson's",
+                "title": "Sanitized comparable",
+                "lot_number": "42",
+                "estimate_low": "1000.00",
+                "estimate_high": "1500.00",
+            }
+        ],
+        bid_rows=[
+            {
+                "premium_pct": 23,
+                "max_bid": "735.77",
+                "buyers_premium": "169.23",
+                "shipping": "200.00",
+                "all_in_acquisition": "1105.00",
+                "projected_profit": "100.00",
+            }
+        ],
+        created_by=created_by,
+    )
 
 
 def watch_lot(**overrides):
@@ -50,6 +141,379 @@ def watch_lot(**overrides):
     }
     values.update(overrides)
     return AuctionWatchLot.objects.create(**values)
+
+
+class ArtpriceMaxBidParserTests(SimpleTestCase):
+    def test_money_string_parsing(self):
+        self.assertEqual(money_to_decimal("$ 1,266.50"), Decimal("1266.50"))
+        self.assertEqual(money_to_decimal("USD 2,000"), Decimal("2000"))
+        self.assertIsNone(money_to_decimal("Not sold"))
+        self.assertIsNone(money_to_decimal(""))
+        self.assertIsNone(money_to_decimal(None))
+        self.assertIsNone(money_to_decimal(Decimal("1e999999999")))
+
+    def test_embedded_json_extraction_and_safe_failures(self):
+        state = extract_preloaded_state(artprice_html())
+        self.assertEqual(state["preferences"]["currency"], "usd")
+
+        with self.assertRaisesRegex(ValueError, "preloaded"):
+            extract_preloaded_state("<html>No Artprice data here</html>")
+
+        secret = "PRIVATE-CUSTOMER-TOKEN"
+        with self.assertRaises(ValueError) as raised:
+            extract_preloaded_state(
+                f"<script>window.__PRELOADED_STATE__ = {{invalid {secret}</script>"
+            )
+        self.assertNotIn(secret, str(raised.exception))
+
+    def test_filters_unsold_deduplicates_and_sorts_newest_first(self):
+        lots = [
+            {
+                "id": "new",
+                "title": "Newest sold",
+                "price": "$ 1,266",
+                "saleDtStart": "26 Mar 2026",
+                "auctioneerName": "Dawson's",
+                "number": "42",
+                "lotstatus": 1,
+                "estimation": {"low": "$ 1,066", "high": "$ 1,599"},
+            },
+            {
+                "id": "old",
+                "title": "Older sold",
+                "price": "$ 900",
+                "saleDtStart": "10 Jan 2024",
+                "auctioneerName": "Example House",
+                "lotstatus": 1,
+            },
+            {
+                "id": "duplicate",
+                "title": "Newest sold",
+                "price": "$ 1,266",
+                "saleDtStart": "26 Mar 2026",
+                "auctioneerName": "Duplicate House",
+                "lotstatus": 1,
+            },
+            {
+                "id": "unsold-number",
+                "title": "Not sold",
+                "price": "$ 8,000",
+                "saleDtStart": "1 Apr 2026",
+                "auctioneerName": "Example House",
+                "lotstatus": 3,
+            },
+            {
+                "id": "unsold-string",
+                "title": "Also not sold",
+                "price": "$ 9,000",
+                "saleDtStart": "2 Apr 2026",
+                "auctioneerName": "Example House",
+                "lotstatus": "3",
+            },
+            {
+                "id": "no-price",
+                "title": "No hammer",
+                "price": "Not sold",
+                "saleDtStart": "3 Apr 2026",
+                "auctioneerName": "Example House",
+                "lotstatus": 1,
+            },
+        ]
+
+        records = parse_auction_results(artprice_html(lots))
+
+        self.assertEqual([record.title for record in records], ["Newest sold", "Older sold"])
+        self.assertEqual(records[0].hammer_price, Decimal("1266"))
+        self.assertEqual(records[0].estimate_low, Decimal("1066"))
+
+    def test_selects_largest_coherent_lot_group_and_supports_list_layouts(self):
+        primary_lots = [
+            {
+                "id": f"primary-{index}",
+                "title": f"Primary {index}",
+                "price": f"$ {1000 + index}",
+                "saleDtStart": f"{26 - index} Mar 2026",
+                "auctioneerName": "Primary House",
+                "lotstatus": 1,
+            }
+            for index in range(2)
+        ]
+        unrelated_lot = {
+            "id": "cached",
+            "title": "Unrelated cached lot",
+            "price": "$ 9999",
+            "saleDtStart": "27 Mar 2026",
+            "auctioneerName": "Cached House",
+            "lotstatus": 1,
+        }
+        state = {
+            "preferences": {"currency": "usd"},
+            "search": {"results": {str(i): lot for i, lot in enumerate(primary_lots)}},
+            "account": {"recent": {"cached": unrelated_lot}},
+        }
+        html = (
+            "<script>window.__PRELOADED_STATE__ = "
+            f"{json.dumps(state)};</script>"
+        )
+
+        coherent_records = parse_auction_results(html)
+
+        self.assertEqual(
+            [record.title for record in coherent_records],
+            ["Primary 0", "Primary 1"],
+        )
+
+        state["search"] = {"results": primary_lots}
+        list_html = (
+            "<script>window.__PRELOADED_STATE__ = "
+            f"{json.dumps(state)};</script>"
+        )
+        list_records = parse_auction_results(list_html)
+        self.assertEqual(
+            [record.title for record in list_records],
+            ["Primary 0", "Primary 1"],
+        )
+
+    def test_deep_valid_state_is_walked_without_a_recursion_failure(self):
+        base_state = {
+            "preferences": {"currency": "usd"},
+            "search": {
+                "lots": {
+                    "0": {
+                        "id": "deep-result",
+                        "title": "Deep comparable",
+                        "price": "$ 1,205",
+                        "saleDtStart": "26 Mar 2026",
+                        "auctioneerName": "House",
+                        "lotstatus": 1,
+                    }
+                }
+            },
+        }
+        depth = 900
+        nested_json = (
+            '{"nested":' * depth
+            + json.dumps(base_state)
+            + "}" * depth
+        )
+        html = f"<script>window.__PRELOADED_STATE__ = {nested_json};</script>"
+
+        result = analyze_artprice_html(html)
+
+        self.assertEqual(result["sold_records_count"], 1)
+        self.assertEqual(result["expected_resale_hammer"], "1205.00")
+
+    def test_all_supported_valuation_methods(self):
+        values = [Decimal("100"), Decimal("200"), Decimal("400")]
+        expected = {
+            "median": Decimal("200"),
+            "mean": Decimal("233.3333333333333333333333333"),
+            "recent": Decimal("150"),
+            "max": Decimal("400"),
+            "min": Decimal("100"),
+            "manual": Decimal("525"),
+        }
+
+        for method, expected_value in expected.items():
+            with self.subTest(method=method):
+                actual = choose_resale_value(
+                    values,
+                    method,
+                    manual_value=Decimal("525"),
+                    recent_count=2,
+                )
+                self.assertEqual(actual, expected_value)
+
+        with self.assertRaisesRegex(ValueError, "greater than zero"):
+            choose_resale_value(values, "manual", manual_value=Decimal("0"))
+
+    def test_maximum_bid_formula_and_no_positive_bid_error(self):
+        net_proceeds, rows = calculate_bid_rows(
+            expected_resale_hammer=Decimal("1205"),
+            premium_min=23,
+            premium_max=35,
+            inbound_shipping=Decimal("200"),
+            target_profit=Decimal("100"),
+            seller_commission_pct=Decimal("0"),
+            outbound_shipping=Decimal("0"),
+            other_resale_costs=Decimal("0"),
+        )
+
+        self.assertEqual(net_proceeds, Decimal("1205"))
+        self.assertEqual(rows[0]["premium_pct"], 23)
+        self.assertEqual(rows[0]["max_bid"].quantize(Decimal("0.01")), Decimal("735.77"))
+        self.assertEqual(rows[0]["buyers_premium"].quantize(Decimal("0.01")), Decimal("169.23"))
+        self.assertEqual(rows[0]["all_in_acquisition"].quantize(Decimal("0.01")), Decimal("1105.00"))
+        self.assertEqual(rows[-1]["max_bid"].quantize(Decimal("0.01")), Decimal("670.37"))
+
+        net_with_costs, rows_with_costs = calculate_bid_rows(
+            expected_resale_hammer=Decimal("1205"),
+            premium_min=23,
+            premium_max=23,
+            inbound_shipping=Decimal("100"),
+            target_profit=Decimal("100"),
+            seller_commission_pct=Decimal("10"),
+            outbound_shipping=Decimal("50"),
+            other_resale_costs=Decimal("25"),
+        )
+        self.assertEqual(net_with_costs, Decimal("1009.5"))
+        self.assertEqual(
+            rows_with_costs[0]["max_bid"].quantize(Decimal("0.01")),
+            Decimal("658.13"),
+        )
+        self.assertEqual(
+            rows_with_costs[0]["buyers_premium"].quantize(Decimal("0.01")),
+            Decimal("151.37"),
+        )
+        self.assertEqual(
+            rows_with_costs[0]["all_in_acquisition"].quantize(Decimal("0.01")),
+            Decimal("909.50"),
+        )
+        self.assertEqual(
+            rows_with_costs[0]["projected_profit"].quantize(Decimal("0.01")),
+            Decimal("100.00"),
+        )
+
+        with self.assertRaisesRegex(ValueError, "No positive bid"):
+            calculate_bid_rows(
+                expected_resale_hammer=Decimal("100"),
+                premium_min=23,
+                premium_max=35,
+                inbound_shipping=Decimal("200"),
+                target_profit=Decimal("100"),
+                seller_commission_pct=Decimal("0"),
+                outbound_shipping=Decimal("0"),
+                other_resale_costs=Decimal("0"),
+            )
+
+    def test_high_level_analysis_is_json_safe_and_uses_two_decimal_money_strings(self):
+        lots = [
+            {
+                "id": "one",
+                "title": "One",
+                "price": "$ 1,000",
+                "saleDtStart": "3 Mar 2026",
+                "auctioneerName": "House",
+                "lotstatus": 1,
+            },
+            {
+                "id": "two",
+                "title": "Two",
+                "price": "$ 1,410",
+                "saleDtStart": "2 Mar 2026",
+                "auctioneerName": "House",
+                "lotstatus": 1,
+            },
+        ]
+
+        result = analyze_artprice_html(artprice_html(lots))
+
+        self.assertEqual(result["currency"], "USD")
+        self.assertEqual(result["sold_records_count"], 2)
+        self.assertEqual(result["expected_resale_hammer"], "1205.00")
+        self.assertEqual(result["net_resale_proceeds"], "1205.00")
+        self.assertEqual(result["assumptions"]["manual_resale_value"], None)
+        self.assertEqual(result["comparables"][0]["hammer_price"], "1000.00")
+        self.assertEqual(result["bid_rows"][0]["max_bid"], "735.77")
+        self.assertEqual(result["bid_rows"][0]["premium_pct"], 23)
+        json.dumps(result)
+
+        manual = analyze_artprice_html(
+            artprice_html(lots),
+            method="manual",
+            manual_resale_value="1500",
+        )
+        self.assertEqual(manual["expected_resale_hammer"], "1500.00")
+
+    def test_persisted_precision_recalculates_identically(self):
+        lots = [
+            {
+                "id": "one",
+                "title": "One",
+                "price": "$ 1,000.005",
+                "saleDtStart": "3 Mar 2026",
+                "auctioneerName": "House",
+                "lotstatus": 1,
+            },
+            {
+                "id": "two",
+                "title": "Two",
+                "price": "$ 1,410.004",
+                "saleDtStart": "2 Mar 2026",
+                "auctioneerName": "House",
+                "lotstatus": 1,
+            },
+        ]
+        result = analyze_artprice_html(
+            artprice_html(lots),
+            seller_commission_pct="7.25",
+            outbound_shipping="40.50",
+            other_resale_costs="12.25",
+        )
+
+        recalculated = analyze_artprice_comparables(
+            result["comparables"],
+            currency=result["currency"],
+            method=result["method"],
+            **result["assumptions"],
+        )
+
+        self.assertEqual(result, recalculated)
+        self.assertEqual(
+            [item["hammer_price"] for item in result["comparables"]],
+            ["1000.00", "1410.00"],
+        )
+
+        for kwargs in (
+            {"inbound_shipping": "1.001"},
+            {"seller_commission_pct": "0.0049"},
+            {"method": "manual", "manual_resale_value": "1205.001"},
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaisesRegex(ValueError, "two decimal places"):
+                    analyze_artprice_html(artprice_html(), **kwargs)
+
+    def test_recent_mean_max_min_and_manual_high_level_results(self):
+        lots = [
+            {
+                "id": str(index),
+                "title": f"Comparable {index}",
+                "price": price,
+                "saleDtStart": sale_date,
+                "auctioneerName": "House",
+                "lotstatus": 1,
+            }
+            for index, (price, sale_date) in enumerate(
+                (
+                    ("$ 100", "3 Mar 2026"),
+                    ("$ 200", "2 Mar 2026"),
+                    ("$ 400", "1 Mar 2026"),
+                )
+            )
+        ]
+        expected = {
+            "median": "200.00",
+            "mean": "233.33",
+            "recent": "150.00",
+            "max": "400.00",
+            "min": "100.00",
+            "manual": "525.00",
+        }
+        for method, expected_value in expected.items():
+            with self.subTest(method=method):
+                result = analyze_artprice_html(
+                    artprice_html(lots),
+                    method=method,
+                    manual_resale_value="525" if method == "manual" else None,
+                    recent_count=2,
+                    inbound_shipping=0,
+                    target_profit=0,
+                )
+                self.assertEqual(result["expected_resale_hammer"], expected_value)
+
+    def test_explicit_non_usd_page_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "USD"):
+            analyze_artprice_html(artprice_html(currency="eur"))
 
 
 @override_settings(CALENDAR_TIME_ZONE="America/Los_Angeles")
@@ -81,12 +545,18 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "July 2026")
         self.assertContains(response, "Bonhams")
-        self.assertContains(response, "Joan Miró")
-        self.assertContains(response, "Henri Matisse")
         self.assertEqual(response.context["calendar_data"]["2026-07-25"][0]["estimate"], "$2,000–3,000 estimate")
         lot_details = response.context["calendar_data"]["2026-07-25"]
+        self.assertEqual({item["artist"] for item in lot_details}, {"Joan Miró", "Henri Matisse"})
         saved_detail = next(item for item in lot_details if item["id"] == saved_lot.pk)
         self.assertEqual(saved_detail["artprice_url"], artprice_url)
+        self.assertEqual(
+            saved_detail["artprice_analysis_url"],
+            reverse("auction_lot_artprice_analysis", args=(saved_lot.pk,)),
+        )
+        self.assertNotIn("comparables", saved_detail)
+        self.assertContains(response, "Artprice Max-Bid Analysis")
+        self.assertContains(response, "Analyze HTML")
         self.assertEqual(response.context["weeks"][0][0]["date"].weekday(), 0)
 
     def test_invalid_month_falls_back_without_error(self):
@@ -162,6 +632,287 @@ class AuctionArtpriceLinkViewTests(TestCase):
 
         self.lot.refresh_from_db()
         self.assertEqual(self.lot.artprice_url, "")
+
+
+class AuctionArtpriceAnalysisViewTests(TestCase):
+    def setUp(self):
+        self.staff = get_user_model().objects.create_user(
+            "analysis-admin",
+            password="test-pass",
+            is_staff=True,
+        )
+        self.lot = watch_lot()
+        self.endpoint = reverse("auction_lot_artprice_analysis", args=(self.lot.pk,))
+
+    @staticmethod
+    def assumptions(**overrides):
+        values = {
+            "method": "median",
+            "recent_count": "3",
+            "inbound_shipping": "200",
+            "target_profit": "100",
+            "seller_commission_pct": "0",
+            "outbound_shipping": "0",
+            "other_resale_costs": "0",
+            "premium_min": "23",
+            "premium_max": "35",
+        }
+        values.update(overrides)
+        return values
+
+    def analyze(self, *, upload=None, **overrides):
+        data = self.assumptions(action="analyze", **overrides)
+        data["artprice_html"] = upload or artprice_upload()
+        return self.client.post(self.endpoint, data)
+
+    def test_logged_out_and_nonstaff_users_cannot_access_analysis(self):
+        response = self.client.get(self.endpoint)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+        response = self.client.post(self.endpoint, {"action": "delete"})
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+        ordinary = get_user_model().objects.create_user("analysis-ordinary", password="test-pass")
+        self.client.force_login(ordinary)
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                response = getattr(self.client, method)(
+                    self.endpoint,
+                    {"action": "delete"} if method == "post" else None,
+                )
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("login", response.url)
+        self.assertFalse(AuctionMaxBidAnalysis.objects.exists())
+
+    def test_staff_gets_null_when_no_analysis_exists(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.get(self.endpoint)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True, "analysis": None})
+
+    def test_staff_can_upload_and_persist_only_normalized_analysis(self):
+        private_marker = "PRIVATE_AUTHENTICATED_ACCOUNT_STATE"
+        self.client.force_login(self.staff)
+
+        response = self.analyze(
+            upload=artprice_upload(
+                "../../customer-results.html",
+                suffix=f"<!-- {private_marker} -->",
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["analysis"]["source_filename"], "customer-results.html")
+        self.assertEqual(payload["analysis"]["currency"], "USD")
+        self.assertEqual(payload["analysis"]["sold_records_count"], 1)
+        self.assertEqual(payload["analysis"]["expected_resale_hammer"], "1205.00")
+        self.assertEqual(payload["analysis"]["bid_rows"][0]["max_bid"], "735.77")
+
+        analysis = AuctionMaxBidAnalysis.objects.get(lot=self.lot)
+        self.assertEqual(analysis.created_by, self.staff)
+        self.assertEqual(analysis.source_filename, "customer-results.html")
+        self.assertEqual(analysis.expected_resale_hammer, Decimal("1205.00"))
+        self.assertFalse(
+            any(field.get_internal_type() == "FileField" for field in analysis._meta.get_fields())
+        )
+        normalized_storage = json.dumps(
+            {
+                "source_filename": analysis.source_filename,
+                "comparables": analysis.comparables,
+                "bid_rows": analysis.bid_rows,
+            }
+        )
+        self.assertNotIn("window.__PRELOADED_STATE__", normalized_storage)
+        self.assertNotIn(private_marker, normalized_storage)
+
+        refreshed = self.client.get(self.endpoint).json()["analysis"]
+        self.assertEqual(refreshed["comparables"], payload["analysis"]["comparables"])
+        self.assertEqual(refreshed["updated_at"], payload["analysis"]["updated_at"])
+
+    def test_oversized_upload_is_rejected_before_parsing(self):
+        self.client.force_login(self.staff)
+        upload = SimpleUploadedFile(
+            "too-large.html",
+            b"x" * (ARTPRICE_UPLOAD_LIMIT + 1),
+            content_type="text/html",
+        )
+
+        with patch("secondstateapp.calendar_views.analyze_artprice_html") as analyze:
+            response = self.analyze(upload=upload)
+
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("5 MB", response.json()["error"])
+        analyze.assert_not_called()
+        self.assertFalse(AuctionMaxBidAnalysis.objects.exists())
+
+    def test_upload_helper_bounds_reads_and_sanitizes_the_filename(self):
+        upload = SimpleNamespace(
+            name="../../customer-results.html",
+            read=Mock(return_value=artprice_html().encode("utf-8")),
+        )
+
+        filename, html_text = _uploaded_artprice_html(
+            SimpleNamespace(FILES={"artprice_html": upload})
+        )
+
+        self.assertEqual(filename, "customer-results.html")
+        self.assertIn("window.__PRELOADED_STATE__", html_text)
+        upload.read.assert_called_once_with(ARTPRICE_UPLOAD_LIMIT + 1)
+
+    def test_invalid_extension_missing_marker_and_malformed_state_are_safe(self):
+        self.client.force_login(self.staff)
+
+        invalid_extension = self.analyze(upload=artprice_upload("results.txt"))
+        self.assertEqual(invalid_extension.status_code, 400)
+        self.assertIn(".html", invalid_extension.json()["error"])
+
+        missing_marker = self.analyze(
+            upload=SimpleUploadedFile("results.html", b"<html>Not an Artprice page</html>")
+        )
+        self.assertEqual(missing_marker.status_code, 400)
+        self.assertIn("preloaded", missing_marker.json()["error"].lower())
+
+        private_marker = "PRIVATE-CUSTOMER-JSON"
+        malformed = self.analyze(
+            upload=SimpleUploadedFile(
+                "results.htm",
+                f"<script>window.__PRELOADED_STATE__ = {{broken {private_marker}</script>".encode(),
+            )
+        )
+        self.assertEqual(malformed.status_code, 400)
+        self.assertNotIn(private_marker, malformed.json()["error"])
+        self.assertFalse(AuctionMaxBidAnalysis.objects.exists())
+
+    def test_invalid_assumptions_are_rejected_without_replacing_saved_data(self):
+        invalid_cases = (
+            {"inbound_shipping": "-1"},
+            {"inbound_shipping": "not-money"},
+            {"inbound_shipping": "1.001"},
+            {"target_profit": "NaN"},
+            {"outbound_shipping": "Infinity"},
+            {"seller_commission_pct": "100"},
+            {"seller_commission_pct": "0.0049"},
+            {"recent_count": "0"},
+            {"premium_min": "36", "premium_max": "35"},
+            {"premium_min": "0", "premium_max": "1000"},
+            {"method": "unsupported"},
+            {"method": "manual", "manual_resale_value": ""},
+            {"method": "manual", "manual_resale_value": "0"},
+            {"other_resale_costs": "999999999999999999999"},
+            {"other_resale_costs": "1e999999999"},
+        )
+        self.client.force_login(self.staff)
+
+        for overrides in invalid_cases:
+            with self.subTest(overrides=overrides):
+                response = self.analyze(**overrides)
+                self.assertEqual(response.status_code, 400)
+                self.assertFalse(AuctionMaxBidAnalysis.objects.exists())
+
+        original = self.analyze().json()["analysis"]
+        response = self.analyze(target_profit="NaN")
+        self.assertEqual(response.status_code, 400)
+        persisted = self.client.get(self.endpoint).json()["analysis"]
+        self.assertEqual(persisted, original)
+
+    def test_staff_can_recalculate_without_reuploading(self):
+        self.client.force_login(self.staff)
+        original = self.analyze().json()["analysis"]
+        original_pk = AuctionMaxBidAnalysis.objects.get(lot=self.lot).pk
+
+        response = self.client.post(
+            self.endpoint,
+            self.assumptions(
+                action="recalculate",
+                method="manual",
+                manual_resale_value="2000",
+                inbound_shipping="150",
+                target_profit="250",
+                premium_min="25",
+                premium_max="26",
+            ),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        updated = response.json()["analysis"]
+        self.assertEqual(updated["method"], "manual")
+        self.assertEqual(updated["expected_resale_hammer"], "2000.00")
+        self.assertEqual(updated["assumptions"]["inbound_shipping"], "150.00")
+        self.assertEqual(updated["assumptions"]["target_profit"], "250.00")
+        self.assertEqual(updated["source_filename"], original["source_filename"])
+        self.assertEqual(updated["comparables"], original["comparables"])
+        self.assertEqual([row["premium_pct"] for row in updated["bid_rows"]], [25, 26])
+        self.assertEqual(AuctionMaxBidAnalysis.objects.get(lot=self.lot).pk, original_pk)
+
+    def test_recalculate_requires_an_existing_analysis(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            self.endpoint,
+            self.assumptions(action="recalculate"),
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("before recalculating", response.json()["error"])
+
+    def test_staff_can_replace_existing_html(self):
+        self.client.force_login(self.staff)
+        self.analyze(upload=artprice_upload("first.html"))
+        original_pk = AuctionMaxBidAnalysis.objects.get(lot=self.lot).pk
+        replacement_lots = [
+            {
+                "id": "replacement-new",
+                "title": "Replacement newest",
+                "price": "$ 2,000",
+                "saleDtStart": "4 Apr 2026",
+                "auctioneerName": "Replacement House",
+                "lotstatus": 1,
+            },
+            {
+                "id": "replacement-old",
+                "title": "Replacement older",
+                "price": "$ 1,000",
+                "saleDtStart": "3 Apr 2026",
+                "auctioneerName": "Replacement House",
+                "lotstatus": 1,
+            },
+        ]
+
+        response = self.analyze(
+            upload=artprice_upload("replacement.htm", lots=replacement_lots)
+        )
+
+        self.assertEqual(response.status_code, 200)
+        replaced = response.json()["analysis"]
+        self.assertEqual(replaced["source_filename"], "replacement.htm")
+        self.assertEqual(replaced["sold_records_count"], 2)
+        self.assertEqual(replaced["expected_resale_hammer"], "1500.00")
+        self.assertEqual(AuctionMaxBidAnalysis.objects.get(lot=self.lot).pk, original_pk)
+
+    def test_staff_can_delete_analysis(self):
+        self.client.force_login(self.staff)
+        self.analyze()
+
+        response = self.client.post(self.endpoint, {"action": "delete"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["analysis"], None)
+        self.assertEqual(response.json()["message"], "Artprice analysis removed.")
+        self.assertFalse(AuctionMaxBidAnalysis.objects.filter(lot=self.lot).exists())
+
+    def test_analysis_post_requires_csrf(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.staff)
+
+        response = csrf_client.post(self.endpoint, {"action": "delete"})
+
+        self.assertEqual(response.status_code, 403)
 
 
 @override_settings(
@@ -293,6 +1044,8 @@ class CalendarSyncApiTests(TestCase):
         self.assertTrue(lot.active)
         lot.artprice_url = "https://www.artprice.com/artist/1/example/lots/pasts"
         lot.save(update_fields=("artprice_url",))
+        analysis = stored_analysis(lot)
+        analysis_pk = analysis.pk
 
         response = self.client.post(
             self.endpoint,
@@ -306,6 +1059,10 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(lot.title, "Galaxia (updated)")
         self.assertFalse(lot.active)
         self.assertEqual(lot.artprice_url, "https://www.artprice.com/artist/1/example/lots/pasts")
+        analysis.refresh_from_db()
+        self.assertEqual(analysis.pk, analysis_pk)
+        self.assertEqual(analysis.lot, lot)
+        self.assertEqual(analysis.expected_resale_hammer, Decimal("1205.00"))
         self.assertEqual(response.json()["reminders"]["status"], "paused")
 
     @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")

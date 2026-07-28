@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     Artwork,
     ArtworkImage,
+    AuctionMaxBidAnalysis,
     AuctionReminderControl,
     AuctionReminderDelivery,
     AuctionWatchLot,
@@ -50,6 +51,53 @@ class AuctionWatchLotAdmin(admin.ModelAdmin):
     @admin.display(description="Artist")
     def artist_label(self, obj):
         return obj.artist_watchlist_name or obj.artist
+
+
+@admin.register(AuctionMaxBidAnalysis)
+class AuctionMaxBidAnalysisAdmin(admin.ModelAdmin):
+    list_select_related = ("lot",)
+    list_display = (
+        "lot",
+        "resale_method",
+        "currency",
+        "expected_resale_hammer",
+        "sold_records_count",
+        "updated_at",
+    )
+    list_filter = ("resale_method", "currency")
+    search_fields = (
+        "lot__artist",
+        "lot__artist_watchlist_name",
+        "lot__title",
+        "lot__auction_house",
+        "source_filename",
+    )
+    readonly_fields = (
+        "lot",
+        "source_filename",
+        "currency",
+        "resale_method",
+        "manual_resale_value",
+        "recent_count",
+        "expected_resale_hammer",
+        "net_resale_proceeds",
+        "inbound_shipping",
+        "target_profit",
+        "seller_commission_pct",
+        "outbound_shipping",
+        "other_resale_costs",
+        "premium_min",
+        "premium_max",
+        "sold_records_count",
+        "comparables",
+        "bid_rows",
+        "created_by",
+        "created_at",
+        "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(AuctionReminderDelivery)

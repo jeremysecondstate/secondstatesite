@@ -9,6 +9,7 @@ import secrets
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone as datetime_timezone
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
@@ -24,8 +25,9 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods, require_POST
 
+from .artprice_max_bid import ArtpriceAnalysisError, analyze_artprice_comparables, analyze_artprice_html
 from .auction_reminders import (
     ReminderConfigurationError,
     build_due_digests,
@@ -33,11 +35,13 @@ from .auction_reminders import (
     masked_reminder_recipients,
     validate_live_reminder_configuration,
 )
-from .models import AuctionReminderControl, AuctionWatchLot
+from .models import AuctionMaxBidAnalysis, AuctionReminderControl, AuctionWatchLot
 
 
 MAX_SYNC_LOTS = 1000
 MAX_SYNC_BYTES = 2_000_000
+MAX_ARTPRICE_HTML_BYTES = 5 * 1024 * 1024
+ARTPRICE_PRELOADED_STATE_MARKER = "window.__PRELOADED_STATE__"
 logger = logging.getLogger(__name__)
 
 
@@ -155,6 +159,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo) -> dict:
         "url": lot.lot_url or lot.sale_url,
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
+        "artprice_analysis_url": reverse("auction_lot_artprice_analysis", args=(lot.pk,)),
         "ended": not lot.active,
     }
 
@@ -312,6 +317,257 @@ def update_auction_lot_artprice_link(request, lot_id: int):
             "message": "Artprice link saved." if artprice_url else "Artprice link removed.",
         }
     )
+
+
+class _ArtpriceAnalysisRequestError(ValueError):
+    def __init__(self, message: str, *, status: int = 400):
+        super().__init__(message)
+        self.status = status
+
+
+def _analysis_options(post_data) -> dict:
+    def submitted(name: str, default):
+        value = post_data.get(name)
+        if value is None:
+            return default
+        return value.strip() if isinstance(value, str) else value
+
+    manual_resale_value = submitted("manual_resale_value", None)
+    if manual_resale_value == "":
+        manual_resale_value = None
+
+    method = post_data.get("method")
+    if method is None:
+        method = post_data.get("resale_method")
+    if method is None:
+        method = "median"
+    elif isinstance(method, str):
+        method = method.strip()
+
+    return {
+        "method": method,
+        "manual_resale_value": manual_resale_value,
+        "recent_count": submitted("recent_count", 3),
+        "inbound_shipping": submitted("inbound_shipping", 200),
+        "target_profit": submitted("target_profit", 100),
+        "seller_commission_pct": submitted("seller_commission_pct", 0),
+        "outbound_shipping": submitted("outbound_shipping", 0),
+        "other_resale_costs": submitted("other_resale_costs", 0),
+        "premium_min": submitted("premium_min", 23),
+        "premium_max": submitted("premium_max", 35),
+    }
+
+
+def _uploaded_artprice_html(request) -> tuple[str, str]:
+    upload = request.FILES.get("artprice_html")
+    if upload is None:
+        raise _ArtpriceAnalysisRequestError("Choose a saved Artprice HTML file to analyze.")
+
+    source_filename = Path(str(upload.name or "")).name
+    if not source_filename or Path(source_filename).suffix.casefold() not in {".html", ".htm"}:
+        raise _ArtpriceAnalysisRequestError("Upload a saved Artprice page with an .html or .htm extension.")
+    if len(source_filename) > 255:
+        source_filename = source_filename[-255:]
+
+    try:
+        raw_html = upload.read(MAX_ARTPRICE_HTML_BYTES + 1)
+    except (OSError, ValueError):
+        raise _ArtpriceAnalysisRequestError("The uploaded Artprice HTML file could not be read.") from None
+    if len(raw_html) > MAX_ARTPRICE_HTML_BYTES:
+        raise _ArtpriceAnalysisRequestError(
+            "The Artprice HTML file must be 5 MB or smaller.",
+            status=413,
+        )
+
+    html_text = raw_html.decode("utf-8", errors="replace")
+    if ARTPRICE_PRELOADED_STATE_MARKER not in html_text:
+        raise _ArtpriceAnalysisRequestError(
+            "The file does not contain the Artprice preloaded results data. Save the Artprice results page and try again."
+        )
+    return source_filename, html_text
+
+
+def _stored_decimal(value, *, nullable: bool = False) -> Decimal | None:
+    if value is None and nullable:
+        return None
+    try:
+        result = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise _ArtpriceAnalysisRequestError("The Artprice analysis produced an invalid normalized result.") from None
+    if not result.is_finite():
+        raise _ArtpriceAnalysisRequestError("The Artprice analysis produced an invalid normalized result.")
+    return result.quantize(Decimal("0.01"))
+
+
+def _analysis_model_defaults(result: dict, *, source_filename: str, created_by) -> dict:
+    assumptions = result.get("assumptions")
+    comparables = result.get("comparables")
+    bid_rows = result.get("bid_rows")
+    if (
+        not isinstance(assumptions, dict)
+        or not isinstance(comparables, list)
+        or not isinstance(bid_rows, list)
+    ):
+        raise _ArtpriceAnalysisRequestError("The Artprice analysis produced an invalid normalized result.")
+
+    try:
+        return {
+            "source_filename": source_filename,
+            "currency": str(result["currency"]),
+            "resale_method": str(result["method"]),
+            "manual_resale_value": _stored_decimal(
+                assumptions.get("manual_resale_value"),
+                nullable=True,
+            ),
+            "recent_count": int(assumptions["recent_count"]),
+            "expected_resale_hammer": _stored_decimal(result["expected_resale_hammer"]),
+            "net_resale_proceeds": _stored_decimal(result["net_resale_proceeds"]),
+            "inbound_shipping": _stored_decimal(assumptions["inbound_shipping"]),
+            "target_profit": _stored_decimal(assumptions["target_profit"]),
+            "seller_commission_pct": _stored_decimal(assumptions["seller_commission_pct"]),
+            "outbound_shipping": _stored_decimal(assumptions["outbound_shipping"]),
+            "other_resale_costs": _stored_decimal(assumptions["other_resale_costs"]),
+            "premium_min": int(assumptions["premium_min"]),
+            "premium_max": int(assumptions["premium_max"]),
+            "sold_records_count": int(result["sold_records_count"]),
+            "comparables": comparables,
+            "bid_rows": bid_rows,
+            "created_by": created_by,
+        }
+    except (KeyError, TypeError, ValueError, OverflowError):
+        raise _ArtpriceAnalysisRequestError("The Artprice analysis produced an invalid normalized result.") from None
+
+
+def _replace_artprice_analysis(
+    lot: AuctionWatchLot,
+    result: dict,
+    *,
+    source_filename: str,
+    created_by,
+) -> AuctionMaxBidAnalysis:
+    defaults = _analysis_model_defaults(
+        result,
+        source_filename=source_filename,
+        created_by=created_by,
+    )
+    with transaction.atomic():
+        analysis, _created = AuctionMaxBidAnalysis.objects.update_or_create(
+            lot=lot,
+            defaults=defaults,
+        )
+    return analysis
+
+
+def _decimal_json(value: Decimal | None) -> str | None:
+    if value is None:
+        return None
+    return f"{value.quantize(Decimal('0.01')):.2f}"
+
+
+def _analysis_json(analysis: AuctionMaxBidAnalysis) -> dict:
+    updated_at = analysis.updated_at.isoformat()
+    return {
+        "source_filename": analysis.source_filename,
+        "currency": analysis.currency,
+        "sold_records_count": analysis.sold_records_count,
+        "method": analysis.resale_method,
+        "expected_resale_hammer": _decimal_json(analysis.expected_resale_hammer),
+        "net_resale_proceeds": _decimal_json(analysis.net_resale_proceeds),
+        "assumptions": {
+            "manual_resale_value": _decimal_json(analysis.manual_resale_value),
+            "recent_count": analysis.recent_count,
+            "inbound_shipping": _decimal_json(analysis.inbound_shipping),
+            "target_profit": _decimal_json(analysis.target_profit),
+            "seller_commission_pct": _decimal_json(analysis.seller_commission_pct),
+            "outbound_shipping": _decimal_json(analysis.outbound_shipping),
+            "other_resale_costs": _decimal_json(analysis.other_resale_costs),
+            "premium_min": analysis.premium_min,
+            "premium_max": analysis.premium_max,
+        },
+        "comparables": analysis.comparables,
+        "bid_rows": analysis.bid_rows,
+        "created_at": analysis.created_at.isoformat(),
+        "updated_at": updated_at,
+        "last_analyzed_at": updated_at,
+    }
+
+
+@staff_member_required
+@require_http_methods(["GET", "POST"])
+def auction_lot_artprice_analysis(request, lot_id: int):
+    lot = AuctionWatchLot.objects.filter(pk=lot_id).first()
+    if lot is None:
+        return JsonResponse({"ok": False, "error": "Auction lot not found."}, status=404)
+
+    if request.method == "GET":
+        analysis = AuctionMaxBidAnalysis.objects.filter(lot=lot).first()
+        return JsonResponse(
+            {
+                "ok": True,
+                "analysis": _analysis_json(analysis) if analysis is not None else None,
+            }
+        )
+
+    action = str(request.POST.get("action") or "").strip().casefold()
+    try:
+        if action == "analyze":
+            source_filename, html_text = _uploaded_artprice_html(request)
+            result = analyze_artprice_html(html_text, **_analysis_options(request.POST))
+            analysis = _replace_artprice_analysis(
+                lot,
+                result,
+                source_filename=source_filename,
+                created_by=request.user,
+            )
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "analysis": _analysis_json(analysis),
+                    "message": "Artprice analysis saved.",
+                }
+            )
+
+        if action == "recalculate":
+            existing = AuctionMaxBidAnalysis.objects.filter(lot=lot).first()
+            if existing is None:
+                raise _ArtpriceAnalysisRequestError(
+                    "Analyze a saved Artprice HTML page before recalculating."
+                )
+            result = analyze_artprice_comparables(
+                existing.comparables,
+                currency=existing.currency,
+                **_analysis_options(request.POST),
+            )
+            analysis = _replace_artprice_analysis(
+                lot,
+                result,
+                source_filename=existing.source_filename,
+                created_by=request.user,
+            )
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "analysis": _analysis_json(analysis),
+                    "message": "Artprice analysis recalculated.",
+                }
+            )
+
+        if action == "delete":
+            with transaction.atomic():
+                AuctionMaxBidAnalysis.objects.filter(lot=lot).delete()
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "analysis": None,
+                    "message": "Artprice analysis removed.",
+                }
+            )
+
+        raise _ArtpriceAnalysisRequestError("Choose a valid Artprice analysis action.")
+    except _ArtpriceAnalysisRequestError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=exc.status)
+    except ArtpriceAnalysisError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
 
 def _add_dispatch_message(request, outcome) -> None:

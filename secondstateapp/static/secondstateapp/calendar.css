@@ -482,6 +482,7 @@
 }
 
 .sidebar-card {
+  min-width: 0;
   border: 1px solid var(--calendar-line);
   border-radius: 4px;
   background: var(--calendar-panel);
@@ -496,6 +497,8 @@
 }
 
 .day-lot {
+  min-width: 0;
+  max-width: 100%;
   padding: 16px 0;
   border-top: 1px solid var(--calendar-line);
 }
@@ -659,6 +662,414 @@
 
 .artprice-status.is-error {
   color: #eb7777;
+}
+
+.artprice-analysis {
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 13px;
+  border: 1px solid var(--calendar-line);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.artprice-analysis,
+.artprice-analysis * {
+  box-sizing: border-box;
+}
+
+.artprice-analysis [hidden] {
+  display: none !important;
+}
+
+.artprice-analysis > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 9px 10px;
+  list-style: none;
+  color: rgba(255, 255, 255, .88);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .035em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.artprice-analysis > summary::-webkit-details-marker {
+  display: none;
+}
+
+.artprice-analysis > summary::before {
+  content: "+";
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(217, 184, 120, .45);
+  border-radius: 50%;
+  color: var(--calendar-gold);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.artprice-analysis[open] > summary::before {
+  content: "−";
+}
+
+.artprice-analysis > summary:hover {
+  background: var(--calendar-gold-soft);
+}
+
+.artprice-analysis > summary:focus-visible,
+.artprice-analysis input:focus-visible,
+.artprice-analysis select:focus-visible,
+.artprice-analysis button:focus-visible,
+.artprice-analysis-table-wrap:focus-visible,
+.artprice-comparables > summary:focus-visible {
+  outline: 2px solid var(--calendar-gold);
+  outline-offset: 2px;
+}
+
+.artprice-analysis-summary-label {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.artprice-analysis-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 19px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(111, 207, 151, .12);
+  color: #6fcf97;
+  font-size: 9px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.artprice-analysis.is-loading .artprice-analysis-badge {
+  background: var(--calendar-gold-soft);
+  color: var(--calendar-gold);
+}
+
+.artprice-analysis-panel {
+  min-width: 0;
+  max-width: 100%;
+  padding: 13px;
+  border-top: 1px solid var(--calendar-line);
+}
+
+.artprice-analysis-intro,
+.artprice-analysis-explanation,
+.artprice-analysis-empty {
+  color: var(--calendar-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.artprice-analysis-intro {
+  margin: 0 0 13px;
+}
+
+.artprice-analysis-form {
+  margin: 0;
+}
+
+.artprice-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 8px;
+}
+
+.artprice-analysis-field {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.artprice-analysis-field.is-wide {
+  grid-column: 1 / -1;
+}
+
+.artprice-analysis-field label {
+  color: var(--calendar-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .055em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.artprice-analysis-field input,
+.artprice-analysis-field select {
+  min-width: 0;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--calendar-line);
+  border-radius: 3px;
+  outline: 0;
+  padding: 7px 8px;
+  color: rgba(255, 255, 255, .92);
+  background: #15191b;
+  font: inherit;
+  font-size: 11px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.artprice-analysis-field input:focus,
+.artprice-analysis-field select:focus {
+  border-color: var(--calendar-gold);
+  box-shadow: 0 0 0 2px var(--calendar-gold-soft);
+}
+
+.artprice-analysis-field input[type="file"] {
+  min-height: 41px;
+  padding: 4px;
+  color: var(--calendar-muted);
+  font-size: 10px;
+}
+
+.artprice-analysis-field input[type="file"]::file-selector-button {
+  min-height: 30px;
+  margin-right: 7px;
+  border: 0;
+  border-radius: 2px;
+  padding: 0 8px;
+  color: #15110a;
+  background: var(--calendar-gold);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.artprice-analysis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 13px;
+}
+
+.artprice-analysis-actions button {
+  min-height: 34px;
+  flex: 1 1 auto;
+  border: 1px solid var(--calendar-line);
+  border-radius: 3px;
+  padding: 7px 9px;
+  color: rgba(255, 255, 255, .84);
+  background: transparent;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .035em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.artprice-analysis-actions button.is-primary {
+  border-color: var(--calendar-gold);
+  color: #15110a;
+  background: var(--calendar-gold);
+}
+
+.artprice-analysis-actions button.is-danger {
+  border-color: rgba(235, 119, 119, .55);
+  color: #f0a0a0;
+}
+
+.artprice-analysis-actions button:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.artprice-analysis-actions button:not(.is-primary):hover:not(:disabled) {
+  background: rgba(255, 255, 255, .06);
+}
+
+.artprice-analysis input:disabled,
+.artprice-analysis select:disabled,
+.artprice-analysis button:disabled {
+  cursor: wait;
+  opacity: .52;
+}
+
+.artprice-analysis-status {
+  margin: 9px 0 0;
+  color: var(--calendar-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.artprice-analysis-status:empty {
+  display: none;
+}
+
+.artprice-analysis-status.is-loading {
+  color: #e5ca96;
+}
+
+.artprice-analysis-status.is-success {
+  color: #6fcf97;
+}
+
+.artprice-analysis-status.is-error {
+  color: #eb7777;
+}
+
+.artprice-analysis-results {
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 14px;
+}
+
+.artprice-analysis-results > h4 {
+  margin: 16px 0 8px;
+  color: var(--calendar-gold);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.artprice-analysis-results > h4:first-child {
+  margin-top: 0;
+}
+
+.artprice-analysis-empty {
+  margin: 0;
+  padding: 10px;
+  border-left: 2px solid var(--calendar-gold-soft);
+  background: rgba(0, 0, 0, .14);
+}
+
+.artprice-analysis-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+
+.artprice-analysis-summary-item {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--calendar-line);
+  background: rgba(0, 0, 0, .15);
+}
+
+.artprice-analysis-summary-item.is-wide {
+  grid-column: 1 / -1;
+}
+
+.artprice-analysis-summary-item dt {
+  color: var(--calendar-muted);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .065em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.artprice-analysis-summary-item dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: rgba(255, 255, 255, .92);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.artprice-analysis-explanation {
+  margin: 9px 0 0;
+}
+
+.artprice-analysis-table-wrap {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--calendar-line);
+  border-radius: 3px;
+  scrollbar-color: rgba(217, 184, 120, .55) rgba(255, 255, 255, .04);
+}
+
+.artprice-analysis-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: rgba(255, 255, 255, .84);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.artprice-analysis-table.is-bids {
+  min-width: 700px;
+}
+
+.artprice-analysis-table.is-comparables {
+  min-width: 620px;
+  white-space: normal;
+}
+
+.artprice-analysis-table th,
+.artprice-analysis-table td {
+  padding: 8px;
+  border-right: 1px solid var(--calendar-line);
+  border-bottom: 1px solid var(--calendar-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.artprice-analysis-table th:last-child,
+.artprice-analysis-table td:last-child {
+  border-right: 0;
+}
+
+.artprice-analysis-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.artprice-analysis-table th {
+  color: var(--calendar-gold);
+  background: rgba(217, 184, 120, .08);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.artprice-analysis-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, .022);
+}
+
+.artprice-analysis-table td small {
+  display: block;
+  margin-top: 4px;
+  color: var(--calendar-muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.artprice-comparables {
+  margin-top: 12px;
+  border-top: 1px solid var(--calendar-line);
+}
+
+.artprice-comparables > summary {
+  padding: 11px 0;
+  color: rgba(255, 255, 255, .84);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.artprice-comparables[open] > summary {
+  color: var(--calendar-gold);
 }
 
 .upcoming-sale {

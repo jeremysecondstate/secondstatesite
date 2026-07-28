@@ -19,6 +19,51 @@ Only normalized auction fields are uploaded. The bookmark HTML, browser state, c
 
 Staff can paste a secure `artprice.com` URL into the **Artprice link** field beneath any lot in the selected-day panel. The saved link is attached to that calendar lot, can be opened or removed from the same panel, and is intentionally preserved when later Artist Watchlist syncs update the auction details.
 
+## Artprice max-bid analysis
+
+Staff users can expand **Artprice Max-Bid Analysis** directly beneath a lot's Artprice-link editor. The panel loads its saved analysis only when opened, so the calendar does not embed every comparable and bid row in the initial page. An existing analysis can be recalculated from its normalized comparables, replaced with a newly saved results page, or removed. Like the Artprice link, it remains attached to the lot when a later Artist Watchlist sync updates that lot.
+
+To create an analysis:
+
+1. Set the currency preference on Artprice to USD and open the relevant sold-results page.
+2. Use the browser's **Save Page As** command to save the complete page as an `.html` or `.htm` file.
+3. Open the lot on `/calendar/`, expand **Artprice Max-Bid Analysis**, choose the saved file, review the assumptions, and click **Analyze HTML**.
+4. Review the extracted sold comparables before relying on the maximum-bid table. Use **Recalculate** after changing assumptions, or choose another HTML page and click **Replace HTML** to replace the saved normalized analysis.
+
+The upload is limited to 5 MB. Parsing happens entirely in memory: the raw HTML is never written to Django storage, media storage, the database, logs, or rendered back into the page, and the server does not request anything from Artprice. Saved Artprice pages can include private account state, so never add them to Git or another shared store. Only the sanitized source filename, normalized sold comparables, assumptions, and calculated results are persisted.
+
+The initial implementation performs USD calculations only and does not convert currencies. If the page explicitly reports another currency, save a new Artprice results page after changing the Artprice currency preference to USD.
+
+Supported resale-valuation methods are:
+
+- **Median**: median hammer price across all extracted sold records.
+- **Mean**: arithmetic mean across all extracted sold records.
+- **Recent records**: median of the newest configured number of sold records.
+- **Maximum**: highest extracted hammer price.
+- **Minimum**: lowest extracted hammer price.
+- **Manual**: a positive resale-hammer value entered by the staff user.
+
+The defaults are median valuation, 3 recent records, $200 inbound shipping, $100 minimum target profit, 0% seller commission, $0 outbound shipping, $0 other resale costs, and buyer-premium rows from 23% through 35%.
+
+The calculation is:
+
+```text
+net resale proceeds =
+    expected resale hammer * (1 - seller commission percentage / 100)
+    - outbound shipping
+    - other resale costs
+
+maximum hammer bid =
+    (net resale proceeds - target profit - inbound shipping)
+    / (1 + buyer premium percentage / 100)
+
+buyer premium = maximum hammer bid * buyer premium percentage / 100
+all-in acquisition cost = maximum hammer bid + buyer premium + inbound shipping
+projected profit = net resale proceeds - all-in acquisition cost
+```
+
+The feature and its JSON endpoint require a staff login and normal Django CSRF protection. Uploaded HTML is treated only as parsing input; displayed filenames and comparable text are emitted as text rather than executable markup.
+
 ## Website configuration
 
 The desktop app and website must use the same `CATALOG_API_KEY`. Production sync requires HTTPS; plain HTTP is accepted only for a localhost development server. Older desktop code contained a fallback value, so rotate that key in Render and the ignored local `.env` before enabling sync-triggered texts; the desktop now refuses calendar sync when the environment value is missing.
@@ -42,7 +87,7 @@ Run the database migration during deployment:
 .\.venv\Scripts\python.exe manage.py migrate
 ```
 
-The existing Render build/start scripts already run migrations, so a normal deploy applies migrations `0014` and `0015` automatically. Migration `0015` adds the persisted Start/Pause control and defaults it to paused.
+The existing Render build/start scripts already run migrations, so a normal deploy applies migrations `0014` through `0017` automatically. Migration `0015` adds the persisted Start/Pause control and defaults it to paused, `0016` adds the preserved Artprice link, and `0017` adds the normalized one-to-one max-bid analysis.
 
 ## Twilio configuration
 
@@ -105,12 +150,14 @@ Delivery rows prevent repeated runs from sending the same digest twice. If a gen
 3. Set the same `CATALOG_API_KEY` for the website and desktop process.
 4. Refresh a small Artist Watchlist selection and confirm the desktop status says the website calendar synced.
 5. Confirm the correct artist, title, auction house, estimate, lot number, and local sale time appear on the chosen day.
-6. Configure a Twilio sender and one opted-in test recipient.
-7. Run the reminder command with `--dry-run` and inspect the digest.
-8. After Twilio approval, enable the Render safety switch and click **Start Reminder Texts** on the calendar.
-9. Verify the immediate catch-up in Twilio, then enable the hourly scheduler as a safety net.
-10. Sync the same lots again and confirm the desktop reports they were already covered rather than sending duplicates.
-11. Add further opted-in recipients only after the single-recipient test succeeds.
+6. Upload a saved USD Artprice results page to a test lot and verify its sold records, valuation, and bid rows.
+7. Recalculate the analysis, replace its source HTML, remove it, and confirm a later calendar sync preserves an analysis that was not removed.
+8. Configure a Twilio sender and one opted-in test recipient.
+9. Run the reminder command with `--dry-run` and inspect the digest.
+10. After Twilio approval, enable the Render safety switch and click **Start Reminder Texts** on the calendar.
+11. Verify the immediate catch-up in Twilio, then enable the hourly scheduler as a safety net.
+12. Sync the same lots again and confirm the desktop reports they were already covered rather than sending duplicates.
+13. Add further opted-in recipients only after the single-recipient test succeeds.
 
 ## Automated verification
 
@@ -120,3 +167,4 @@ Delivery rows prevent repeated runs from sending the same digest twice. If a gen
 ```
 
 Tests use fake HTTP sessions; they do not contact Twilio, Invaluable, or the production website.
+The calendar test module includes the Artprice parser/calculator, staff-only analysis endpoint, persistence, replacement, recalculation, deletion, sync-preservation, and template/lot-JSON coverage. Its HTML fixtures contain only minimal sanitized preloaded-state data; the authenticated manual-verification page must remain outside the repository.

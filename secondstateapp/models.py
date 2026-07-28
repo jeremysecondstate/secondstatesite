@@ -177,6 +177,58 @@ class AuctionWatchLot(models.Model):
         return f"{label} - {self.title or self.source_lot_id}"
 
 
+class AuctionMaxBidAnalysis(models.Model):
+    """Normalized Artprice comparables and maximum-bid calculations for one lot."""
+
+    class ResaleMethod(models.TextChoices):
+        MEDIAN = "median", "Median"
+        MEAN = "mean", "Mean"
+        RECENT = "recent", "Recent records"
+        MAX = "max", "Maximum"
+        MIN = "min", "Minimum"
+        MANUAL = "manual", "Manual"
+
+    lot = models.OneToOneField(
+        AuctionWatchLot,
+        on_delete=models.CASCADE,
+        related_name="max_bid_analysis",
+    )
+    source_filename = models.CharField(max_length=255)
+    currency = models.CharField(max_length=8, default="USD")
+    resale_method = models.CharField(max_length=12, choices=ResaleMethod.choices)
+    manual_resale_value = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    recent_count = models.PositiveIntegerField(default=3)
+    expected_resale_hammer = models.DecimalField(max_digits=15, decimal_places=2)
+    net_resale_proceeds = models.DecimalField(max_digits=15, decimal_places=2)
+    inbound_shipping = models.DecimalField(max_digits=15, decimal_places=2)
+    target_profit = models.DecimalField(max_digits=15, decimal_places=2)
+    seller_commission_pct = models.DecimalField(max_digits=7, decimal_places=2)
+    outbound_shipping = models.DecimalField(max_digits=15, decimal_places=2)
+    other_resale_costs = models.DecimalField(max_digits=15, decimal_places=2)
+    premium_min = models.PositiveSmallIntegerField()
+    premium_max = models.PositiveSmallIntegerField()
+    sold_records_count = models.PositiveIntegerField()
+    comparables = models.JSONField(default=list, blank=True)
+    bid_rows = models.JSONField(default=list, blank=True)
+    created_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        verbose_name = "auction max-bid analysis"
+        verbose_name_plural = "auction max-bid analyses"
+
+    def __str__(self):
+        return f"{self.lot} ({self.get_resale_method_display()})"
+
+
 class AuctionReminderDelivery(models.Model):
     """Idempotency and delivery audit record for one daily reminder digest."""
 

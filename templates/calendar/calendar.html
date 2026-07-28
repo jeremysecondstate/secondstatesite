@@ -204,6 +204,27 @@
   const list = document.getElementById("selected-day-lots");
   const dayButtons = Array.from(document.querySelectorAll(".calendar-day"));
   const csrfToken = document.getElementById("calendar-csrf-token").dataset.token;
+  const maxBidDefaults = {
+    method: "median",
+    manual_resale_value: "",
+    recent_count: "3",
+    inbound_shipping: "200.00",
+    target_profit: "100.00",
+    seller_commission_pct: "0.00",
+    outbound_shipping: "0.00",
+    other_resale_costs: "0.00",
+    premium_min: "23",
+    premium_max: "35",
+  };
+  const maxBidMethodLabels = {
+    median: "Median",
+    mean: "Mean",
+    recent: "Recent records",
+    max: "Maximum",
+    min: "Minimum",
+    manual: "Manual",
+  };
+  const moneyFormatters = new Map();
 
   const appendText = (parent, tag, className, value) => {
     if (!value) return;
@@ -221,6 +242,53 @@
     link.rel = "noopener noreferrer";
     link.textContent = label;
     return link;
+  };
+
+  const formatAnalysisMoney = (value, currency = "USD") => {
+    if (value === null || value === undefined || value === "") return "—";
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return "—";
+    const currencyCode = typeof currency === "string" && currency ? currency.toUpperCase() : "USD";
+    try {
+      if (!moneyFormatters.has(currencyCode)) {
+        moneyFormatters.set(currencyCode, new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: currencyCode,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }));
+      }
+      return moneyFormatters.get(currencyCode).format(amount);
+    } catch (_error) {
+      return `$${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    }
+  };
+
+  const formatAnalysisTimestamp = (value) => {
+    if (!value) return "Not available";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  const requestAnalysisJson = async (url, options, fallbackMessage) => {
+    const response = await fetch(url, options);
+    const responseType = response.headers.get("content-type") || "";
+    const payload = responseType.includes("application/json") ? await response.json() : {};
+    if (!response.ok || !payload.ok) {
+      const sessionExpired = response.redirected || response.status === 401 || response.status === 403;
+      const fallback = sessionExpired
+        ? "Your session expired. Refresh the page and sign in again."
+        : fallbackMessage;
+      throw new Error(payload.error || fallback);
+    }
+    return payload;
   };
 
   const appendArtpriceEditor = (item, lot, actionLinks) => {
@@ -350,6 +418,579 @@
     item.appendChild(form);
   };
 
+  const appendArtpriceAnalysis = (item, lot) => {
+    const details = document.createElement("details");
+    details.className = "artprice-analysis";
+
+    const summary = document.createElement("summary");
+    const summaryLabel = document.createElement("span");
+    summaryLabel.className = "artprice-analysis-summary-label";
+    summaryLabel.textContent = "Artprice Max-Bid Analysis";
+    const summaryBadge = document.createElement("span");
+    summaryBadge.className = "artprice-analysis-badge";
+    summaryBadge.hidden = true;
+    summary.append(summaryLabel, summaryBadge);
+
+    const panel = document.createElement("div");
+    panel.className = "artprice-analysis-panel";
+
+    const intro = document.createElement("p");
+    intro.className = "artprice-analysis-intro";
+    intro.textContent = "Upload a saved Artprice results page, then adjust the assumptions used to calculate maximum hammer bids.";
+
+    const form = document.createElement("form");
+    form.className = "artprice-analysis-form";
+    form.noValidate = false;
+
+    const fields = {};
+    const fieldGroups = {};
+    const addInput = (name, labelText, options = {}) => {
+      const group = document.createElement("div");
+      group.className = `artprice-analysis-field${options.wide ? " is-wide" : ""}`;
+      const label = document.createElement("label");
+      const inputId = `artprice-analysis-${name}-${lot.id}`;
+      label.htmlFor = inputId;
+      label.textContent = labelText;
+
+      let control;
+      if (options.options) {
+        control = document.createElement("select");
+        options.options.forEach(([value, text]) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = text;
+          control.appendChild(option);
+        });
+      } else {
+        control = document.createElement("input");
+        control.type = options.type || "text";
+      }
+
+      control.id = inputId;
+      control.name = name;
+      if (options.accept) control.accept = options.accept;
+      if (options.inputMode) control.inputMode = options.inputMode;
+      if (options.min !== undefined) control.min = options.min;
+      if (options.max !== undefined) control.max = options.max;
+      if (options.step !== undefined) control.step = options.step;
+      if (options.required) control.required = true;
+      if (options.value !== undefined) control.value = options.value;
+      control.setAttribute("aria-describedby", `artprice-analysis-status-${lot.id}`);
+
+      group.append(label, control);
+      fields[name] = control;
+      fieldGroups[name] = group;
+      return group;
+    };
+
+    const grid = document.createElement("div");
+    grid.className = "artprice-analysis-grid";
+    grid.append(
+      addInput("artprice_html", "Saved Artprice HTML page", {
+        type: "file",
+        accept: ".html,.htm,text/html",
+        required: true,
+        wide: true,
+      }),
+      addInput("method", "Resale valuation method", {
+        options: Object.entries(maxBidMethodLabels),
+        value: maxBidDefaults.method,
+        wide: true,
+      }),
+      addInput("manual_resale_value", "Manual resale value (USD)", {
+        type: "number",
+        inputMode: "decimal",
+        min: "0.01",
+        step: "0.01",
+        value: maxBidDefaults.manual_resale_value,
+        wide: true,
+      }),
+      addInput("recent_count", "Recent sold records", {
+        type: "number",
+        inputMode: "numeric",
+        min: "1",
+        step: "1",
+        value: maxBidDefaults.recent_count,
+        wide: true,
+      }),
+      addInput("inbound_shipping", "Inbound shipping (USD)", {
+        type: "number",
+        inputMode: "decimal",
+        min: "0",
+        step: "0.01",
+        required: true,
+        value: maxBidDefaults.inbound_shipping,
+      }),
+      addInput("target_profit", "Minimum target profit (USD)", {
+        type: "number",
+        inputMode: "decimal",
+        min: "0",
+        step: "0.01",
+        required: true,
+        value: maxBidDefaults.target_profit,
+      }),
+      addInput("seller_commission_pct", "Seller commission (%)", {
+        type: "number",
+        inputMode: "decimal",
+        min: "0",
+        max: "99.99",
+        step: "0.01",
+        required: true,
+        value: maxBidDefaults.seller_commission_pct,
+      }),
+      addInput("outbound_shipping", "Outbound shipping (USD)", {
+        type: "number",
+        inputMode: "decimal",
+        min: "0",
+        step: "0.01",
+        required: true,
+        value: maxBidDefaults.outbound_shipping,
+      }),
+      addInput("other_resale_costs", "Other resale costs (USD)", {
+        type: "number",
+        inputMode: "decimal",
+        min: "0",
+        step: "0.01",
+        required: true,
+        value: maxBidDefaults.other_resale_costs,
+      }),
+      addInput("premium_min", "Minimum buyer premium (%)", {
+        type: "number",
+        inputMode: "numeric",
+        min: "0",
+        step: "1",
+        required: true,
+        value: maxBidDefaults.premium_min,
+      }),
+      addInput("premium_max", "Maximum buyer premium (%)", {
+        type: "number",
+        inputMode: "numeric",
+        min: "0",
+        step: "1",
+        required: true,
+        value: maxBidDefaults.premium_max,
+      })
+    );
+
+    const actions = document.createElement("div");
+    actions.className = "artprice-analysis-actions";
+    const analyzeButton = document.createElement("button");
+    analyzeButton.className = "is-primary";
+    analyzeButton.type = "submit";
+    analyzeButton.textContent = "Analyze HTML";
+    const recalculateButton = document.createElement("button");
+    recalculateButton.type = "button";
+    recalculateButton.textContent = "Recalculate";
+    recalculateButton.hidden = true;
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "is-danger";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Remove Analysis";
+    deleteButton.hidden = true;
+    actions.append(analyzeButton, recalculateButton, deleteButton);
+
+    const status = document.createElement("p");
+    status.id = `artprice-analysis-status-${lot.id}`;
+    status.className = "artprice-analysis-status";
+    status.setAttribute("aria-live", "polite");
+    status.setAttribute("aria-atomic", "true");
+
+    const results = document.createElement("div");
+    results.className = "artprice-analysis-results";
+
+    form.append(grid, actions);
+    panel.append(intro, form, status, results);
+    details.append(summary, panel);
+    item.appendChild(details);
+
+    let currentAnalysis = null;
+    let loaded = false;
+    let busy = false;
+
+    const setStatus = (message = "", tone = "") => {
+      status.textContent = message;
+      status.className = "artprice-analysis-status";
+      if (tone) status.classList.add(`is-${tone}`);
+    };
+
+    const updateMethodFields = () => {
+      const isManual = fields.method.value === "manual";
+      const isRecent = fields.method.value === "recent";
+      fieldGroups.manual_resale_value.hidden = !isManual;
+      fieldGroups.recent_count.hidden = !isRecent;
+      fields.manual_resale_value.required = isManual;
+      if (!busy) {
+        fields.manual_resale_value.disabled = !isManual;
+        fields.recent_count.disabled = !isRecent;
+      }
+    };
+
+    const setBusy = (value) => {
+      busy = value;
+      Array.from(form.elements).forEach((control) => {
+        control.disabled = value;
+      });
+      if (!value) updateMethodFields();
+      details.classList.toggle("is-loading", value);
+    };
+
+    const updateActionState = () => {
+      const hasAnalysis = Boolean(currentAnalysis);
+      analyzeButton.textContent = hasAnalysis ? "Replace HTML" : "Analyze HTML";
+      recalculateButton.hidden = !hasAnalysis;
+      deleteButton.hidden = !hasAnalysis;
+      summaryBadge.hidden = !hasAnalysis;
+      summaryBadge.textContent = hasAnalysis ? "Saved" : "";
+      lot.has_artprice_analysis = hasAnalysis;
+    };
+
+    const populateAssumptions = (analysis) => {
+      const assumptions = analysis?.assumptions || {};
+      fields.method.value = analysis?.method || maxBidDefaults.method;
+      Object.keys(maxBidDefaults).forEach((name) => {
+        if (name === "method") return;
+        const savedValue = assumptions[name];
+        fields[name].value = savedValue === null || savedValue === undefined
+          ? maxBidDefaults[name]
+          : String(savedValue);
+      });
+      updateMethodFields();
+    };
+
+    const appendSummaryItem = (summaryGrid, labelText, valueText, wide = false) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = `artprice-analysis-summary-item${wide ? " is-wide" : ""}`;
+      const term = document.createElement("dt");
+      term.textContent = labelText;
+      const description = document.createElement("dd");
+      description.textContent = valueText;
+      wrapper.append(term, description);
+      summaryGrid.appendChild(wrapper);
+    };
+
+    const appendTableCell = (row, tag, value) => {
+      const cell = document.createElement(tag);
+      cell.textContent = value;
+      row.appendChild(cell);
+      return cell;
+    };
+
+    const renderAnalysis = (analysis) => {
+      results.replaceChildren();
+      if (!analysis) {
+        const empty = document.createElement("p");
+        empty.className = "artprice-analysis-empty";
+        empty.textContent = "No saved analysis yet. Choose a saved Artprice HTML page to begin.";
+        results.appendChild(empty);
+        return;
+      }
+
+      const currency = analysis.currency || "USD";
+      const heading = document.createElement("h4");
+      heading.textContent = "Saved analysis";
+      const summaryGrid = document.createElement("dl");
+      summaryGrid.className = "artprice-analysis-summary-grid";
+      appendSummaryItem(summaryGrid, "Sold records", String(analysis.sold_records_count ?? 0));
+      appendSummaryItem(
+        summaryGrid,
+        "Valuation method",
+        maxBidMethodLabels[analysis.method] || String(analysis.method || "—")
+      );
+      appendSummaryItem(
+        summaryGrid,
+        "Expected resale hammer",
+        formatAnalysisMoney(analysis.expected_resale_hammer, currency)
+      );
+      appendSummaryItem(
+        summaryGrid,
+        "Net resale proceeds",
+        formatAnalysisMoney(analysis.net_resale_proceeds, currency)
+      );
+      appendSummaryItem(
+        summaryGrid,
+        "Minimum target profit",
+        formatAnalysisMoney(analysis.assumptions?.target_profit, currency)
+      );
+      appendSummaryItem(
+        summaryGrid,
+        "Last analyzed",
+        formatAnalysisTimestamp(analysis.updated_at || analysis.created_at)
+      );
+      appendSummaryItem(summaryGrid, "Source file", String(analysis.source_filename || "Not available"), true);
+
+      const explanation = document.createElement("p");
+      explanation.className = "artprice-analysis-explanation";
+      explanation.textContent = "Figures are based on the extracted sold records and the assumptions entered above.";
+
+      const bidHeading = document.createElement("h4");
+      bidHeading.textContent = "Maximum hammer bids";
+      const bidTableWrap = document.createElement("div");
+      bidTableWrap.className = "artprice-analysis-table-wrap";
+      bidTableWrap.tabIndex = 0;
+      bidTableWrap.setAttribute("aria-label", "Maximum hammer bid table, horizontally scrollable");
+      const bidTable = document.createElement("table");
+      bidTable.className = "artprice-analysis-table is-bids";
+      const bidHead = document.createElement("thead");
+      const bidHeadRow = document.createElement("tr");
+      [
+        "Buyer premium",
+        "Maximum hammer bid",
+        "Premium amount",
+        "Shipping",
+        "All-in acquisition cost",
+        "Projected profit",
+      ].forEach((label) => appendTableCell(bidHeadRow, "th", label));
+      bidHead.appendChild(bidHeadRow);
+      const bidBody = document.createElement("tbody");
+      (Array.isArray(analysis.bid_rows) ? analysis.bid_rows : []).forEach((row) => {
+        const tableRow = document.createElement("tr");
+        appendTableCell(tableRow, "td", `${row.premium_pct}%`);
+        appendTableCell(tableRow, "td", formatAnalysisMoney(row.max_bid, currency));
+        appendTableCell(tableRow, "td", formatAnalysisMoney(row.buyers_premium, currency));
+        appendTableCell(tableRow, "td", formatAnalysisMoney(row.shipping, currency));
+        appendTableCell(tableRow, "td", formatAnalysisMoney(row.all_in_acquisition, currency));
+        appendTableCell(tableRow, "td", formatAnalysisMoney(row.projected_profit, currency));
+        bidBody.appendChild(tableRow);
+      });
+      bidTable.append(bidHead, bidBody);
+      bidTableWrap.appendChild(bidTable);
+
+      const comparables = Array.isArray(analysis.comparables) ? analysis.comparables : [];
+      const comparableDetails = document.createElement("details");
+      comparableDetails.className = "artprice-comparables";
+      const comparableSummary = document.createElement("summary");
+      comparableSummary.textContent = `Sold comparables (${comparables.length})`;
+      const comparableTableWrap = document.createElement("div");
+      comparableTableWrap.className = "artprice-analysis-table-wrap";
+      comparableTableWrap.tabIndex = 0;
+      comparableTableWrap.setAttribute("aria-label", "Sold comparables table, horizontally scrollable");
+      const comparableTable = document.createElement("table");
+      comparableTable.className = "artprice-analysis-table is-comparables";
+      const comparableHead = document.createElement("thead");
+      const comparableHeadRow = document.createElement("tr");
+      ["Date", "Hammer", "Auction house", "Title"].forEach((label) => {
+        appendTableCell(comparableHeadRow, "th", label);
+      });
+      comparableHead.appendChild(comparableHeadRow);
+      const comparableBody = document.createElement("tbody");
+      comparables.forEach((comparable) => {
+        const row = document.createElement("tr");
+        appendTableCell(row, "td", String(comparable.sale_date || "—"));
+        appendTableCell(row, "td", formatAnalysisMoney(comparable.hammer_price, currency));
+        appendTableCell(row, "td", String(comparable.auction_house || "—"));
+        const titleCell = appendTableCell(row, "td", String(comparable.title || "Untitled"));
+        const secondaryParts = [];
+        if (comparable.lot_number) secondaryParts.push(`Lot ${comparable.lot_number}`);
+        if (comparable.estimate_low || comparable.estimate_high) {
+          const low = formatAnalysisMoney(comparable.estimate_low, currency);
+          const high = formatAnalysisMoney(comparable.estimate_high, currency);
+          const estimate = comparable.estimate_low && comparable.estimate_high
+            ? `${low}–${high}`
+            : (comparable.estimate_low ? `from ${low}` : `up to ${high}`);
+          secondaryParts.push(`Estimate ${estimate}`);
+        }
+        if (secondaryParts.length) {
+          const secondary = document.createElement("small");
+          secondary.textContent = secondaryParts.join(" · ");
+          titleCell.appendChild(secondary);
+        }
+        comparableBody.appendChild(row);
+      });
+      comparableTable.append(comparableHead, comparableBody);
+      comparableTableWrap.appendChild(comparableTable);
+      comparableDetails.append(comparableSummary, comparableTableWrap);
+
+      results.append(
+        heading,
+        summaryGrid,
+        explanation,
+        bidHeading,
+        bidTableWrap,
+        comparableDetails
+      );
+    };
+
+    const applyAnalysis = (analysis) => {
+      currentAnalysis = analysis || null;
+      if (currentAnalysis) populateAssumptions(currentAnalysis);
+      updateActionState();
+      renderAnalysis(currentAnalysis);
+    };
+
+    const buildAssumptionData = (action) => {
+      const formData = new FormData();
+      formData.append("action", action);
+      [
+        "method",
+        "manual_resale_value",
+        "recent_count",
+        "inbound_shipping",
+        "target_profit",
+        "seller_commission_pct",
+        "outbound_shipping",
+        "other_resale_costs",
+        "premium_min",
+        "premium_max",
+      ].forEach((name) => {
+        formData.append(name, fields[name].value.trim());
+      });
+      return formData;
+    };
+
+    const validateAssumptions = () => {
+      updateMethodFields();
+      const controls = [
+        fields.method,
+        fields.inbound_shipping,
+        fields.target_profit,
+        fields.seller_commission_pct,
+        fields.outbound_shipping,
+        fields.other_resale_costs,
+        fields.premium_min,
+        fields.premium_max,
+      ];
+      if (fields.method.value === "manual") controls.push(fields.manual_resale_value);
+      if (fields.method.value === "recent") controls.push(fields.recent_count);
+      return controls.every((control) => control.reportValidity());
+    };
+
+    const loadAnalysis = async () => {
+      if (loaded || busy) return;
+      setBusy(true);
+      summaryBadge.hidden = false;
+      summaryBadge.textContent = "Loading";
+      setStatus("Loading saved analysis…", "loading");
+      try {
+        const payload = await requestAnalysisJson(
+          lot.artprice_analysis_url,
+          {
+            method: "GET",
+            credentials: "same-origin",
+            headers: {"X-Requested-With": "XMLHttpRequest"},
+          },
+          "The saved Artprice analysis could not be loaded."
+        );
+        loaded = true;
+        applyAnalysis(payload.analysis);
+        setStatus("");
+      } catch (error) {
+        summaryBadge.hidden = true;
+        setStatus(
+          error instanceof Error ? error.message : "The saved Artprice analysis could not be loaded.",
+          "error"
+        );
+      } finally {
+        setBusy(false);
+        updateActionState();
+      }
+    };
+
+    const postAnalysis = async (action, formData, loadingMessage, fallbackMessage) => {
+      setBusy(true);
+      setStatus(loadingMessage, "loading");
+      if (action === "analyze") analyzeButton.textContent = currentAnalysis ? "Replacing…" : "Analyzing…";
+      if (action === "recalculate") recalculateButton.textContent = "Recalculating…";
+      if (action === "delete") deleteButton.textContent = "Removing…";
+      try {
+        const payload = await requestAnalysisJson(
+          lot.artprice_analysis_url,
+          {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "X-CSRFToken": csrfToken,
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: formData,
+          },
+          fallbackMessage
+        );
+        loaded = true;
+        applyAnalysis(payload.analysis);
+        fields.artprice_html.value = "";
+        setStatus(payload.message || "Artprice analysis updated.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : fallbackMessage, "error");
+      } finally {
+        setBusy(false);
+        updateActionState();
+        recalculateButton.textContent = "Recalculate";
+        deleteButton.textContent = "Remove Analysis";
+      }
+    };
+
+    fields.method.addEventListener("change", () => {
+      updateMethodFields();
+      setStatus("");
+    });
+    fields.artprice_html.addEventListener("change", () => {
+      fields.artprice_html.setCustomValidity("");
+      setStatus("");
+    });
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!validateAssumptions()) return;
+      const file = fields.artprice_html.files?.[0];
+      if (!file) {
+        fields.artprice_html.setCustomValidity("Choose a saved Artprice .html or .htm file.");
+        fields.artprice_html.reportValidity();
+        return;
+      }
+      fields.artprice_html.setCustomValidity("");
+      if (file.size > 5 * 1024 * 1024) {
+        fields.artprice_html.setCustomValidity("The saved HTML file must be 5 MB or smaller.");
+        fields.artprice_html.reportValidity();
+        return;
+      }
+      if (!/\.html?$/i.test(file.name)) {
+        fields.artprice_html.setCustomValidity("Choose a file ending in .html or .htm.");
+        fields.artprice_html.reportValidity();
+        return;
+      }
+      const formData = buildAssumptionData("analyze");
+      formData.append("artprice_html", file, file.name);
+      postAnalysis(
+        "analyze",
+        formData,
+        currentAnalysis ? "Replacing saved analysis…" : "Analyzing saved Artprice page…",
+        "The Artprice HTML could not be analyzed."
+      );
+    });
+
+    recalculateButton.addEventListener("click", () => {
+      if (!validateAssumptions()) return;
+      postAnalysis(
+        "recalculate",
+        buildAssumptionData("recalculate"),
+        "Recalculating maximum bids…",
+        "The Artprice analysis could not be recalculated."
+      );
+    });
+
+    deleteButton.addEventListener("click", () => {
+      if (!window.confirm("Remove this saved Artprice analysis? The normalized comparables and results will be deleted.")) {
+        return;
+      }
+      const formData = new FormData();
+      formData.append("action", "delete");
+      postAnalysis(
+        "delete",
+        formData,
+        "Removing saved analysis…",
+        "The Artprice analysis could not be removed."
+      );
+    });
+
+    details.addEventListener("toggle", () => {
+      if (details.open) loadAnalysis();
+    });
+
+    populateAssumptions(null);
+    updateActionState();
+    renderAnalysis(null);
+  };
+
   const showDay = (isoDate) => {
     const date = new Date(`${isoDate}T12:00:00`);
     title.textContent = date.toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric"});
@@ -387,6 +1028,7 @@
       }
       item.appendChild(actionLinks);
       appendArtpriceEditor(item, lot, actionLinks);
+      appendArtpriceAnalysis(item, lot);
       list.appendChild(item);
     });
   };
