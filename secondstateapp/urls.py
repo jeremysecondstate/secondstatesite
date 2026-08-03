@@ -1,11 +1,21 @@
 from django.urls import path
 
-from . import calendar_views, capital_dashboard_views, catalog_api_views, upload_safe_views, views
+from . import (
+    calendar_views,
+    capital_dashboard_views,
+    catalog_api_views,
+    legal_views,
+    upload_safe_views,
+    views,
+)
 
 urlpatterns = [
     path("", views.home, name="home"),
     path("about/", views.about, name="about"),
     path("contact/", views.contact, name="contact"),
+    path("sms/", legal_views.sms_program, name="sms_program"),
+    path("privacy/", legal_views.privacy_policy, name="privacy_policy"),
+    path("sms-terms/", legal_views.sms_terms, name="sms_terms"),
     path("gallery/", views.gallery, name="gallery"),
     path("accounts/register/", views.register, name="register"),
     path("accounts/login/", views.login_view, name="login"),

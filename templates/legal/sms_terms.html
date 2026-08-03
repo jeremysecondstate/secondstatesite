@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}SMS Terms and Conditions | SecondState{% endblock %}
+
+{% block content %}
+<section class="hero hero--clean">
+  <div class="hero-copy">
+    <p class="kicker">SECONDSTATE AUCTION WATCH</p>
+    <h1>SMS Terms and Conditions</h1>
+    <p class="tagline mx-auto">Effective August 3, 2026</p>
+  </div>
+</section>
+
+<section class="about-card mt-4">
+  <h2>Program description</h2>
+  <p>
+    The SecondState Auction Watch SMS program provides recurring informational reminders concerning fine-art auction lots that a subscriber has specifically requested to track. Messages may include artist names, artwork or lot information, auction dates and times, estimates, status changes, and links to public auction-lot pages.
+  </p>
+</section>
+
+<section class="about-card mt-3">
+  <h2>Opt-in</h2>
+  <p>
+    You may subscribe by following the instructions on the public
+    <a href="{% url 'sms_program' %}">Auction Watch SMS Program page</a> and texting <strong>START</strong> from the mobile number you want enrolled. By doing so, you consent to receive recurring automated text messages from SecondState at that number.
+  </p>
+  <p class="mt-3">
+    Consent to receive text messages is not a condition of purchasing any goods or services. You represent that you are the owner or authorized user of the mobile number used to subscribe.
+  </p>
+</section>
+
+<section class="about-card mt-3">
+  <h2>Message frequency and charges</h2>
+  <p>
+    Message frequency varies according to the auction lots you request to track, up to one message per day. Message and data rates may apply according to your mobile carrier and service plan.
+  </p>
+</section>
+
+<section class="about-card mt-3">
+  <h2>Opt-out</h2>
+  <p>
+    You may cancel at any time by replying <strong>STOP</strong>. After an opt-out request, you may receive one final message confirming that you have been unsubscribed. No additional Auction Watch messages will be sent unless you later subscribe again by texting START.
+  </p>
+</section>
+
+<section class="about-card mt-3">
+  <h2>Help</h2>
+  <p>
+    Reply <strong>HELP</strong> for assistance or contact
+    <a href="mailto:hello@secondstate.art">hello@secondstate.art</a>.
+  </p>
+</section>
+
+<section class="about-card mt-3">
+  <h2>Delivery and carrier disclaimer</h2>
+  <p>
+    Mobile carriers are not liable for delayed or undelivered messages. Message delivery depends on effective transmission by your wireless carrier and is outside SecondState's control. The program may not be available on all carriers or devices.
+  </p>
+</section>
+
+<section class="about-card mt-3">
+  <h2>Privacy</h2>
+  <p>
+    Information associated with the SMS program is handled according to the
+    <a href="{% url 'privacy_policy' %}">SecondState Privacy Policy</a>. Mobile information and SMS consent are not shared with third parties or affiliates for their own marketing or promotional purposes.
+  </p>
+</section>
+
+<section class="about-card mt-3">
+  <h2>Changes or termination</h2>
+  <p>
+    SecondState may update these terms or modify, suspend, or discontinue the SMS program. Updated terms will be posted on this page with a revised effective date. If your mobile number changes or you are no longer its authorized user, reply STOP or contact SecondState promptly.
+  </p>
+</section>
+
+<section class="about-card mt-3">
+  <h2>Contact</h2>
+  <p>
+    SecondState<br>
+    <a href="mailto:hello@secondstate.art">hello@secondstate.art</a>
+  </p>
+</section>
+{% endblock %}

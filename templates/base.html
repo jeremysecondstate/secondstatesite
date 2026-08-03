@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SecondState</title>
+  <title>{% block title %}SecondState{% endblock %}</title>
 
   {% load static %}
 
@@ -44,7 +44,12 @@
   </main>
 
   <footer class="footer">
-    © {% now "Y" %} SecondState — Fine Art Prints
+    <div>© {% now "Y" %} SecondState — Fine Art Prints</div>
+    <nav class="d-flex flex-wrap justify-content-center gap-3 mt-2" aria-label="Legal and messaging policies">
+      <a href="{% url 'sms_program' %}">SMS Program</a>
+      <a href="{% url 'privacy_policy' %}">Privacy Policy</a>
+      <a href="{% url 'sms_terms' %}">SMS Terms</a>
+    </nav>
   </footer>
 </body>
 </html>
