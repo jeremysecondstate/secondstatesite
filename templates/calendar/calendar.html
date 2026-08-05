@@ -29,96 +29,54 @@
     </div>
   </header>
 
-  <section class="reminder-control-card" aria-labelledby="reminder-control-title">
-    <div class="reminder-control-heading">
+  <section class="email-tray-card" aria-labelledby="email-tray-title">
+    <div class="email-tray-heading">
       <div>
-        <p class="calendar-kicker">Text reminders</p>
-        <h2 id="reminder-control-title">
-          <span class="reminder-status-dot{% if reminder_control.active and reminder_master_enabled %} is-active{% elif reminder_control.active %} is-locked{% endif %}" aria-hidden="true"></span>
-          {{ reminder_status_label }}
+        <p class="calendar-kicker">Email Tray</p>
+        <h2 id="email-tray-title">
+          <span class="email-tray-count" data-email-tray-count>{{ email_selected_count }}</span>
+          selected <span data-email-tray-lot-label>lot{{ email_selected_count|pluralize }}</span>
         </h2>
-        {% if reminder_control.active and reminder_master_enabled %}
-          <p>Successful Artist Watchlist syncs now send any newly due 3-, 2-, or 1-day reminders.</p>
-        {% elif reminder_control.active %}
-          <p>The reminder plan is active, but Render's master SMS safety switch is currently off.</p>
-        {% else %}
-          <p>Preview safely, then start delivery after Twilio approval. Previously covered sales stay skipped.</p>
-        {% endif %}
+        <p>Select lots with saved Artprice links, then review one consolidated message before sending.</p>
       </div>
-
-      <div class="reminder-actions">
-        {% if reminder_control.active %}
-          <form method="post" action="{% url 'auction_reminder_control' %}">
-            {% csrf_token %}
-            <input type="hidden" name="month" value="{{ month_value }}">
-            <input type="hidden" name="action" value="pause">
-            <button class="reminder-button is-secondary" type="submit">Pause Reminder Texts</button>
-          </form>
-          <form method="post" action="{% url 'auction_reminder_send' %}">
-            {% csrf_token %}
-            <input type="hidden" name="month" value="{{ month_value }}">
-            <button
-              class="reminder-button"
-              type="submit"
-              {% if not reminder_master_enabled %}disabled{% endif %}
-              onclick="return confirm('Send any currently due reminder texts now? Already covered sales will be skipped.');"
-            >Send Due Now</button>
-          </form>
-        {% else %}
-          <form method="post" action="{% url 'auction_reminder_control' %}">
-            {% csrf_token %}
-            <input type="hidden" name="month" value="{{ month_value }}">
-            <input type="hidden" name="action" value="start">
-            <button
-              class="reminder-button"
-              type="submit"
-              {% if not reminder_can_start %}disabled{% endif %}
-              onclick="return confirm('Start reminder texts and immediately send any currently due, previously unsent digests?');"
-            >Start Reminder Texts</button>
-          </form>
-        {% endif %}
-      </div>
+      <a class="email-tray-button" href="{% url 'auction_email_tray' %}">Review &amp; Send</a>
     </div>
 
-    <div class="reminder-control-meta">
+    <div class="email-tray-meta">
       <div>
-        <span>Render safety switch</span>
-        <strong>{% if reminder_master_enabled %}Enabled{% else %}Disabled{% endif %}</strong>
+        <span>Selected</span>
+        <strong><span data-email-tray-count>{{ email_selected_count }}</span> <span data-email-tray-lot-label>lot{{ email_selected_count|pluralize }}</span></strong>
       </div>
       <div>
         <span>Recipients</span>
-        <strong>
-          {% for recipient in reminder_recipients %}{{ recipient }}{% if not forloop.last %}, {% endif %}{% empty %}Not configured{% endfor %}
-        </strong>
+        <strong>{{ email_recipient_names }}</strong>
       </div>
       <div>
-        <span>Last reminder run</span>
-        <strong>{% if reminder_control.last_run_at %}{{ reminder_control.last_run_at|date:"M j, Y g:i A" }}{% else %}Not run yet{% endif %}</strong>
+        <span>Last successful email</span>
+        <strong>
+          {% if email_last_sent_batch %}
+            {{ email_last_sent_batch.sent_at|date:"M j, Y g:i A" }}
+            {% if email_last_sent_batch.requested_by %}
+              by {% firstof email_last_sent_batch.requested_by.get_full_name email_last_sent_batch.requested_by.username %}
+            {% endif %}
+          {% else %}
+            Not sent yet
+          {% endif %}
+        </strong>
       </div>
     </div>
 
-    {% if reminder_configuration_error %}
-      <p class="reminder-configuration-warning">{{ reminder_configuration_error }}</p>
-    {% elif not reminder_master_enabled %}
-      <p class="reminder-configuration-warning">Live delivery remains locked until <code>TWILIO_SMS_ENABLED=true</code> in Render.</p>
-    {% endif %}
-    {% if reminder_control.last_run_summary %}
-      <p class="reminder-last-run">{{ reminder_control.last_run_summary }} <span>Source: {{ reminder_control.last_run_source|default:"manual" }}</span></p>
-    {% endif %}
-
-    <details class="reminder-preview">
-      <summary>Preview due texts <span>{{ due_reminder_digests|length }}</span></summary>
-      <div class="reminder-preview-list">
-        {% for digest in due_reminder_digests %}
-          <article>
-            <p>{{ digest.days_before }}-day reminder &middot; {{ digest.sale_count }} sale{{ digest.sale_count|pluralize }} &middot; {{ digest.lot_count }} lot{{ digest.lot_count|pluralize }}</p>
-            <pre>{{ digest.body }}</pre>
-          </article>
-        {% empty %}
-          <p class="sidebar-empty">No reminder texts are due today.</p>
-        {% endfor %}
+    {% if email_configuration_warnings %}
+      <div class="email-tray-warning" role="status">
+        <strong>Gmail delivery is not ready.</strong>
+        Configure the sender, fixed recipients, Google OAuth credentials, and sending switch. Preview and tray management remain available.
       </div>
-    </details>
+    {% endif %}
+    {% if email_batch.status == "failed" and email_batch.failure_summary %}
+      <p class="email-tray-failure">Last attempt failed: {{ email_batch.failure_summary }}</p>
+    {% elif email_batch.status == "sending" %}
+      <p class="email-tray-sending">This tray is currently being sent and cannot be changed.</p>
+    {% endif %}
   </section>
 
   <div class="calendar-layout">
@@ -204,6 +162,14 @@
   const list = document.getElementById("selected-day-lots");
   const dayButtons = Array.from(document.querySelectorAll(".calendar-day"));
   const csrfToken = document.getElementById("calendar-csrf-token").dataset.token;
+  const updateEmailTrayCount = (count) => {
+    document.querySelectorAll("[data-email-tray-count]").forEach((node) => {
+      node.textContent = String(count);
+    });
+    document.querySelectorAll("[data-email-tray-lot-label]").forEach((node) => {
+      node.textContent = count === 1 ? "lot" : "lots";
+    });
+  };
   const maxBidDefaults = {
     method: "median",
     manual_resale_value: "",
@@ -330,11 +296,29 @@
     status.className = "artprice-status";
     status.setAttribute("aria-live", "polite");
 
+    const trayControl = document.createElement("label");
+    trayControl.className = "email-tray-toggle";
+    const trayCheckbox = document.createElement("input");
+    trayCheckbox.type = "checkbox";
+    trayCheckbox.checked = Boolean(lot.email_tray_selected);
+    trayCheckbox.disabled = !lot.artprice_url;
+    trayCheckbox.setAttribute("aria-describedby", `email-tray-status-${lot.id}`);
+    const trayLabel = document.createElement("span");
+    trayLabel.textContent = "Include in next email";
+    trayControl.append(trayCheckbox, trayLabel);
+
+    const trayStatus = document.createElement("p");
+    trayStatus.id = `email-tray-status-${lot.id}`;
+    trayStatus.className = "email-tray-toggle-status";
+    trayStatus.setAttribute("aria-live", "polite");
+
     const updateArtpriceLink = (url) => {
       let link = actionLinks.querySelector(".lot-artprice-link");
       if (!url) {
         link?.remove();
         removeButton.hidden = true;
+        trayCheckbox.checked = false;
+        trayCheckbox.disabled = true;
         return;
       }
       if (!link) {
@@ -344,7 +328,47 @@
         link.href = url;
       }
       removeButton.hidden = false;
+      trayCheckbox.disabled = false;
     };
+
+    trayCheckbox.addEventListener("change", async () => {
+      const requestedSelection = trayCheckbox.checked;
+      trayCheckbox.disabled = true;
+      trayStatus.textContent = requestedSelection ? "Adding…" : "Removing…";
+      trayStatus.classList.remove("is-error", "is-success");
+      try {
+        const response = await fetch(lot.email_tray_update_url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "X-CSRFToken": csrfToken,
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: new URLSearchParams({selected: requestedSelection ? "true" : "false"}),
+        });
+        const responseType = response.headers.get("content-type") || "";
+        const payload = responseType.includes("application/json") ? await response.json() : {};
+        if (!response.ok || !payload.ok) {
+          const fallback = response.redirected
+            ? "Your session expired. Refresh the page and sign in again."
+            : "The Email Tray could not be updated.";
+          throw new Error(payload.error || fallback);
+        }
+        lot.email_tray_selected = Boolean(payload.selected);
+        trayCheckbox.checked = lot.email_tray_selected;
+        updateEmailTrayCount(Number(payload.selected_count) || 0);
+        trayStatus.textContent = payload.message;
+        trayStatus.classList.add("is-success");
+      } catch (error) {
+        lot.email_tray_selected = !requestedSelection;
+        trayCheckbox.checked = lot.email_tray_selected;
+        trayStatus.textContent = error instanceof Error ? error.message : "The Email Tray could not be updated.";
+        trayStatus.classList.add("is-error");
+      } finally {
+        trayCheckbox.disabled = !lot.artprice_url;
+      }
+    });
 
     input.addEventListener("input", () => {
       input.setCustomValidity("");
@@ -391,8 +415,11 @@
         }
 
         lot.artprice_url = payload.artprice_url;
+        lot.email_tray_selected = Boolean(payload.email_tray_selected);
         input.value = payload.artprice_url;
+        trayCheckbox.checked = lot.email_tray_selected;
         updateArtpriceLink(payload.artprice_url);
+        updateEmailTrayCount(Number(payload.selected_count) || 0);
         status.textContent = payload.message;
         status.classList.add("is-success");
         saveButton.textContent = "Saved";
@@ -414,7 +441,7 @@
     });
 
     editor.append(input, saveButton, removeButton);
-    form.append(label, editor, status);
+    form.append(label, editor, status, trayControl, trayStatus);
     item.appendChild(form);
   };
 

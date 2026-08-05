@@ -20,18 +20,12 @@ class CalendarSyncResult:
     created: int
     updated: int
     ended: int
-    reminder_status: str = ""
-    reminder_summary: str = ""
-    reminder_sent: int = 0
-    reminder_skipped: int = 0
-    reminder_failed: int = 0
 
     def summary(self) -> str:
-        calendar_summary = (
+        return (
             f"Website calendar synced: {self.received} lots "
             f"({self.created} new, {self.updated} updated, {self.ended} ended)."
         )
-        return f"{calendar_summary} {self.reminder_summary}".strip()
 
 
 def _calendar_payload(lot: NormalizedLot) -> dict:
@@ -103,17 +97,9 @@ def sync_watchlist_lots(
         raise CalendarSyncError(message or f"Website calendar returned HTTP {response.status_code}.")
     if not isinstance(response_payload, dict) or not response_payload.get("ok"):
         raise CalendarSyncError("Website calendar returned an unexpected response.")
-    reminder_payload = response_payload.get("reminders")
-    if not isinstance(reminder_payload, dict):
-        reminder_payload = {}
     return CalendarSyncResult(
         received=int(response_payload.get("received", 0)),
         created=int(response_payload.get("created", 0)),
         updated=int(response_payload.get("updated", 0)),
         ended=int(response_payload.get("ended", 0)),
-        reminder_status=str(reminder_payload.get("status") or ""),
-        reminder_summary=str(reminder_payload.get("summary") or ""),
-        reminder_sent=int(reminder_payload.get("sent", 0)),
-        reminder_skipped=int(reminder_payload.get("skipped", 0)),
-        reminder_failed=int(reminder_payload.get("failed", 0)),
     )

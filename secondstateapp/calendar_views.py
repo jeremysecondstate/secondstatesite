@@ -3,7 +3,6 @@ from __future__ import annotations
 import calendar as month_calendar
 import hashlib
 import json
-import logging
 import os
 import secrets
 from collections import defaultdict
@@ -28,21 +27,22 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .artprice_max_bid import ArtpriceAnalysisError, analyze_artprice_comparables, analyze_artprice_html
-from .auction_reminders import (
-    ReminderConfigurationError,
-    build_due_digests,
-    dispatch_active_auction_reminders,
-    masked_reminder_recipients,
-    validate_live_reminder_configuration,
+from .auction_email import (
+    AuctionEmailConfigurationError,
+    compose_auction_email,
+    configuration_warnings,
+    recipient_choices,
+    sanitize_delivery_failure,
+    send_auction_email,
+    validate_sending_configuration,
 )
-from .models import AuctionMaxBidAnalysis, AuctionReminderControl, AuctionWatchLot
+from .models import AuctionEmailBatch, AuctionEmailBatchItem, AuctionMaxBidAnalysis, AuctionWatchLot
 
 
 MAX_SYNC_LOTS = 1000
 MAX_SYNC_BYTES = 2_000_000
 MAX_ARTPRICE_HTML_BYTES = 5 * 1024 * 1024
 ARTPRICE_PRELOADED_STATE_MARKER = "window.__PRELOADED_STATE__"
-logger = logging.getLogger(__name__)
 
 
 def _calendar_zone() -> ZoneInfo:
@@ -144,7 +144,8 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
     return sorted(groups, key=lambda item: (item["sort_at"], item["auction_house"]))
 
 
-def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo) -> dict:
+def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None) -> dict:
+    selected_lot_ids = selected_lot_ids or set()
     return {
         "id": lot.pk,
         "artist": _artist_label(lot),
@@ -160,6 +161,8 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo) -> dict:
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
         "artprice_analysis_url": reverse("auction_lot_artprice_analysis", args=(lot.pk,)),
+        "email_tray_selected": lot.pk in selected_lot_ids,
+        "email_tray_update_url": reverse("auction_email_lot_selection", args=(lot.pk,)),
         "ended": not lot.active,
     }
 
@@ -171,6 +174,15 @@ def auction_calendar(request):
     selected_month = _month_start(request.GET.get("month"), now_local.date())
     following_month = _next_month(selected_month)
     range_start, range_end = _utc_bounds(selected_month, following_month, zone)
+
+    active_email_batch = (
+        AuctionEmailBatch.objects.filter(is_active=True)
+        .prefetch_related("items")
+        .first()
+    )
+    selected_lot_ids = {
+        item.lot_id for item in active_email_batch.items.all()
+    } if active_email_batch else set()
 
     month_lots = list(
         AuctionWatchLot.objects.filter(event_at__gte=range_start, event_at__lt=range_end).order_by(
@@ -202,7 +214,7 @@ def auction_calendar(request):
         weeks.append(week_items)
 
     calendar_data = {
-        day.isoformat(): [_lot_json(lot, zone) for lot in lots]
+        day.isoformat(): [_lot_json(lot, zone, selected_lot_ids) for lot in lots]
         for day, lots in sorted(lots_by_day.items())
     }
 
@@ -219,7 +231,10 @@ def auction_calendar(request):
         upcoming_by_day[local_day].append(lot)
 
     for local_day, day_lots in upcoming_by_day.items():
-        calendar_data.setdefault(local_day.isoformat(), [_lot_json(lot, zone) for lot in day_lots])
+        calendar_data.setdefault(
+            local_day.isoformat(),
+            [_lot_json(lot, zone, selected_lot_ids) for lot in day_lots],
+        )
 
     upcoming_groups = []
     for (local_day, _identity), sale_lots in upcoming_by_day_and_sale.items():
@@ -229,18 +244,13 @@ def auction_calendar(request):
         upcoming_groups.append(group)
     upcoming_groups.sort(key=lambda item: (item["date_iso"], item["sort_at"], item["auction_house"]))
 
-    reminder_control = AuctionReminderControl.load()
-    reminder_configuration_error = ""
-    try:
-        validate_live_reminder_configuration()
-    except ReminderConfigurationError as exc:
-        reminder_configuration_error = str(exc)
-    if reminder_control.active and settings.TWILIO_SMS_ENABLED:
-        reminder_status_label = "Active"
-    elif reminder_control.active:
-        reminder_status_label = "Safety lock on"
-    else:
-        reminder_status_label = "Paused"
+    last_sent_batch = (
+        AuctionEmailBatch.objects.filter(status=AuctionEmailBatch.Status.SENT, is_active=False)
+        .select_related("requested_by")
+        .order_by("-sent_at", "-id")
+        .first()
+    )
+    email_recipients = recipient_choices()
 
     context = {
         "month_title": selected_month.strftime("%B %Y"),
@@ -253,13 +263,11 @@ def auction_calendar(request):
         "upcoming_groups": upcoming_groups[:10],
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
         "synced_lot_count": AuctionWatchLot.objects.count(),
-        "reminder_control": reminder_control,
-        "reminder_status_label": reminder_status_label,
-        "reminder_master_enabled": settings.TWILIO_SMS_ENABLED,
-        "reminder_configuration_error": reminder_configuration_error,
-        "reminder_can_start": bool(settings.TWILIO_SMS_ENABLED and not reminder_configuration_error),
-        "reminder_recipients": masked_reminder_recipients(),
-        "due_reminder_digests": build_due_digests(now_local.date()),
+        "email_batch": active_email_batch,
+        "email_selected_count": len(selected_lot_ids),
+        "email_recipient_names": ", ".join(choice["name"] for choice in email_recipients),
+        "email_last_sent_batch": last_sent_batch,
+        "email_configuration_warnings": configuration_warnings(),
     }
     return render(request, "calendar/calendar.html", context)
 
@@ -297,24 +305,110 @@ def _validated_artprice_url(value: object) -> str:
     return candidate
 
 
+def _active_email_batch_for_update(*, create: bool = False) -> AuctionEmailBatch | None:
+    batch = AuctionEmailBatch.objects.select_for_update().filter(is_active=True).first()
+    if batch is None and create:
+        batch, _created = AuctionEmailBatch.objects.get_or_create(
+            is_active=True,
+            defaults={"status": AuctionEmailBatch.Status.DRAFT},
+        )
+        batch = AuctionEmailBatch.objects.select_for_update().get(pk=batch.pk)
+    return batch
+
+
+def _batch_selected_count(batch: AuctionEmailBatch | None) -> int:
+    return batch.items.count() if batch else 0
+
+
 @staff_member_required
 @require_POST
 def update_auction_lot_artprice_link(request, lot_id: int):
-    lot = get_object_or_404(AuctionWatchLot, pk=lot_id)
     try:
         artprice_url = _validated_artprice_url(request.POST.get("artprice_url"))
     except ValueError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
-    if lot.artprice_url != artprice_url:
-        lot.artprice_url = artprice_url
-        lot.save(update_fields=("artprice_url",))
+    with transaction.atomic():
+        lot = get_object_or_404(AuctionWatchLot.objects.select_for_update(), pk=lot_id)
+        batch = _active_email_batch_for_update()
+        selected_item = (
+            batch.items.filter(lot=lot).first()
+            if batch
+            else None
+        )
+        if (
+            selected_item
+            and batch.status == AuctionEmailBatch.Status.SENDING
+            and lot.artprice_url != artprice_url
+        ):
+            return JsonResponse(
+                {"ok": False, "error": "This lot cannot be changed while its email batch is sending."},
+                status=409,
+            )
+        if lot.artprice_url != artprice_url:
+            lot.artprice_url = artprice_url
+            lot.save(update_fields=("artprice_url",))
+        if not artprice_url and selected_item:
+            selected_item.delete()
+        selected = bool(artprice_url and selected_item)
+        selected_count = _batch_selected_count(batch)
 
     return JsonResponse(
         {
             "ok": True,
             "artprice_url": artprice_url,
+            "email_tray_selected": selected,
+            "selected_count": selected_count,
             "message": "Artprice link saved." if artprice_url else "Artprice link removed.",
+        }
+    )
+
+
+@staff_member_required
+@require_POST
+def update_auction_email_selection(request, lot_id: int):
+    submitted = str(request.POST.get("selected", "")).strip().casefold()
+    if submitted not in {"true", "false", "1", "0", "on", "off"}:
+        return JsonResponse({"ok": False, "error": "Choose whether to include this lot."}, status=400)
+    selected = submitted in {"true", "1", "on"}
+
+    with transaction.atomic():
+        lot = get_object_or_404(AuctionWatchLot.objects.select_for_update(), pk=lot_id)
+        batch = _active_email_batch_for_update(create=selected)
+        if batch and batch.status == AuctionEmailBatch.Status.SENDING:
+            return JsonResponse(
+                {"ok": False, "error": "The Email Tray cannot be changed while it is sending."},
+                status=409,
+            )
+        if selected:
+            if not lot.artprice_url:
+                return JsonResponse(
+                    {"ok": False, "error": "Save an Artprice link before including this lot."},
+                    status=400,
+                )
+            try:
+                _validated_artprice_url(lot.artprice_url)
+            except ValueError:
+                return JsonResponse(
+                    {"ok": False, "error": "This lot does not have a valid saved Artprice link."},
+                    status=400,
+                )
+            AuctionEmailBatchItem.objects.get_or_create(
+                batch=batch,
+                lot=lot,
+                defaults={"selected_by": request.user},
+            )
+        elif batch:
+            batch.items.filter(lot=lot).delete()
+
+        selected_count = _batch_selected_count(batch)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "selected": selected,
+            "selected_count": selected_count,
+            "message": "Lot added to the Email Tray." if selected else "Lot removed from the Email Tray.",
         }
     )
 
@@ -570,62 +664,260 @@ def auction_lot_artprice_analysis(request, lot_id: int):
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
 
-def _add_dispatch_message(request, outcome) -> None:
-    if outcome.status in {"disabled", "failed", "partial_failure", "configuration_error"}:
-        messages.error(request, outcome.summary)
-    elif outcome.status in {"no_due", "paused", "up_to_date"}:
-        messages.info(request, outcome.summary)
+def _email_item_sort_key(item: AuctionEmailBatchItem) -> tuple:
+    lot = item.lot
+    return (
+        lot.event_at is None,
+        lot.event_at or datetime.max.replace(tzinfo=datetime_timezone.utc),
+        (lot.auction_house or lot.source or "Auction").casefold(),
+        (_artist_label(lot)).casefold(),
+        (lot.lot_number or lot.source_lot_id or str(lot.pk)).casefold(),
+        lot.pk,
+    )
+
+
+def _email_tray_redirect():
+    return redirect(reverse("auction_email_tray"))
+
+
+@staff_member_required
+def review_auction_email_tray(request):
+    batch = (
+        AuctionEmailBatch.objects.filter(is_active=True)
+        .select_related("requested_by")
+        .prefetch_related("items__lot", "items__selected_by")
+        .first()
+    )
+    items = sorted(list(batch.items.all()), key=_email_item_sort_key) if batch else []
+    composition = compose_auction_email([item.lot for item in items]) if items else None
+    checked_keys = set(batch.recipient_keys) if batch and batch.status == AuctionEmailBatch.Status.FAILED else set()
+    if not checked_keys:
+        checked_keys = {choice["key"] for choice in recipient_choices()}
+    choices = [
+        {**choice, "checked": choice["key"] in checked_keys}
+        for choice in recipient_choices()
+    ]
+    return render(
+        request,
+        "calendar/email_tray.html",
+        {
+            "batch": batch,
+            "items": items,
+            "composition": composition,
+            "recipient_choices": choices,
+            "configuration_warnings": configuration_warnings(),
+            "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
+        },
+    )
+
+
+@staff_member_required
+@require_POST
+def remove_auction_email_lot(request, lot_id: int):
+    with transaction.atomic():
+        batch = _active_email_batch_for_update()
+        if not batch:
+            messages.info(request, "The Email Tray is already empty.")
+            return _email_tray_redirect()
+        if batch.status == AuctionEmailBatch.Status.SENDING:
+            messages.error(request, "The Email Tray cannot be changed while it is sending.")
+            return _email_tray_redirect()
+        deleted, _details = batch.items.filter(lot_id=lot_id).delete()
+    if deleted:
+        messages.success(request, "Lot removed from the Email Tray.")
     else:
-        messages.success(request, outcome.summary)
+        messages.info(request, "That lot is not in the Email Tray.")
+    return _email_tray_redirect()
 
 
 @staff_member_required
 @require_POST
-def manage_auction_reminders(request):
-    action = request.POST.get("action", "").strip().lower()
-    control = AuctionReminderControl.load()
-    now = timezone.now()
+def clear_auction_email_tray(request):
+    with transaction.atomic():
+        batch = _active_email_batch_for_update()
+        if not batch:
+            messages.info(request, "The Email Tray is already empty.")
+            return _email_tray_redirect()
+        if batch.status == AuctionEmailBatch.Status.SENDING:
+            messages.error(request, "The Email Tray cannot be cleared while it is sending.")
+            return _email_tray_redirect()
+        batch.items.all().delete()
+        if batch.status == AuctionEmailBatch.Status.FAILED:
+            batch.status = AuctionEmailBatch.Status.DRAFT
+            batch.recipient_keys = []
+            batch.recipient_snapshot = []
+            batch.subject_snapshot = ""
+            batch.html_body_snapshot = ""
+            batch.text_body_snapshot = ""
+            batch.gmail_message_id = ""
+            batch.failure_summary = ""
+            batch.save(
+                update_fields=(
+                    "status",
+                    "recipient_keys",
+                    "recipient_snapshot",
+                    "subject_snapshot",
+                    "html_body_snapshot",
+                    "text_body_snapshot",
+                    "gmail_message_id",
+                    "failure_summary",
+                    "updated_at",
+                )
+            )
+    messages.success(request, "Email Tray cleared.")
+    return _email_tray_redirect()
 
-    if action == "pause":
-        control.active = False
-        control.paused_at = now
-        control.updated_by = request.user
-        control.save(update_fields=("active", "paused_at", "updated_by", "updated_at"))
-        messages.success(request, "Reminder texts are paused. Already queued Twilio messages cannot be recalled.")
-        return _calendar_redirect(request)
 
-    if action != "start":
-        messages.error(request, "Unknown reminder control action.")
-        return _calendar_redirect(request)
-    if not settings.TWILIO_SMS_ENABLED:
-        messages.error(request, "The Render SMS safety switch is off. Enable it only after Twilio approval.")
-        return _calendar_redirect(request)
+def _prepare_auction_email_dispatch(request, *, retry: bool):
+    submitted_keys = request.POST.getlist("recipients")
+    with transaction.atomic():
+        batch = _active_email_batch_for_update()
+        if not batch or not batch.items.exists():
+            messages.error(request, "The Email Tray is empty.")
+            return None
+        if batch.status == AuctionEmailBatch.Status.SENDING:
+            messages.error(request, "This Email Tray batch is already sending.")
+            return None
+        if retry and batch.status != AuctionEmailBatch.Status.FAILED:
+            messages.error(request, "Only a failed Email Tray batch can be retried.")
+            return None
+        if not retry and batch.status == AuctionEmailBatch.Status.FAILED:
+            messages.error(request, "Use Retry Email to deliberately retry this failed batch.")
+            return None
+        if not retry and batch.status != AuctionEmailBatch.Status.DRAFT:
+            messages.error(request, "This Email Tray batch cannot be sent from its current state.")
+            return None
+
+        try:
+            recipients = validate_sending_configuration(submitted_keys)
+        except AuctionEmailConfigurationError as exc:
+            messages.error(request, str(exc))
+            return None
+
+        items = sorted(
+            list(batch.items.select_related("lot", "selected_by")),
+            key=_email_item_sort_key,
+        )
+        invalid_lots = []
+        for item in items:
+            try:
+                valid_url = _validated_artprice_url(item.lot.artprice_url)
+            except ValueError:
+                valid_url = ""
+            if not valid_url:
+                invalid_lots.append(item.lot.lot_number or item.lot.source_lot_id or str(item.lot_id))
+        if invalid_lots:
+            messages.error(
+                request,
+                "Every selected lot must have a valid saved Artprice link. Remove or repair: "
+                + ", ".join(invalid_lots[:5]),
+            )
+            return None
+
+        composition = compose_auction_email([item.lot for item in items])
+        for item in items:
+            item.lot_snapshot = composition.lot_snapshots[item.lot_id]
+        AuctionEmailBatchItem.objects.bulk_update(items, ("lot_snapshot",))
+
+        now = timezone.now()
+        batch.status = AuctionEmailBatch.Status.SENDING
+        batch.requested_by = request.user
+        batch.recipient_keys = [recipient.key for recipient in recipients]
+        batch.recipient_snapshot = [
+            {"key": recipient.key, "name": recipient.name, "address": recipient.address}
+            for recipient in recipients
+        ]
+        batch.subject_snapshot = composition.subject
+        batch.html_body_snapshot = composition.html_body
+        batch.text_body_snapshot = composition.text_body
+        batch.gmail_message_id = ""
+        batch.attempt_count += 1
+        batch.attempted_at = now
+        batch.failure_summary = ""
+        batch.save(
+            update_fields=(
+                "status",
+                "requested_by",
+                "recipient_keys",
+                "recipient_snapshot",
+                "subject_snapshot",
+                "html_body_snapshot",
+                "text_body_snapshot",
+                "gmail_message_id",
+                "attempt_count",
+                "attempted_at",
+                "failure_summary",
+                "updated_at",
+            )
+        )
+    return batch, recipients, composition
+
+
+def _dispatch_auction_email(request, *, retry: bool):
+    prepared = _prepare_auction_email_dispatch(request, retry=retry)
+    if prepared is None:
+        return _email_tray_redirect()
+    batch, recipients, composition = prepared
     try:
-        validate_live_reminder_configuration()
-    except ReminderConfigurationError as exc:
-        messages.error(request, f"Reminder configuration error: {exc}")
-        return _calendar_redirect(request)
+        message_id = send_auction_email(
+            subject=composition.subject,
+            text_body=composition.text_body,
+            html_body=composition.html_body,
+            recipients=[recipient.address for recipient in recipients],
+        )
+    except Exception as exc:
+        failure_summary = sanitize_delivery_failure(exc)
+        AuctionEmailBatch.objects.filter(
+            pk=batch.pk,
+            is_active=True,
+            status=AuctionEmailBatch.Status.SENDING,
+        ).update(
+            status=AuctionEmailBatch.Status.FAILED,
+            failure_summary=failure_summary,
+            updated_at=timezone.now(),
+        )
+        messages.error(request, f"Email delivery failed. The tray is ready to retry. {failure_summary}")
+        return _email_tray_redirect()
 
-    control.active = True
-    control.started_at = now
-    control.paused_at = None
-    control.updated_by = request.user
-    control.save(update_fields=("active", "started_at", "paused_at", "updated_by", "updated_at"))
-    outcome = dispatch_active_auction_reminders(source="start")
-    _add_dispatch_message(request, outcome)
+    with transaction.atomic():
+        sending_batch = AuctionEmailBatch.objects.select_for_update().get(pk=batch.pk)
+        if sending_batch.status != AuctionEmailBatch.Status.SENDING or not sending_batch.is_active:
+            messages.error(request, "Gmail returned success, but the batch state changed unexpectedly.")
+            return _email_tray_redirect()
+        sending_batch.status = AuctionEmailBatch.Status.SENT
+        sending_batch.is_active = False
+        sending_batch.gmail_message_id = message_id
+        sending_batch.sent_at = timezone.now()
+        sending_batch.failure_summary = ""
+        sending_batch.save(
+            update_fields=(
+                "status",
+                "is_active",
+                "gmail_message_id",
+                "sent_at",
+                "failure_summary",
+                "updated_at",
+            )
+        )
+
+    recipient_names = ", ".join(recipient.name for recipient in recipients)
+    messages.success(
+        request,
+        f"Sent {composition.lot_count} selected auction lot{'s' if composition.lot_count != 1 else ''} to {recipient_names}.",
+    )
     return _calendar_redirect(request)
 
 
 @staff_member_required
 @require_POST
-def send_due_auction_reminders(request):
-    control = AuctionReminderControl.load()
-    if not control.active:
-        messages.error(request, "Start reminder texts before using Send Due Now.")
-        return _calendar_redirect(request)
-    outcome = dispatch_active_auction_reminders(source="manual")
-    _add_dispatch_message(request, outcome)
-    return _calendar_redirect(request)
+def send_auction_email_batch(request):
+    return _dispatch_auction_email(request, retry=False)
+
+
+@staff_member_required
+@require_POST
+def retry_auction_email_batch(request):
+    return _dispatch_auction_email(request, retry=True)
 
 
 def _sync_authorized(request) -> bool:
@@ -768,27 +1060,6 @@ def sync_auction_calendar(request):
             updated_count += int(not created)
             ended_count += int(not defaults["active"])
 
-    reminder_payload = {
-        "status": "not_run",
-        "summary": "No reminder catch-up was needed.",
-        "active": False,
-        "master_enabled": bool(settings.TWILIO_SMS_ENABLED),
-        "attempted": False,
-        "due_digests": 0,
-        "sent": 0,
-        "skipped": 0,
-        "failed": 0,
-    }
-    if prepared:
-        try:
-            reminder_payload = dispatch_active_auction_reminders(source="sync").as_dict()
-        except Exception:
-            logger.exception("Auction reminder catch-up failed after calendar sync")
-            reminder_payload.update(
-                status="error",
-                summary="Calendar data synced, but the reminder catch-up could not run.",
-            )
-
     return JsonResponse(
         {
             "ok": True,
@@ -796,6 +1067,5 @@ def sync_auction_calendar(request):
             "created": created_count,
             "updated": updated_count,
             "ended": ended_count,
-            "reminders": reminder_payload,
         }
     )

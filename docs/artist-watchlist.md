@@ -22,7 +22,7 @@ local bookmark HTML
   -> local SQLite content-hash cache and diff
   -> optional compact ambiguous-record enrichment
   -> date/artist agenda + Markdown/CSV/ICS exports
-  -> private website calendar sync + optional SMS reminder digests
+  -> private website calendar sync
 ```
 
 The implementation is split by responsibility:
@@ -79,7 +79,7 @@ Every refresh reports:
 
 ICS output defaults to one event per auction sale. Matched artists and lots are grouped in the description. A timezone-aware source time is converted to UTC. A source date without a time becomes an all-day event and the description marks the time as unverified. Event-per-lot and reminders are supported by the export function but are intentionally not the noisy UI default.
 
-The private web calendar at `/calendar/` is populated automatically after a successful refresh and can be retried with **Sync Website Calendar**. See [`auction-calendar.md`](auction-calendar.md) for authentication, deployment, and Twilio reminder setup.
+The private web calendar at `/calendar/` is populated automatically after a successful refresh and can be retried with **Sync Website Calendar**. Website staff can explicitly select lots with saved Artprice links for the shared Email Tray; sync never selects, deselects, or sends them. See [`auction-calendar.md`](auction-calendar.md) for authentication, deployment, and Gmail setup.
 
 ## Migration note
 

@@ -85,18 +85,19 @@ USE_I18N = True
 USE_TZ = True
 CALENDAR_TIME_ZONE = os.environ.get("CALENDAR_TIME_ZONE", "America/Los_Angeles")
 SECONDSTATE_PUBLIC_URL = os.environ.get("SECONDSTATE_PUBLIC_URL", "https://secondstate.art").rstrip("/")
-TWILIO_SMS_ENABLED = os.environ.get("TWILIO_SMS_ENABLED", "false").strip().lower() in {
+AUCTION_EMAIL_SENDING_ENABLED = os.environ.get("AUCTION_EMAIL_SENDING_ENABLED", "false").strip().lower() in {
     "1",
     "true",
     "yes",
     "on",
 }
-TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
-TWILIO_API_KEY_SID = os.environ.get("TWILIO_API_KEY_SID", "")
-TWILIO_API_KEY_SECRET = os.environ.get("TWILIO_API_KEY_SECRET", "")
-TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
-TWILIO_MESSAGING_SERVICE_SID = os.environ.get("TWILIO_MESSAGING_SERVICE_SID", "")
-AUCTION_REMINDER_TO_NUMBERS = os.environ.get("AUCTION_REMINDER_TO_NUMBERS", "")
+AUCTION_EMAIL_SENDER = os.environ.get("AUCTION_EMAIL_SENDER", "jeremy@secondstate.art")
+AUCTION_EMAIL_RECIPIENT_JEREMY = os.environ.get("AUCTION_EMAIL_RECIPIENT_JEREMY", "")
+AUCTION_EMAIL_RECIPIENT_OLIVER = os.environ.get("AUCTION_EMAIL_RECIPIENT_OLIVER", "")
+AUCTION_EMAIL_RECIPIENT_ALEX = os.environ.get("AUCTION_EMAIL_RECIPIENT_ALEX", "")
+GOOGLE_GMAIL_CLIENT_ID = os.environ.get("GOOGLE_GMAIL_CLIENT_ID", "")
+GOOGLE_GMAIL_CLIENT_SECRET = os.environ.get("GOOGLE_GMAIL_CLIENT_SECRET", "")
+GOOGLE_GMAIL_REFRESH_TOKEN = os.environ.get("GOOGLE_GMAIL_REFRESH_TOKEN", "")
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path("/var/data/media")   # <-- inside your Render disk mount
 # WHITENOISE_ALLOW_ALL_ORIGINS = True

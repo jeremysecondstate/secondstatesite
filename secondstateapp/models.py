@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Max
+from django.db.models import Max, Q
 from PIL import Image
 from io import BytesIO
 from django.core.files.base import ContentFile
@@ -296,3 +296,83 @@ class AuctionReminderControl(models.Model):
 
     def __str__(self):
         return "Auction reminder texts: active" if self.active else "Auction reminder texts: paused"
+
+
+class AuctionEmailBatch(models.Model):
+    """One shared manual auction-lot email tray and its delivery history."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SENDING = "sending", "Sending"
+        SENT = "sent", "Sent"
+        FAILED = "failed", "Failed"
+
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    requested_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    recipient_keys = models.JSONField(default=list, blank=True)
+    recipient_snapshot = models.JSONField(default=list, blank=True)
+    subject_snapshot = models.TextField(blank=True)
+    html_body_snapshot = models.TextField(blank=True)
+    text_body_snapshot = models.TextField(blank=True)
+    gmail_message_id = models.CharField(max_length=255, blank=True)
+    attempt_count = models.PositiveIntegerField(default=0)
+    attempted_at = models.DateTimeField(blank=True, null=True)
+    sent_at = models.DateTimeField(blank=True, null=True)
+    failure_summary = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("is_active",),
+                condition=Q(is_active=True),
+                name="unique_active_auction_email_batch",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(is_active=True, status__in=("draft", "sending", "failed"))
+                    | Q(is_active=False, status="sent")
+                ),
+                name="auction_email_batch_active_status",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Auction email batch {self.pk or 'new'} ({self.status})"
+
+
+class AuctionEmailBatchItem(models.Model):
+    """A selected lot plus the staff attribution and send-time lot snapshot."""
+
+    batch = models.ForeignKey(AuctionEmailBatch, related_name="items", on_delete=models.CASCADE)
+    lot = models.ForeignKey(AuctionWatchLot, related_name="email_batch_items", on_delete=models.PROTECT)
+    selected_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    selected_at = models.DateTimeField(auto_now_add=True)
+    lot_snapshot = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["selected_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("batch", "lot"),
+                name="unique_auction_email_batch_lot",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.lot} in batch {self.batch_id}"

@@ -75,7 +75,7 @@
   border-left-color: #eb7777;
 }
 
-.reminder-control-card {
+.email-tray-card {
   margin-bottom: 28px;
   padding: 22px 24px;
   border: 1px solid var(--calendar-line);
@@ -84,90 +84,66 @@
   box-shadow: 0 18px 55px rgba(0, 0, 0, .2);
 }
 
-.reminder-control-heading,
-.reminder-actions,
-.reminder-control-card h2 {
+.email-tray-heading,
+.email-tray-card h2 {
   display: flex;
 }
 
-.reminder-control-heading {
+.email-tray-heading {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
 }
 
-.reminder-control-card h2 {
+.email-tray-card h2 {
   align-items: center;
-  gap: 10px;
+  gap: 7px;
   margin: 0;
   font-size: 25px;
   font-weight: 550;
 }
 
-.reminder-control-heading p:not(.calendar-kicker) {
+.email-tray-heading p:not(.calendar-kicker) {
   max-width: 760px;
   margin: 7px 0 0;
   color: var(--calendar-muted);
   font-size: 13px;
 }
 
-.reminder-status-dot {
-  width: 10px;
-  height: 10px;
-  flex: 0 0 auto;
+.email-tray-count {
+  display: inline-grid;
+  min-width: 35px;
+  height: 35px;
+  padding: 0 8px;
+  place-items: center;
+  border: 1px solid rgba(217, 184, 120, .35);
   border-radius: 50%;
-  background: rgba(255, 255, 255, .34);
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, .05);
+  background: var(--calendar-gold-soft);
+  color: var(--calendar-gold);
+  font-size: 16px;
 }
 
-.reminder-status-dot.is-active {
-  background: #6fcf97;
-  box-shadow: 0 0 0 5px rgba(111, 207, 151, .12);
-}
-
-.reminder-status-dot.is-locked {
-  background: var(--calendar-gold);
-  box-shadow: 0 0 0 5px var(--calendar-gold-soft);
-}
-
-.reminder-actions {
+.email-tray-button {
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 9px;
-  flex-wrap: wrap;
-}
-
-.reminder-actions form {
-  margin: 0;
-}
-
-.reminder-button {
+  justify-content: center;
   padding: 10px 14px;
   border: 1px solid var(--calendar-gold);
   border-radius: 3px;
   color: #15110a;
   background: var(--calendar-gold);
-  font: inherit;
   font-size: 12px;
   font-weight: 700;
-  cursor: pointer;
+  text-decoration: none;
 }
 
-.reminder-button.is-secondary {
-  color: rgba(255, 255, 255, .88);
-  background: transparent;
-}
-
-.reminder-button:hover:not(:disabled) {
+.email-tray-button:hover,
+.email-tray-button:focus-visible {
+  color: #15110a;
   filter: brightness(1.08);
 }
 
-.reminder-button:disabled {
-  cursor: not-allowed;
-  opacity: .42;
-}
-
-.reminder-control-meta {
+.email-tray-meta {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
@@ -176,99 +152,50 @@
   border-top: 1px solid var(--calendar-line);
 }
 
-.reminder-control-meta > div {
+.email-tray-meta > div {
   display: grid;
   gap: 4px;
   padding-left: 12px;
   border-left: 2px solid var(--calendar-gold-soft);
 }
 
-.reminder-control-meta span,
-.reminder-last-run span {
+.email-tray-meta > div > span {
   color: var(--calendar-muted);
   font-size: 10px;
   letter-spacing: .08em;
   text-transform: uppercase;
 }
 
-.reminder-control-meta strong {
+.email-tray-meta strong {
   font-size: 13px;
   font-weight: 600;
 }
 
-.reminder-configuration-warning,
-.reminder-last-run {
+.email-tray-warning,
+.email-tray-failure,
+.email-tray-sending {
   margin: 14px 0 0;
-  color: var(--calendar-muted);
-  font-size: 12px;
-}
-
-.reminder-configuration-warning {
+  padding: 10px 12px;
+  border-left: 2px solid var(--calendar-gold);
+  background: rgba(217, 184, 120, .08);
   color: #e5ca96;
-}
-
-.reminder-configuration-warning code {
-  color: inherit;
-}
-
-.reminder-last-run span {
-  margin-left: 7px;
-}
-
-.reminder-preview {
-  margin-top: 17px;
-  border-top: 1px solid var(--calendar-line);
-}
-
-.reminder-preview summary {
-  padding-top: 15px;
-  color: rgba(255, 255, 255, .88);
   font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
 }
 
-.reminder-preview summary span {
-  display: inline-grid;
-  min-width: 20px;
-  margin-left: 6px;
-  padding: 1px 6px;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--calendar-gold-soft);
-  color: var(--calendar-gold);
+.email-tray-warning strong {
+  margin-right: 4px;
 }
 
-.reminder-preview-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+.email-tray-failure {
+  border-left-color: #eb7777;
+  background: rgba(235, 119, 119, .08);
+  color: #f0aaaa;
 }
 
-.reminder-preview-list article {
-  min-width: 0;
-  padding: 13px;
-  border: 1px solid var(--calendar-line);
-  background: rgba(0, 0, 0, .16);
-}
-
-.reminder-preview-list article > p {
-  margin: 0 0 9px;
-  color: var(--calendar-gold);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-
-.reminder-preview-list pre {
-  margin: 0;
-  overflow: visible;
-  color: rgba(255, 255, 255, .76);
-  font: 11px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.email-tray-sending {
+  border-left-color: #6fcf97;
+  background: rgba(111, 207, 151, .08);
+  color: #a5dfbc;
 }
 
 .calendar-sync-note {
@@ -661,6 +588,47 @@
 }
 
 .artprice-status.is-error {
+  color: #eb7777;
+}
+
+.email-tray-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: rgba(255, 255, 255, .82);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.email-tray-toggle input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--calendar-gold);
+}
+
+.email-tray-toggle:has(input:disabled) {
+  color: rgba(255, 255, 255, .38);
+  cursor: not-allowed;
+}
+
+.email-tray-toggle-status {
+  margin: 5px 0 0;
+  color: var(--calendar-muted);
+  font-size: 10px;
+}
+
+.email-tray-toggle-status:empty {
+  display: none;
+}
+
+.email-tray-toggle-status.is-success {
+  color: #6fcf97;
+}
+
+.email-tray-toggle-status.is-error {
   color: #eb7777;
 }
 
@@ -1121,9 +1089,439 @@
   margin: 16px 0 0;
 }
 
+.email-review-hero,
+.email-review-section-heading,
+.email-review-lot,
+.email-review-lot-links,
+.email-recipient-choice {
+  display: flex;
+}
+
+.email-review-hero {
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.email-review-back {
+  display: inline-block;
+  margin-bottom: 22px;
+  color: var(--calendar-muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.email-review-back:hover,
+.email-review-back:focus-visible {
+  color: var(--calendar-gold);
+}
+
+.email-review-hero h1 {
+  margin: 0;
+  font-family: "Playfair Display", serif;
+  font-size: clamp(38px, 5vw, 62px);
+  font-weight: 500;
+  letter-spacing: -.035em;
+}
+
+.email-review-hero p:not(.calendar-kicker) {
+  margin: 9px 0 0;
+  color: var(--calendar-muted);
+}
+
+.email-review-status {
+  padding: 8px 12px;
+  border: 1px solid var(--calendar-line);
+  border-radius: 999px;
+  color: var(--calendar-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.email-review-status.is-failed {
+  border-color: rgba(235, 119, 119, .5);
+  color: #f0aaaa;
+}
+
+.email-review-status.is-sending {
+  border-color: rgba(111, 207, 151, .5);
+  color: #a5dfbc;
+}
+
+.email-review-notice {
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid var(--calendar-line);
+  border-left: 3px solid #6fcf97;
+  background: var(--calendar-panel);
+  color: rgba(255, 255, 255, .8);
+  font-size: 12px;
+}
+
+.email-review-notice.is-error {
+  border-left-color: #eb7777;
+}
+
+.email-review-notice.is-warning {
+  border-left-color: var(--calendar-gold);
+  color: #e5ca96;
+}
+
+.email-review-summary {
+  display: grid;
+  grid-template-columns: .7fr .7fr 1fr 2fr;
+  gap: 1px;
+  margin: 24px 0;
+  border: 1px solid var(--calendar-line);
+  background: var(--calendar-line);
+}
+
+.email-review-summary > div {
+  min-width: 0;
+  padding: 14px 16px;
+  background: rgba(9, 12, 14, .96);
+}
+
+.email-review-summary span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--calendar-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.email-review-summary strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.email-review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(280px, .75fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.email-review-lots,
+.email-send-card,
+.email-preview,
+.email-review-empty {
+  border: 1px solid var(--calendar-line);
+  border-radius: 4px;
+  background: var(--calendar-panel);
+}
+
+.email-review-lots {
+  padding: 20px;
+}
+
+.email-review-section-heading {
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 15px;
+}
+
+.email-review-section-heading h2,
+.email-send-card h2,
+.email-preview > h2,
+.email-review-empty h2 {
+  margin: 0;
+  font-family: "Playfair Display", serif;
+  font-size: 27px;
+  font-weight: 500;
+}
+
+.email-review-text-button,
+.email-review-remove {
+  border: 0;
+  padding: 5px;
+  color: var(--calendar-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.email-review-text-button:hover:not(:disabled),
+.email-review-remove:hover:not(:disabled) {
+  color: #eb7777;
+}
+
+.email-review-text-button:disabled,
+.email-review-remove:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.email-review-lot-list {
+  display: grid;
+  gap: 9px;
+}
+
+.email-review-lot {
+  align-items: flex-start;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid var(--calendar-line);
+  background: rgba(255, 255, 255, .025);
+}
+
+.email-review-lot-number {
+  min-width: 62px;
+  padding: 4px 7px;
+  border: 1px solid rgba(217, 184, 120, .28);
+  color: var(--calendar-gold);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.email-review-lot-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.email-review-lot-copy > p {
+  margin: 0;
+  color: var(--calendar-gold);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.email-review-lot-copy h3 {
+  margin: 3px 0 9px;
+  font-family: "Playfair Display", serif;
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.email-review-lot-copy dl {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+.email-review-lot-copy dl > div {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 7px;
+  font-size: 10px;
+}
+
+.email-review-lot-copy dt {
+  color: var(--calendar-muted);
+  font-weight: 500;
+}
+
+.email-review-lot-copy dd {
+  margin: 0;
+}
+
+.email-review-lot-links {
+  gap: 12px;
+  margin-top: 9px;
+}
+
+.email-review-lot-links a,
+.email-preview a {
+  color: var(--calendar-gold);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.email-send-card {
+  position: sticky;
+  top: 20px;
+  padding: 20px;
+}
+
+.email-send-card > p:not(.calendar-kicker) {
+  margin: 8px 0 17px;
+  color: var(--calendar-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.email-recipient-list {
+  display: grid;
+  gap: 8px;
+}
+
+.email-recipient-choice {
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid var(--calendar-line);
+  background: rgba(255, 255, 255, .025);
+  cursor: pointer;
+}
+
+.email-recipient-choice:has(input:checked) {
+  border-color: rgba(217, 184, 120, .55);
+  background: var(--calendar-gold-soft);
+}
+
+.email-recipient-choice.is-unconfigured {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.email-recipient-choice input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--calendar-gold);
+}
+
+.email-recipient-choice strong,
+.email-recipient-choice small {
+  display: block;
+}
+
+.email-recipient-choice strong {
+  font-size: 12px;
+}
+
+.email-recipient-choice small {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: var(--calendar-muted);
+  font-size: 9px;
+}
+
+.email-recipient-error {
+  min-height: 17px;
+  margin: 8px 0 0;
+  color: #eb7777;
+  font-size: 10px;
+}
+
+.email-send-button {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--calendar-gold);
+  border-radius: 3px;
+  color: #15110a;
+  background: var(--calendar-gold);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.email-send-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.email-send-button:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+
+.email-preview {
+  margin-top: 24px;
+  padding: 24px;
+}
+
+.email-preview-meta {
+  margin-top: 7px;
+  color: var(--calendar-muted);
+  font-size: 11px;
+}
+
+.email-preview-date > h3 {
+  margin: 25px 0 11px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(217, 184, 120, .35);
+  color: var(--calendar-gold);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.email-preview-house > h4 {
+  margin: 16px 0 8px;
+  font-family: "Playfair Display", serif;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.email-preview-house article {
+  margin-bottom: 8px;
+  padding: 13px 15px;
+  border: 1px solid var(--calendar-line);
+  background: rgba(255, 255, 255, .025);
+}
+
+.email-preview-house article p {
+  margin: 0;
+  color: var(--calendar-gold);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.email-preview-house article h5 {
+  margin: 3px 0 6px;
+  font-family: "Playfair Display", serif;
+  font-size: 16px;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.email-preview-house article div {
+  margin-bottom: 6px;
+  color: var(--calendar-muted);
+  font-size: 10px;
+}
+
+.email-preview-house article a + a {
+  margin-left: 12px;
+}
+
+.email-review-empty {
+  padding: 42px;
+  text-align: center;
+}
+
+.email-review-empty p:not(.calendar-kicker) {
+  max-width: 540px;
+  margin: 10px auto 20px;
+  color: var(--calendar-muted);
+}
+
 @media (max-width: 1180px) {
   .calendar-layout {
     display: grid;
+  }
+
+  .email-review-summary {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .email-review-summary .is-subject {
+    grid-column: 1 / -1;
+  }
+
+  .email-review-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .email-send-card {
+    position: static;
   }
 
   .calendar-sidebar {
@@ -1141,17 +1539,12 @@
 
   .calendar-hero,
   .calendar-toolbar,
-  .reminder-control-heading {
+  .email-tray-heading {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .reminder-actions {
-    justify-content: flex-start;
-  }
-
-  .reminder-control-meta,
-  .reminder-preview-list {
+  .email-tray-meta {
     grid-template-columns: 1fr;
   }
 
@@ -1161,5 +1554,23 @@
 
   .calendar-sidebar {
     grid-template-columns: 1fr;
+  }
+
+  .email-review-hero,
+  .email-review-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .email-review-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .email-review-summary .is-subject {
+    grid-column: auto;
+  }
+
+  .email-review-lot {
+    flex-wrap: wrap;
   }
 }

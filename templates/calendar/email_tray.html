@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Email Tray · SecondState{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
+{% endblock %}
+
+{% block main_class %}calendar-page-shell{% endblock %}
+
+{% block content %}
+<section class="auction-calendar email-tray-review" aria-labelledby="email-tray-review-title">
+  {% if messages %}
+    <div class="calendar-alerts" aria-live="polite">
+      {% for message in messages %}
+        <p class="calendar-alert is-{{ message.tags|default:'info' }}">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <header class="email-review-hero">
+    <div>
+      <a class="email-review-back" href="{% url 'auction_calendar' %}">← Auction Calendar</a>
+      <p class="calendar-kicker">Email Tray</p>
+      <h1 id="email-tray-review-title">Review &amp; Send</h1>
+      <p>Confirm the selected lots and recipients before one consolidated Gmail delivery.</p>
+    </div>
+    <div class="email-review-status is-{{ batch.status|default:'draft' }}">
+      {{ batch.get_status_display|default:"Draft" }}
+    </div>
+  </header>
+
+  {% if batch.status == "failed" and batch.failure_summary %}
+    <div class="email-review-notice is-error">
+      <strong>Last delivery failed.</strong> {{ batch.failure_summary }} The same tray is preserved for a deliberate retry.
+    </div>
+  {% elif batch.status == "sending" %}
+    <div class="email-review-notice">
+      <strong>Sending is in progress.</strong> Duplicate sends and tray changes are blocked for this batch.
+    </div>
+  {% endif %}
+
+  {% if configuration_warnings %}
+    <div class="email-review-notice is-warning">
+      <strong>Gmail delivery is not ready.</strong>
+      {{ configuration_warnings|join:" " }} You can continue reviewing and managing the tray.
+    </div>
+  {% endif %}
+
+  {% if items %}
+    <div class="email-review-summary">
+      <div>
+        <span>Selected lots</span>
+        <strong>{{ composition.lot_count }}</strong>
+      </div>
+      <div>
+        <span>Auctions</span>
+        <strong>{{ composition.auction_count }}</strong>
+      </div>
+      <div>
+        <span>Sale dates</span>
+        <strong>{{ composition.date_range }}</strong>
+      </div>
+      <div class="is-subject">
+        <span>Subject preview</span>
+        <strong>{{ composition.subject }}</strong>
+      </div>
+    </div>
+
+    <div class="email-review-layout">
+      <section class="email-review-lots" aria-labelledby="selected-lots-title">
+        <div class="email-review-section-heading">
+          <div>
+            <p class="calendar-kicker">Selected lots</p>
+            <h2 id="selected-lots-title">{{ items|length }} lot{{ items|length|pluralize }}</h2>
+          </div>
+          <form method="post" action="{% url 'auction_email_tray_clear' %}" onsubmit="return confirm('Clear every lot from the active Email Tray?');">
+            {% csrf_token %}
+            <button class="email-review-text-button" type="submit" {% if batch.status == "sending" %}disabled{% endif %}>Clear tray</button>
+          </form>
+        </div>
+
+        <div class="email-review-lot-list">
+          {% for item in items %}
+            <article class="email-review-lot">
+              <div class="email-review-lot-number">{% if item.lot.lot_number %}Lot {{ item.lot.lot_number }}{% else %}{{ item.lot.source_lot_id }}{% endif %}</div>
+              <div class="email-review-lot-copy">
+                <p>{{ item.lot.artist_watchlist_name|default:item.lot.artist|default:"Unknown artist" }}</p>
+                <h3>{{ item.lot.title|default:"Untitled lot" }}</h3>
+                <dl>
+                  <div><dt>Auction</dt><dd>{{ item.lot.auction_house|default:item.lot.source }}</dd></div>
+                  {% if item.lot.sale_title %}<div><dt>Sale</dt><dd>{{ item.lot.sale_title }}</dd></div>{% endif %}
+                  <div><dt>Selected by</dt><dd>{% if item.selected_by %}{% firstof item.selected_by.get_full_name item.selected_by.username %}{% else %}Unknown staff user{% endif %}</dd></div>
+                </dl>
+                <div class="email-review-lot-links">
+                  <a href="{{ item.lot.artprice_url }}" target="_blank" rel="noopener noreferrer">Artprice ↗</a>
+                  {% if item.lot.lot_url or item.lot.sale_url %}
+                    <a href="{% firstof item.lot.lot_url item.lot.sale_url %}" target="_blank" rel="noopener noreferrer">Auction lot ↗</a>
+                  {% endif %}
+                </div>
+              </div>
+              <form method="post" action="{% url 'auction_email_lot_remove' item.lot_id %}">
+                {% csrf_token %}
+                <button class="email-review-remove" type="submit" {% if batch.status == "sending" %}disabled{% endif %}>Remove</button>
+              </form>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <aside class="email-send-card" aria-labelledby="recipient-title">
+        <p class="calendar-kicker">Recipients</p>
+        <h2 id="recipient-title">Choose recipients</h2>
+        <p>Addresses are resolved from fixed server-side keys. At least one recipient is required.</p>
+
+        <form
+          id="email-send-form"
+          method="post"
+          action="{% if batch.status == 'failed' %}{% url 'auction_email_retry' %}{% else %}{% url 'auction_email_send' %}{% endif %}"
+          data-lot-count="{{ composition.lot_count }}"
+        >
+          {% csrf_token %}
+          <div class="email-recipient-list">
+            {% for choice in recipient_choices %}
+              <label class="email-recipient-choice{% if not choice.configured %} is-unconfigured{% endif %}">
+                <input
+                  type="checkbox"
+                  name="recipients"
+                  value="{{ choice.key }}"
+                  data-recipient-name="{{ choice.name }}"
+                  {% if choice.checked and choice.configured %}checked{% endif %}
+                  {% if not choice.configured or batch.status == "sending" %}disabled{% endif %}
+                >
+                <span>
+                  <strong>{{ choice.name }}</strong>
+                  <small>{{ choice.address }}{% if not choice.configured %} · not configured{% endif %}</small>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+          <p id="email-recipient-error" class="email-recipient-error" role="alert"></p>
+          <button
+            class="email-send-button"
+            type="submit"
+            {% if configuration_warnings or batch.status == "sending" %}disabled{% endif %}
+          >{% if batch.status == "failed" %}Retry Email{% else %}Send Email{% endif %}</button>
+        </form>
+      </aside>
+    </div>
+
+    <section class="email-preview" aria-labelledby="email-preview-title">
+      <p class="calendar-kicker">Message preview</p>
+      <h2 id="email-preview-title">{{ composition.subject }}</h2>
+      <div class="email-preview-meta">{{ composition.auction_count }} auction{{ composition.auction_count|pluralize }} · {{ composition.date_range }} · Times use {{ timezone_label }}</div>
+      {% for date_group in composition.groups %}
+        <section class="email-preview-date">
+          <h3>{{ date_group.date_label }}</h3>
+          {% for house in date_group.houses %}
+            <div class="email-preview-house">
+              <h4>{{ house.name }}</h4>
+              {% for lot in house.lots %}
+                <article>
+                  <p>{{ lot.artist }}</p>
+                  <h5>{{ lot.title }}</h5>
+                  <div>
+                    {% if lot.sale_title %}{{ lot.sale_title }} · {% endif %}
+                    {{ lot.sale_time_label }} · Lot {{ lot.lot_number }}{% if lot.estimate %} · {{ lot.estimate }}{% endif %}
+                  </div>
+                  <a href="{{ lot.artprice_url }}" target="_blank" rel="noopener noreferrer">Artprice</a>
+                  {% if lot.lot_url %}<a href="{{ lot.lot_url }}" target="_blank" rel="noopener noreferrer">Auction lot</a>{% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </section>
+      {% endfor %}
+    </section>
+  {% else %}
+    <div class="email-review-empty">
+      <p class="calendar-kicker">Nothing selected</p>
+      <h2>The Email Tray is empty.</h2>
+      <p>Return to the calendar, save an Artprice link on a lot, and check <strong>Include in next email</strong>.</p>
+      <a class="email-tray-button" href="{% url 'auction_calendar' %}">Choose lots</a>
+    </div>
+  {% endif %}
+</section>
+
+<script>
+(() => {
+  const form = document.getElementById("email-send-form");
+  if (!form) return;
+  form.addEventListener("submit", (event) => {
+    const selected = Array.from(form.querySelectorAll('input[name="recipients"]:checked'));
+    const error = document.getElementById("email-recipient-error");
+    if (!selected.length) {
+      event.preventDefault();
+      error.textContent = "Choose at least one recipient.";
+      return;
+    }
+    const names = selected.map((input) => input.dataset.recipientName).join(", ");
+    const lotCount = Number(form.dataset.lotCount) || 0;
+    if (!window.confirm(`Send ${lotCount} selected lot${lotCount === 1 ? "" : "s"} to ${names}?`)) {
+      event.preventDefault();
+      return;
+    }
+    error.textContent = "";
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    button.textContent = "Sending…";
+  });
+})();
+</script>
+{% endblock %}

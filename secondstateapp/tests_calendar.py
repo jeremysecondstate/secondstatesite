@@ -1,6 +1,7 @@
+import base64
 import json
 import os
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from io import StringIO
 from types import SimpleNamespace
@@ -9,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.management import call_command
+from django.core.management import call_command, get_commands
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
@@ -24,21 +25,12 @@ from secondstateapp.artprice_max_bid import (
     money_to_decimal,
     parse_auction_results,
 )
+from secondstateapp.auction_email import GMAIL_SEND_SCOPE, build_mime_message, compose_auction_email, send_auction_email
 from secondstateapp.calendar_views import _uploaded_artprice_html
-from secondstateapp.auction_reminders import (
-    ReminderDispatchOutcome,
-    ReminderConfigurationError,
-    ReminderRunResult,
-    TwilioSendResult,
-    TwilioSmsSender,
-    build_due_digests,
-    dispatch_active_auction_reminders,
-    run_auction_reminders,
-)
 from secondstateapp.models import (
+    AuctionEmailBatch,
+    AuctionEmailBatchItem,
     AuctionMaxBidAnalysis,
-    AuctionReminderControl,
-    AuctionReminderDelivery,
     AuctionWatchLot,
 )
 
@@ -564,18 +556,28 @@ class AuctionCalendarViewTests(TestCase):
         response = self.client.get(reverse("auction_calendar"), {"month": "not-a-month"})
         self.assertEqual(response.status_code, 200)
 
-    def test_calendar_renders_the_paused_reminder_controls_and_preview(self):
+    def test_calendar_renders_the_shared_email_tray_panel(self):
         self.client.force_login(self.staff)
         response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
-        self.assertContains(response, "Start Reminder Texts")
-        self.assertContains(response, "Preview due texts")
-        self.assertFalse(response.context["reminder_control"].active)
+        self.assertContains(response, "Email Tray")
+        self.assertContains(response, "Review &amp; Send")
+        self.assertContains(response, "Gmail delivery is not ready")
+        self.assertEqual(response.context["email_selected_count"], 0)
 
-    def test_reminder_control_endpoints_are_staff_only(self):
-        ordinary = get_user_model().objects.create_user("reminder-ordinary", password="test-pass")
+    def test_email_tray_pages_and_endpoints_are_staff_only(self):
+        lot = watch_lot(artprice_url="https://www.artprice.com/artist/1/example/lots/pasts")
+        ordinary = get_user_model().objects.create_user("email-ordinary", password="test-pass")
         self.client.force_login(ordinary)
-        for endpoint in ("auction_reminder_control", "auction_reminder_send"):
-            response = self.client.post(reverse(endpoint), {"action": "start", "month": "2026-07"})
+        requests = (
+            ("get", reverse("auction_email_tray"), {}),
+            ("post", reverse("auction_email_lot_selection", args=(lot.pk,)), {"selected": "true"}),
+            ("post", reverse("auction_email_lot_remove", args=(lot.pk,)), {}),
+            ("post", reverse("auction_email_tray_clear"), {}),
+            ("post", reverse("auction_email_send"), {"recipients": "jeremy"}),
+            ("post", reverse("auction_email_retry"), {"recipients": "jeremy"}),
+        )
+        for method, endpoint, data in requests:
+            response = getattr(self.client, method)(endpoint, data)
             self.assertEqual(response.status_code, 302)
             self.assertIn("login", response.url)
 
@@ -915,83 +917,101 @@ class AuctionArtpriceAnalysisViewTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
-@override_settings(
-    CALENDAR_TIME_ZONE="America/Los_Angeles",
-    TWILIO_SMS_ENABLED=True,
-    TWILIO_ACCOUNT_SID="AC" + "1" * 32,
-    TWILIO_API_KEY_SID="SK" + "2" * 32,
-    TWILIO_API_KEY_SECRET="test-secret",
-    TWILIO_FROM_NUMBER="+12065550123",
-    TWILIO_MESSAGING_SERVICE_SID="",
-    AUCTION_REMINDER_TO_NUMBERS="+12065550124",
-)
-class AuctionReminderControlViewTests(TestCase):
+@override_settings(CALENDAR_TIME_ZONE="America/Los_Angeles")
+class AuctionEmailTraySelectionTests(TestCase):
     def setUp(self):
-        self.staff = get_user_model().objects.create_user("reminder-admin", password="test-pass", is_staff=True)
+        self.staff = get_user_model().objects.create_user("email-admin", password="test-pass", is_staff=True)
+        self.other_staff = get_user_model().objects.create_user(
+            "email-admin-two", password="test-pass", is_staff=True
+        )
+        self.artprice_url = "https://www.artprice.com/artist/1/example/lots/pasts"
+        self.lot = watch_lot()
         self.client.force_login(self.staff)
 
-    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")
-    def test_start_activates_and_immediately_runs_catch_up(self, dispatch):
-        dispatch.return_value = ReminderDispatchOutcome(
-            status="no_due",
-            summary="Nothing due.",
-            control_active=True,
-            master_enabled=True,
-            attempted=True,
-            result=ReminderRunResult(),
+    def save_artprice(self):
+        return self.client.post(
+            reverse("auction_lot_artprice_link", args=(self.lot.pk,)),
+            {"artprice_url": self.artprice_url},
         )
+
+    def select(self, selected=True):
+        return self.client.post(
+            reverse("auction_email_lot_selection", args=(self.lot.pk,)),
+            {"selected": "true" if selected else "false"},
+        )
+
+    def test_checkbox_is_disabled_without_artprice_and_saving_enables_without_selecting(self):
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        lot_data = response.context["calendar_data"]["2026-07-25"][0]
+        self.assertEqual(lot_data["artprice_url"], "")
+        self.assertFalse(lot_data["email_tray_selected"])
+        self.assertContains(response, "Include in next email")
+        self.assertContains(response, "trayCheckbox.disabled = !lot.artprice_url")
+
+        saved = self.save_artprice()
+
+        self.assertEqual(saved.status_code, 200)
+        self.assertFalse(saved.json()["email_tray_selected"])
+        self.assertFalse(AuctionEmailBatchItem.objects.exists())
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        lot_data = response.context["calendar_data"]["2026-07-25"][0]
+        self.assertEqual(lot_data["artprice_url"], self.artprice_url)
+        self.assertFalse(lot_data["email_tray_selected"])
+
+    def test_select_and_deselect_persist_and_record_selecting_staff(self):
+        self.save_artprice()
+        selected = self.select()
+
+        self.assertEqual(selected.status_code, 200)
+        self.assertEqual(selected.json()["selected_count"], 1)
+        item = AuctionEmailBatchItem.objects.select_related("batch").get()
+        self.assertEqual(item.selected_by, self.staff)
+        self.assertTrue(item.batch.is_active)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        self.assertTrue(response.context["calendar_data"]["2026-07-25"][0]["email_tray_selected"])
+        self.client.force_login(self.other_staff)
+        response = self.client.get(reverse("auction_email_tray"))
+        self.assertContains(response, self.staff.username)
+        self.assertEqual(response.context["items"][0], item)
+
+        deselected = self.select(False)
+        self.assertEqual(deselected.json()["selected_count"], 0)
+        self.assertFalse(AuctionEmailBatchItem.objects.exists())
+
+    def test_removing_artprice_link_removes_selected_lot(self):
+        self.save_artprice()
+        self.select()
 
         response = self.client.post(
-            reverse("auction_reminder_control"),
-            {"action": "start", "month": "2026-07"},
+            reverse("auction_lot_artprice_link", args=(self.lot.pk,)),
+            {"artprice_url": ""},
         )
 
-        self.assertRedirects(response, "/calendar/?month=2026-07", fetch_redirect_response=False)
-        control = AuctionReminderControl.load()
-        self.assertTrue(control.active)
-        self.assertEqual(control.updated_by, self.staff)
-        dispatch.assert_called_once_with(source="start")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["email_tray_selected"])
+        self.assertEqual(response.json()["selected_count"], 0)
+        self.assertFalse(AuctionEmailBatchItem.objects.exists())
 
-    @override_settings(TWILIO_SMS_ENABLED=False)
-    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")
-    def test_start_refuses_when_the_render_safety_switch_is_off(self, dispatch):
-        response = self.client.post(reverse("auction_reminder_control"), {"action": "start"})
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(AuctionReminderControl.load().active)
-        dispatch.assert_not_called()
+    def test_selection_requires_saved_artprice_and_all_mutations_require_csrf(self):
+        response = self.select()
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(AuctionEmailBatchItem.objects.exists())
 
-    def test_pause_blocks_send_due_now(self):
-        control = AuctionReminderControl.load()
-        control.active = True
-        control.save(update_fields=("active", "updated_at"))
-
-        response = self.client.post(reverse("auction_reminder_control"), {"action": "pause"})
-        self.assertEqual(response.status_code, 302)
-        control.refresh_from_db()
-        self.assertFalse(control.active)
-
-        response = self.client.post(reverse("auction_reminder_send"))
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(AuctionReminderControl.load().active)
-
-    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")
-    def test_send_due_now_uses_the_same_idempotent_dispatcher(self, dispatch):
-        control = AuctionReminderControl.load()
-        control.active = True
-        control.save(update_fields=("active", "updated_at"))
-        dispatch.return_value = ReminderDispatchOutcome(
-            status="up_to_date",
-            summary="Already covered.",
-            control_active=True,
-            master_enabled=True,
-            attempted=True,
-            result=ReminderRunResult(skipped=1),
+        self.save_artprice()
+        self.select()
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.staff)
+        mutations = (
+            (reverse("auction_email_lot_selection", args=(self.lot.pk,)), {"selected": "false"}),
+            (reverse("auction_email_lot_remove", args=(self.lot.pk,)), {}),
+            (reverse("auction_email_tray_clear"), {}),
+            (reverse("auction_email_send"), {"recipients": "jeremy"}),
+            (reverse("auction_email_retry"), {"recipients": "jeremy"}),
         )
-
-        response = self.client.post(reverse("auction_reminder_send"), {"month": "2026-07"})
-
-        self.assertRedirects(response, "/calendar/?month=2026-07", fetch_redirect_response=False)
-        dispatch.assert_called_once_with(source="manual")
+        for endpoint, data in mutations:
+            with self.subTest(endpoint=endpoint):
+                self.assertEqual(csrf_client.post(endpoint, data).status_code, 403)
 
 
 @override_settings(CALENDAR_TIME_ZONE="America/Los_Angeles")
@@ -1046,6 +1066,8 @@ class CalendarSyncApiTests(TestCase):
         lot.save(update_fields=("artprice_url",))
         analysis = stored_analysis(lot)
         analysis_pk = analysis.pk
+        batch = AuctionEmailBatch.objects.create()
+        tray_item = AuctionEmailBatchItem.objects.create(batch=batch, lot=lot)
 
         response = self.client.post(
             self.endpoint,
@@ -1063,20 +1085,12 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(analysis.pk, analysis_pk)
         self.assertEqual(analysis.lot, lot)
         self.assertEqual(analysis.expected_resale_hammer, Decimal("1205.00"))
-        self.assertEqual(response.json()["reminders"]["status"], "paused")
+        tray_item.refresh_from_db()
+        self.assertEqual(tray_item.lot, lot)
+        self.assertNotIn("reminders", response.json())
 
-    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders")
     @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
-    def test_successful_sync_runs_and_reports_the_reminder_catch_up(self, dispatch):
-        dispatch.return_value = ReminderDispatchOutcome(
-            status="sent",
-            summary="Reminder catch-up sent 1 text.",
-            control_active=True,
-            master_enabled=True,
-            attempted=True,
-            result=ReminderRunResult(sent=1),
-        )
-
+    def test_successful_sync_has_no_reminder_dispatch_or_result(self):
         response = self.client.post(
             self.endpoint,
             data=json.dumps(self._payload()),
@@ -1085,23 +1099,7 @@ class CalendarSyncApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["reminders"]["status"], "sent")
-        self.assertEqual(response.json()["reminders"]["sent"], 1)
-        dispatch.assert_called_once_with(source="sync")
-
-    @patch("secondstateapp.calendar_views.dispatch_active_auction_reminders", side_effect=RuntimeError("boom"))
-    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
-    def test_reminder_error_does_not_roll_back_a_successful_calendar_sync(self, _dispatch):
-        with patch("secondstateapp.calendar_views.logger.exception"):
-            response = self.client.post(
-                self.endpoint,
-                data=json.dumps(self._payload()),
-                content_type="application/json",
-                HTTP_X_API_KEY="sync-test-key",
-            )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["reminders"]["status"], "error")
+        self.assertNotIn("reminders", response.json())
         self.assertEqual(AuctionWatchLot.objects.count(), 1)
 
     @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
@@ -1141,151 +1139,296 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(response.status_code, 503)
 
 
-class _FakeSender:
-    def __init__(self, fail=False):
-        self.calls = []
-        self.fail = fail
-
-    def send(self, recipient, body):
-        self.calls.append((recipient, body))
-        if self.fail:
-            raise RuntimeError("test failure")
-        return TwilioSendResult(message_sid=f"SM{len(self.calls):032d}", status="queued")
-
-
 @override_settings(
     CALENDAR_TIME_ZONE="America/Los_Angeles",
     SECONDSTATE_PUBLIC_URL="https://secondstate.art",
-    SECRET_KEY="reminder-test-secret",
+    AUCTION_EMAIL_SENDING_ENABLED=True,
+    AUCTION_EMAIL_SENDER="jeremy@secondstate.art",
+    AUCTION_EMAIL_RECIPIENT_JEREMY="jeremy@secondstate.art",
+    AUCTION_EMAIL_RECIPIENT_OLIVER="oliver@secondstate.art",
+    AUCTION_EMAIL_RECIPIENT_ALEX="alex@secondstate.art",
+    GOOGLE_GMAIL_CLIENT_ID="test-client.apps.googleusercontent.com",
+    GOOGLE_GMAIL_CLIENT_SECRET="test-client-secret",
+    GOOGLE_GMAIL_REFRESH_TOKEN="test-refresh-token",
 )
-class AuctionReminderTests(TestCase):
-    today = date(2026, 7, 20)
+class AuctionEmailBatchTests(TestCase):
+    def setUp(self):
+        self.staff = get_user_model().objects.create_user("sender", password="test-pass", is_staff=True)
+        self.client.force_login(self.staff)
 
-    def _event(self, days_ahead, **overrides):
-        target = self.today + timedelta(days=days_ahead)
-        return watch_lot(
-            source_lot_id=f"due-{days_ahead}-{AuctionWatchLot.objects.count()}",
-            event_at=datetime.combine(target, datetime.min.time(), tzinfo=CALENDAR_ZONE) + timedelta(hours=13),
-            **overrides,
+    def selected_batch(self, *lots):
+        if not lots:
+            lots = (
+                watch_lot(
+                    artprice_url="https://www.artprice.com/artist/1/example/lots/pasts",
+                ),
+            )
+        batch = AuctionEmailBatch.objects.create()
+        for lot in lots:
+            AuctionEmailBatchItem.objects.create(batch=batch, lot=lot, selected_by=self.staff)
+        return batch, list(lots)
+
+    def test_email_contents_order_grouping_unicode_escaping_and_multipart(self):
+        later = watch_lot(
+            source_lot_id="later",
+            artist="Joan Miró",
+            artist_watchlist_name="Joan Miró",
+            title='<Study & "Blue">',
+            auction_house="Phillips",
+            sale_title="Evening Editions",
+            lot_number="9",
+            event_at=datetime(2026, 8, 7, 12, 0, tzinfo=CALENDAR_ZONE),
+            artprice_url="https://www.artprice.com/artist/2/miro/lots/pasts",
+        )
+        second = watch_lot(
+            source_lot_id="second",
+            artist="Zao Wou-Ki",
+            artist_watchlist_name="Zao Wou-Ki",
+            title="Composition",
+            auction_house="Bonhams",
+            lot_number="12",
+            event_at=datetime(2026, 8, 6, 13, 0, tzinfo=CALENDAR_ZONE),
+            artprice_url="https://www.artprice.com/artist/3/zao/lots/pasts",
+        )
+        first = watch_lot(
+            source_lot_id="first",
+            artist="Alex Katz",
+            artist_watchlist_name="Alex Katz",
+            title="Morning",
+            auction_house="Bonhams",
+            lot_number="2",
+            event_at=datetime(2026, 8, 6, 13, 0, tzinfo=CALENDAR_ZONE),
+            artprice_url="https://www.artprice.com/artist/4/katz/lots/pasts",
         )
 
-    def test_builds_only_the_remaining_three_two_one_day_digests(self):
-        self._event(3)
-        self._event(2)
-        self._event(1)
-        self._event(4)
-        self._event(0)
+        email = compose_auction_email([later, second, first])
 
-        digests = build_due_digests(self.today)
+        self.assertEqual(email.subject, "SecondState — 3 selected auction lots · Aug 6–7")
+        self.assertEqual(email.lot_count, 3)
+        self.assertEqual(email.groups[0]["houses"][0]["name"], "Bonhams")
+        self.assertEqual([lot["artist"] for lot in email.groups[0]["houses"][0]["lots"]], ["Alex Katz", "Zao Wou-Ki"])
+        self.assertLess(email.text_body.index("Alex Katz"), email.text_body.index("Zao Wou-Ki"))
+        self.assertLess(email.text_body.index("Zao Wou-Ki"), email.text_body.index("Joan Miró"))
+        self.assertIn("https://secondstate.art/calendar/", email.text_body)
+        self.assertIn("Joan Miró", email.html_body)
+        self.assertIn("&lt;Study &amp; &quot;Blue&quot;&gt;", email.html_body)
+        self.assertNotIn('<Study & "Blue">', email.html_body)
 
-        self.assertEqual([item.days_before for item in digests], [3, 2, 1])
-        self.assertTrue(all("Calendar: https://secondstate.art/calendar/" in item.body for item in digests))
+        message = build_mime_message(
+            subject=email.subject,
+            text_body=email.text_body,
+            html_body=email.html_body,
+            recipients=["jeremy@secondstate.art"],
+        )
+        self.assertEqual(message["From"], "jeremy@secondstate.art")
+        self.assertEqual(message["To"], "jeremy@secondstate.art")
+        self.assertEqual([part.get_content_type() for part in message.iter_parts()], ["text/plain", "text/html"])
 
-    def test_late_discovery_one_day_before_sends_only_one_reminder(self):
-        self._event(1)
-        digests = build_due_digests(self.today)
-        self.assertEqual(len(digests), 1)
-        self.assertEqual(digests[0].days_before, 1)
+    @patch("secondstateapp.calendar_views.send_auction_email", return_value="gmail-message-123")
+    def test_success_archives_batch_records_metadata_and_clears_active_tray(self, sender):
+        batch, lots = self.selected_batch()
 
-    def test_delivery_is_idempotent_and_phone_is_not_stored_in_plaintext(self):
-        self._event(3)
-        sender = _FakeSender()
-        recipient = "+12065550123"
+        response = self.client.post(
+            reverse("auction_email_send"),
+            {"recipients": ["jeremy", "alex"], "recipient_address": "attacker@example.com", "month": "2026-07"},
+        )
 
-        first = run_auction_reminders(today=self.today, recipients=[recipient], sender=sender)
-        second = run_auction_reminders(today=self.today, recipients=[recipient], sender=sender)
+        self.assertRedirects(response, "/calendar/?month=2026-07", fetch_redirect_response=False)
+        sender.assert_called_once()
+        self.assertEqual(sender.call_args.kwargs["recipients"], ["jeremy@secondstate.art", "alex@secondstate.art"])
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.SENT)
+        self.assertFalse(batch.is_active)
+        self.assertEqual(batch.requested_by, self.staff)
+        self.assertEqual(batch.recipient_keys, ["jeremy", "alex"])
+        self.assertEqual(batch.gmail_message_id, "gmail-message-123")
+        self.assertEqual(batch.attempt_count, 1)
+        self.assertIsNotNone(batch.attempted_at)
+        self.assertIsNotNone(batch.sent_at)
+        self.assertTrue(batch.subject_snapshot)
+        self.assertIn("Joan Miró", batch.html_body_snapshot)
+        item = batch.items.get()
+        self.assertEqual(item.lot_snapshot["title"], lots[0].title)
+        self.assertFalse(AuctionEmailBatch.objects.filter(is_active=True).exists())
 
-        self.assertEqual(first.sent, 1)
-        self.assertEqual(second.skipped, 1)
-        self.assertEqual(len(sender.calls), 1)
-        delivery = AuctionReminderDelivery.objects.get()
-        self.assertEqual(delivery.status, AuctionReminderDelivery.Status.SENT)
-        self.assertEqual(delivery.recipient_display, "***0123")
-        self.assertNotIn(recipient, delivery.recipient_hash)
+        original_subject = batch.subject_snapshot
+        lots[0].title = "Changed after send"
+        lots[0].save(update_fields=("title",))
+        batch.refresh_from_db()
+        item.refresh_from_db()
+        self.assertEqual(batch.subject_snapshot, original_subject)
+        self.assertNotEqual(item.lot_snapshot["title"], lots[0].title)
 
-    def test_failed_delivery_is_recorded_and_can_retry(self):
-        self._event(2)
-        failed = run_auction_reminders(today=self.today, recipients=["+12065550123"], sender=_FakeSender(fail=True))
-        retried_sender = _FakeSender()
-        retried = run_auction_reminders(today=self.today, recipients=["+12065550123"], sender=retried_sender)
+        calendar = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        self.assertEqual(calendar.context["email_selected_count"], 0)
+        self.assertEqual(calendar.context["email_last_sent_batch"], batch)
 
-        self.assertEqual(failed.failed, 1)
-        self.assertEqual(retried.sent, 1)
-        self.assertEqual(AuctionReminderDelivery.objects.get().status, AuctionReminderDelivery.Status.SENT)
+    @patch("secondstateapp.calendar_views.send_auction_email")
+    def test_recipient_allowlist_empty_recipient_and_empty_tray_are_rejected(self, sender):
+        batch, _lots = self.selected_batch()
 
-    def test_new_sale_added_after_a_digest_gets_one_supplemental_message(self):
-        self._event(2, auction_house="Bonhams", sale_url="https://example.com/sale/bonhams")
-        sender = _FakeSender()
-        recipient = "+12065550123"
-        first = run_auction_reminders(today=self.today, recipients=[recipient], sender=sender)
+        tampered = self.client.post(reverse("auction_email_send"), {"recipients": "attacker@example.com"})
+        self.assertEqual(tampered.status_code, 302)
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.DRAFT)
 
-        self._event(2, auction_house="Phillips", sale_url="https://example.com/sale/phillips")
-        supplemental = run_auction_reminders(today=self.today, recipients=[recipient], sender=sender)
-        unchanged = run_auction_reminders(today=self.today, recipients=[recipient], sender=sender)
+        empty_recipients = self.client.post(reverse("auction_email_send"), {})
+        self.assertEqual(empty_recipients.status_code, 302)
+        batch.items.all().delete()
+        empty_tray = self.client.post(reverse("auction_email_send"), {"recipients": "jeremy"})
+        self.assertEqual(empty_tray.status_code, 302)
+        sender.assert_not_called()
 
-        self.assertEqual(first.sent, 1)
-        self.assertEqual(supplemental.sent, 1)
-        self.assertEqual(unchanged.skipped, 1)
-        self.assertEqual(len(sender.calls), 2)
-        self.assertIn("Phillips", sender.calls[1][1])
-        self.assertNotIn("Bonhams", sender.calls[1][1])
-        self.assertEqual(len(AuctionReminderDelivery.objects.get().covered_sale_hashes), 2)
+    @patch("secondstateapp.calendar_views.send_auction_email")
+    def test_failed_batch_is_preserved_and_requires_deliberate_retry(self, sender):
+        batch, _lots = self.selected_batch()
+        sender.side_effect = RuntimeError("failure included test-refresh-token")
 
-    def test_dry_run_command_does_not_require_or_send_twilio_configuration(self):
-        self._event(1)
+        self.client.post(reverse("auction_email_send"), {"recipients": ["jeremy", "oliver"]})
+
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.FAILED)
+        self.assertTrue(batch.is_active)
+        self.assertEqual(batch.items.count(), 1)
+        self.assertIn("[redacted]", batch.failure_summary)
+        self.assertNotIn("test-refresh-token", batch.failure_summary)
+        sender.reset_mock()
+        sender.side_effect = None
+        sender.return_value = "gmail-retry-456"
+
+        self.client.post(reverse("auction_email_send"), {"recipients": "jeremy"})
+        sender.assert_not_called()
+        self.client.post(reverse("auction_email_retry"), {"recipients": ["jeremy", "oliver"]})
+
+        sender.assert_called_once()
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.SENT)
+        self.assertEqual(batch.gmail_message_id, "gmail-retry-456")
+        self.assertEqual(batch.attempt_count, 2)
+
+    @patch("secondstateapp.calendar_views.send_auction_email")
+    def test_sending_state_blocks_duplicate_send_retry_and_tray_mutation(self, sender):
+        batch, lots = self.selected_batch()
+        batch.status = AuctionEmailBatch.Status.SENDING
+        batch.save(update_fields=("status", "updated_at"))
+
+        self.client.post(reverse("auction_email_send"), {"recipients": "jeremy"})
+        self.client.post(reverse("auction_email_retry"), {"recipients": "jeremy"})
+        mutation = self.client.post(
+            reverse("auction_email_lot_selection", args=(lots[0].pk,)),
+            {"selected": "false"},
+        )
+
+        self.assertEqual(mutation.status_code, 409)
+        sender.assert_not_called()
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.SENDING)
+        self.assertEqual(batch.items.count(), 1)
+
+    @override_settings(AUCTION_EMAIL_SENDING_ENABLED=False)
+    @patch("secondstateapp.calendar_views.send_auction_email")
+    def test_disabled_delivery_keeps_preview_available_and_refuses_provider(self, sender):
+        batch, _lots = self.selected_batch()
+
+        review = self.client.get(reverse("auction_email_tray"))
+        response = self.client.post(reverse("auction_email_send"), {"recipients": "jeremy"})
+
+        self.assertEqual(review.status_code, 200)
+        self.assertContains(review, "Message preview")
+        self.assertContains(review, "Gmail delivery is not ready")
+        self.assertEqual(response.status_code, 302)
+        sender.assert_not_called()
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.DRAFT)
+
+    @override_settings(GOOGLE_GMAIL_REFRESH_TOKEN="")
+    @patch("secondstateapp.calendar_views.send_auction_email")
+    def test_incomplete_configuration_refuses_provider(self, sender):
+        batch, _lots = self.selected_batch()
+        self.client.post(reverse("auction_email_send"), {"recipients": "jeremy"})
+        sender.assert_not_called()
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.DRAFT)
+
+    def test_review_uses_only_fixed_recipient_keys_and_tray_can_remove_and_clear(self):
+        first = watch_lot(
+            source_lot_id="remove-one",
+            artprice_url="https://www.artprice.com/artist/1/one/lots/pasts",
+        )
+        second = watch_lot(
+            source_lot_id="remove-two",
+            artprice_url="https://www.artprice.com/artist/2/two/lots/pasts",
+        )
+        batch, _lots = self.selected_batch(first, second)
+
+        review = self.client.get(reverse("auction_email_tray"))
+        for key, name, address in (
+            ("jeremy", "Jeremy", "jeremy@secondstate.art"),
+            ("oliver", "Oliver", "oliver@secondstate.art"),
+            ("alex", "Alex", "alex@secondstate.art"),
+        ):
+            self.assertContains(review, f'value="{key}"')
+            self.assertContains(review, name)
+            self.assertContains(review, address)
+        self.assertNotContains(review, 'input type="email"')
+
+        self.client.post(reverse("auction_email_lot_remove", args=(first.pk,)))
+        self.assertEqual(batch.items.count(), 1)
+        self.client.post(reverse("auction_email_tray_clear"))
+        self.assertEqual(batch.items.count(), 0)
+
+    def test_scheduled_twilio_command_is_retired(self):
+        self.assertNotIn("send_auction_reminders", get_commands())
+
+
+@override_settings(
+    AUCTION_EMAIL_SENDER="jeremy@secondstate.art",
+    GOOGLE_GMAIL_CLIENT_ID="test-client.apps.googleusercontent.com",
+    GOOGLE_GMAIL_CLIENT_SECRET="test-client-secret",
+    GOOGLE_GMAIL_REFRESH_TOKEN="test-refresh-token",
+)
+class GmailProviderTests(SimpleTestCase):
+    @patch("googleapiclient.discovery.build")
+    def test_provider_sends_one_urlsafe_multipart_message_as_the_oauth_user(self, build):
+        execute = build.return_value.users.return_value.messages.return_value.send.return_value.execute
+        execute.return_value = {"id": "gmail-provider-id"}
+
+        message_id = send_auction_email(
+            subject="SecondState — 1 selected auction lot · Aug 6",
+            text_body="Joan Miró\n",
+            html_body="<p>Joan Miró</p>",
+            recipients=["jeremy@secondstate.art"],
+        )
+
+        self.assertEqual(message_id, "gmail-provider-id")
+        build.assert_called_once_with("gmail", "v1", credentials=build.call_args.kwargs["credentials"], cache_discovery=False)
+        send = build.return_value.users.return_value.messages.return_value.send
+        self.assertEqual(send.call_args.kwargs["userId"], "me")
+        encoded = send.call_args.kwargs["body"]["raw"]
+        decoded = base64.urlsafe_b64decode(encoded.encode("ascii"))
+        self.assertIn(b'multipart/alternative', decoded)
+        self.assertIn(b'jeremy@secondstate.art', decoded)
+
+
+@override_settings(
+    AUCTION_EMAIL_SENDER="jeremy@secondstate.art",
+    GOOGLE_GMAIL_CLIENT_ID="test-client.apps.googleusercontent.com",
+    GOOGLE_GMAIL_CLIENT_SECRET="test-client-secret",
+)
+class AuthorizeAuctionGmailCommandTests(SimpleTestCase):
+    @patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config")
+    def test_command_requests_only_gmail_send_and_prints_without_writing(self, from_client_config):
+        flow = from_client_config.return_value
+        flow.run_local_server.return_value = SimpleNamespace(refresh_token="test-command-refresh-token")
         stdout = StringIO()
-        call_command("send_auction_reminders", "--dry-run", "--date", "2026-07-20", stdout=stdout)
-        self.assertIn("1-day digest", stdout.getvalue())
-        self.assertEqual(AuctionReminderDelivery.objects.count(), 0)
 
-    def test_live_command_exits_cleanly_while_reminders_are_paused(self):
-        self._event(1)
-        stdout = StringIO()
-        call_command("send_auction_reminders", "--date", "2026-07-20", stdout=stdout)
-        self.assertIn("paused", stdout.getvalue().lower())
-        self.assertEqual(AuctionReminderDelivery.objects.count(), 0)
+        call_command("authorize_auction_gmail", stdout=stdout)
 
-    @override_settings(
-        TWILIO_SMS_ENABLED=True,
-        TWILIO_ACCOUNT_SID="AC" + "1" * 32,
-        TWILIO_API_KEY_SID="SK" + "2" * 32,
-        TWILIO_API_KEY_SECRET="test-secret",
-        TWILIO_FROM_NUMBER="+12065550123",
-        TWILIO_MESSAGING_SERVICE_SID="",
-        AUCTION_REMINDER_TO_NUMBERS="+12065550124",
-    )
-    @patch("secondstateapp.auction_reminders.TwilioSmsSender.from_settings")
-    def test_active_dispatch_sends_once_and_records_the_run(self, sender_from_settings):
-        self._event(2)
-        sender = _FakeSender()
-        sender_from_settings.return_value = sender
-        control = AuctionReminderControl.load()
-        control.active = True
-        control.save(update_fields=("active", "updated_at"))
-
-        first = dispatch_active_auction_reminders(source="sync", today=self.today)
-        second = dispatch_active_auction_reminders(source="scheduler", today=self.today)
-
-        self.assertEqual(first.status, "sent")
-        self.assertEqual(first.result.sent, 1)
-        self.assertEqual(second.status, "up_to_date")
-        self.assertEqual(second.result.skipped, 1)
-        self.assertEqual(len(sender.calls), 1)
-        control.refresh_from_db()
-        self.assertEqual(control.last_run_source, "scheduler")
-        self.assertEqual(control.last_run_status, "up_to_date")
-
-    @override_settings(TWILIO_SMS_ENABLED=False)
-    def test_active_control_still_obeys_the_render_safety_switch(self):
-        control = AuctionReminderControl.load()
-        control.active = True
-        control.save(update_fields=("active", "updated_at"))
-
-        outcome = dispatch_active_auction_reminders(source="sync", today=self.today)
-
-        self.assertEqual(outcome.status, "disabled")
-        self.assertFalse(outcome.attempted)
-        self.assertEqual(AuctionReminderDelivery.objects.count(), 0)
+        self.assertEqual(from_client_config.call_args.kwargs["scopes"], [GMAIL_SEND_SCOPE])
+        self.assertEqual(flow.run_local_server.call_args.kwargs["login_hint"], "jeremy@secondstate.art")
+        self.assertEqual(flow.run_local_server.call_args.kwargs["access_type"], "offline")
+        self.assertIn("GOOGLE_GMAIL_REFRESH_TOKEN=", stdout.getvalue())
+        self.assertIn("test-command-refresh-token", stdout.getvalue())
 
 
 class _JsonResponse:
@@ -1305,41 +1448,6 @@ class _RecordingSession:
     def post(self, url, **kwargs):
         self.calls.append((url, kwargs))
         return self.response
-
-
-class TwilioSenderTests(SimpleTestCase):
-    def test_api_key_auth_and_messaging_service_are_sent_to_twilio(self):
-        session = _RecordingSession(_JsonResponse(201, {"sid": "SM123", "status": "queued"}))
-        account_sid = "AC" + "1" * 32
-        api_key_sid = "SK" + "2" * 32
-        messaging_service_sid = "MG" + "3" * 32
-        sender = TwilioSmsSender(
-            account_sid=account_sid,
-            api_key_sid=api_key_sid,
-            api_key_secret="secret",
-            messaging_service_sid=messaging_service_sid,
-            session=session,
-        )
-
-        result = sender.send("+12065550123", "Reminder")
-
-        self.assertEqual(result.message_sid, "SM123")
-        self.assertEqual(session.calls[0][1]["auth"], (api_key_sid, "secret"))
-        self.assertEqual(session.calls[0][1]["data"]["MessagingServiceSid"], messaging_service_sid)
-        self.assertNotIn("From", session.calls[0][1]["data"])
-
-    def test_placeholder_messaging_service_sid_fails_before_a_request(self):
-        with self.assertRaisesMessage(
-            ReminderConfigurationError,
-            "TWILIO_MESSAGING_SERVICE_SID must be empty or a valid MG-prefixed Messaging Service SID.",
-        ):
-            TwilioSmsSender(
-                account_sid="AC" + "1" * 32,
-                api_key_sid="SK" + "2" * 32,
-                api_key_secret="secret",
-                from_number="+12065550123",
-                messaging_service_sid="???",
-            )
 
 
 class DesktopCalendarSyncTests(SimpleTestCase):
@@ -1363,13 +1471,6 @@ class DesktopCalendarSyncTests(SimpleTestCase):
                     "created": 1,
                     "updated": 0,
                     "ended": 0,
-                    "reminders": {
-                        "status": "sent",
-                        "summary": "Reminder catch-up sent 1 text.",
-                        "sent": 1,
-                        "skipped": 0,
-                        "failed": 0,
-                    },
                 },
             )
         )
@@ -1389,9 +1490,10 @@ class DesktopCalendarSyncTests(SimpleTestCase):
         self.assertNotIn("image_url", sent_lot)
         self.assertNotIn("ambiguities", sent_lot)
         self.assertNotIn("content_hash", sent_lot)
-        self.assertEqual(result.reminder_status, "sent")
-        self.assertEqual(result.reminder_sent, 1)
-        self.assertIn("Reminder catch-up sent 1 text.", result.summary())
+        self.assertEqual(
+            result.summary(),
+            "Website calendar synced: 1 lots (1 new, 0 updated, 0 ended).",
+        )
 
     def test_remote_plain_http_is_rejected(self):
         with self.assertRaises(CalendarSyncError):
