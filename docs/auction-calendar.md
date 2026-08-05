@@ -78,6 +78,8 @@ GOOGLE_GMAIL_CLIENT_SECRET='<desktop-oauth-client-secret>'
 GOOGLE_GMAIL_REFRESH_TOKEN='<refresh-token-created-locally>'
 ```
 
+Local Django commands and the development server load the repository-root `.env` without overriding variables already present in the process. Render does not receive that local file; configure the same names in the Render service environment for deployment.
+
 The sender must resolve to `jeremy@secondstate.art`. Every selected recipient must be configured and use the `@secondstate.art` domain. Browser requests submit only fixed recipient keys; addresses are resolved from the server environment. OAuth credentials are never stored in the database, page, fixtures, or logs.
 
 ### Google Cloud and Workspace setup

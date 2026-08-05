@@ -30,6 +30,7 @@ PyRect
 PyScreeze
 pytesseract
 python-dateutil
+python-dotenv
 python-docx
 pytweening
 pytz

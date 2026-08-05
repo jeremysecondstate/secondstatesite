@@ -508,7 +508,10 @@ class ArtpriceMaxBidParserTests(SimpleTestCase):
             analyze_artprice_html(artprice_html(currency="eur"))
 
 
-@override_settings(CALENDAR_TIME_ZONE="America/Los_Angeles")
+@override_settings(
+    CALENDAR_TIME_ZONE="America/Los_Angeles",
+    AUCTION_EMAIL_SENDING_ENABLED=False,
+)
 class AuctionCalendarViewTests(TestCase):
     def setUp(self):
         self.staff = get_user_model().objects.create_user("calendar-admin", password="test-pass", is_staff=True)
