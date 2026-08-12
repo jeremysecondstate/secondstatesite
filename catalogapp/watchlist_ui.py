@@ -203,9 +203,10 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.agenda_tree = ttk.Treeview(agenda_tab, columns=columns, show="tree headings", height=6)
         self.agenda_tree.heading("#0", text="Date / Artist")
         self.agenda_tree.column("#0", width=200, stretch=True)
-        widths = {"time": 60, "sale": 180, "lot": 55, "title": 220, "estimate": 105, "bid": 75, "status": 70}
+        widths = {"time": 60, "sale": 180, "lot": 55, "title": 220, "estimate": 105, "bid": 130, "status": 70}
         for column in columns:
-            self.agenda_tree.heading(column, text=column.replace("_", " ").title())
+            heading = "Current Bid" if column == "bid" else column.replace("_", " ").title()
+            self.agenda_tree.heading(column, text=heading)
             self.agenda_tree.column(column, width=widths[column], stretch=column in {"artist", "sale", "title"})
         self.agenda_tree.grid(row=0, column=0, sticky="nsew")
         agenda_scroll = ttk.Scrollbar(agenda_tab, orient=tk.VERTICAL, command=self.agenda_tree.yview)
@@ -530,7 +531,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             estimate = ""
             if lot.estimate_low is not None or lot.estimate_high is not None:
                 estimate = f"{lot.estimate_low or '?'}–{lot.estimate_high or '?'} {lot.currency}".strip()
-            bid = f"{lot.current_bid:g} {lot.currency}".strip() if lot.current_bid is not None else ""
+            bid = lot.bid_label
             iid = f"lot-{index}"
             self.agenda_tree.insert(
                 artist_parent,

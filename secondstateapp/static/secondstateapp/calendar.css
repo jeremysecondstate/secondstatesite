@@ -468,6 +468,14 @@
   color: rgba(255, 255, 255, .78);
 }
 
+.lot-bid {
+  margin: 4px 0 0;
+  color: var(--calendar-gold);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .lot-action-links {
   display: flex;
   flex-wrap: wrap;

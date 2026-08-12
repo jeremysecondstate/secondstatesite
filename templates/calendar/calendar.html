@@ -1045,6 +1045,7 @@
       appendText(item, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
       const facts = [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.estimate, lot.medium].filter(Boolean);
       appendText(item, "p", "lot-facts", facts.join(" · "));
+      appendText(item, "p", "lot-bid", lot.bid);
       const actionLinks = document.createElement("div");
       actionLinks.className = "lot-action-links";
       if (lot.url) {

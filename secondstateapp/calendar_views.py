@@ -111,6 +111,23 @@ def _estimate_label(lot: AuctionWatchLot) -> str:
     return f"{prefix}{value} estimate"
 
 
+def _bid_label(lot: AuctionWatchLot) -> str:
+    if lot.bid_count == 0:
+        return "Current bid: No bids"
+    if lot.current_bid is None:
+        return "Current bid: N/A"
+    currency = (lot.currency or "").upper()
+    prefix = {"USD": "$", "GBP": "\u00a3", "EUR": "\u20ac"}.get(
+        currency,
+        f"{currency} " if currency else "",
+    )
+    label = f"Current bid: {prefix}{_money(lot.current_bid)}"
+    if lot.bid_count is not None:
+        noun = "bid" if lot.bid_count == 1 else "bids"
+        label += f" \u00b7 {lot.bid_count} {noun}"
+    return label
+
+
 def _time_label(lot: AuctionWatchLot, zone: ZoneInfo) -> str:
     if not lot.event_at or lot.is_all_day:
         return "Time TBA"
@@ -156,6 +173,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "medium": lot.medium,
         "location": lot.location,
         "estimate": _estimate_label(lot),
+        "bid": _bid_label(lot),
         "time": _time_label(lot, zone),
         "url": lot.lot_url or lot.sale_url,
         "artprice_url": lot.artprice_url,
@@ -955,6 +973,20 @@ def _decimal(value) -> Decimal | None:
         raise ValueError("must be a number with at most two decimal places") from exc
 
 
+def _nonnegative_integer(value) -> int | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        raise ValueError("must be a non-negative integer")
+    try:
+        result = int(str(value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("must be a non-negative integer") from exc
+    if str(result) != str(value).strip() or result < 0 or result > 2_147_483_647:
+        raise ValueError("must be a non-negative integer")
+    return result
+
+
 def _source_datetime(value, zone: ZoneInfo) -> tuple[datetime | None, bool]:
     if value in (None, ""):
         return None, False
@@ -1035,6 +1067,7 @@ def sync_auction_calendar(request):
                 "estimate_high": _decimal(record.get("estimate_high")),
                 "currency": _text(record.get("currency"), 8).upper(),
                 "current_bid": _decimal(record.get("current_bid")),
+                "bid_count": _nonnegative_integer(record.get("bid_count")),
                 "lot_url": _url(record.get("lot_url")),
                 "sale_url": _url(record.get("sale_url")),
                 "source_status": source_status,

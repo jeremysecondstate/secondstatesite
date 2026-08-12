@@ -554,6 +554,24 @@ class AuctionCalendarViewTests(TestCase):
         self.assertContains(response, "Analyze HTML")
         self.assertEqual(response.context["weeks"][0][0]["date"].weekday(), 0)
 
+    def test_calendar_distinguishes_current_bid_no_bids_and_unavailable(self):
+        watch_lot(source_lot_id="current", current_bid=1700, bid_count=4)
+        watch_lot(source_lot_id="none", current_bid=3800, bid_count=0)
+        watch_lot(source_lot_id="unavailable", current_bid=None, bid_count=None)
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        labels = {
+            item["id"]: item["bid"]
+            for item in response.context["calendar_data"]["2026-07-25"]
+        }
+        lots = {lot.source_lot_id: lot for lot in AuctionWatchLot.objects.all()}
+        self.assertEqual(labels[lots["current"].pk], "Current bid: $1,700 · 4 bids")
+        self.assertEqual(labels[lots["none"].pk], "Current bid: No bids")
+        self.assertEqual(labels[lots["unavailable"].pk], "Current bid: N/A")
+        self.assertContains(response, 'appendText(item, "p", "lot-bid", lot.bid)')
+
     def test_invalid_month_falls_back_without_error(self):
         self.client.force_login(self.staff)
         response = self.client.get(reverse("auction_calendar"), {"month": "not-a-month"})
@@ -1036,6 +1054,8 @@ class CalendarSyncApiTests(TestCase):
             "estimate_low": 10000,
             "estimate_high": 15000,
             "currency": "USD",
+            "current_bid": 10000,
+            "bid_count": 4,
             "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-galaxia",
             "sale_url": "https://www.invaluable.com/catalog/example",
             "first_seen_at": "2026-07-20T10:00:00Z",
@@ -1064,6 +1084,8 @@ class CalendarSyncApiTests(TestCase):
         lot = AuctionWatchLot.objects.get()
         self.assertEqual(lot.title, "Galaxia")
         self.assertEqual(lot.event_at.astimezone(CALENDAR_ZONE).hour, 13)
+        self.assertEqual(lot.current_bid, Decimal("10000.00"))
+        self.assertEqual(lot.bid_count, 4)
         self.assertTrue(lot.active)
         lot.artprice_url = "https://www.artprice.com/artist/1/example/lots/pasts"
         lot.save(update_fields=("artprice_url",))
@@ -1074,7 +1096,14 @@ class CalendarSyncApiTests(TestCase):
 
         response = self.client.post(
             self.endpoint,
-            data=json.dumps(self._payload(title="Galaxia (updated)", status="ended")),
+            data=json.dumps(
+                self._payload(
+                    title="Galaxia (updated)",
+                    current_bid=3800,
+                    bid_count=0,
+                    status="ended",
+                )
+            ),
             content_type="application/json",
             HTTP_X_API_KEY="sync-test-key",
         )
@@ -1082,6 +1111,8 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(response.json()["updated"], 1)
         self.assertEqual(response.json()["ended"], 1)
         self.assertEqual(lot.title, "Galaxia (updated)")
+        self.assertEqual(lot.current_bid, Decimal("3800.00"))
+        self.assertEqual(lot.bid_count, 0)
         self.assertFalse(lot.active)
         self.assertEqual(lot.artprice_url, "https://www.artprice.com/artist/1/example/lots/pasts")
         analysis.refresh_from_db()
@@ -1125,6 +1156,16 @@ class CalendarSyncApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertFalse(AuctionWatchLot.objects.filter(source_lot_id="bad").exists())
+
+        bad_bid_count = self._payload(source_lot_id="bad-bid-count", bid_count=-1)
+        response = self.client.post(
+            self.endpoint,
+            data=json.dumps(bad_bid_count),
+            content_type="application/json",
+            HTTP_X_API_KEY="sync-test-key",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(AuctionWatchLot.objects.filter(source_lot_id="bad-bid-count").exists())
 
         invalid_date = self._payload(source_lot_id="bad-date", end_at="2026-99-99")
         response = self.client.post(
@@ -1462,6 +1503,8 @@ class DesktopCalendarSyncTests(SimpleTestCase):
             artist_watchlist_name="Joan Miró",
             title="Lithograph",
             end_at="2026-07-25T13:00:00-07:00",
+            current_bid=1700,
+            bid_count=4,
             image_url="https://images.example/private.jpg",
             ambiguities=["example"],
         )
@@ -1493,6 +1536,8 @@ class DesktopCalendarSyncTests(SimpleTestCase):
         self.assertNotIn("image_url", sent_lot)
         self.assertNotIn("ambiguities", sent_lot)
         self.assertNotIn("content_hash", sent_lot)
+        self.assertEqual(sent_lot["current_bid"], 1700)
+        self.assertEqual(sent_lot["bid_count"], 4)
         self.assertEqual(
             result.summary(),
             "Website calendar synced: 1 lots (1 new, 0 updated, 0 ended).",

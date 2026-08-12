@@ -30,6 +30,7 @@ class NormalizedLot:
     estimate_high: float | None = None
     currency: str = ""
     current_bid: float | None = None
+    bid_count: int | None = None
     lot_url: str = ""
     sale_url: str = ""
     image_url: str = ""
@@ -54,6 +55,22 @@ class NormalizedLot:
     @property
     def relevant_at(self) -> str:
         return self.end_at or self.start_at
+
+    @property
+    def bid_label(self) -> str:
+        """Human-readable bid state for the desktop agenda."""
+
+        if self.bid_count == 0:
+            return "No bids"
+        if self.current_bid is None:
+            return "N/A"
+        amount = f"{self.current_bid:,.2f}".rstrip("0").rstrip(".")
+        currency = (self.currency or "").upper()
+        value = f"{amount} {currency}".strip()
+        if self.bid_count is not None:
+            noun = "bid" if self.bid_count == 1 else "bids"
+            return f"{value} ({self.bid_count} {noun})"
+        return value
 
     def visible_content(self) -> dict[str, Any]:
         ignored = {

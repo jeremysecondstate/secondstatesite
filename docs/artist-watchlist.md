@@ -75,6 +75,8 @@ Every refresh reports:
 - AI-enriched records;
 - input, output, and total token usage.
 
+Invaluable's `currentBid` and `bidCount` values are normalized separately so the desktop agenda can distinguish a live current bid from **No bids** and an unavailable bid field from **N/A**. Bid-count changes participate in the content hash and therefore appear as changed lots on refresh.
+
 ## Calendar behavior
 
 ICS output defaults to one event per auction sale. Matched artists and lots are grouped in the description. A timezone-aware source time is converted to UTC. A source date without a time becomes an all-day event and the description marks the time as unverified. Event-per-lot and reminders are supported by the export function but are intentionally not the noisy UI default.

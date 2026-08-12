@@ -501,6 +501,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             "estimateLow": self._value(hit, "estimateLow"),
             "estimateHigh": self._value(hit, "estimateHigh"),
             "currentBid": self._value(hit, "currentBid"),
+            "bidCount": self._value(hit, "bidCount"),
             "currency": self._text_value(hit, "currencyCode"),
             "endAt": self._catalog_datetime(hit),
             "location": location,
@@ -574,7 +575,11 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             self._value(raw, "estimateHigh", "highEstimate", "highPrice"),
             self._value(raw, "currency", "priceCurrency"),
         )
-        current = self._money(self._value(raw, "currentBid", "bid", "price"), None, None, estimate.currency)
+        current_bid_value = self._value(raw, "currentBid", "bid", "price")
+        current = self._money(current_bid_value, None, None, estimate.currency)
+        bid_count = self._bid_count(self._value(raw, "bidCount", "numberOfBids"))
+        if bid_count is None:
+            bid_count = self._bid_count(current_bid_value, require_label=True)
         start_at = self._date_value(raw, "startAt", "startDate", "saleStart", "start_at")
         end_at = self._date_value(raw, "endAt", "endDate", "saleEnd", "closeDate", "end_at")
         ambiguities: list[str] = []
@@ -602,6 +607,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             estimate_high=estimate.high,
             currency=estimate.currency or current.currency,
             current_bid=current.low,
+            bid_count=bid_count,
             lot_url=lot_url,
             sale_url=(
                 urljoin(page_url, str(self._value(raw, "saleUrl", "auctionUrl", "eventUrl")))
@@ -629,6 +635,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             "lotNumber": self._node_text(node, (".lot-number", "[data-lot-number]")),
             "estimate": self._node_text(node, (".estimate", "[data-estimate]")),
             "currentBid": self._node_text(node, (".current-bid", ".bid")),
+            "bidCount": self._node_text(node, (".bid-count", "[data-bid-count]", "[data-testid='bid-count']")),
             "endAt": self._node_attr(node, ("time[datetime]", "[data-end-at]"), ("datetime", "data-end-at")),
             "startAt": self._node_attr(node, ("[data-start-at]",), ("data-start-at",)),
             "image": (node.find("img").get("src", "") if hasattr(node, "find") and node.find("img") else ""),
@@ -648,6 +655,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             "lotNumber": self._node_text(soup, (".lot-number", "[data-testid='lot-number']")),
             "estimate": self._node_text(soup, (".estimate", "[data-testid='estimate']")),
             "currentBid": self._node_text(soup, (".current-bid", "[data-testid='current-bid']")),
+            "bidCount": self._node_text(soup, (".bid-count", "[data-bid-count]", "[data-testid='bid-count']")),
             "endAt": self._node_attr(soup, ("time[datetime]", "[data-end-at]"), ("datetime", "data-end-at")),
         }
 
@@ -682,7 +690,14 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         for key in keys:
             value = folded.get(key.casefold())
             if isinstance(value, dict):
-                value = value.get("name") or value.get("value") or value.get("url")
+                value = next(
+                    (
+                        value[child_key]
+                        for child_key in ("name", "value", "url")
+                        if child_key in value and value[child_key] not in (None, "")
+                    ),
+                    None,
+                )
             if value not in (None, ""):
                 return value
         return None
@@ -741,6 +756,22 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         else:
             high_value = numbers[1] if len(numbers) > 1 else None
         return _Money(low_value, high_value, currency_code)
+
+    @staticmethod
+    def _bid_count(value: Any, *, require_label: bool = False) -> int | None:
+        if value in (None, "") or isinstance(value, bool):
+            return None
+        normalized = " ".join(str(value).split())
+        if re.search(r"\bno\s+bids?\b", normalized, re.IGNORECASE):
+            return 0
+        labelled = re.search(r"(\d[\d,]*)\s+bids?\b", normalized, re.IGNORECASE)
+        if labelled:
+            return int(labelled.group(1).replace(",", ""))
+        if require_label:
+            return None
+        if re.fullmatch(r"\d[\d,]*", normalized):
+            return int(normalized.replace(",", ""))
+        return None
 
     @staticmethod
     def _node_text(node: Any, selectors: Iterable[str]) -> str:

@@ -104,6 +104,8 @@ class InvaluableAdapterTests(SimpleTestCase):
         card = next(lot for lot in lots if lot.source_lot_id == "inv-24")
         self.assertEqual(card.estimate_low, 2000)
         self.assertEqual(card.current_bid, 1500)
+        self.assertEqual(card.bid_count, 4)
+        self.assertEqual(card.bid_label, "1,500 USD (4 bids)")
         self.assertEqual(card.end_at, "2026-07-18T17:00:00-04:00")
         self.assertEqual(card.sale_url, "https://www.invaluable.com/catalog/modern-prints")
         self.assertIn("https://www.invaluable.com/auction-lot/", self.adapter.extract_lot_links(page, self.url)[0])
@@ -118,6 +120,23 @@ class InvaluableAdapterTests(SimpleTestCase):
         self.assertEqual(detail.medium, "Lithograph on wove paper")
         self.assertEqual(detail.auction_house, "House A")
         self.assertFalse(self.adapter.needs_detail(detail))
+
+    def test_parses_zero_bids_from_combined_detail_text(self):
+        detail = self.adapter.parse_lot_detail(
+            """
+            <html><body>
+              <h1>Andy Warhol, Kiss. 1966.</h1>
+              <div class="current-bid">$3,800 USD 0 bids</div>
+            </body></html>
+            """,
+            "https://www.invaluable.com/auction-lot/andy-warhol-kiss-1966-237",
+            "Andy Warhol",
+        )
+
+        self.assertIsNotNone(detail)
+        self.assertEqual(detail.current_bid, 3800)
+        self.assertEqual(detail.bid_count, 0)
+        self.assertEqual(detail.bid_label, "No bids")
 
     def test_extracts_pagination(self):
         next_url = self.adapter.extract_next_page_url(fixture("invaluable_page_1.html"), self.url)
@@ -150,6 +169,7 @@ class InvaluableAdapterTests(SimpleTestCase):
                             "estimateLow": 10000,
                             "estimateHigh": 15000,
                             "currentBid": 10000,
+                            "bidCount": 0,
                             "currencyCode": "USD",
                         }
                     ],
@@ -184,6 +204,8 @@ class InvaluableAdapterTests(SimpleTestCase):
         self.assertEqual(lot.medium, "Mixografia")
         self.assertEqual(lot.auction_house, "Bonhams")
         self.assertEqual(lot.estimate_high, 15000)
+        self.assertEqual(lot.bid_count, 0)
+        self.assertEqual(lot.bid_label, "No bids")
         self.assertEqual(lot.end_at, "2026-07-29T20:00:00+00:00")
         self.assertEqual(lot.sale_url, "https://www.invaluable.com/catalog/8NR19L2CW9")
         self.assertEqual(
@@ -541,8 +563,17 @@ class CacheAndServiceTests(SimpleTestCase):
 
 
 class ExportTests(SimpleTestCase):
+    def test_bid_labels_distinguish_current_no_bids_and_unavailable(self):
+        current = sample_lot(current_bid=1700, bid_count=4)
+        no_bids = sample_lot(current_bid=3800, bid_count=0)
+        unavailable = sample_lot(current_bid=None, bid_count=None)
+
+        self.assertEqual(current.bid_label, "1,700 USD (4 bids)")
+        self.assertEqual(no_bids.bid_label, "No bids")
+        self.assertEqual(unavailable.bid_label, "N/A")
+
     def test_markdown_csv_and_sale_grouped_ics(self):
-        first = sample_lot()
+        first = sample_lot(current_bid=1700, bid_count=4)
         second = sample_lot(source_lot_id="inv-81", lot_number="81", title="Lithograph", lot_url="https://www.invaluable.com/auction-lot/81")
 
         markdown = render_markdown([second, first])
@@ -552,6 +583,8 @@ class ExportTests(SimpleTestCase):
         self.assertIn("## 2026-07-18", markdown)
         self.assertIn("### Rufino Tamayo", markdown)
         self.assertEqual(csv_text.count("\n"), 3)
+        self.assertIn("current_bid,bid_count,status", csv_text)
+        self.assertIn("1700,4,unchanged", csv_text)
         self.assertEqual(ics.count("BEGIN:VEVENT"), 1)
         self.assertIn("SUMMARY:Invaluable — 2 watched print lots", ics)
         self.assertTrue(ics.endswith("END:VCALENDAR\r\n"))

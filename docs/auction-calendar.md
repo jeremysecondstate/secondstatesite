@@ -16,6 +16,8 @@ Artist Watchlist refresh
 
 The desktop sync uploads only normalized auction fields. It does not upload bookmark HTML, browser state, cookies, local cache data, source page HTML, image URLs, ambiguity flags, Artprice URLs, Email Tray state, or API credentials. Existing Artprice links, analyses, and Email Tray selections survive later upserts of the same source lot.
 
+Each selected-day lot shows a separate current-bid line beneath its estimate/details. It renders the current amount and bid count when available, **No bids** when the source reports a zero bid count, and **N/A** when Invaluable omits bid data.
+
 ## Email Tray behavior
 
 Under each lot's Artprice editor, **Include in next email** is disabled until a secure `artprice.com` URL has been saved. Saving a link enables the checkbox but does not select it. Selection is explicit and shared by all staff users; the selecting staff account is stored with the item.
@@ -61,7 +63,7 @@ Run migrations during deployment:
 .\.venv\Scripts\python.exe manage.py migrate
 ```
 
-Migration `0018_auctionemailbatch_auctionemailbatchitem_and_more` adds the shared active-batch constraint, send history, item attribution, and immutable send-time snapshots. Historical reminder migrations remain untouched.
+Migration `0018_auctionemailbatch_auctionemailbatchitem_and_more` adds the shared active-batch constraint, send history, item attribution, and immutable send-time snapshots. Migration `0019_auctionwatchlot_bid_count` preserves Invaluable's zero/positive/missing bid-count distinction on synced lots. Historical reminder migrations remain untouched.
 
 ## Gmail configuration
 
