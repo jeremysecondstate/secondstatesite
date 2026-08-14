@@ -31,6 +31,7 @@ from secondstateapp.models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
     AuctionMaxBidAnalysis,
+    AuctionWatchArtist,
     AuctionWatchLot,
 )
 
@@ -553,6 +554,47 @@ class AuctionCalendarViewTests(TestCase):
         self.assertContains(response, "Artprice Max-Bid Analysis")
         self.assertContains(response, "Analyze HTML")
         self.assertEqual(response.context["weeks"][0][0]["date"].weekday(), 0)
+
+    def test_calendar_serializes_and_renders_only_valid_imported_artist_links(self):
+        imported_url = (
+            "https://www.artprice.com/artist/28011/antoni-tapies/lots/pasts"
+            "?idcategory=2&p=1&sort=datesale_desc"
+        )
+        artist = AuctionWatchArtist.objects.create(
+            name="Antoni Tàpies",
+            normalized_name="antoni tapies",
+            artprice_url=imported_url,
+        )
+        linked_lot = watch_lot(
+            source_lot_id="tapies-linked",
+            artist="Antoni Tàpies",
+            artist_watchlist_name="Antoni Tàpies",
+            watchlist_artist=artist,
+        )
+        unlinked_lot = watch_lot(source_lot_id="artist-unlinked", artist="Unknown", artist_watchlist_name="Unknown")
+        invalid_artist = AuctionWatchArtist.objects.create(
+            name="Unsafe Artist",
+            normalized_name="artist unsafe",
+            artprice_url="https://artprice.com.evil.example/artist/1/unsafe",
+        )
+        invalid_lot = watch_lot(
+            source_lot_id="artist-invalid",
+            artist="Unsafe Artist",
+            artist_watchlist_name="Unsafe Artist",
+            watchlist_artist=invalid_artist,
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        details = {item["id"]: item for item in response.context["calendar_data"]["2026-07-25"]}
+        self.assertEqual(details[linked_lot.pk]["artist_artprice_url"], imported_url)
+        self.assertEqual(details[unlinked_lot.pk]["artist_artprice_url"], "")
+        self.assertEqual(details[invalid_lot.pk]["artist_artprice_url"], "")
+        self.assertContains(response, 'link.target = "_blank"')
+        self.assertContains(response, 'link.rel = "noopener noreferrer"')
+        self.assertContains(response, 'className = "lot-artist"')
+        self.assertContains(response, "View ${lot.artist} on Artprice (opens in a new tab)")
 
     def test_calendar_distinguishes_current_bid_no_bids_and_unavailable(self):
         watch_lot(source_lot_id="current", current_bid=1700, bid_count=4)
@@ -1124,6 +1166,70 @@ class CalendarSyncApiTests(TestCase):
         self.assertNotIn("reminders", response.json())
 
     @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_artist_link_sync_is_persistent_idempotent_and_preserves_manual_lot_link(self):
+        first_url = "https://www.artprice.com/artist/27973/rufino-tamayo/lots/pasts?idcategory[]=2"
+        updated_url = "http://artprice.com/artist/27973/rufino-tamayo/lots/pasts?idcategory=2&p=1"
+        payload = self._payload()
+        payload["artist_links"] = [{"name": "TAMAYO, RUFINO", "artprice_url": first_url}]
+
+        response = self.client.post(
+            self.endpoint,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_API_KEY="sync-test-key",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["artist_links"], 1)
+        self.assertEqual(AuctionWatchArtist.objects.count(), 1)
+        artist = AuctionWatchArtist.objects.get()
+        lot = AuctionWatchLot.objects.get()
+        self.assertEqual(artist.artprice_url, first_url)
+        self.assertEqual(lot.watchlist_artist, artist)
+
+        manual_url = "https://www.artprice.com/artist/27973/rufino-tamayo/lots/pasts?manual=1"
+        lot.artprice_url = manual_url
+        lot.save(update_fields=("artprice_url",))
+        payload["artist_links"] = [{"name": "Rufino Tamayo", "artprice_url": updated_url}]
+
+        response = self.client.post(
+            self.endpoint,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_API_KEY="sync-test-key",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AuctionWatchArtist.objects.count(), 1)
+        artist.refresh_from_db()
+        lot.refresh_from_db()
+        self.assertEqual(artist.artprice_url, updated_url)
+        self.assertEqual(lot.watchlist_artist, artist)
+        self.assertEqual(lot.artprice_url, manual_url)
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_artist_link_sync_rejects_unsafe_or_non_artist_urls_atomically(self):
+        invalid_urls = (
+            "https://artprice.com.evil.example/artist/27973/rufino-tamayo",
+            "https://user:password@www.artprice.com/artist/27973/rufino-tamayo",
+            "ftp://www.artprice.com/artist/27973/rufino-tamayo",
+            "https://www.artprice.com/search?q=tamayo",
+        )
+        for invalid_url in invalid_urls:
+            with self.subTest(invalid_url=invalid_url):
+                payload = self._payload()
+                payload["artist_links"] = [{"name": "Rufino Tamayo", "artprice_url": invalid_url}]
+                response = self.client.post(
+                    self.endpoint,
+                    data=json.dumps(payload),
+                    content_type="application/json",
+                    HTTP_X_API_KEY="sync-test-key",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(AuctionWatchArtist.objects.count(), 0)
+                self.assertEqual(AuctionWatchLot.objects.count(), 0)
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
     def test_successful_sync_has_no_reminder_dispatch_or_result(self):
         response = self.client.post(
             self.endpoint,
@@ -1525,6 +1631,10 @@ class DesktopCalendarSyncTests(SimpleTestCase):
             [lot],
             base_url="https://secondstate.art",
             api_key="catalog-key",
+            artist_artprice_links={
+                "Joan Miró": "https://www.artprice.com/artist/19928/joan-miro/lots/pasts?idcategory=2&p=1",
+                "MIRO, JOAN": "https://www.artprice.com/artist/19928/joan-miro/lots/pasts?idcategory=2&p=1",
+            },
             session=session,
         )
 
@@ -1538,6 +1648,15 @@ class DesktopCalendarSyncTests(SimpleTestCase):
         self.assertNotIn("content_hash", sent_lot)
         self.assertEqual(sent_lot["current_bid"], 1700)
         self.assertEqual(sent_lot["bid_count"], 4)
+        self.assertEqual(
+            request["json"]["artist_links"],
+            [
+                {
+                    "name": "Joan Miró",
+                    "artprice_url": "https://www.artprice.com/artist/19928/joan-miro/lots/pasts?idcategory=2&p=1",
+                }
+            ],
+        )
         self.assertEqual(
             result.summary(),
             "Website calendar synced: 1 lots (1 new, 0 updated, 0 ended).",

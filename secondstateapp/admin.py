@@ -6,6 +6,7 @@ from .models import (
     AuctionMaxBidAnalysis,
     AuctionReminderControl,
     AuctionReminderDelivery,
+    AuctionWatchArtist,
     AuctionWatchLot,
     SoldPiece,
     UserProfile,
@@ -51,6 +52,13 @@ class AuctionWatchLotAdmin(admin.ModelAdmin):
     @admin.display(description="Artist")
     def artist_label(self, obj):
         return obj.artist_watchlist_name or obj.artist
+
+
+@admin.register(AuctionWatchArtist)
+class AuctionWatchArtistAdmin(admin.ModelAdmin):
+    list_display = ("name", "artprice_url", "updated_at")
+    search_fields = ("name", "normalized_name", "artprice_url")
+    readonly_fields = ("normalized_name", "created_at", "updated_at")
 
 
 @admin.register(AuctionMaxBidAnalysis)

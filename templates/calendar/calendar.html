@@ -210,6 +210,20 @@
     return link;
   };
 
+  const appendArtistLabel = (item, lot) => {
+    if (!lot.artist) return;
+    const label = document.createElement("p");
+    label.className = "lot-artist";
+    if (lot.artist_artprice_url) {
+      const link = externalLink(lot.artist_artprice_url, "lot-artist-link", lot.artist);
+      link.setAttribute("aria-label", `View ${lot.artist} on Artprice (opens in a new tab)`);
+      label.appendChild(link);
+    } else {
+      label.textContent = lot.artist;
+    }
+    item.appendChild(label);
+  };
+
   const formatAnalysisMoney = (value, currency = "USD") => {
     if (value === null || value === undefined || value === "") return "—";
     const amount = Number(value);
@@ -1040,7 +1054,7 @@
     lots.forEach((lot) => {
       const item = document.createElement("article");
       item.className = `day-lot${lot.ended ? " is-ended" : ""}`;
-      appendText(item, "p", "lot-artist", lot.artist);
+      appendArtistLabel(item, lot);
       appendText(item, "h3", "lot-title", lot.title);
       appendText(item, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
       const facts = [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.estimate, lot.medium].filter(Boolean);

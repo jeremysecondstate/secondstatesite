@@ -448,6 +448,27 @@
   text-transform: uppercase;
 }
 
+.lot-artist-link {
+  border-radius: 2px;
+  color: inherit;
+  text-decoration-color: rgba(211, 174, 91, .46);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color 120ms ease, text-decoration-color 120ms ease, box-shadow 120ms ease;
+}
+
+.lot-artist-link:hover {
+  color: #f0d58f;
+  text-decoration-color: currentColor;
+}
+
+.lot-artist-link:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--calendar-gold-soft);
+  color: #f0d58f;
+  text-decoration-color: currentColor;
+}
+
 .lot-title {
   margin: 0;
   font-family: "Playfair Display", serif;

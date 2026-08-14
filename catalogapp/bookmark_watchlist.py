@@ -107,6 +107,15 @@ class _NetscapeBookmarkParser(HTMLParser):
             self._text.append(data)
 
 
+def parse_netscape_bookmarks(html: str) -> list[BookmarkEntry]:
+    """Parse a Netscape bookmark export without applying source-domain filters."""
+
+    parser = _NetscapeBookmarkParser()
+    parser.feed(html or "")
+    parser.close()
+    return parser.entries
+
+
 def _clean_text(value: str) -> str:
     return " ".join((value or "").replace("\xa0", " ").split()).strip()
 
@@ -210,13 +219,10 @@ def parse_bookmarks_html(
     selected_folders: Iterable[str] | None = None,
     allowed_domains: Sequence[str] = DEFAULT_ALLOWED_DOMAINS,
 ) -> list[BookmarkEntry]:
-    parser = _NetscapeBookmarkParser()
-    parser.feed(html or "")
-    parser.close()
     selected = set(selected_folders) if selected_folders is not None else None
     entries: list[BookmarkEntry] = []
     seen: set[str] = set()
-    for raw in parser.entries:
+    for raw in parse_netscape_bookmarks(html):
         if not _folder_selected(raw.folder_path, selected):
             continue
         canonical = canonicalize_bookmark_url(raw.url)

@@ -134,6 +134,22 @@ class UserProfile(models.Model):
         return [item.strip() for item in raw_value.split(",") if item.strip()]
 
 
+class AuctionWatchArtist(models.Model):
+    """A persistent artist identity imported through the Artist Watchlist."""
+
+    name = models.CharField(max_length=255)
+    normalized_name = models.CharField(max_length=255, unique=True)
+    artprice_url = models.URLField(max_length=2000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name", "id"]
+
+    def __str__(self):
+        return self.name
+
+
 class AuctionWatchLot(models.Model):
     """A normalized auction lot synced from the desktop Artist Watchlist."""
 
@@ -141,6 +157,13 @@ class AuctionWatchLot(models.Model):
     source_lot_id = models.CharField(max_length=255)
     artist = models.CharField(max_length=255, blank=True)
     artist_watchlist_name = models.CharField(max_length=255, blank=True)
+    watchlist_artist = models.ForeignKey(
+        AuctionWatchArtist,
+        related_name="lots",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+    )
     title = models.CharField(max_length=500, blank=True)
     medium = models.CharField(max_length=500, blank=True)
     auction_house = models.CharField(max_length=255, blank=True)

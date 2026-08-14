@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Mapping
 from urllib.parse import urlparse
 
 import requests
 
+from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.watchlist_models import NormalizedLot
 
 
@@ -73,17 +75,34 @@ def sync_watchlist_lots(
     *,
     base_url: str,
     api_key: str,
+    artist_artprice_links: Mapping[str, str] | None = None,
     session=requests,
     timeout: tuple[int, int] = (10, 120),
 ) -> CalendarSyncResult:
     if not api_key:
         raise CalendarSyncError("CATALOG_API_KEY is required for website calendar sync.")
     endpoint = f"{_validated_base_url(base_url)}/calendar/sync/"
+    artist_links: dict[str, tuple[str, str]] = {}
+    for name, url in (artist_artprice_links or {}).items():
+        key = artist_identity_key(name)
+        if not key or not str(url or "").strip():
+            continue
+        value = (str(name).strip(), str(url).strip())
+        existing = artist_links.get(key)
+        if existing is not None and existing[1] != value[1]:
+            raise CalendarSyncError(f"Conflicting Artprice links were matched to {value[0]}.")
+        artist_links[key] = min(existing, value, key=lambda item: item[0].casefold()) if existing else value
     try:
         response = session.post(
             endpoint,
             headers={"X-API-KEY": api_key, "Accept": "application/json"},
-            json={"lots": [_calendar_payload(lot) for lot in lots]},
+            json={
+                "lots": [_calendar_payload(lot) for lot in lots],
+                "artist_links": [
+                    {"name": name, "artprice_url": url}
+                    for name, url in sorted(artist_links.values(), key=lambda item: item[0].casefold())
+                ],
+            },
             timeout=timeout,
         )
     except requests.RequestException as exc:

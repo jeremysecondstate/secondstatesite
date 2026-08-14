@@ -11,6 +11,7 @@ import webbrowser
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
+from catalogapp.artprice_artist_links import ArtpriceMatchResult, load_artprice_artist_links
 from catalogapp.bookmark_watchlist import (
     BookmarkEntry,
     artist_source_counts,
@@ -51,6 +52,8 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.calendar_syncer = calendar_syncer or sync_watchlist_lots
         self.all_entries: list[BookmarkEntry] = []
         self.active_entries: list[BookmarkEntry] = []
+        self.artist_artprice_links: dict[str, str] = {}
+        self.artprice_match_result = ArtpriceMatchResult({}, (), (), 0)
         self.selected_artists: set[str] = set()
         self.folder_vars: dict[str, tk.BooleanVar] = {}
         self.current_lots: list[NormalizedLot] = []
@@ -258,10 +261,16 @@ class ArtistWatchlistPanel(ttk.Frame):
     def load_bookmarks(self, path: str | Path) -> bool:
         try:
             entries = load_bookmarks_file(path)
+            artprice_matches = load_artprice_artist_links(
+                path,
+                {entry.artist for entry in entries if entry.artist},
+            )
         except Exception as exc:
             messagebox.showerror("Bookmark Import Failed", str(exc), parent=self)
             return False
         self.all_entries = entries
+        self.artist_artprice_links = dict(artprice_matches.links_by_artist)
+        self.artprice_match_result = artprice_matches
         self.bookmark_path_var.set(str(Path(path).resolve()))
         self._save_settings_hint()
         self._build_folder_controls()
@@ -302,8 +311,14 @@ class ArtistWatchlistPanel(ttk.Frame):
         for entry in self.active_entries:
             source_counts[entry.source] = source_counts.get(entry.source, 0) + 1
         sources = ", ".join(f"{source}: {count}" for source, count in sorted(source_counts.items())) or "none"
+        artprice_summary = (
+            f" · {len(set(self.artist_artprice_links.values()))} Artprice artist links matched"
+            if self.artprice_match_result.extracted_count
+            else ""
+        )
         self.import_summary_var.set(
-            f"{len(self.folder_vars)} folders detected · {len(artists)} artists selected from allowed sources ({sources})."
+            f"{len(self.folder_vars)} folders detected · {len(artists)} artists selected from allowed sources "
+            f"({sources}){artprice_summary}."
         )
 
     def _fill_artist_tree(self) -> None:
@@ -391,6 +406,7 @@ class ArtistWatchlistPanel(ttk.Frame):
                             result.lots,
                             base_url=self.calendar_base_url,
                             api_key=self.calendar_api_key,
+                            artist_artprice_links=self.artist_artprice_links,
                         )
                     except Exception as exc:
                         sync_error = " ".join(str(exc).split())[:500]
@@ -479,6 +495,7 @@ class ArtistWatchlistPanel(ttk.Frame):
                     lots,
                     base_url=self.calendar_base_url,
                     api_key=self.calendar_api_key,
+                    artist_artprice_links=self.artist_artprice_links,
                 )
                 self.after(0, lambda: self._finish_calendar_sync(result))
             except Exception as exc:

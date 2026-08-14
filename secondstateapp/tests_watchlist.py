@@ -8,6 +8,11 @@ from django.conf import settings
 from django.test import SimpleTestCase, TestCase
 from django.urls import NoReverseMatch, reverse
 
+from catalogapp.artprice_artist_links import (
+    artist_identity_key,
+    extract_artprice_bookmarks,
+    parse_artprice_artist_links,
+)
 from catalogapp.bookmark_watchlist import (
     BookmarkEntry,
     artist_source_counts,
@@ -89,6 +94,130 @@ class BookmarkParserTests(SimpleTestCase):
         counts = artist_source_counts(load_bookmarks_file(FIXTURES / "bookmarks.html"))
         self.assertEqual(counts["Rufino Tamayo"], {"Invaluable": 1})
         self.assertEqual(counts["Joan Miró"], {"LiveAuctioneers": 1})
+
+
+class ArtpriceArtistLinkParserTests(SimpleTestCase):
+    @staticmethod
+    def bookmarks(*folders):
+        body = "".join(
+            f"<DT><H3>{name}</H3><DL><p>{links}</DL><p>"
+            for name, links in folders
+        )
+        return f"<!DOCTYPE NETSCAPE-Bookmark-file-1><DL><p>{body}</DL><p>"
+
+    @staticmethod
+    def link(title, url, **attributes):
+        extras = " ".join(f'{key}="{value}"' for key, value in attributes.items())
+        return f'<DT><A HREF="{url}" {extras}>{title}</A>'
+
+    def test_extracts_only_valid_artist_urls_from_artprice_folder(self):
+        complete_url = "https://www.artprice.com/artist/28011/antoni-tapies/lots/pasts?idcategory[]=2&amp;p=1"
+        root_domain_url = "http://artprice.com/artist/17457/sol-lewitt?sort=datesale_desc"
+        html = self.bookmarks(
+            ("OTHER", self.link("Wrong folder", complete_url)),
+            (
+                "ARTPRICE",
+                self.link("Antoni Tàpies", complete_url, ICON="ignored", ADD_DATE="123")
+                + self.link("Sol LEWITT", root_domain_url)
+                + self.link("Wrong host", "https://artprice.com.evil.example/artist/1/name")
+                + self.link("Not an artist", "https://www.artprice.com/search?q=Antoni"),
+            ),
+        )
+
+        bookmarks = extract_artprice_bookmarks(html)
+
+        self.assertEqual(
+            {bookmark.url for bookmark in bookmarks},
+            {
+                "https://www.artprice.com/artist/28011/antoni-tapies/lots/pasts?idcategory[]=2&p=1",
+                root_domain_url,
+            },
+        )
+        self.assertNotIn("ignored", repr(bookmarks))
+        self.assertNotIn("123", repr(bookmarks))
+
+    def test_matches_accents_punctuation_casing_and_surname_first_names(self):
+        html = self.bookmarks(
+            (
+                "ARTPRICE",
+                self.link(
+                    "TAPIES: sold lots by Antoni TAPIES - Artprice.com",
+                    "https://www.artprice.com/artist/28011/antoni-tapies/lots/pasts?idcategory=2",
+                )
+                + self.link(
+                    "TING Walasse: sold lots by TING Walasse - Artprice.com",
+                    "https://www.artprice.com/artist/28448/walasse-ting/lots/pasts?idcategory[]=2",
+                )
+                + self.link(
+                    "John SLOAN: sold lots by John SLOAN - Artprice.com",
+                    "https://www.artprice.com/artist/26833/john-sloan/lots/pasts",
+                )
+                + self.link(
+                    "Sol LEWITT (1928-2007) Estimate, Auction prices, Value – Artprice",
+                    "https://www.artprice.com/artist/17457/sol-lewitt",
+                )
+                + self.link(
+                    "LEWIS - Artprice.com",
+                    "https://www.artprice.com/artist/42672/martin-lewis/lots/pasts?idcategory=2",
+                ),
+            ),
+        )
+
+        result = parse_artprice_artist_links(
+            html,
+            [
+                "Antoni Tàpies",
+                "TAPIES, ANTONI",
+                "Walasse Ting",
+                "SLOAN, JOHN",
+                "LEWITT, SOL",
+                "LEWIS, MARTIN",
+            ],
+        )
+
+        self.assertEqual(artist_identity_key("Antoni Tàpies"), artist_identity_key("TAPIES, ANTONI"))
+        self.assertIn("/28011/antoni-tapies/", result.links_by_artist["Antoni Tàpies"])
+        self.assertEqual(result.links_by_artist["Antoni Tàpies"], result.links_by_artist["TAPIES, ANTONI"])
+        self.assertIn("/28448/walasse-ting/", result.links_by_artist["Walasse Ting"])
+        self.assertIn("/26833/john-sloan/", result.links_by_artist["SLOAN, JOHN"])
+        self.assertIn("/17457/sol-lewitt", result.links_by_artist["LEWITT, SOL"])
+        self.assertIn("/42672/martin-lewis/", result.links_by_artist["LEWIS, MARTIN"])
+
+    def test_duplicate_bookmarks_choose_one_complete_url_deterministically(self):
+        shorter = "https://www.artprice.com/artist/711/karel-appel/lots/pasts?idcategory[]=2"
+        preferred = "https://www.artprice.com/artist/711/karel-appel/lots/pasts?idcategory=2&amp;p=1&amp;sort=datesale_desc"
+        html = self.bookmarks(
+            (
+                "ARTPRICE",
+                self.link("Karel APPEL: sold lots by Karel APPEL - Artprice.com", shorter)
+                + self.link("Karel APPEL: sold lots by Karel APPEL - Artprice.com", preferred)
+                + self.link("Karel APPEL duplicate", preferred),
+            ),
+        )
+
+        first = parse_artprice_artist_links(html, ["APPEL, KAREL"])
+        second = parse_artprice_artist_links(html, ["APPEL, KAREL"])
+
+        self.assertEqual(first.links_by_artist, second.links_by_artist)
+        self.assertEqual(
+            first.links_by_artist,
+            {"APPEL, KAREL": preferred.replace("&amp;", "&")},
+        )
+
+    def test_ambiguous_and_unmatched_bookmarks_are_not_attached(self):
+        html = self.bookmarks(
+            (
+                "ARTPRICE",
+                self.link("SMITH - Artprice.com", "https://www.artprice.com/artist/1/smith")
+                + self.link("Unknown Artist", "https://www.artprice.com/artist/2/unknown-artist"),
+            ),
+        )
+
+        result = parse_artprice_artist_links(html, ["John Smith", "Jane Smith", "Antoni Tàpies"])
+
+        self.assertEqual(result.links_by_artist, {})
+        self.assertIn("SMITH - Artprice.com", result.ambiguous_titles)
+        self.assertIn("Unknown Artist", result.unmatched_titles)
 
 
 class InvaluableAdapterTests(SimpleTestCase):

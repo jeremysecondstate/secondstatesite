@@ -4,6 +4,7 @@ import calendar as month_calendar
 import hashlib
 import json
 import os
+import re
 import secrets
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone as datetime_timezone
@@ -26,6 +27,8 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
+from catalogapp.artprice_artist_links import artist_identity_key
+
 from .artprice_max_bid import ArtpriceAnalysisError, analyze_artprice_comparables, analyze_artprice_html
 from .auction_email import (
     AuctionEmailConfigurationError,
@@ -36,7 +39,13 @@ from .auction_email import (
     send_auction_email,
     validate_sending_configuration,
 )
-from .models import AuctionEmailBatch, AuctionEmailBatchItem, AuctionMaxBidAnalysis, AuctionWatchLot
+from .models import (
+    AuctionEmailBatch,
+    AuctionEmailBatchItem,
+    AuctionMaxBidAnalysis,
+    AuctionWatchArtist,
+    AuctionWatchLot,
+)
 
 
 MAX_SYNC_LOTS = 1000
@@ -163,6 +172,12 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
 
 def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None) -> dict:
     selected_lot_ids = selected_lot_ids or set()
+    artist_artprice_url = ""
+    if lot.watchlist_artist_id and lot.watchlist_artist.artprice_url:
+        try:
+            artist_artprice_url = _validated_artist_artprice_url(lot.watchlist_artist.artprice_url)
+        except ValueError:
+            pass
     return {
         "id": lot.pk,
         "artist": _artist_label(lot),
@@ -176,6 +191,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "bid": _bid_label(lot),
         "time": _time_label(lot, zone),
         "url": lot.lot_url or lot.sale_url,
+        "artist_artprice_url": artist_artprice_url,
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
         "artprice_analysis_url": reverse("auction_lot_artprice_analysis", args=(lot.pk,)),
@@ -203,9 +219,9 @@ def auction_calendar(request):
     } if active_email_batch else set()
 
     month_lots = list(
-        AuctionWatchLot.objects.filter(event_at__gte=range_start, event_at__lt=range_end).order_by(
-            "event_at", "auction_house", "artist", "id"
-        )
+        AuctionWatchLot.objects.filter(event_at__gte=range_start, event_at__lt=range_end)
+        .select_related("watchlist_artist")
+        .order_by("event_at", "auction_house", "artist", "id")
     )
     lots_by_day: dict[date, list[AuctionWatchLot]] = defaultdict(list)
     for lot in month_lots:
@@ -239,6 +255,7 @@ def auction_calendar(request):
     today_start, upcoming_end = _utc_bounds(now_local.date(), now_local.date() + timedelta(days=181), zone)
     upcoming_lots = list(
         AuctionWatchLot.objects.filter(active=True, event_at__gte=today_start, event_at__lt=upcoming_end)
+        .select_related("watchlist_artist")
         .order_by("event_at", "auction_house", "artist", "id")[:1000]
     )
     upcoming_by_day_and_sale: dict[tuple[date, str], list[AuctionWatchLot]] = {}
@@ -320,6 +337,34 @@ def _validated_artprice_url(value: object) -> str:
         or port not in (None, 443)
     ):
         raise ValueError("Enter a valid secure artprice.com link.")
+    return candidate
+
+
+def _validated_artist_artprice_url(value: object) -> str:
+    """Validate an imported Artprice artist URL without rewriting its query."""
+
+    candidate = str(value or "").strip()
+    if not candidate:
+        return ""
+    if len(candidate) > 2000:
+        raise ValueError("The imported Artprice artist link is too long.")
+    try:
+        URLValidator(schemes=("http", "https"))(candidate)
+        parsed = urlparse(candidate)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        port = parsed.port
+    except (ValidationError, ValueError):
+        raise ValueError("Enter a valid Artprice artist link.") from None
+    expected_ports = {None, 443} if parsed.scheme.lower() == "https" else {None, 80}
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or host not in {"artprice.com", "www.artprice.com"}
+        or parsed.username
+        or parsed.password
+        or port not in expected_ports
+        or not re.match(r"^/artist/\d+/[^/?#]+(?:/|$)", parsed.path or "", re.IGNORECASE)
+    ):
+        raise ValueError("Enter a valid Artprice artist link.")
     return candidate
 
 
@@ -1035,10 +1080,37 @@ def sync_auction_calendar(request):
         return JsonResponse({"ok": False, "error": "Request must contain a lots array."}, status=400)
     if len(payload["lots"]) > MAX_SYNC_LOTS:
         return JsonResponse({"ok": False, "error": f"At most {MAX_SYNC_LOTS} lots may be synced at once."}, status=400)
+    raw_artist_links = payload.get("artist_links", [])
+    if not isinstance(raw_artist_links, list):
+        return JsonResponse({"ok": False, "error": "artist_links must be an array."}, status=400)
+    if len(raw_artist_links) > MAX_SYNC_LOTS:
+        return JsonResponse(
+            {"ok": False, "error": f"At most {MAX_SYNC_LOTS} artist links may be synced at once."},
+            status=400,
+        )
 
     zone = _calendar_zone()
     prepared = []
+    prepared_artist_links: dict[str, tuple[str, str]] = {}
     try:
+        for index, record in enumerate(raw_artist_links):
+            if not isinstance(record, dict):
+                raise ValueError(f"artist_links[{index}] must be an object")
+            name = _text(record.get("name"), 255)
+            if not name:
+                raise ValueError(f"artist_links[{index}].name is required")
+            normalized_name = artist_identity_key(name)[:255]
+            if not normalized_name:
+                raise ValueError(f"artist_links[{index}].name is invalid")
+            artprice_url = _validated_artist_artprice_url(record.get("artprice_url"))
+            if not artprice_url:
+                raise ValueError(f"artist_links[{index}].artprice_url is required")
+            existing = prepared_artist_links.get(normalized_name)
+            if existing and existing[1] != artprice_url:
+                raise ValueError(f"artist_links[{index}] conflicts with another link for {name}")
+            if existing is None or name.casefold() < existing[0].casefold():
+                prepared_artist_links[normalized_name] = (name, artprice_url)
+
         for index, record in enumerate(payload["lots"]):
             if not isinstance(record, dict):
                 raise ValueError(f"lots[{index}] must be an object")
@@ -1075,7 +1147,9 @@ def sync_auction_calendar(request):
                 "source_first_seen_at": first_seen_at,
                 "source_last_seen_at": last_seen_at,
             }
-            prepared.append((source, source_lot_id, defaults))
+            artist_name = defaults["artist_watchlist_name"] or defaults["artist"]
+            normalized_artist_name = artist_identity_key(artist_name)[:255]
+            prepared.append((source, source_lot_id, defaults, artist_name, normalized_artist_name))
     except ValueError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
@@ -1083,7 +1157,24 @@ def sync_auction_calendar(request):
     updated_count = 0
     ended_count = 0
     with transaction.atomic():
-        for source, source_lot_id, defaults in prepared:
+        artists_by_key: dict[str, AuctionWatchArtist] = {}
+        for normalized_name, (name, artprice_url) in prepared_artist_links.items():
+            artist, _created = AuctionWatchArtist.objects.update_or_create(
+                normalized_name=normalized_name,
+                defaults={"name": name, "artprice_url": artprice_url},
+            )
+            artists_by_key[normalized_name] = artist
+
+        for source, source_lot_id, defaults, artist_name, normalized_artist_name in prepared:
+            if normalized_artist_name:
+                artist = artists_by_key.get(normalized_artist_name)
+                if artist is None:
+                    artist, _created = AuctionWatchArtist.objects.get_or_create(
+                        normalized_name=normalized_artist_name,
+                        defaults={"name": artist_name},
+                    )
+                    artists_by_key[normalized_artist_name] = artist
+                defaults["watchlist_artist"] = artist
             _lot, created = AuctionWatchLot.objects.update_or_create(
                 source=source,
                 source_lot_id=source_lot_id,
@@ -1100,5 +1191,6 @@ def sync_auction_calendar(request):
             "created": created_count,
             "updated": updated_count,
             "ended": ended_count,
+            "artist_links": len(prepared_artist_links),
         }
     )
