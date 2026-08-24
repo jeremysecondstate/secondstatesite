@@ -506,7 +506,25 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             "endAt": self._catalog_datetime(hit),
             "location": location,
             "saleUrl": urljoin(page_url, f"/catalog/{catalog_ref}") if catalog_ref else "",
+            "imageUrl": self._catalog_image_url(hit),
         }
+
+    @classmethod
+    def _catalog_image_url(cls, hit: dict[str, Any]) -> str:
+        """Expand Invaluable's CDN-relative primary image path."""
+
+        photo_path = cls._text_value(hit, "photoPath", "imageUrl", "image")
+        if not photo_path:
+            return ""
+        parsed = urlsplit(photo_path)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return photo_path
+        if photo_path.startswith("//"):
+            return f"https:{photo_path}"
+        relative_path = photo_path.lstrip("/")
+        if relative_path.casefold().startswith("housephotos/"):
+            relative_path = relative_path[len("housePhotos/") :]
+        return urljoin("https://image.invaluable.com/housePhotos/", relative_path)
 
     @classmethod
     def _catalog_lot_url(cls, hit: dict[str, Any], page_url: str) -> str:

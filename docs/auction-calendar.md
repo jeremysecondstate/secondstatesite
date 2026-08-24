@@ -14,9 +14,11 @@ Artist Watchlist refresh
   -> one multipart message through Gmail API users.messages.send
 ```
 
-The desktop sync uploads only normalized auction fields. It does not upload bookmark HTML, browser state, cookies, local cache data, source page HTML, image URLs, ambiguity flags, Artprice URLs, Email Tray state, or API credentials. Existing Artprice links, analyses, and Email Tray selections survive later upserts of the same source lot.
+The desktop sync uploads only normalized auction fields and the source's public primary-image URL. It does not upload bookmark HTML, browser state, cookies, local cache data, source page HTML, image bytes, ambiguity flags, Artprice URLs, Email Tray state, or API credentials. Existing Artprice links, analyses, and Email Tray selections survive later upserts of the same source lot.
 
 Each selected-day lot shows a separate current-bid line beneath its estimate/details. It renders the current amount and bid count when available, **No bids** when the source reports a zero bid count, and **N/A** when Invaluable omits bid data.
+
+A selected day with synced lots shows **Browse all N lots**. The button opens one modal rather than creating browser tabs: only the current lot card and primary image are rendered, while previous/next buttons or Left/Right move through the date's in-memory lot data. Navigation wraps at either end; Home and End jump to the first and last lot; Escape and the close button return focus to the launch button. Missing or failed images use a neutral fallback, and opening the external auction page remains a deliberate per-lot action.
 
 ## Email Tray behavior
 
@@ -63,7 +65,7 @@ Run migrations during deployment:
 .\.venv\Scripts\python.exe manage.py migrate
 ```
 
-Migration `0018_auctionemailbatch_auctionemailbatchitem_and_more` adds the shared active-batch constraint, send history, item attribution, and immutable send-time snapshots. Migration `0019_auctionwatchlot_bid_count` preserves Invaluable's zero/positive/missing bid-count distinction on synced lots. Historical reminder migrations remain untouched.
+Migration `0018_auctionemailbatch_auctionemailbatchitem_and_more` adds the shared active-batch constraint, send history, item attribution, and immutable send-time snapshots. Migration `0019_auctionwatchlot_bid_count` preserves Invaluable's zero/positive/missing bid-count distinction on synced lots. Migration `0021_auctionwatchlot_image_url` stores the public primary image used by the lot browser. Historical reminder migrations remain untouched.
 
 ## Gmail configuration
 
@@ -128,6 +130,7 @@ Removing obsolete Render variables before the code deployment is safe for the ne
 7. With sending disabled, confirm the warning appears and the preview remains usable.
 8. After OAuth configuration, send a small batch to Jeremy and confirm the provider message ID, sending staff account, and sent time are stored.
 9. Confirm the sent lots are unchecked and the calendar panel shows the last successful email.
+10. Select a date with several lots, open **Browse all N lots**, and verify the image/fallback, counter, wraparound arrows, Left/Right, Home/End, Escape, and mobile layout.
 
 ## Automated verification
 

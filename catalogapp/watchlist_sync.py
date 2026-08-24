@@ -53,6 +53,7 @@ def _calendar_payload(lot: NormalizedLot) -> dict:
         "bid_count": lot.bid_count,
         "lot_url": lot.lot_url,
         "sale_url": lot.sale_url,
+        "image_url": lot.image_url,
         "first_seen_at": lot.first_seen_at,
         "last_seen_at": lot.last_seen_at,
         "status": lot.status,

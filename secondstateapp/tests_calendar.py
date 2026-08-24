@@ -532,7 +532,8 @@ class AuctionCalendarViewTests(TestCase):
             "https://www.artprice.com/artist/15266/rockwell-kent/lots/pasts"
             "?idcategory=2&keyword=Starry%20Night&p=1&signed=1&sort=datesale_desc"
         )
-        saved_lot = watch_lot(artprice_url=artprice_url)
+        image_url = "https://image.invaluable.com/housePhotos/Bonhams/lot-primary.jpg"
+        saved_lot = watch_lot(artprice_url=artprice_url, image_url=image_url)
         watch_lot(source_lot_id="inv-101", artist="Henri Matisse", artist_watchlist_name="Henri Matisse")
         self.client.force_login(self.staff)
 
@@ -546,6 +547,7 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual({item["artist"] for item in lot_details}, {"Joan Miró", "Henri Matisse"})
         saved_detail = next(item for item in lot_details if item["id"] == saved_lot.pk)
         self.assertEqual(saved_detail["artprice_url"], artprice_url)
+        self.assertEqual(saved_detail["images"], [image_url])
         self.assertEqual(
             saved_detail["artprice_analysis_url"],
             reverse("auction_lot_artprice_analysis", args=(saved_lot.pk,)),
@@ -553,6 +555,12 @@ class AuctionCalendarViewTests(TestCase):
         self.assertNotIn("comparables", saved_detail)
         self.assertContains(response, "Artprice Max-Bid Analysis")
         self.assertContains(response, "Analyze HTML")
+        self.assertContains(response, 'id="day-lot-browser"')
+        self.assertContains(response, 'id="day-lot-browser-launch"')
+        self.assertContains(response, 'id="lot-browser-previous"')
+        self.assertContains(response, 'id="lot-browser-next"')
+        self.assertContains(response, 'image.referrerPolicy = "no-referrer"')
+        self.assertContains(response, "moveLotBrowser(-1)")
         self.assertEqual(response.context["weeks"][0][0]["date"].weekday(), 0)
 
     def test_calendar_serializes_and_renders_only_valid_imported_artist_links(self):
@@ -613,6 +621,19 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual(labels[lots["none"].pk], "Current bid: No bids")
         self.assertEqual(labels[lots["unavailable"].pk], "Current bid: N/A")
         self.assertContains(response, 'appendText(item, "p", "lot-bid", lot.bid)')
+
+    def test_calendar_does_not_auto_load_images_from_untrusted_hosts(self):
+        unsafe_lot = watch_lot(
+            source_lot_id="unsafe-image",
+            image_url="http://127.0.0.1/private-calendar-image.jpg",
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        details = {item["id"]: item for item in response.context["calendar_data"]["2026-07-25"]}
+        self.assertEqual(details[unsafe_lot.pk]["images"], [])
+        self.assertNotContains(response, "private-calendar-image.jpg")
 
     def test_invalid_month_falls_back_without_error(self):
         self.client.force_login(self.staff)
@@ -1100,6 +1121,7 @@ class CalendarSyncApiTests(TestCase):
             "bid_count": 4,
             "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-galaxia",
             "sale_url": "https://www.invaluable.com/catalog/example",
+            "image_url": "https://image.invaluable.com/housePhotos/Bonhams/galaxia.jpg",
             "first_seen_at": "2026-07-20T10:00:00Z",
             "last_seen_at": "2026-07-20T10:00:00Z",
             "status": "new",
@@ -1128,6 +1150,7 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(lot.event_at.astimezone(CALENDAR_ZONE).hour, 13)
         self.assertEqual(lot.current_bid, Decimal("10000.00"))
         self.assertEqual(lot.bid_count, 4)
+        self.assertEqual(lot.image_url, "https://image.invaluable.com/housePhotos/Bonhams/galaxia.jpg")
         self.assertTrue(lot.active)
         lot.artprice_url = "https://www.artprice.com/artist/1/example/lots/pasts"
         lot.save(update_fields=("artprice_url",))
@@ -1611,7 +1634,7 @@ class DesktopCalendarSyncTests(SimpleTestCase):
             end_at="2026-07-25T13:00:00-07:00",
             current_bid=1700,
             bid_count=4,
-            image_url="https://images.example/private.jpg",
+            image_url="https://images.example/lot-primary.jpg",
             ambiguities=["example"],
         )
         session = _RecordingSession(
@@ -1643,7 +1666,7 @@ class DesktopCalendarSyncTests(SimpleTestCase):
         self.assertEqual(url, "https://secondstate.art/calendar/sync/")
         self.assertEqual(request["headers"]["X-API-KEY"], "catalog-key")
         sent_lot = request["json"]["lots"][0]
-        self.assertNotIn("image_url", sent_lot)
+        self.assertEqual(sent_lot["image_url"], "https://images.example/lot-primary.jpg")
         self.assertNotIn("ambiguities", sent_lot)
         self.assertNotIn("content_hash", sent_lot)
         self.assertEqual(sent_lot["current_bid"], 1700)

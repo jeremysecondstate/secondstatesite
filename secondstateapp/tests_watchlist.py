@@ -300,6 +300,7 @@ class InvaluableAdapterTests(SimpleTestCase):
                             "currentBid": 10000,
                             "bidCount": 0,
                             "currencyCode": "USD",
+                            "photoPath": "Bonhams/19/812345/H1234-Lprimary.jpg",
                         }
                     ],
                 }
@@ -337,6 +338,10 @@ class InvaluableAdapterTests(SimpleTestCase):
         self.assertEqual(lot.bid_label, "No bids")
         self.assertEqual(lot.end_at, "2026-07-29T20:00:00+00:00")
         self.assertEqual(lot.sale_url, "https://www.invaluable.com/catalog/8NR19L2CW9")
+        self.assertEqual(
+            lot.image_url,
+            "https://image.invaluable.com/housePhotos/Bonhams/19/812345/H1234-Lprimary.jpg",
+        )
         self.assertEqual(
             lot.lot_url,
             "https://www.invaluable.com/auction-lot/rufino-tamayo-galaxia-galaxy-47-c-fd04340a1d",

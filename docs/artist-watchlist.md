@@ -48,7 +48,7 @@ The implementation is split by responsibility:
 - Local settings and cache data live under `%LOCALAPPDATA%\SecondState\ArtistWatchlist`, outside the repository.
 - Zero-AI mode is enabled in the UI by default. Optional enrichment also requires `OPENAI_WATCHLIST_ENRICHMENT_ENABLED=1`.
 - Enrichment sends only allowlisted normalized fields. URLs, bookmark data, page HTML, cookies, and credentials are excluded.
-- Website calendar sync sends only normalized sale/lot fields. It excludes the bookmark file, page HTML, cookies, cache internals, images, and credentials.
+- Website calendar sync sends only normalized sale/lot fields plus the source's public primary-image URL. It excludes the bookmark file, page HTML, cookies, cache internals, image bytes, and credentials.
 - The Responses API request has no tools and uses a strict JSON schema. Ambiguous records are batched and cached by deterministic content hash.
 
 Optional local environment settings:
@@ -81,7 +81,7 @@ Invaluable's `currentBid` and `bidCount` values are normalized separately so the
 
 ICS output defaults to one event per auction sale. Matched artists and lots are grouped in the description. A timezone-aware source time is converted to UTC. A source date without a time becomes an all-day event and the description marks the time as unverified. Event-per-lot and reminders are supported by the export function but are intentionally not the noisy UI default.
 
-The private web calendar at `/calendar/` is populated automatically after a successful refresh and can be retried with **Sync Website Calendar**. Website staff can explicitly select lots with saved Artprice links for the shared Email Tray; sync never selects, deselects, or sends them. See [`auction-calendar.md`](auction-calendar.md) for authentication, deployment, and Gmail setup.
+The private web calendar at `/calendar/` is populated automatically after a successful refresh and can be retried with **Sync Website Calendar**. A selected date with lots exposes **Browse all N lots**, which opens a single modal viewer with the current lot's primary image, details, counter, progress, wraparound previous/next controls, and keyboard navigation. Website staff can explicitly select lots with saved Artprice links for the shared Email Tray; sync never selects, deselects, or sends them. See [`auction-calendar.md`](auction-calendar.md) for authentication, deployment, and Gmail setup.
 
 ## Migration note
 

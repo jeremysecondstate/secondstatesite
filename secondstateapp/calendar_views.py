@@ -28,6 +28,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
 from catalogapp.artprice_artist_links import artist_identity_key
+from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
 
 from .artprice_max_bid import ArtpriceAnalysisError, analyze_artprice_comparables, analyze_artprice_html
 from .auction_email import (
@@ -172,6 +173,7 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
 
 def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None) -> dict:
     selected_lot_ids = selected_lot_ids or set()
+    image_url = _calendar_image_url(lot.image_url)
     artist_artprice_url = ""
     if lot.watchlist_artist_id and lot.watchlist_artist.artprice_url:
         try:
@@ -191,6 +193,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "bid": _bid_label(lot),
         "time": _time_label(lot, zone),
         "url": lot.lot_url or lot.sale_url,
+        "images": [image_url] if image_url else [],
         "artist_artprice_url": artist_artprice_url,
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
@@ -1003,6 +1006,19 @@ def _url(value) -> str:
     return ""
 
 
+def _calendar_image_url(value) -> str:
+    """Allow automatic browser loads only from HTTPS watchlist-source hosts."""
+
+    candidate = _url(value)
+    parsed = urlparse(candidate)
+    host = (parsed.hostname or "").casefold()
+    if parsed.scheme != "https":
+        return ""
+    if any(host == domain or host.endswith(f".{domain}") for domain in DEFAULT_ALLOWED_DOMAINS):
+        return candidate
+    return ""
+
+
 def _decimal(value) -> Decimal | None:
     if value in (None, ""):
         return None
@@ -1142,6 +1158,7 @@ def sync_auction_calendar(request):
                 "bid_count": _nonnegative_integer(record.get("bid_count")),
                 "lot_url": _url(record.get("lot_url")),
                 "sale_url": _url(record.get("sale_url")),
+                "image_url": _calendar_image_url(record.get("image_url")),
                 "source_status": source_status,
                 "active": active,
                 "source_first_seen_at": first_seen_at,
