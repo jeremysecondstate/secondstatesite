@@ -667,6 +667,10 @@ body:has(.lot-browser[open]) {
   padding: clamp(24px, 4vw, 52px);
 }
 
+.lot-browser-copy.has-workflow {
+  align-self: stretch;
+}
+
 .lot-browser-copy .lot-title {
   font-size: clamp(26px, 3vw, 39px);
   line-height: 1.16;
@@ -728,6 +732,26 @@ body:has(.lot-browser[open]) {
   color: #f0d58f;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.lot-browser-workflow {
+  min-width: 0;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--calendar-line);
+}
+
+.lot-browser-workflow-label {
+  margin: 0 0 12px;
+  color: var(--calendar-gold);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.lot-browser-workflow .artprice-form {
+  margin-top: 0;
 }
 
 .lot-browser-arrow {
@@ -1079,6 +1103,7 @@ body:has(.lot-browser[open]) {
 .artprice-analysis select:focus-visible,
 .artprice-analysis button:focus-visible,
 .artprice-analysis-table-wrap:focus-visible,
+.artprice-analysis-advanced > summary:focus-visible,
 .artprice-comparables > summary:focus-visible {
   outline: 2px solid var(--calendar-gold);
   outline-offset: 2px;
@@ -1131,6 +1156,15 @@ body:has(.lot-browser[open]) {
   margin: 0;
 }
 
+.artprice-analysis.is-quick {
+  margin-top: 16px;
+  background: rgba(217, 184, 120, .025);
+}
+
+.artprice-analysis.is-quick > summary {
+  color: var(--calendar-gold);
+}
+
 .artprice-analysis-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1145,6 +1179,32 @@ body:has(.lot-browser[open]) {
 
 .artprice-analysis-field.is-wide {
   grid-column: 1 / -1;
+}
+
+.artprice-analysis-advanced {
+  margin-top: 10px;
+  border: 1px solid var(--calendar-line);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, .12);
+}
+
+.artprice-analysis-advanced > summary {
+  padding: 9px 10px;
+  color: var(--calendar-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.artprice-analysis-advanced[open] > summary {
+  border-bottom: 1px solid var(--calendar-line);
+  color: var(--calendar-gold);
+}
+
+.artprice-analysis-advanced .artprice-analysis-grid {
+  padding: 10px;
 }
 
 .artprice-analysis-field label {

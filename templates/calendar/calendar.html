@@ -252,6 +252,23 @@
     manual: "Manual",
   };
   const moneyFormatters = new Map();
+  const artpriceEditorInstances = new Map();
+  const artpriceAnalysisInstances = new Map();
+  const artpriceAnalysisCache = new Map();
+
+  const registerLotInstance = (registry, lotId, node, applyState) => {
+    const key = String(lotId);
+    const connected = (registry.get(key) || []).filter((instance) => instance.node.isConnected);
+    connected.push({node, applyState});
+    registry.set(key, connected);
+  };
+
+  const syncLotInstances = (registry, lotId, value) => {
+    const key = String(lotId);
+    const connected = (registry.get(key) || []).filter((instance) => instance.node.isConnected);
+    connected.forEach((instance) => instance.applyState(value));
+    registry.set(key, connected);
+  };
 
   const appendText = (parent, tag, className, value) => {
     if (!value) return;
@@ -332,11 +349,14 @@
     return payload;
   };
 
-  const appendArtpriceEditor = (item, lot, actionLinks) => {
+  const appendArtpriceEditor = (item, lot, actionLinks, options = {}) => {
     const form = document.createElement("form");
-    const inputId = `artprice-link-${lot.id}`;
-    const statusId = `artprice-status-${lot.id}`;
+    const idPrefix = options.idPrefix ? `${options.idPrefix}-` : "";
+    const inputId = `${idPrefix}artprice-link-${lot.id}`;
+    const statusId = `${idPrefix}artprice-status-${lot.id}`;
+    const trayStatusId = `${idPrefix}email-tray-status-${lot.id}`;
     form.className = "artprice-form";
+    form.dataset.lotId = String(lot.id);
 
     const label = document.createElement("label");
     label.className = "artprice-label";
@@ -377,13 +397,13 @@
     trayCheckbox.type = "checkbox";
     trayCheckbox.checked = Boolean(lot.email_tray_selected);
     trayCheckbox.disabled = !lot.artprice_url;
-    trayCheckbox.setAttribute("aria-describedby", `email-tray-status-${lot.id}`);
+    trayCheckbox.setAttribute("aria-describedby", trayStatusId);
     const trayLabel = document.createElement("span");
     trayLabel.textContent = "Include in next email";
     trayControl.append(trayCheckbox, trayLabel);
 
     const trayStatus = document.createElement("p");
-    trayStatus.id = `email-tray-status-${lot.id}`;
+    trayStatus.id = trayStatusId;
     trayStatus.className = "email-tray-toggle-status";
     trayStatus.setAttribute("aria-live", "polite");
 
@@ -405,6 +425,12 @@
       removeButton.hidden = false;
       trayCheckbox.disabled = false;
     };
+
+    registerLotInstance(artpriceEditorInstances, lot.id, form, (state) => {
+      input.value = state.artprice_url || "";
+      trayCheckbox.checked = Boolean(state.email_tray_selected);
+      updateArtpriceLink(state.artprice_url || "");
+    });
 
     trayCheckbox.addEventListener("change", async () => {
       const requestedSelection = trayCheckbox.checked;
@@ -431,13 +457,13 @@
           throw new Error(payload.error || fallback);
         }
         lot.email_tray_selected = Boolean(payload.selected);
-        trayCheckbox.checked = lot.email_tray_selected;
+        syncLotInstances(artpriceEditorInstances, lot.id, lot);
         updateEmailTrayCount(Number(payload.selected_count) || 0);
         trayStatus.textContent = payload.message;
         trayStatus.classList.add("is-success");
       } catch (error) {
         lot.email_tray_selected = !requestedSelection;
-        trayCheckbox.checked = lot.email_tray_selected;
+        syncLotInstances(artpriceEditorInstances, lot.id, lot);
         trayStatus.textContent = error instanceof Error ? error.message : "The Email Tray could not be updated.";
         trayStatus.classList.add("is-error");
       } finally {
@@ -491,9 +517,7 @@
 
         lot.artprice_url = payload.artprice_url;
         lot.email_tray_selected = Boolean(payload.email_tray_selected);
-        input.value = payload.artprice_url;
-        trayCheckbox.checked = lot.email_tray_selected;
-        updateArtpriceLink(payload.artprice_url);
+        syncLotInstances(artpriceEditorInstances, lot.id, lot);
         updateEmailTrayCount(Number(payload.selected_count) || 0);
         status.textContent = payload.message;
         status.classList.add("is-success");
@@ -520,14 +544,17 @@
     item.appendChild(form);
   };
 
-  const appendArtpriceAnalysis = (item, lot) => {
+  const appendArtpriceAnalysis = (item, lot, options = {}) => {
+    const idPrefix = options.idPrefix ? `${options.idPrefix}-` : "";
+    const quick = Boolean(options.quick);
     const details = document.createElement("details");
-    details.className = "artprice-analysis";
+    details.className = `artprice-analysis${quick ? " is-quick" : ""}`;
+    details.dataset.lotId = String(lot.id);
 
     const summary = document.createElement("summary");
     const summaryLabel = document.createElement("span");
     summaryLabel.className = "artprice-analysis-summary-label";
-    summaryLabel.textContent = "Artprice Max-Bid Analysis";
+    summaryLabel.textContent = quick ? "Quick Artprice HTML Analysis" : "Artprice Max-Bid Analysis";
     const summaryBadge = document.createElement("span");
     summaryBadge.className = "artprice-analysis-badge";
     summaryBadge.hidden = true;
@@ -538,7 +565,9 @@
 
     const intro = document.createElement("p");
     intro.className = "artprice-analysis-intro";
-    intro.textContent = "Upload a saved Artprice results page, then adjust the assumptions used to calculate maximum hammer bids.";
+    intro.textContent = quick
+      ? "Upload a saved Artprice results page and analyze it with the default assumptions, or expand the assumptions to adjust them first."
+      : "Upload a saved Artprice results page, then adjust the assumptions used to calculate maximum hammer bids.";
 
     const form = document.createElement("form");
     form.className = "artprice-analysis-form";
@@ -550,7 +579,7 @@
       const group = document.createElement("div");
       group.className = `artprice-analysis-field${options.wide ? " is-wide" : ""}`;
       const label = document.createElement("label");
-      const inputId = `artprice-analysis-${name}-${lot.id}`;
+      const inputId = `${idPrefix}artprice-analysis-${name}-${lot.id}`;
       label.htmlFor = inputId;
       label.textContent = labelText;
 
@@ -577,7 +606,7 @@
       if (options.step !== undefined) control.step = options.step;
       if (options.required) control.required = true;
       if (options.value !== undefined) control.value = options.value;
-      control.setAttribute("aria-describedby", `artprice-analysis-status-${lot.id}`);
+      control.setAttribute("aria-describedby", `${idPrefix}artprice-analysis-status-${lot.id}`);
 
       group.append(label, control);
       fields[name] = control;
@@ -587,13 +616,13 @@
 
     const grid = document.createElement("div");
     grid.className = "artprice-analysis-grid";
-    grid.append(
-      addInput("artprice_html", "Saved Artprice HTML page", {
-        type: "file",
-        accept: ".html,.htm,text/html",
-        required: true,
-        wide: true,
-      }),
+    const htmlField = addInput("artprice_html", "Saved Artprice HTML page", {
+      type: "file",
+      accept: ".html,.htm,text/html",
+      required: true,
+      wide: true,
+    });
+    const advancedFields = [
       addInput("method", "Resale valuation method", {
         options: Object.entries(maxBidMethodLabels),
         value: maxBidDefaults.method,
@@ -671,8 +700,19 @@
         step: "1",
         required: true,
         value: maxBidDefaults.premium_max,
-      })
-    );
+      }),
+    ];
+    grid.appendChild(htmlField);
+
+    const advanced = document.createElement("details");
+    advanced.className = "artprice-analysis-advanced";
+    const advancedSummary = document.createElement("summary");
+    advancedSummary.textContent = "Adjust analysis assumptions";
+    const advancedGrid = document.createElement("div");
+    advancedGrid.className = "artprice-analysis-grid";
+    advancedGrid.append(...advancedFields);
+    advanced.append(advancedSummary, advancedGrid);
+    if (!quick) grid.append(...advancedFields);
 
     const actions = document.createElement("div");
     actions.className = "artprice-analysis-actions";
@@ -692,7 +732,7 @@
     actions.append(analyzeButton, recalculateButton, deleteButton);
 
     const status = document.createElement("p");
-    status.id = `artprice-analysis-status-${lot.id}`;
+    status.id = `${idPrefix}artprice-analysis-status-${lot.id}`;
     status.className = "artprice-analysis-status";
     status.setAttribute("aria-live", "polite");
     status.setAttribute("aria-atomic", "true");
@@ -700,7 +740,9 @@
     const results = document.createElement("div");
     results.className = "artprice-analysis-results";
 
-    form.append(grid, actions);
+    form.append(grid);
+    if (quick) form.append(advanced);
+    form.append(actions);
     panel.append(intro, form, status, results);
     details.append(summary, panel);
     item.appendChild(details);
@@ -914,7 +956,7 @@
 
     const applyAnalysis = (analysis) => {
       currentAnalysis = analysis || null;
-      if (currentAnalysis) populateAssumptions(currentAnalysis);
+      populateAssumptions(currentAnalysis);
       updateActionState();
       renderAnalysis(currentAnalysis);
     };
@@ -958,6 +1000,12 @@
 
     const loadAnalysis = async () => {
       if (loaded || busy) return;
+      const analysisKey = String(lot.id);
+      if (artpriceAnalysisCache.has(analysisKey)) {
+        loaded = true;
+        applyAnalysis(artpriceAnalysisCache.get(analysisKey));
+        return;
+      }
       setBusy(true);
       summaryBadge.hidden = false;
       summaryBadge.textContent = "Loading";
@@ -973,7 +1021,9 @@
           "The saved Artprice analysis could not be loaded."
         );
         loaded = true;
-        applyAnalysis(payload.analysis);
+        const analysis = payload.analysis || null;
+        artpriceAnalysisCache.set(analysisKey, analysis);
+        syncLotInstances(artpriceAnalysisInstances, lot.id, analysis);
         setStatus("");
       } catch (error) {
         summaryBadge.hidden = true;
@@ -1008,7 +1058,9 @@
           fallbackMessage
         );
         loaded = true;
-        applyAnalysis(payload.analysis);
+        const analysis = payload.analysis || null;
+        artpriceAnalysisCache.set(String(lot.id), analysis);
+        syncLotInstances(artpriceAnalysisInstances, lot.id, analysis);
         fields.artprice_html.value = "";
         setStatus(payload.message || "Artprice analysis updated.", "success");
       } catch (error) {
@@ -1088,9 +1140,21 @@
       if (details.open) loadAnalysis();
     });
 
-    populateAssumptions(null);
-    updateActionState();
-    renderAnalysis(null);
+    registerLotInstance(artpriceAnalysisInstances, lot.id, details, (analysis) => {
+      loaded = true;
+      applyAnalysis(analysis);
+    });
+    const cachedAnalysisKey = String(lot.id);
+    if (artpriceAnalysisCache.has(cachedAnalysisKey)) {
+      loaded = true;
+      applyAnalysis(artpriceAnalysisCache.get(cachedAnalysisKey));
+    } else {
+      applyAnalysis(null);
+    }
+    if (quick) {
+      details.open = true;
+      loadAnalysis();
+    }
   };
 
   const formatCalendarDay = (isoDate, options) => {
@@ -1206,7 +1270,7 @@
     lotBrowserCard.appendChild(appendLotBrowserMedia(lot));
 
     const copy = document.createElement("div");
-    copy.className = "lot-browser-copy";
+    copy.className = "lot-browser-copy has-workflow";
     if (lot.ended) appendText(copy, "p", "lot-browser-status", "Sale ended");
     appendArtistLabel(copy, lot);
     appendText(copy, "h3", "lot-title", lot.title);
@@ -1224,6 +1288,16 @@
     }
     copy.appendChild(actionLinks);
     lotBrowserCard.appendChild(copy);
+
+    const workflow = document.createElement("section");
+    workflow.className = "lot-browser-workflow";
+    const workflowLabel = document.createElement("p");
+    workflowLabel.className = "lot-browser-workflow-label";
+    workflowLabel.textContent = "Artprice quick workflow";
+    workflow.appendChild(workflowLabel);
+    copy.appendChild(workflow);
+    appendArtpriceEditor(workflow, lot, actionLinks, {idPrefix: "browser"});
+    appendArtpriceAnalysis(workflow, lot, {idPrefix: "browser", quick: true});
   };
 
   const moveLotBrowser = (distance) => {
@@ -1269,6 +1343,9 @@
   });
   lotBrowser.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    const inWorkflow = event.target instanceof Element
+      && event.target.closest(".artprice-form, .artprice-analysis");
+    if (inWorkflow && event.key !== "Escape") return;
     if (event.key === "Escape") {
       event.preventDefault();
       closeLotBrowser();

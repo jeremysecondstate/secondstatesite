@@ -20,6 +20,8 @@ Each selected-day lot shows a separate current-bid line beneath its estimate/det
 
 A selected day with synced lots shows **Browse all N lots**. The button opens one modal rather than creating browser tabs: only the current lot card and primary image are rendered, while previous/next buttons or Left/Right move through the date's in-memory lot data. Navigation wraps at either end; Home and End jump to the first and last lot; Escape and the close button return focus to the launch button. Missing or failed images use a neutral fallback, and opening the external auction page remains a deliberate per-lot action.
 
+The modal's **Artprice quick workflow** saves or removes the current lot's Artprice link and provides an immediately open HTML upload/analyzer. Default max-bid assumptions keep rapid lot-by-lot processing to a file choice and one click; an optional disclosure exposes every assumption when adjustments are needed. Link, Email Tray, and saved-analysis changes are synchronized with the selected-day panel without refreshing the page. Arrow, Home, and End keys continue to work for lot navigation except while focus is inside these workflow controls, where they retain their normal form behavior.
+
 ## Email Tray behavior
 
 Under each lot's Artprice editor, **Include in next email** is disabled until a secure `artprice.com` URL has been saved. Saving a link enables the checkbox but does not select it. Selection is explicit and shared by all staff users; the selecting staff account is stored with the item.
