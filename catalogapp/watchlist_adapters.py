@@ -5,16 +5,19 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from copy import copy
 import json
 import re
 from typing import Any, Iterable, Protocol
 import unicodedata
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
+from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup
 
 from catalogapp.bookmark_watchlist import canonicalize_bookmark_url
 from catalogapp.watchlist_models import NormalizedLot
+from catalogapp.watchlist_fetch import SourceAccessError
 
 
 class PageFetcher(Protocol):
@@ -813,7 +816,258 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         return ""
 
 
-ADAPTERS: tuple[BookmarkSourceAdapter, ...] = (InvaluableAdapter(),)
+class HeritageAdapter(BookmarkSourceAdapter):
+    """Read Heritage's public catalog cards, including whole-sale bookmarks.
+
+    A starting bid is not a current bid. Catalog dates are kept date-only unless
+    a lot detail explicitly supplies its session's time and timezone.
+    """
+
+    source = "Heritage"
+    domains = ("ha.com",)
+    _lot_path = re.compile(r"/a/(\d+)-(\d+)\.s(?:/|$)", re.I)
+
+    @staticmethod
+    def _text(node) -> str:
+        return " ".join(node.get_text(" ", strip=True).split()) if node else ""
+
+    @classmethod
+    def _identity(cls, url: str) -> tuple[str, str] | None:
+        match = cls._lot_path.search(urlsplit(url).path)
+        return (match[1], match[2]) if match else None
+
+    @staticmethod
+    def _clean_url(url: str) -> str:
+        parts = urlsplit(url)
+        query = [(k, v) for k, v in parse_qsl(parts.query) if not re.fullmatch(r"ic\d+", k, re.I)]
+        return canonicalize_bookmark_url(urlunsplit(parts._replace(query=urlencode(query))))
+
+    @staticmethod
+    def _sale_filter(url: str) -> str:
+        values = {k.casefold(): v for k, v in parse_qsl(urlsplit(url).query)}
+        return values.get("auction_name") or values.get("saleno") or ""
+
+    @classmethod
+    def _description(cls, node) -> tuple[str, str, str]:
+        if node is None:
+            return "", "", ""
+        artist = cls._text(node.select_one("b, strong"))
+        # Birth/death years belong to the source description, not artist identity.
+        artist = re.sub(r"\s*\((?:b\.?\s*)?\d{4}[^)]*\)\s*$", "", artist, flags=re.I).strip()
+        description = copy(node)
+        for br in description.find_all("br"):
+            br.replace_with("\n")
+        lines = [" ".join(line.split()) for line in description.get_text().splitlines() if line.strip()]
+        if artist and len(lines) >= 2:
+            return artist, lines[1], lines[2] if len(lines) >= 3 else ""
+        return artist, cls._text(node.select_one("i, em")) or cls._text(node), ""
+
+    @staticmethod
+    def _date(text: str) -> str:
+        # Gallery cards omit dates; the selected sale heading uses year-first
+        # dates, e.g. "2026 October 22 Prints & Multiples Signature Auction".
+        heading = re.search(r"\b(20\d{2})\s+([A-Za-z]+)\s+(\d{1,2})\b(?!\s*[-–/]\s*\d)", text)
+        if heading:
+            text = f"{heading[2]} {heading[3]}, {heading[1]}"
+        match = re.search(r"\b([A-Za-z]+\s+\d{1,2},?\s+\d{4})\b", text)
+        if not match:
+            return ""
+        for fmt in ("%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%B %d %Y"):
+            try:
+                return datetime.strptime(match[1], fmt).date().isoformat()
+            except ValueError:
+                pass
+        return ""
+
+    @staticmethod
+    def _image_url(node, page_url: str) -> str:
+        """Keep public image URLs, never reinterpret a saved local asset as one."""
+
+        if node is None:
+            return ""
+        for name in ("data-src", "src"):
+            value = str(node.get(name) or "").strip()
+            if not value.startswith(("https://", "//", "/")):
+                continue
+            url = urljoin(page_url, value)
+            parts = urlsplit(url)
+            host = (parts.hostname or "").casefold()
+            if parts.scheme == "https" and not parts.username and not parts.password and any(
+                host == domain or host.endswith(f".{domain}") for domain in ("ha.com", "heritagestatic.com")
+            ):
+                return url
+        return ""
+
+    @classmethod
+    def _bid(cls, node) -> tuple[float | None, int | None]:
+        text = cls._text(node)
+        match = re.search(r"\bCurrent\s+Bid\s*:\s*\$([\d,]+(?:\.\d+)?)", text, re.I)
+        if match:
+            return float(match[1].replace(",", "")), None
+        # Heritage explicitly distinguishes 'Starting Bid' from money bid.
+        if re.search(r"\bStarting Bid\s*:", text, re.I):
+            return None, 0
+        return None, None
+
+    @classmethod
+    def _estimate(cls, node) -> _Money:
+        match = re.search(r"Estimate\s*:\s*(\$[\d,]+(?:\.\d+)?(?:\s*[-–]\s*\$?[\d,]+(?:\.\d+)?)?)", cls._text(node), re.I)
+        return InvaluableAdapter._money(match[1] if match else "", None, None, "USD")
+
+    @classmethod
+    def _sale_title(cls, soup: BeautifulSoup, sale: str) -> str:
+        home = soup.select_one(".auction-home-link")
+        if home:
+            title = cls._text(home).split("(go to Auction Home page)")[0].strip()
+            if title:
+                return title
+        for node in soup.select("a.trigger, a[href*='auction-home.zx']"):
+            title = cls._text(node)
+            if re.search(r"\b20\d{2}\b", title) and "auction" in title.casefold():
+                return title
+        return f"Heritage Auction {sale}"
+
+    def extract_lot_links(self, page: str, page_url: str) -> list[str]:
+        soup = BeautifulSoup(page, "html.parser")
+        return list(dict.fromkeys(
+            self._clean_url(urljoin(page_url, node["href"]))
+            for node in soup.select(".item-block a.item-title[href]")
+            if self.supports(urljoin(page_url, node["href"])) and self._identity(node["href"])
+        ))
+
+    def parse_search_page(self, page: str, page_url: str, watchlist_artist: str) -> list[NormalizedLot]:
+        soup = BeautifulSoup(page, "html.parser")
+        if self._identity(page_url):
+            detail = self.parse_lot_detail(page, page_url, watchlist_artist)
+            return [detail] if detail else []
+        nodes = soup.select(".item-block")
+        if not nodes:
+            text = self._text(soup)
+            if re.search(r"\b(?:no (?:items|results) (?:found|match)|0 available items)\b", text, re.I):
+                return []
+            raise SourceAccessError(
+                "Heritage did not return readable catalog lots. Open the bookmarked sale in your browser "
+                "and use Import Saved Heritage Pages, or configure the optional watchlist browser profile."
+            )
+        lots: dict[str, NormalizedLot] = {}
+        expected_sale = self._sale_filter(page_url)
+        for node in nodes:
+            link = node.select_one("a.item-title[href]")
+            url = self._clean_url(urljoin(page_url, link["href"])) if link else ""
+            identity = self._identity(url)
+            if not identity or not self.supports(url):
+                raise SourceAccessError("A Heritage catalog card was incomplete; existing lots have been retained.")
+            sale, number = identity
+            if expected_sale and sale != expected_sale:
+                raise SourceAccessError("The Heritage catalog does not match the bookmarked auction number.")
+            artist, title, medium = self._description(link)
+            estimate = self._estimate(node)
+            bid, count = self._bid(node.select_one(".item-value, .current-amount .bid-value"))
+            sale_title = self._sale_title(soup, sale)
+            date_node = node.select_one(".live-auction-date")
+            when = self._date(self._text(date_node))
+            if not when:
+                when = self._date(self._text(node.select_one(".auction-date, .closing-date")))
+            if not when and expected_sale:
+                when = self._date(sale_title)
+            image = node.select_one("a.photo-holder img[src], img.thumbnail[src]")
+            sale_link = node.select_one(".item-info a[href*='search.zx'], .lotno a[href*='search.zx']")
+            sale_url = self._clean_url(urljoin(page_url, sale_link["href"])) if sale_link else ""
+            lot = NormalizedLot(
+                source=self.source, source_lot_id=f"{sale}-{number}", artist=artist,
+                artist_watchlist_name=watchlist_artist or artist, title=title, medium=medium,
+                auction_house="Heritage Auctions", sale_title=sale_title,
+                lot_number=number, start_at=when, currency="USD",
+                estimate_low=estimate.low, estimate_high=estimate.high,
+                current_bid=bid, bid_count=count, lot_url=url, sale_url=sale_url,
+                image_url=self._image_url(image, page_url),
+                ambiguities=[] if artist else ["artist"],
+            )
+            lots[lot.cache_key] = lot
+        return list(lots.values())
+
+    def parse_lot_detail(self, page: str, lot_url: str, watchlist_artist: str) -> NormalizedLot | None:
+        identity = self._identity(lot_url)
+        soup = BeautifulSoup(page, "html.parser")
+        description = soup.select_one('#auction-description [itemprop="description"]')
+        if not identity or description is None:
+            raise SourceAccessError("Heritage did not return a readable lot detail page.")
+        sale, number = identity
+        artist, title, medium = self._description(description)
+        sale_title = self._sale_title(soup, sale)
+        info = soup.select_one("#auction-info")
+        # Use the actual session time, never the earlier proxy bidding deadline.
+        session = self._text(info.select_one(".additional-info .left")) if info else ""
+        match = re.search(
+            r"(\d{1,2}:\d{2}\s*[AP]M)\s+(Central Time|CT|CST|CDT|Eastern Time|ET|EST|EDT|Pacific Time|PT|PST|PDT),\s*(?:\w+,\s*)?([A-Za-z]+ \d{1,2}, \d{4})",
+            session, re.I,
+        )
+        when = ""
+        if match:
+            zone = "America/Chicago" if match[2].upper().startswith("C") else "America/New_York" if match[2].upper().startswith("E") else "America/Los_Angeles"
+            day = self._date(match[3])
+            if day:
+                local_time = datetime.strptime(re.sub(r"\s+", " ", match[1]).upper(), "%I:%M %p").time()
+                when = datetime.combine(datetime.fromisoformat(day).date(), local_time, tzinfo=ZoneInfo(zone)).isoformat()
+        if not when:
+            match_date = re.search(r"\b(20\d{2}) ([A-Za-z]+) (\d{1,2})\b", sale_title)
+            when = self._date(f"{match_date[2]} {match_date[3]}, {match_date[1]}") if match_date else ""
+        estimate = self._estimate(soup.select_one("#auction-description"))
+        bid, count = self._bid(soup.select_one("#bidBlockTop"))
+        # Positive 'Bids + Registered Phone Bidders' is not a bid count.
+        bid_node = soup.select_one("#number-bids")
+        if self._text(bid_node) == "0":
+            count = 0
+        image = soup.select_one('img[src*="heritagestatic.com"][src*="it=product"]')
+        sale_link = soup.select_one(".auction-home-link a[href]")
+        return NormalizedLot(
+            source=self.source, source_lot_id=f"{sale}-{number}", artist=artist,
+            artist_watchlist_name=watchlist_artist or artist, title=title, medium=medium,
+            auction_house="Heritage Auctions", sale_title=sale_title, lot_number=number,
+            start_at=when, currency="USD", estimate_low=estimate.low, estimate_high=estimate.high,
+            current_bid=bid, bid_count=count, lot_url=self._clean_url(lot_url),
+            sale_url=self._clean_url(urljoin(lot_url, sale_link["href"])) if sale_link else "",
+            image_url=self._image_url(image, lot_url),
+            ambiguities=[] if artist else ["artist"],
+        )
+
+    def extract_next_page_url(self, page: str, page_url: str) -> str:
+        if self._identity(page_url):
+            return ""
+        soup = BeautifulSoup(page, "html.parser")
+        def page_number(url: str) -> int:
+            value = dict(parse_qsl(urlsplit(url).query)).get("page", "25~1")
+            match = re.fullmatch(r"\d+~(\d+)", value)
+            return int(match[1]) if match else 1
+        current = page_number(page_url)
+        current_node = soup.select_one(".items-pagination .pageindex.current")
+        if current_node and self._text(current_node).isdigit() and int(self._text(current_node)) != current:
+            raise SourceAccessError("Heritage returned a different catalog page; refresh is incomplete.")
+        candidates: list[tuple[int, str]] = []
+        for link in soup.select("a.pageindex[href], a[rel='next'][href]"):
+            url = self._clean_url(urljoin(page_url, link["href"]))
+            if (not self.supports(url) or urlsplit(url).path != urlsplit(page_url).path
+                    or self._sale_filter(url) != self._sale_filter(page_url)):
+                raise SourceAccessError("Heritage pagination left the bookmarked catalog; refresh is incomplete.")
+            number = page_number(url)
+            if number > current:
+                candidates.append((number, url))
+        if candidates:
+            number, url = min(candidates)
+            if number != current + 1:
+                raise SourceAccessError("Heritage skipped a catalog page; refresh is incomplete.")
+            return url
+        total_text = self._text(soup.select_one(".number-bid-buy-results")).replace(",", "")
+        page_value = dict(parse_qsl(urlsplit(page_url).query)).get("page", "25~1")
+        size = re.fullmatch(r"(\d+)~\d+", page_value)
+        if total_text.isdigit() and size:
+            accounted = (current - 1) * int(size[1]) + len(soup.select(".item-block"))
+            if accounted < int(total_text):
+                raise SourceAccessError("Heritage has more catalog lots but no next page; refresh is incomplete.")
+        return ""
+
+
+ADAPTERS: tuple[BookmarkSourceAdapter, ...] = (InvaluableAdapter(), HeritageAdapter())
 
 
 def adapter_for_url(url: str) -> BookmarkSourceAdapter | None:

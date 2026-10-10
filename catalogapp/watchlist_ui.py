@@ -21,8 +21,10 @@ from catalogapp.bookmark_watchlist import (
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_exports import render_calendar_preview, render_csv, render_ics, render_markdown
 from catalogapp.watchlist_models import NormalizedLot, parse_lot_datetime
+from catalogapp.watchlist_saved_pages import import_saved_heritage_pages
 from catalogapp.watchlist_service import WatchlistResult, WatchlistService
 from catalogapp.watchlist_sync import CalendarSyncResult, sync_watchlist_lots
+from secondstate import environment
 
 
 DEFAULT_BOOKMARK_PATH = Path(r"I:\Shared drives\SECONDSTATE\ARTAPP\INVALUABLE-BM.html")
@@ -57,6 +59,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.selected_artists: set[str] = set()
         self.folder_vars: dict[str, tk.BooleanVar] = {}
         self.current_lots: list[NormalizedLot] = []
+        self.fallback_lot_keys: set[str] = set()
         self.stop_event = threading.Event()
         self.worker: threading.Thread | None = None
         self._lot_urls: dict[str, str] = {}
@@ -73,7 +76,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         ttk.Label(
             self,
             text=(
-                "Import curated auction bookmarks, visit only selected artist URLs, and build a local agenda. "
+                "Import curated auction bookmarks, visit selected artist or sale URLs, and build a local agenda. "
                 "Bookmark files stay on this computer; zero-AI mode is on by default."
             ),
             style="Subtle.TLabel",
@@ -117,7 +120,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         )
         self.selection_pane = selection
         folders = ttk.LabelFrame(selection, text="Detected folders", padding=8, width=300)
-        artists = ttk.LabelFrame(selection, text="Artists", padding=8)
+        artists = ttk.LabelFrame(selection, text="Artists / sales", padding=8)
         selection.add(folders, minsize=160, stretch="always")
         selection.add(artists, minsize=280, stretch="always")
         self.folder_controls = ttk.Frame(folders)
@@ -151,7 +154,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         )
         for key, title, width in (
             ("watch", "Watch", 55),
-            ("artist", "Artist", 230),
+            ("artist", "Artist / sale", 230),
             ("sources", "Sources", 180),
             ("urls", "URLs", 55),
         ):
@@ -170,7 +173,7 @@ class ArtistWatchlistPanel(ttk.Frame):
 
         results = ttk.LabelFrame(workspace, text="2. Refresh and agenda", padding=8)
         results.columnconfigure(0, weight=1)
-        results.rowconfigure(1, weight=1)
+        results.rowconfigure(2, weight=1)
         workspace.add(selection, minsize=100, stretch="always")
         workspace.add(results, minsize=140, stretch="always")
         controls = ttk.Frame(results)
@@ -194,8 +197,23 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.stop_button = ttk.Button(controls, text="Stop", command=self.stop_refresh, state=tk.DISABLED)
         self.stop_button.pack(side=tk.RIGHT, padx=(0, 8))
 
+        saved_controls = ttk.Frame(results)
+        saved_controls.grid(row=1, column=0, sticky="ew", pady=(0, 7))
+        self.import_saved_button = ttk.Button(
+            saved_controls,
+            text="Import Saved Heritage Pages…",
+            command=self.import_saved_heritage_pages,
+        )
+        self.import_saved_button.pack(side=tk.LEFT)
+        ttk.Label(
+            saved_controls,
+            text="Select a Heritage sale, then import its results pages saved as HTML from your browser.",
+            style="Subtle.TLabel",
+            wraplength=680,
+        ).pack(side=tk.LEFT, padx=(8, 0))
+
         views = ttk.Notebook(results)
-        views.grid(row=1, column=0, sticky="nsew")
+        views.grid(row=2, column=0, sticky="nsew")
         agenda_tab = ttk.Frame(views, padding=4)
         calendar_tab = ttk.Frame(views, padding=4)
         views.add(agenda_tab, text="Agenda")
@@ -225,6 +243,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.agenda_tree.tag_configure("new", foreground="#117a37")
         self.agenda_tree.tag_configure("changed", foreground="#a05a00")
         self.agenda_tree.tag_configure("ended", foreground="#777777")
+        self.agenda_tree.tag_configure("cached", foreground="#777777")
         self.agenda_tree.bind("<Double-1>", self._open_selected_lot)
         self.calendar_text = scrolledtext.ScrolledText(calendar_tab, wrap=tk.WORD, font=("Consolas", 10), height=10)
         self.calendar_text.pack(fill=tk.BOTH, expand=True)
@@ -317,7 +336,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             else ""
         )
         self.import_summary_var.set(
-            f"{len(self.folder_vars)} folders detected · {len(artists)} artists selected from allowed sources "
+            f"{len(self.folder_vars)} folders detected · {len(artists)} artists / sales from selected folders "
             f"({sources}){artprice_summary}."
         )
 
@@ -371,10 +390,11 @@ class ArtistWatchlistPanel(ttk.Frame):
             messagebox.showwarning("No Bookmarks", "Import a bookmark file and select at least one allowed folder.", parent=self)
             return
         if not self.selected_artists:
-            messagebox.showwarning("No Artists", "Select at least one artist to refresh.", parent=self)
+            messagebox.showwarning("No Selection", "Select at least one artist or sale to refresh.", parent=self)
             return
         self.stop_event = threading.Event()
         self.refresh_button.configure(state=tk.DISABLED)
+        self.import_saved_button.configure(state=tk.DISABLED)
         self.stop_button.configure(state=tk.NORMAL)
         self._set_status("Starting deterministic watchlist refresh…")
         entries = list(self.active_entries)
@@ -397,27 +417,7 @@ class ArtistWatchlistPanel(ttk.Frame):
                         stop_event=self.stop_event,
                         progress=lambda text: self.after(0, lambda value=text: self._set_status(value)),
                     )
-                sync_result = None
-                sync_error = ""
-                if not result.stopped and self._calendar_sync_configured():
-                    self.after(0, lambda: self._set_status("Watchlist refreshed. Syncing the website calendar..."))
-                    try:
-                        sync_result = self.calendar_syncer(
-                            result.lots,
-                            base_url=self.calendar_base_url,
-                            api_key=self.calendar_api_key,
-                            artist_artprice_links=self.artist_artprice_links,
-                        )
-                    except Exception as exc:
-                        sync_error = " ".join(str(exc).split())[:500]
-                self.after(
-                    0,
-                    lambda result=result, sync_result=sync_result, sync_error=sync_error: self._finish_refresh(
-                        result,
-                        sync_result=sync_result,
-                        sync_error=sync_error,
-                    ),
-                )
+                self._sync_and_finish_result(result)
             except Exception as exc:
                 message = " ".join(str(exc).split())[:500]
                 self.after(0, lambda: self._finish_refresh_error(message))
@@ -425,15 +425,129 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.worker = threading.Thread(target=run, name="artist-watchlist-refresh", daemon=True)
         self.worker.start()
 
+    def import_saved_heritage_pages(self) -> None:
+        if self.worker and self.worker.is_alive():
+            return
+        chosen = [
+            entry for entry in self.active_entries
+            if entry.source == "Heritage" and entry.is_sale and entry.watch_label in self.selected_artists
+        ]
+        if len(chosen) != 1:
+            messagebox.showwarning(
+                "Select One Heritage Sale",
+                "Enable the Heritage folder and select exactly one Heritage sale to import. "
+                "Other sources can remain selected.",
+                parent=self,
+            )
+            return
+        paths = filedialog.askopenfilenames(
+            title=f"Import saved results for {chosen[0].watch_label}",
+            filetypes=[("Saved HTML pages", "*.html *.htm"), ("All Files", "*.*")],
+            parent=self,
+        )
+        if not paths:
+            return
+        entry = chosen[0]
+        previous_lots = list(self.current_lots)
+        previous_fallback_keys = set(self.fallback_lot_keys)
+        horizon_days = int(self.horizon_var.get())
+        new_changed_only = bool(self.new_changed_var.get())
+        self.refresh_button.configure(state=tk.DISABLED)
+        self.import_saved_button.configure(state=tk.DISABLED)
+        self._set_status(f"Importing saved Heritage results for {entry.watch_label}…")
+
+        def run() -> None:
+            try:
+                local_watchlist_directory().mkdir(parents=True, exist_ok=True)
+                with WatchlistCache(self._cache_path) as cache:
+                    result = import_saved_heritage_pages(
+                        paths,
+                        entry,
+                        cache,
+                        horizon_days=horizon_days,
+                        new_changed_only=new_changed_only,
+                    )
+                merged = {lot.cache_key: lot for lot in previous_lots}
+                result.fallback_lot_keys.update(
+                    previous_fallback_keys.difference(lot.cache_key for lot in result.lots)
+                )
+                merged.update({lot.cache_key: lot for lot in result.lots})
+                result.lots = sorted(
+                    merged.values(),
+                    key=lambda lot: (lot.relevant_at or "9999", lot.artist_watchlist_name.casefold(), lot.lot_number),
+                )
+                self._sync_and_finish_result(result)
+            except Exception as exc:
+                message = " ".join(str(exc).split())[:500]
+                self.after(0, lambda message=message: self._finish_refresh_error(message))
+
+        self.worker = threading.Thread(target=run, name="heritage-saved-page-import", daemon=True)
+        self.worker.start()
+
+    def _sync_and_finish_result(self, result: WatchlistResult) -> None:
+        """Run calendar sync on the worker for either a refresh or a saved import."""
+
+        sync_result = None
+        sync_error = ""
+        sync_setup_message = ""
+        if not result.stopped and result.lots:
+            if self._calendar_sync_configured():
+                self.after(0, lambda: self._set_status("Watchlist updated. Syncing the website calendar..."))
+                try:
+                    sync_result = self.calendar_syncer(
+                        result.lots,
+                        base_url=self.calendar_base_url,
+                        api_key=self.calendar_api_key,
+                        artist_artprice_links=self.artist_artprice_links,
+                    )
+                except Exception as exc:
+                    sync_error = " ".join(str(exc).split())[:500]
+            else:
+                sync_setup_message = self._calendar_sync_setup_message()
+        self.after(
+            0,
+            lambda result=result, sync_result=sync_result, sync_error=sync_error,
+            sync_setup_message=sync_setup_message: self._finish_refresh(
+                result,
+                sync_result=sync_result,
+                sync_error=sync_error,
+                sync_setup_message=sync_setup_message,
+            ),
+        )
+
     def stop_refresh(self) -> None:
         self.stop_event.set()
         self._set_status("Stopping after the current safe fetch…")
 
     def _calendar_sync_configured(self) -> bool:
+        # A user can add missing credentials to .env and retry without restarting.
+        # Explicitly supplied settings and existing environment values still win.
+        environment.load_project_environment()
+        self.calendar_base_url = (
+            self.calendar_base_url or os.environ.get("SECONDSTATE_BASE_URL", "")
+        ).strip().rstrip("/")
+        self.calendar_api_key = (
+            self.calendar_api_key or os.environ.get("CATALOG_API_KEY", "")
+        ).strip()
         return bool(self.calendar_base_url and self.calendar_api_key)
 
+    def _calendar_sync_setup_message(self) -> str:
+        missing = []
+        if not self.calendar_base_url:
+            missing.append("SECONDSTATE_BASE_URL")
+        if not self.calendar_api_key:
+            missing.append("CATALOG_API_KEY")
+        return (
+            f"The local lots are ready, but website calendar sync needs {' and '.join(missing)}.\n\n"
+            f"Add the missing setting(s) to:\n{environment.PROJECT_ROOT / '.env'}\n\n"
+            "Use SECONDSTATE_BASE_URL=https://secondstate.art and the same CATALOG_API_KEY "
+            "configured on the website. Then click Sync Website Calendar again; "
+            "the app reloads this file automatically."
+        )
+
     def _set_calendar_sync_button_state(self) -> None:
-        enabled = bool(self.current_lots and self._calendar_sync_configured())
+        # Keep setup instructions reachable even when credentials are missing.
+        enabled = bool(self.current_lots)
         self.calendar_sync_button.configure(state=tk.NORMAL if enabled else tk.DISABLED)
 
     def _finish_refresh(
@@ -442,30 +556,70 @@ class ArtistWatchlistPanel(ttk.Frame):
         *,
         sync_result: CalendarSyncResult | None = None,
         sync_error: str = "",
+        sync_setup_message: str = "",
     ) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
+        self.import_saved_button.configure(state=tk.NORMAL)
         self.stop_button.configure(state=tk.DISABLED)
         self.current_lots = result.lots
+        self.fallback_lot_keys = set(result.fallback_lot_keys)
         self._set_calendar_sync_button_state()
         self.metrics_var.set(result.metrics.summary())
         self._fill_agenda()
-        if result.errors:
-            messagebox.showwarning("Watchlist Finished with Source Issues", "\n".join(result.errors[:8]), parent=self)
-        if sync_error:
-            messagebox.showwarning(
-                "Website Calendar Sync Failed",
-                f"The local watchlist refreshed successfully, but the website calendar did not sync.\n\n{sync_error}",
-                parent=self,
-            )
         label = "Watchlist refresh stopped." if result.stopped else result.metrics.summary()
         if sync_result:
             label = sync_result.summary()
+            if result.fallback_lot_keys:
+                label += f" Includes {len(result.fallback_lot_keys)} cached lots; live data was not verified."
+            elif result.errors:
+                label += " Some live sources could not be refreshed."
         elif sync_error:
-            label = "Local watchlist refreshed; website calendar sync failed. Use Sync Website Calendar to retry."
+            label = (
+                "Website calendar sync incomplete; some updates may already be saved. "
+                "See the sync message for the next step."
+            )
+        elif sync_setup_message:
+            label = "Local lots ready; website calendar not synced. Add the missing .env settings, then click Sync Website Calendar."
+        elif result.errors and not result.stopped:
+            label = "Live source refresh incomplete; website calendar was not synced."
+        # Update before opening modal dialogs so the underlying window cannot
+        # remain stuck on the earlier 'Syncing...' progress message.
         self._set_status(label)
+        if result.errors:
+            if sync_result:
+                sync_message = sync_result.summary()
+            elif sync_error:
+                sync_message = (
+                    "Website calendar sync is incomplete; some updates may already be saved.\n"
+                    + sync_error
+                )
+            else:
+                sync_message = "The website calendar was not synced."
+            cached_message = (
+                f"\nThis sync includes {len(result.fallback_lot_keys)} cached lots whose live data was not verified."
+                if sync_result and result.fallback_lot_keys else ""
+            )
+            messagebox.showwarning(
+                "Live Source Refresh Incomplete",
+                "Some auction sources could not be refreshed live.\n\n"
+                f"{sync_message}{cached_message}\n\n" + "\n".join(result.errors[:8]),
+                parent=self,
+            )
+        if result.notices:
+            messagebox.showinfo("Watchlist Import Notes", "\n".join(result.notices[:8]), parent=self)
+        if sync_error:
+            messagebox.showwarning(
+                "Website Calendar Sync Incomplete",
+                "Local lots were retained. Some lot details or earlier batches may already be saved "
+                f"on the website, but sync did not finish.\n\n{sync_error}",
+                parent=self,
+            )
+        if sync_setup_message:
+            messagebox.showwarning("Calendar Sync Not Configured", sync_setup_message, parent=self)
 
     def _finish_refresh_error(self, message: str) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
+        self.import_saved_button.configure(state=tk.NORMAL)
         self.stop_button.configure(state=tk.DISABLED)
         self._set_status("Watchlist refresh failed.")
         messagebox.showerror("Watchlist Refresh Failed", message, parent=self)
@@ -477,14 +631,16 @@ class ArtistWatchlistPanel(ttk.Frame):
             messagebox.showwarning("Nothing to Sync", "Refresh the watchlist first.", parent=self)
             return
         if not self._calendar_sync_configured():
+            self._set_status("Website calendar not synced: missing .env settings. See the setup instructions.")
             messagebox.showwarning(
                 "Calendar Sync Not Configured",
-                "SECONDSTATE_BASE_URL and CATALOG_API_KEY are required.",
+                self._calendar_sync_setup_message(),
                 parent=self,
             )
             return
 
         self.refresh_button.configure(state=tk.DISABLED)
+        self.import_saved_button.configure(state=tk.DISABLED)
         self.calendar_sync_button.configure(state=tk.DISABLED)
         self._set_status("Syncing current watchlist results to the website calendar...")
         lots = list(self.current_lots)
@@ -507,14 +663,21 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def _finish_calendar_sync(self, result: CalendarSyncResult) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
+        self.import_saved_button.configure(state=tk.NORMAL)
         self._set_calendar_sync_button_state()
         self._set_status(result.summary())
 
     def _finish_calendar_sync_error(self, message: str) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
+        self.import_saved_button.configure(state=tk.NORMAL)
         self._set_calendar_sync_button_state()
-        self._set_status("Website calendar sync failed.")
-        messagebox.showerror("Website Calendar Sync Failed", message, parent=self)
+        self._set_status("Website calendar sync incomplete; some updates may already be saved. See the sync message for the next step.")
+        messagebox.showerror(
+            "Website Calendar Sync Incomplete",
+            "Some lot details or earlier batches may already be saved on the website, "
+            f"but sync did not finish.\n\n{message}",
+            parent=self,
+        )
 
     def _fill_agenda(self) -> None:
         for item in self.agenda_tree.get_children(""):
@@ -549,6 +712,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             if lot.estimate_low is not None or lot.estimate_high is not None:
                 estimate = f"{lot.estimate_low or '?'}–{lot.estimate_high or '?'} {lot.currency}".strip()
             bid = lot.bid_label
+            display_status = "cached" if lot.cache_key in self.fallback_lot_keys else lot.status
             iid = f"lot-{index}"
             self.agenda_tree.insert(
                 artist_parent,
@@ -561,9 +725,9 @@ class ArtistWatchlistPanel(ttk.Frame):
                     lot.title,
                     estimate,
                     bid,
-                    lot.status.title(),
+                    display_status.title(),
                 ),
-                tags=(lot.status,),
+                tags=(display_status,),
             )
             self._lot_urls[iid] = lot.lot_url
         self.calendar_text.configure(state=tk.NORMAL)

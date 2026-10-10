@@ -11,7 +11,7 @@ from catalogapp.bookmark_watchlist import BookmarkEntry
 from catalogapp.watchlist_adapters import BatchedSearchPage, BookmarkSourceAdapter, adapter_for_url
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_enrichment import OpenAIEnricher
-from catalogapp.watchlist_fetch import WatchlistStopped, page_fetcher_from_environment
+from catalogapp.watchlist_fetch import SourceAccessError, WatchlistStopped, page_fetcher_from_environment
 from catalogapp.watchlist_models import (
     NormalizedLot,
     lot_within_horizon,
@@ -51,6 +51,10 @@ class WatchlistResult:
     metrics: WatchlistMetrics
     errors: list[str] = field(default_factory=list)
     stopped: bool = False
+    notices: list[str] = field(default_factory=list)
+    # View-only provenance: the source failed and these lots were not observed
+    # in this refresh. Do not overwrite their stored transition or timestamp.
+    fallback_lot_keys: set[str] = field(default_factory=set)
 
 
 class WatchlistService:
@@ -83,10 +87,10 @@ class WatchlistService:
         stop = stop_event or threading.Event()
         fetcher = self.fetcher or page_fetcher_from_environment(stop)
         selected = {artist.casefold() for artist in selected_artists}
-        chosen = [entry for entry in entries if entry.artist.casefold() in selected]
+        chosen = [entry for entry in entries if entry.watch_label.casefold() in selected]
         metrics = WatchlistMetrics(
             bookmark_urls=len(chosen),
-            artists=len({entry.artist.casefold() for entry in chosen}),
+            artists=len({entry.watch_label.casefold() for entry in chosen}),
         )
         errors: list[str] = []
         if not zero_ai and not self.enricher.enabled:
@@ -95,6 +99,8 @@ class WatchlistService:
                 "and configure OPENAI_API_KEY, or keep Zero-AI mode selected."
             )
         refreshed_lots: list[NormalizedLot] = []
+        fallback_lot_keys: set[str] = set()
+        observed_lot_keys: set[str] = set()
         stopped = False
         started_pages = int(getattr(fetcher, "pages_fetched", 0))
         observed_at = self.now()
@@ -136,9 +142,10 @@ class WatchlistService:
                     cached = self._cached_lots_for_entry(entry)
                     cached_count += len(cached)
                     refreshed_lots.extend(cached)
+                    fallback_lot_keys.update(lot.cache_key for lot in cached)
                     metrics.cache_hits += len(cached)
                     self.cache.record_source_error(entry.url, message, observed_at)
-                suffix = f" Showing {cached_count} cached lots." if cached_count else ""
+                suffix = _cached_fallback_message(cached_count, new_changed_only)
                 errors.append(
                     f"{adapter.source} ({len(adapter_entries)} artists): {message}{suffix}"
                 )
@@ -155,10 +162,10 @@ class WatchlistService:
                 continue
             adapter = adapter_for_url(entry.url)
             if adapter is None:
-                errors.append(f"{entry.source or 'Unsupported source'} adapter is not available yet: {entry.artist}")
+                errors.append(f"{entry.source or 'Unsupported source'} adapter is not available yet: {entry.watch_label}")
                 continue
             if progress:
-                progress(f"Fetching {entry.artist} from {entry.source}…")
+                progress(f"Fetching {entry.watch_label} from {entry.source}…")
             try:
                 lots, ended, complete = self._refresh_entry(
                     entry,
@@ -168,6 +175,7 @@ class WatchlistService:
                     metrics,
                     observed_at,
                     preloaded_search=batched_pages.get(entry.url),
+                    observed_lot_keys=observed_lot_keys,
                 )
                 refreshed_lots.extend(lots)
                 if complete:
@@ -181,20 +189,25 @@ class WatchlistService:
                 message = " ".join(str(exc).split())[:500]
                 cached = self._cached_lots_for_entry(entry)
                 refreshed_lots.extend(cached)
+                fallback_lot_keys.update(lot.cache_key for lot in cached)
                 metrics.cache_hits += len(cached)
-                suffix = f" Showing {len(cached)} cached lots." if cached else ""
-                errors.append(f"{entry.artist} ({entry.source}): {message}{suffix}")
+                suffix = _cached_fallback_message(
+                    sum(lot.cache_key not in observed_lot_keys for lot in cached), new_changed_only
+                )
+                errors.append(f"{entry.watch_label} ({entry.source}): {message}{suffix}")
                 self.cache.record_source_error(entry.url, message, observed_at)
 
         metrics.pages_fetched = max(0, int(getattr(fetcher, "pages_fetched", 0)) - started_pages)
-        enrichment = self.enricher.enrich(refreshed_lots, zero_ai=zero_ai)
+        fallback_lot_keys.difference_update(observed_lot_keys)
+        freshly_observed_lots = [lot for lot in refreshed_lots if lot.cache_key not in fallback_lot_keys]
+        enrichment = self.enricher.enrich(freshly_observed_lots, zero_ai=zero_ai)
         metrics.ai_enriched_records = enrichment.records_enriched
         metrics.ai_cache_hits = enrichment.cache_hits
         metrics.cache_hits += enrichment.cache_hits
         metrics.input_tokens = enrichment.input_tokens
         metrics.output_tokens = enrichment.output_tokens
         metrics.total_tokens = enrichment.total_tokens
-        for lot in refreshed_lots:
+        for lot in freshly_observed_lots:
             self.cache.update_payload(lot)
 
         deduplicated: dict[str, NormalizedLot] = {}
@@ -203,11 +216,17 @@ class WatchlistService:
         lots = list(deduplicated.values())
         lots = [lot for lot in lots if lot.status == "ended" or lot_within_horizon(lot, observed_at, horizon_days)]
         if new_changed_only:
-            lots = [lot for lot in lots if lot.status in {"new", "changed", "ended"}]
+            lots = [
+                lot for lot in lots
+                if lot.cache_key not in fallback_lot_keys and lot.status in {"new", "changed", "ended"}
+            ]
         lots.sort(key=_agenda_sort_key)
         if progress:
             progress(metrics.summary())
-        return WatchlistResult(lots=lots, metrics=metrics, errors=errors, stopped=stopped)
+        return WatchlistResult(
+            lots=lots, metrics=metrics, errors=errors, stopped=stopped,
+            fallback_lot_keys=fallback_lot_keys.intersection(lot.cache_key for lot in lots),
+        )
 
     def _refresh_entry(
         self,
@@ -218,6 +237,7 @@ class WatchlistService:
         metrics: WatchlistMetrics,
         observed_at: datetime,
         preloaded_search: BatchedSearchPage | None = None,
+        observed_lot_keys: set[str] | None = None,
     ) -> tuple[list[NormalizedLot], list[NormalizedLot], bool]:
         page_url = entry.url
         visited_pages: set[str] = set()
@@ -239,6 +259,10 @@ class WatchlistService:
             else:
                 page = adapter.fetch_search_page(page_url, fetcher)
             cards = adapter.parse_search_page(page, page_url, entry.artist)
+            if len(visited_pages) > 1 and cards and all(card.cache_key in observed_keys for card in cards):
+                raise SourceAccessError(
+                    "The source repeated an earlier catalog page; existing lots have been retained."
+                )
             for card in cards:
                 if card.cache_key in observed_keys:
                     continue
@@ -247,7 +271,7 @@ class WatchlistService:
                 cached = self.cache.lookup(card)
                 if cached and cached.search_hash == search_hash and not adapter.needs_detail(cached.lot):
                     lot = cached.lot
-                    lot.artist_watchlist_name = entry.artist
+                    lot.artist_watchlist_name = entry.artist or lot.artist
                     metrics.cache_hits += 1
                 else:
                     lot = card
@@ -263,6 +287,8 @@ class WatchlistService:
                     search_hash=search_hash,
                     observed_at=observed_at,
                 )
+                if observed_lot_keys is not None:
+                    observed_lot_keys.add(lot.cache_key)
                 if transition == "new":
                     metrics.new_lots += 1
                 elif transition == "changed":
@@ -275,12 +301,14 @@ class WatchlistService:
                 next_url = ""
             page_url = next_url
         ended = self.cache.mark_missing_ended(entry.url, observed_keys, observed_at) if complete else []
+        if observed_lot_keys is not None:
+            observed_lot_keys.update(lot.cache_key for lot in ended)
         return lots, ended, complete
 
     def _cached_lots_for_entry(self, entry: BookmarkEntry) -> list[NormalizedLot]:
         lots = self.cache.active_lots_for_watch_url(entry.url)
         for lot in lots:
-            lot.artist_watchlist_name = entry.artist
+            lot.artist_watchlist_name = entry.artist or lot.artist
         return lots
 
 
@@ -293,3 +321,11 @@ def _agenda_sort_key(lot: NormalizedLot) -> tuple[str, str, str, str]:
         lot.auction_house.casefold(),
         lot.lot_number.casefold(),
     )
+
+
+def _cached_fallback_message(count: int, new_changed_only: bool) -> str:
+    if not count:
+        return ""
+    noun = "lot" if count == 1 else "lots"
+    visibility = " Hidden by New/changed only." if new_changed_only else " Displayed as Cached."
+    return f" Retained {count} cached {noun}; live data was not verified.{visibility}"

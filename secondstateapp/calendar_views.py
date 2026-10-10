@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import RequestDataTooBig, ValidationError
 from django.core.validators import URLValidator
 from django.db import transaction
 from django.http import JsonResponse
@@ -40,6 +40,11 @@ from .auction_email import (
     send_auction_email,
     validate_sending_configuration,
 )
+from .calendar_images import (
+    is_saved_calendar_image_url,
+    prepare_saved_calendar_image,
+    store_saved_calendar_image,
+)
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -53,6 +58,8 @@ MAX_SYNC_LOTS = 1000
 MAX_SYNC_BYTES = 2_000_000
 MAX_ARTPRICE_HTML_BYTES = 5 * 1024 * 1024
 ARTPRICE_PRELOADED_STATE_MARKER = "window.__PRELOADED_STATE__"
+# Heritage serves lot photographs separately from its bookmarked auction pages.
+CALENDAR_IMAGE_DOMAINS = (*DEFAULT_ALLOWED_DOMAINS, "heritagestatic.com")
 
 
 def _calendar_zone() -> ZoneInfo:
@@ -1007,14 +1014,16 @@ def _url(value) -> str:
 
 
 def _calendar_image_url(value) -> str:
-    """Allow automatic browser loads only from HTTPS watchlist-source hosts."""
+    """Allow saved artwork or HTTPS auction hosts and their CDNs."""
 
+    if is_saved_calendar_image_url(value):
+        return value
     candidate = _url(value)
     parsed = urlparse(candidate)
     host = (parsed.hostname or "").casefold()
     if parsed.scheme != "https":
         return ""
-    if any(host == domain or host.endswith(f".{domain}") for domain in DEFAULT_ALLOWED_DOMAINS):
+    if any(host == domain or host.endswith(f".{domain}") for domain in CALENDAR_IMAGE_DOMAINS):
         return candidate
     return ""
 
@@ -1085,11 +1094,15 @@ def sync_auction_calendar(request):
         return JsonResponse({"ok": False, "error": "Calendar sync is not configured."}, status=503)
     if not _sync_authorized(request):
         return JsonResponse({"ok": False, "error": "Unauthorized."}, status=401)
-    if len(request.body) > MAX_SYNC_BYTES:
+    try:
+        body = request.body
+    except RequestDataTooBig:
+        return JsonResponse({"ok": False, "error": "Sync payload is too large."}, status=413)
+    if len(body) > MAX_SYNC_BYTES:
         return JsonResponse({"ok": False, "error": "Sync payload is too large."}, status=413)
 
     try:
-        payload = json.loads(request.body or b"{}")
+        payload = json.loads(body or b"{}")
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"ok": False, "error": "Request body must be valid JSON."}, status=400)
     if not isinstance(payload, dict) or not isinstance(payload.get("lots"), list):
@@ -1107,6 +1120,7 @@ def sync_auction_calendar(request):
 
     zone = _calendar_zone()
     prepared = []
+    prepared_images = []
     prepared_artist_links: dict[str, tuple[str, str]] = {}
     try:
         for index, record in enumerate(raw_artist_links):
@@ -1166,6 +1180,13 @@ def sync_auction_calendar(request):
             }
             artist_name = defaults["artist_watchlist_name"] or defaults["artist"]
             normalized_artist_name = artist_identity_key(artist_name)[:255]
+            saved_image = None
+            if "saved_image_base64" in record:
+                try:
+                    saved_image = prepare_saved_calendar_image(record["saved_image_base64"])
+                except ValueError as exc:
+                    raise ValueError(f"lots[{index}].{exc}") from exc
+            prepared_images.append(saved_image)
             prepared.append((source, source_lot_id, defaults, artist_name, normalized_artist_name))
     except ValueError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
@@ -1173,6 +1194,13 @@ def sync_auction_calendar(request):
     created_count = 0
     updated_count = 0
     ended_count = 0
+    # Every record has passed validation before either files or database rows change.
+    try:
+        for prepared_lot, saved_image in zip(prepared, prepared_images):
+            if saved_image is not None:
+                prepared_lot[2]["image_url"] = store_saved_calendar_image(saved_image)
+    except OSError:
+        return JsonResponse({"ok": False, "error": "Calendar image storage is unavailable. Please retry."}, status=503)
     with transaction.atomic():
         artists_by_key: dict[str, AuctionWatchArtist] = {}
         for normalized_name, (name, artprice_url) in prepared_artist_links.items():
@@ -1182,7 +1210,7 @@ def sync_auction_calendar(request):
             )
             artists_by_key[normalized_name] = artist
 
-        for source, source_lot_id, defaults, artist_name, normalized_artist_name in prepared:
+        for (source, source_lot_id, defaults, artist_name, normalized_artist_name), saved_image in zip(prepared, prepared_images):
             if normalized_artist_name:
                 artist = artists_by_key.get(normalized_artist_name)
                 if artist is None:
@@ -1192,6 +1220,12 @@ def sync_auction_calendar(request):
                     )
                     artists_by_key[normalized_artist_name] = artist
                 defaults["watchlist_artist"] = artist
+            if saved_image is None:
+                existing_image = AuctionWatchLot.objects.select_for_update().filter(
+                    source=source, source_lot_id=source_lot_id,
+                ).values_list("image_url", flat=True).first()
+                if is_saved_calendar_image_url(existing_image):
+                    defaults.pop("image_url", None)
             _lot, created = AuctionWatchLot.objects.update_or_create(
                 source=source,
                 source_lot_id=source_lot_id,
@@ -1209,5 +1243,6 @@ def sync_auction_calendar(request):
             "updated": updated_count,
             "ended": ended_count,
             "artist_links": len(prepared_artist_links),
+            "images_received": sum(image is not None for image in prepared_images),
         }
     )

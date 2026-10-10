@@ -1,4 +1,4 @@
-"""Local, privacy-preserving browser bookmark import for artist watchlists."""
+"""Local, privacy-preserving browser bookmark import for artist and sale watchlists."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ DEFAULT_ALLOWED_DOMAINS = (
     "invaluable.com",
     "liveauctioneers.com",
     "drouot.com",
+    "ha.com",
 )
 _TRACKING_QUERY_KEYS = {
     "fbclid",
@@ -48,6 +49,18 @@ class BookmarkEntry:
     @property
     def folder(self) -> str:
         return self.folder_path[-1] if self.folder_path else "Unfiled"
+
+    @property
+    def is_sale(self) -> bool:
+        return is_sale_bookmark_url(self.url)
+
+    @property
+    def watch_label(self) -> str:
+        """Return the picker label without treating a sale title as an artist."""
+
+        if self.is_sale:
+            return self.title or "Heritage sale"
+        return self.artist or self.title or "Unknown artist"
 
 
 class _NetscapeBookmarkParser(HTMLParser):
@@ -145,7 +158,18 @@ def source_for_url(url: str) -> str:
         return "LiveAuctioneers"
     if host == "drouot.com" or host.endswith(".drouot.com"):
         return "Drouot"
+    if host == "ha.com" or host.endswith(".ha.com"):
+        return "Heritage"
     return ""
+
+
+def is_sale_bookmark_url(url: str) -> bool:
+    """Recognize a Heritage catalog selected by its public auction number."""
+
+    return source_for_url(url) == "Heritage" and any(
+        key.casefold() in {"auction_name", "saleno"} and value.strip()
+        for key, value in parse_qsl(urlsplit(url).query, keep_blank_values=False)
+    )
 
 
 def canonicalize_bookmark_url(url: str) -> str:
@@ -189,6 +213,8 @@ def normalize_artist_label(value: str) -> str:
 
 
 def artist_from_bookmark(title: str, url: str) -> str:
+    if is_sale_bookmark_url(url):
+        return ""
     query = parse_qsl(urlsplit(url).query, keep_blank_values=False)
     for key, value in query:
         if key.casefold() in _ARTIST_QUERY_KEYS:
@@ -267,6 +293,6 @@ def folder_counts(entries: Iterable[BookmarkEntry]) -> dict[str, int]:
 def artist_source_counts(entries: Iterable[BookmarkEntry]) -> dict[str, dict[str, int]]:
     counts: dict[str, dict[str, int]] = {}
     for entry in entries:
-        artist_counts = counts.setdefault(entry.artist or entry.title or "Unknown artist", {})
+        artist_counts = counts.setdefault(entry.watch_label, {})
         artist_counts[entry.source or "Unsupported"] = artist_counts.get(entry.source or "Unsupported", 0) + 1
     return dict(sorted(counts.items(), key=lambda item: item[0].casefold()))

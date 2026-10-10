@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Mapping
 from urllib.parse import urlparse
 
@@ -22,18 +23,22 @@ class CalendarSyncResult:
     created: int
     updated: int
     ended: int
+    images_received: int = 0
 
     def summary(self) -> str:
-        return (
+        message = (
             f"Website calendar synced: {self.received} lots "
             f"({self.created} new, {self.updated} updated, {self.ended} ended)."
         )
+        if self.images_received:
+            message += f" {self.images_received} saved artwork images synced."
+        return message
 
 
 def _calendar_payload(lot: NormalizedLot) -> dict:
     """Return only normalized public auction fields; never local bookmark or cache data."""
 
-    return {
+    payload = {
         "source": lot.source,
         "source_lot_id": lot.source_lot_id,
         "artist": lot.artist,
@@ -58,6 +63,33 @@ def _calendar_payload(lot: NormalizedLot) -> dict:
         "last_seen_at": lot.last_seen_at,
         "status": lot.status,
     }
+    if lot.saved_image_base64:
+        payload["saved_image_base64"] = lot.saved_image_base64
+    return payload
+
+
+def _sync_batches(lots: list[NormalizedLot], artist_links: list[dict]) -> list[dict]:
+    """Keep each JSON request under the website's 2 MB limit, including images."""
+
+    limit = 1_800_000
+    batch = {"lots": [], "artist_links": artist_links}
+    size = len(json.dumps(batch).encode("utf-8"))
+    if size > limit or len(artist_links) > 1000:
+        raise CalendarSyncError("Too many artist links for one calendar sync.")
+    batches = []
+    for lot in lots:
+        record = _calendar_payload(lot)
+        record_size = len(json.dumps(record).encode("utf-8")) + 2
+        if record_size > limit - 100:
+            raise CalendarSyncError("A saved artwork image is too large to sync. Import the saved catalog again.")
+        if size + record_size > limit or len(batch["lots"]) >= 1000:
+            batches.append(batch)
+            batch = {"lots": [], "artist_links": []}
+            size = len(json.dumps(batch).encode("utf-8"))
+        batch["lots"].append(record)
+        size += record_size
+    batches.append(batch)
+    return batches
 
 
 def _validated_base_url(base_url: str) -> str:
@@ -93,34 +125,46 @@ def sync_watchlist_lots(
         if existing is not None and existing[1] != value[1]:
             raise CalendarSyncError(f"Conflicting Artprice links were matched to {value[0]}.")
         artist_links[key] = min(existing, value, key=lambda item: item[0].casefold()) if existing else value
-    try:
-        response = session.post(
-            endpoint,
-            headers={"X-API-KEY": api_key, "Accept": "application/json"},
-            json={
-                "lots": [_calendar_payload(lot) for lot in lots],
-                "artist_links": [
-                    {"name": name, "artprice_url": url}
-                    for name, url in sorted(artist_links.values(), key=lambda item: item[0].casefold())
-                ],
-            },
-            timeout=timeout,
-        )
-    except requests.RequestException as exc:
-        raise CalendarSyncError(f"Could not reach the website calendar: {exc}") from exc
+    batches = _sync_batches(lots, [
+        {"name": name, "artprice_url": url}
+        for name, url in sorted(artist_links.values(), key=lambda item: item[0].casefold())
+    ])
+    totals = dict(received=0, created=0, updated=0, ended=0, images_received=0)
+    for batch in batches:
+        try:
+            response = session.post(
+                endpoint,
+                headers={"X-API-KEY": api_key, "Accept": "application/json"},
+                json=batch,
+                timeout=timeout,
+            )
+        except requests.RequestException as exc:
+            raise CalendarSyncError(
+                "Could not reach the website calendar. Retry Sync Website Calendar; "
+                "any completed batches will be updated without duplicates."
+            ) from exc
 
-    try:
-        response_payload = response.json()
-    except (TypeError, ValueError):
-        response_payload = {}
-    if response.status_code >= 400:
-        message = response_payload.get("error") if isinstance(response_payload, dict) else ""
-        raise CalendarSyncError(message or f"Website calendar returned HTTP {response.status_code}.")
-    if not isinstance(response_payload, dict) or not response_payload.get("ok"):
-        raise CalendarSyncError("Website calendar returned an unexpected response.")
-    return CalendarSyncResult(
-        received=int(response_payload.get("received", 0)),
-        created=int(response_payload.get("created", 0)),
-        updated=int(response_payload.get("updated", 0)),
-        ended=int(response_payload.get("ended", 0)),
-    )
+        try:
+            response_payload = response.json()
+        except (TypeError, ValueError):
+            response_payload = {}
+        if response.status_code >= 400:
+            message = response_payload.get("error") if isinstance(response_payload, dict) else ""
+            raise CalendarSyncError(message or f"Website calendar returned HTTP {response.status_code}.")
+        if not isinstance(response_payload, dict) or not response_payload.get("ok"):
+            raise CalendarSyncError("Website calendar returned an unexpected response.")
+        expected_images = sum(bool(record.get("saved_image_base64")) for record in batch["lots"])
+        try:
+            counts = {key: int(response_payload.get(key, 0)) for key in totals}
+        except (TypeError, ValueError) as exc:
+            raise CalendarSyncError("Website calendar returned invalid sync counts.") from exc
+        if counts["received"] != len(batch["lots"]):
+            raise CalendarSyncError("The website did not confirm every lot. Retry Sync Website Calendar.")
+        if counts["images_received"] != expected_images:
+            raise CalendarSyncError(
+                "Lot details reached the website, but saved artwork images were not confirmed. "
+                "Deploy the website's saved-image update, then click Sync Website Calendar again."
+            )
+        for key in totals:
+            totals[key] += counts[key]
+    return CalendarSyncResult(**totals)

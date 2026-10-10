@@ -83,7 +83,11 @@ class HttpPageFetcher:
         response = self._request("post", url, headers=headers, json=payload)
         content_type = (response.headers.get("Content-Type") or "").casefold()
         if content_type and "json" not in content_type:
-            raise SourceAccessError(f"{urlsplit(url).hostname or 'The source'} returned a non-JSON response.")
+            received = "a web page instead of auction data" if "html" in content_type else "a non-JSON response"
+            raise SourceAccessError(
+                f"{urlsplit(url).hostname or 'The source'} returned {received} "
+                f"(HTTP {response.status_code}). Live auction data was not refreshed."
+            )
         try:
             return response.json()
         except (TypeError, ValueError) as exc:
@@ -116,9 +120,14 @@ class HttpPageFetcher:
             if not _allowed_url(final_url):
                 raise SourceAccessError("The source redirected outside the explicit watchlist domain allowlist.")
             if response.status_code in {401, 403}:
+                guidance = (
+                    " For Heritage, save the catalog page from your signed-in browser and use "
+                    "Import Saved Heritage Pages in the watchlist."
+                    if host == "ha.com" or host.endswith(".ha.com") else ""
+                )
                 raise SourceAccessError(
                     f"{host} requires authentication or blocked automation (HTTP {response.status_code}). "
-                    "The watchlist will not bypass that control."
+                    f"The watchlist will not bypass that control.{guidance}"
                 )
             if response.status_code == 429 or response.status_code >= 500:
                 if attempt < self.max_retries:
@@ -191,6 +200,21 @@ class ControlledPlaywrightFetcher:
                     raise SourceAccessError(
                         f"The source returned HTTP {response.status}. The watchlist will not bypass that control."
                     )
+                host = (urlsplit(url).hostname or "").casefold()
+                if host == "ha.com" or host.endswith(".ha.com"):
+                    # Heritage renders catalog cards after DOMContentLoaded. Reading
+                    # the empty shell here would incorrectly look like an empty sale.
+                    try:
+                        page.wait_for_function(
+                            """() => Boolean(document.querySelector('.item-block .item-title, #auction-description [itemprop="description"]'))
+                                || /\\b(no (items|results) (found|match)|0 available items)\\b/i.test(document.body.innerText)""",
+                            timeout=15_000,
+                        )
+                    except Exception as exc:
+                        raise SourceAccessError(
+                            "Heritage did not display readable catalog data. Save the loaded catalog "
+                            "in your browser and use Import Saved Heritage Pages."
+                        ) from exc
                 html = page.content()
                 challenge_text = f"{page.title()} {html[:4000]}".casefold()
                 if any(term in challenge_text for term in ("captcha", "verify you are human", "access denied")):

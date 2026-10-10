@@ -40,6 +40,9 @@ class NormalizedLot:
     status: str = "unchanged"
     ambiguities: list[str] = field(default_factory=list)
     duplicate_of: str = ""
+    # Sanitized artwork pixels imported from a saved catalog's companion folder.
+    # Never a local filename, original HTML, or browser/session data.
+    saved_image_base64: str = ""
 
     def __post_init__(self) -> None:
         self.lot_url = canonicalize_bookmark_url(self.lot_url) or self.lot_url
@@ -82,7 +85,11 @@ class NormalizedLot:
             "ambiguities",
             "duplicate_of",
         }
-        return {key: value for key, value in asdict(self).items() if key not in ignored}
+        content = {key: value for key, value in asdict(self).items() if key not in ignored}
+        # Keep pre-image cache hashes stable until artwork pixels are imported.
+        if not self.saved_image_base64:
+            content.pop("saved_image_base64", None)
+        return content
 
     def calculate_content_hash(self) -> str:
         payload = json.dumps(self.visible_content(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))

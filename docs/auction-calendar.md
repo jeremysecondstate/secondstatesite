@@ -14,7 +14,9 @@ Artist Watchlist refresh
   -> one multipart message through Gmail API users.messages.send
 ```
 
-The desktop sync uploads only normalized auction fields and the source's public primary-image URL. It does not upload bookmark HTML, browser state, cookies, local cache data, source page HTML, image bytes, ambiguity flags, Artprice URLs, Email Tray state, or API credentials. Existing Artprice links, analyses, and Email Tray selections survive later upserts of the same source lot.
+The desktop sync uploads normalized auction fields and the source's public primary-image URL. Saved Heritage imports can also upload the artwork image from the saved page's companion folder. It does not upload bookmark HTML, browser state, cookies, source page HTML, ambiguity flags, per-lot Artprice links, or Email Tray state. The API key is sent only in the authentication header. Existing Artprice links, analyses, and Email Tray selections survive later upserts of the same source lot.
+
+Each optional `saved_image_base64` is validated independently by the website: JPEG, PNG, or WebP, at most 512 KiB decoded and 4 million pixels, with both dimensions exceeding 8 pixels. The website re-encodes it as a metadata-free JPEG with a maximum edge of 1600 pixels. It validates the entire sync batch before writing images or database rows. Images use content-derived names under `MEDIA_ROOT/calendar-lots/` on the persistent media disk; repeat uploads of the same image reuse the file. Later URL-only refreshes preserve saved images. Only the exact `/media/calendar-lots/<sha256>.jpg` path format and approved HTTPS auction/CDN hosts may appear as calendar images. Sync responses include `images_received`, allowing the desktop to detect older website versions that do not support saved images. The existing 2 MB request limit still applies, so the desktop sends bounded batches.
 
 Each selected-day lot shows a separate current-bid line beneath its estimate/details. It renders the current amount and bid count when available, **No bids** when the source reports a zero bid count, and **N/A** when Invaluable omits bid data.
 

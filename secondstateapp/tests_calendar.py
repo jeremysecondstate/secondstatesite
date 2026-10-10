@@ -1194,6 +1194,149 @@ class CalendarSyncApiTests(TestCase):
         self.assertNotIn("reminders", response.json())
 
     @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_heritage_sale_sync_groups_prints_on_the_calendar_and_updates_in_place(self):
+        sale_url = "https://fineart.ha.com/c/search/results.zx?dept=1544&mode=live&auction_name=8280"
+        artprice_url = "https://www.artprice.com/artist/27973/rufino-tamayo/lots/pasts?idcategory=2"
+        payload = self._payload(
+            source="Heritage",
+            source_lot_id="8280-65001",
+            auction_house="Heritage Auctions",
+            sale_title="2026 October 22 Prints & Multiples Signature Auction",
+            lot_number="65001",
+            end_at="2026-10-22T11:00:00-05:00",
+            lot_url="https://fineart.ha.com/itm/prints-and-multiples/rufino-tamayo/a/8280-65001.s",
+            sale_url=sale_url,
+            image_url="https://dyn1.heritagestatic.com/ha?p=3-5-1-8-3-35183186&w=120&h=300&it=product",
+        )
+        second_lot = dict(
+            payload["lots"][0],
+            source_lot_id="8280-65002",
+            lot_number="65002",
+            artist="Joan Miró",
+            artist_watchlist_name="Joan Miró",
+            title="Lithograph",
+            lot_url="https://fineart.ha.com/itm/prints-and-multiples/joan-miro/a/8280-65002.s",
+        )
+        payload["lots"].append(second_lot)
+        payload["artist_links"] = [{"name": "TAMAYO, RUFINO", "artprice_url": artprice_url}]
+
+        response = self.client.post(
+            self.endpoint,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_API_KEY="sync-test-key",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["created"], 2)
+        saved_lot = AuctionWatchLot.objects.get(source="Heritage", source_lot_id="8280-65001")
+        saved_pk = saved_lot.pk
+        self.assertEqual(saved_lot.event_at.astimezone(CALENDAR_ZONE).hour, 9)
+        self.assertEqual(saved_lot.watchlist_artist.artprice_url, artprice_url)
+        self.assertEqual(saved_lot.artist_watchlist_name, "Rufino Tamayo")
+
+        staff = get_user_model().objects.create_user("heritage-calendar-admin", is_staff=True)
+        self.client.force_login(staff)
+        calendar = self.client.get(reverse("auction_calendar"), {"month": "2026-10"})
+
+        self.assertEqual(calendar.status_code, 200)
+        details = calendar.context["calendar_data"]["2026-10-22"]
+        self.assertEqual({item["artist"] for item in details}, {"Rufino Tamayo", "Joan Miró"})
+        first_detail = next(item for item in details if item["id"] == saved_pk)
+        self.assertEqual(first_detail["time"], "9:00 AM")
+        self.assertEqual(first_detail["url"], payload["lots"][0]["lot_url"])
+        self.assertEqual(first_detail["images"], [payload["lots"][0]["image_url"]])
+        self.assertEqual(first_detail["artist_artprice_url"], artprice_url)
+        day = next(
+            day for week in calendar.context["weeks"] for day in week
+            if day["iso"] == "2026-10-22"
+        )
+        self.assertEqual(len(day["event_groups"]), 1)
+        self.assertEqual(day["event_groups"][0]["auction_house"], "Heritage Auctions")
+        self.assertEqual(day["event_groups"][0]["lot_count"], 2)
+        self.assertEqual(day["event_groups"][0]["url"], sale_url)
+
+        payload["lots"][0].update(current_bid=12000, bid_count=5, status="changed")
+        response = self.client.post(
+            self.endpoint,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_API_KEY="sync-test-key",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["created"], 0)
+        self.assertEqual(response.json()["updated"], 2)
+        saved_lot.refresh_from_db()
+        self.assertEqual(saved_lot.pk, saved_pk)
+        self.assertEqual(saved_lot.current_bid, Decimal("12000.00"))
+        self.assertEqual(saved_lot.bid_count, 5)
+        self.assertEqual(AuctionWatchLot.objects.count(), 2)
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_heritage_date_only_sale_keeps_its_calendar_day(self):
+        payload = self._payload(
+            source="Heritage",
+            source_lot_id="8280-65001",
+            auction_house="Heritage Auctions",
+            end_at="2026-10-22",
+        )
+
+        response = self.client.post(
+            self.endpoint,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_API_KEY="sync-test-key",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        lot = AuctionWatchLot.objects.get()
+        self.assertTrue(lot.is_all_day)
+        self.assertEqual(lot.event_at.astimezone(CALENDAR_ZONE).date().isoformat(), "2026-10-22")
+
+        staff = get_user_model().objects.create_user("heritage-date-admin", is_staff=True)
+        self.client.force_login(staff)
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-10"})
+        detail = response.context["calendar_data"]["2026-10-22"][0]
+        self.assertEqual(detail["time"], "Time TBA")
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_heritage_image_cdn_allowlist_rejects_lookalikes_and_insecure_urls(self):
+        for image_url in (
+            "https://dyn1.heritagestatic.com.evil.example/lot.jpg",
+            "https://evilheritagestatic.com/lot.jpg",
+            "http://dyn1.heritagestatic.com/lot.jpg",
+            "https://user:password@dyn1.heritagestatic.com/lot.jpg",
+        ):
+            with self.subTest(image_url=image_url):
+                response = self.client.post(
+                    self.endpoint,
+                    data=json.dumps(self._payload(source="Heritage", image_url=image_url)),
+                    content_type="application/json",
+                    HTTP_X_API_KEY="sync-test-key",
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(AuctionWatchLot.objects.get().image_url, "")
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_heritage_and_invaluable_lot_ids_do_not_collide(self):
+        payload = self._payload(source_lot_id="65001")
+        payload["lots"].append(
+            dict(payload["lots"][0], source="Heritage", auction_house="Heritage Auctions")
+        )
+
+        response = self.client.post(
+            self.endpoint,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_API_KEY="sync-test-key",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["created"], 2)
+        self.assertEqual(AuctionWatchLot.objects.count(), 2)
+        self.assertEqual(AuctionWatchArtist.objects.count(), 1)
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
     def test_artist_link_sync_is_persistent_idempotent_and_preserves_manual_lot_link(self):
         first_url = "https://www.artprice.com/artist/27973/rufino-tamayo/lots/pasts?idcategory[]=2"
         updated_url = "http://artprice.com/artist/27973/rufino-tamayo/lots/pasts?idcategory=2&p=1"

@@ -693,7 +693,8 @@ class CacheAndServiceTests(SimpleTestCase):
         self.assertEqual(result.metrics.cache_hits, 1)
         self.assertEqual(len(result.errors), 1)
         self.assertIn("2 artists", result.errors[0])
-        self.assertIn("Showing 1 cached lots", result.errors[0])
+        self.assertIn("Retained 1 cached lot", result.errors[0])
+        self.assertEqual(result.fallback_lot_keys, {result.lots[0].cache_key})
 
 
 class ExportTests(SimpleTestCase):
