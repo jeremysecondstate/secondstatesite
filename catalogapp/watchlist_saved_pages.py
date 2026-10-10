@@ -14,7 +14,7 @@ from catalogapp.bookmark_watchlist import BookmarkEntry, source_for_url
 from catalogapp.watchlist_adapters import adapter_for_url
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_fetch import SourceAccessError
-from catalogapp.watchlist_images import attach_saved_heritage_images
+from catalogapp.watchlist_images import attach_saved_heritage_images, prefer_cached_saved_image
 from catalogapp.watchlist_models import NormalizedLot, lot_within_horizon
 from catalogapp.watchlist_service import WatchlistMetrics, WatchlistResult, _agenda_sort_key
 
@@ -91,6 +91,8 @@ def import_saved_heritage_pages(
                 raise ValueError(f"{path.name} contains a lot outside Heritage sale {sale_number}.")
         image_notices.extend(attach_saved_heritage_images(page, path, cards))
         for card in cards:
+            if card.cache_key in observed:
+                prefer_cached_saved_image(card, observed[card.cache_key])
             observed[card.cache_key] = card
 
     observed_at = now or datetime.now(timezone.utc)
@@ -106,10 +108,10 @@ def import_saved_heritage_pages(
 
     for card in observed.values():
         cached = cache.lookup(card)
-        if cached and not card.saved_image_base64 and cached.lot.saved_image_base64:
-            # A later HTML-only save should not discard an earlier good image.
-            card.saved_image_base64 = cached.lot.saved_image_base64
-            card.content_hash = card.calculate_content_hash()
+        if cached:
+            # A later catalog save must not replace a good preview with a tiny
+            # thumbnail, while a changed known primary image remains authoritative.
+            prefer_cached_saved_image(card, cached.lot)
         search_hash = card.content_hash
         lot = card
         if cached and cached.search_hash == search_hash:

@@ -7,7 +7,7 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath
 import re
 from typing import Iterable
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 import warnings
 
 from bs4 import BeautifulSoup
@@ -22,6 +22,105 @@ _MAX_SOURCE_BYTES = 10 * 1024 * 1024
 _MAX_SOURCE_PIXELS = 20_000_000
 _LOT_PATH = re.compile(r"/a/(\d+)-(\d+)\.s(?:/|$)", re.IGNORECASE)
 _PLACEHOLDER_NAME = re.compile(r"(?:^|[-_.])(placeholder|spacer|transparent|loading|blank|pixel)(?:[-_.]|$)", re.I)
+
+
+def heritage_preview_url(url: str) -> str:
+    """Normalize a recognized public Heritage product image to a 612x600 preview.
+
+    This only constructs a URL; it never fetches an image. Unrelated hosts,
+    authenticated URLs, unexpected endpoints, and invalid image IDs are rejected.
+    """
+
+    value = (url or "").strip()
+    if len(value) > 2048 or any(ord(char) < 32 or ord(char) == 127 for char in value):
+        return ""
+    try:
+        parts = urlsplit(value)
+        if (
+            parts.scheme != "https"
+            or not re.fullmatch(r"dyn[0-9]*\.heritagestatic\.com", parts.hostname or "")
+            or parts.path != "/ha"
+            or parts.username is not None or parts.password is not None
+            or parts.port is not None or parts.fragment
+        ):
+            return ""
+        query = parse_qs(parts.query, keep_blank_values=True)
+    except ValueError:
+        return ""
+    identifiers = query.get("p", [])
+    kinds = query.get("it", [])
+    if (
+        len(identifiers) != 1 or len(identifiers[0]) > 128
+        or not re.fullmatch(r"[0-9]+(?:-[0-9]+)+", identifiers[0])
+        or len(kinds) > 1 or (kinds and kinds[0] != "product")
+    ):
+        return ""
+    normalized = [("p", identifiers[0]), ("w", "612"), ("h", "600")]
+    if kinds:
+        normalized.append(("it", kinds[0]))
+    return urlunsplit(("https", parts.hostname, "/ha", urlencode(normalized), ""))
+
+
+def _asset_heritage_preview_url(asset: Path) -> str:
+    """Read only HostUrl from the already-confined asset's Windows origin stream."""
+
+    try:
+        with Path(f"{asset}:Zone.Identifier").open("rb") as stream:
+            data = stream.read(8193)
+    except OSError:
+        return ""
+    if len(data) > 8192:
+        return ""
+    for line in data.decode("utf-8-sig", errors="replace").splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key.strip().casefold() == "hosturl":
+            # Chromium appends a NUL on some saved resource origin values.
+            return heritage_preview_url(value.strip().rstrip("\x00").strip())
+    return ""
+
+
+def _saved_jpeg_size(encoded: str) -> tuple[int, int] | None:
+    if not encoded or len(encoded) > 4 * ((MAX_SAVED_IMAGE_BYTES + 2) // 3):
+        return None
+    try:
+        data = base64.b64decode(encoded, validate=True)
+        if len(data) > MAX_SAVED_IMAGE_BYTES:
+            return None
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(data)) as image:
+                size = image.size
+                if image.format != "JPEG" or min(size) < 16 or max(size) > MAX_SAVED_IMAGE_DIMENSION:
+                    return None
+                image.load()
+                return size
+    except (ValueError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+        return None
+
+
+def prefer_cached_saved_image(lot: NormalizedLot, cached: NormalizedLot) -> None:
+    """Retain a valid larger cached JPEG for the same lot and primary image.
+
+    A changed known public image ID takes precedence even when the new image is
+    smaller. Older caches without that ID can still retain their better pixels
+    when a later save includes only a small catalog thumbnail or no local asset.
+    """
+
+    if lot.source != "Heritage" or cached.source != "Heritage" or lot.cache_key != cached.cache_key:
+        return
+    current_url = heritage_preview_url(lot.image_url)
+    cached_url = heritage_preview_url(cached.image_url)
+    current_id = parse_qs(urlsplit(current_url).query).get("p", [""])[0]
+    cached_id = parse_qs(urlsplit(cached_url).query).get("p", [""])[0]
+    if current_id and cached_id and current_id != cached_id:
+        return
+    old_size = _saved_jpeg_size(cached.saved_image_base64)
+    new_size = _saved_jpeg_size(lot.saved_image_base64)
+    if old_size and (not new_size or old_size[0] * old_size[1] > new_size[0] * new_size[1]):
+        lot.saved_image_base64 = cached.saved_image_base64
+    if current_url or cached_url:
+        lot.image_url = current_url or cached_url
+    lot.content_hash = lot.calculate_content_hash()
 
 
 def _saved_asset_path(page_path: Path, src: str) -> Path | None:
@@ -112,8 +211,20 @@ def attach_saved_heritage_images(
         image = node.select_one("a.photo-holder img, img.thumbnail")
         if image is None:
             continue
+        lot = selected[identity]
+        asset = _saved_asset_path(path, image.get("src", ""))
+        # The actual saved/displayed image is authoritative. A lazy-loading
+        # data-src can still point to a previous primary image after an upgrade.
+        preview = (
+            heritage_preview_url(image.get("src", ""))
+            or (_asset_heritage_preview_url(asset) if asset is not None else "")
+            or heritage_preview_url(image.get("data-src", ""))
+            or heritage_preview_url(lot.image_url)
+        )
+        if preview:
+            lot.image_url = preview
+            lot.content_hash = lot.calculate_content_hash()
         try:
-            asset = _saved_asset_path(path, image.get("src", ""))
             if asset is None or _PLACEHOLDER_NAME.search(asset.name) or asset.stat().st_size > _MAX_SOURCE_BYTES:
                 continue
             with asset.open("rb") as stream:
@@ -121,7 +232,6 @@ def attach_saved_heritage_images(
             encoded = normalize_saved_thumbnail(data)
         except (OSError, ValueError):
             continue
-        lot = selected[identity]
         lot.saved_image_base64 = encoded
         lot.content_hash = lot.calculate_content_hash()
         attached.add(identity)

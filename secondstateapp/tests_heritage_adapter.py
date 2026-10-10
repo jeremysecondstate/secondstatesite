@@ -19,7 +19,7 @@ NOW = datetime(2026, 10, 10, 12, tzinfo=timezone.utc)
 def card(number="65001", artist="Example Artist", bid="Starting Bid: $2,000", sale="8280"):
     return f'''<li class="item-block list" id="{sale}-internal-{number}">
       <a class="photo-holder" href="/itm/print/a/{sale}-{number}.s">
-        <img class="thumbnail" src="https://dyn1.heritagestatic.com/ha?p=example&amp;it=product"></a>
+        <img class="thumbnail" src="https://dyn1.heritagestatic.com/ha?p=1-2-3-12345678&amp;w=120&amp;h=300&amp;it=product"></a>
       <div class="item-info"><p><a href="/c/search.zx?saleNo={sale}&amp;ic4=tracking">Auction {sale}</a> | Lot {number}</p>
         <a class="item-title short" href="/itm/print/a/{sale}-{number}.s?ic4=ListView-ShortDescription">
           <b>{artist} (1900-1980)</b><br><i>Test Print</i>, 1962<br>Linocut in colors on paper<br>Signed</a>
@@ -55,7 +55,10 @@ class HeritageAdapterTests(SimpleTestCase):
         self.assertEqual(lots[1].current_bid, 1400)
         self.assertIsNone(lots[1].bid_count)
         self.assertFalse(self.adapter.needs_detail(lot))
-        self.assertIn("dyn1.heritagestatic.com", lot.image_url)
+        self.assertEqual(
+            lot.image_url,
+            "https://dyn1.heritagestatic.com/ha?p=1-2-3-12345678&w=612&h=600&it=product",
+        )
         self.assertEqual(self.adapter.extract_lot_links(page, URL), [lot.lot_url for lot in lots])
         ics = render_ics(lots, generated_at=NOW)
         self.assertEqual(ics.count("BEGIN:VEVENT"), 1)
@@ -69,7 +72,7 @@ class HeritageAdapterTests(SimpleTestCase):
     def test_saved_gallery_cards_use_sale_heading_bid_fields_and_remote_lazy_images(self):
         page = catalog('''<li class="item-block gallery">
           <a class="photo-holder"><img src="./saved_files/ha(4)"
-            data-src="https://dyn1.heritagestatic.com/ha?p=example&amp;it=product"></a>
+            data-src="https://dyn1.heritagestatic.com/ha?p=1-2-3-12345678&amp;w=200&amp;h=400&amp;it=product"></a>
           <a class="item-title short" href="https://fineart.ha.com/itm/print/a/8280-65001.s">
             <b>Example Artist (1900-1980)</b><br><i>Gallery Print</i>, 1962<br>Linocut on paper</a>
           <div class="lotno"><a href="https://fineart.ha.com/c/search.zx?saleNo=8280">Auction 8280</a> | Lot: 65001</div>
@@ -80,13 +83,29 @@ class HeritageAdapterTests(SimpleTestCase):
         self.assertEqual(lot.start_at, "2026-10-22")
         self.assertEqual(lot.current_bid, 2500)
         self.assertEqual(lot.sale_url, "https://fineart.ha.com/c/search.zx?saleNo=8280")
-        self.assertEqual(lot.image_url, "https://dyn1.heritagestatic.com/ha?p=example&it=product")
+        self.assertEqual(lot.image_url, "https://dyn1.heritagestatic.com/ha?p=1-2-3-12345678&w=612&h=600&it=product")
         self.assertFalse(self.adapter.needs_detail(lot))
-        without_remote = page.replace('data-src="https://dyn1.heritagestatic.com/ha?p=example&amp;it=product"', "")
+        without_remote = page.replace('data-src="https://dyn1.heritagestatic.com/ha?p=1-2-3-12345678&amp;w=200&amp;h=400&amp;it=product"', "")
         lot = self.adapter.parse_search_page(without_remote.replace("Current Bid:", "Starting Bid:"), URL, "")[0]
         self.assertEqual(lot.image_url, "")
         self.assertIsNone(lot.current_bid)
         self.assertEqual(lot.bid_count, 0)
+
+    def test_preview_normalization_preserves_other_allowed_public_image_urls(self):
+        original = "https://dyn1.heritagestatic.com/ha?p=1-2-3-12345678&amp;w=120&amp;h=300&amp;it=product"
+        urls = [
+            "https://www.heritagestatic.com/c/i/artwork.jpg?w=120&amp;h=300",
+            "https://fineart.ha.com/images/print.jpg?w=120&amp;h=300",
+            "https://dyn1.heritagestatic.com/other?p=1-2-3-12345678&amp;w=120",
+            "https://dyn1.heritagestatic.com/ha?p=unrecognized&amp;w=120&amp;h=300",
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                lot = self.adapter.parse_search_page(catalog(card().replace(original, url)), URL, "")[0]
+                self.assertEqual(lot.image_url, url.replace("&amp;", "&"))
+        blocked = "https://unrelated.example/artwork.jpg"
+        lot = self.adapter.parse_search_page(catalog(card().replace(original, blocked)), URL, "")[0]
+        self.assertEqual(lot.image_url, "")
 
     def test_date_heading_fallback_requires_a_single_bookmarked_sale_and_single_day(self):
         page = catalog(card().replace('<div class="live-auction-date">Live auction on Oct 22, 2026</div>', ""))
@@ -123,12 +142,14 @@ class HeritageAdapterTests(SimpleTestCase):
             <div class="bidding-end">Proxy Bidding Ends October 22nd 10:50 am CT</div>
             <div>Bids + Registered Phone Bidders: <span id="number-bids">8</span></div>
             <div class="additional-info"><div class="left">This lot is in: 1 - Floor Session
-            (Lots 65001-65118) - 11:00 AM Central Time, Thursday, October 22, 2026.</div></div></div>'''
+            (Lots 65001-65118) - 11:00 AM Central Time, Thursday, October 22, 2026.</div></div></div>
+          <img src="https://dyn2.heritagestatic.com/ha?p=1-2-3-12345678&amp;w=120&amp;h=300&amp;it=product">'''
         lot = self.adapter.parse_lot_detail(html, "https://fineart.ha.com/itm/print/a/8280-65001.s", "")
         self.assertEqual(lot.start_at, "2026-10-22T11:00:00-05:00")
         self.assertEqual(lot.end_at, "")
         self.assertEqual(lot.current_bid, 2200)
         self.assertIsNone(lot.bid_count)
+        self.assertEqual(lot.image_url, "https://dyn2.heritagestatic.com/ha?p=1-2-3-12345678&w=612&h=600&it=product")
         self.assertIn("DTSTART:20261022T160000Z", render_ics([lot], generated_at=NOW))
         recommended = html.replace("Current Bid: $2,200", "Starting Bid: $2,000") + '<aside>Current Bid: $500</aside>'
         lot = self.adapter.parse_lot_detail(recommended, "https://fineart.ha.com/itm/print/a/8280-65001.s", "")

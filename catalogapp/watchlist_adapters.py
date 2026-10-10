@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 from catalogapp.bookmark_watchlist import canonicalize_bookmark_url
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_fetch import SourceAccessError
+from catalogapp.watchlist_images import heritage_preview_url
 
 
 class PageFetcher(Protocol):
@@ -881,7 +882,7 @@ class HeritageAdapter(BookmarkSourceAdapter):
 
     @staticmethod
     def _image_url(node, page_url: str) -> str:
-        """Keep public image URLs, never reinterpret a saved local asset as one."""
+        """Use Heritage product previews and retain other allowed public images."""
 
         if node is None:
             return ""
@@ -895,7 +896,7 @@ class HeritageAdapter(BookmarkSourceAdapter):
             if parts.scheme == "https" and not parts.username and not parts.password and any(
                 host == domain or host.endswith(f".{domain}") for domain in ("ha.com", "heritagestatic.com")
             ):
-                return url
+                return heritage_preview_url(url) or url
         return ""
 
     @classmethod
