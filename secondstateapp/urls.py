@@ -4,6 +4,7 @@ from . import (
     calendar_views,
     capital_dashboard_views,
     catalog_api_views,
+    ordering_views,
     upload_safe_views,
     views,
 )
@@ -13,6 +14,7 @@ urlpatterns = [
     path("about/", views.about, name="about"),
     path("contact/", views.contact, name="contact"),
     path("gallery/", views.gallery, name="gallery"),
+    path("gallery/reorder/", ordering_views.gallery_reorder, name="gallery_reorder"),
     path("accounts/register/", views.register, name="register"),
     path("accounts/login/", views.login_view, name="login"),
     path("accounts/logout/", views.logout_view, name="logout"),
@@ -53,6 +55,7 @@ urlpatterns = [
     path("artworks/reorder_artworks/", catalog_api_views.reorder_artworks, name="reorder_artworks"),
     path("artworks/generate_description/", catalog_api_views.generate_catalog_description_from_payload, name="generate_catalog_description_from_payload"),
     path("artworks/<int:pk>/", views.artwork_detail, name="artwork_detail"),
+    path("artworks/<int:pk>/images/reorder/", ordering_views.artwork_image_reorder, name="artwork_image_reorder"),
     path("artworks/<int:pk>/edit/", views.artwork_edit, name="artwork_edit"),
     path("artworks/<int:pk>/generate_description/", views.generate_artwork_description, name="generate_artwork_description"),
     path("artworks/<int:pk>/update_artwork/", catalog_api_views.update_artwork, name="update_artwork"),

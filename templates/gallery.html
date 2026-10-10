@@ -4,11 +4,12 @@
 {% block title %}The Collection — SecondState{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'secondstateapp/gallery.css' %}">
+{% if user.is_staff %}<link rel="stylesheet" href="{% static 'secondstateapp/ordering.css' %}">{% endif %}
 {% endblock %}
 {% block main_class %}collection-shell{% endblock %}
 
 {% block content %}
-<section class="collection" aria-labelledby="gallery-heading" data-gallery>
+<section class="collection" aria-labelledby="gallery-heading" data-gallery {% if user.is_staff %}data-order-editor data-order-url="{% url 'gallery_reorder' %}"{% endif %}>
     <header class="collection-header">
         <div>
             <p class="collection-eyebrow">SecondState / The gallery</p>
@@ -21,20 +22,34 @@
     </header>
 
     {% if artworks %}
+    {% if user.is_staff %}
+    <div class="order-toolbar" data-order-controls hidden>
+        {% csrf_token %}
+        <div class="order-toolbar__actions">
+            <button type="button" data-order-start>Arrange works <span aria-hidden="true">↕</span></button>
+            <span data-order-edit-only hidden>
+                <button type="button" data-order-save>Save order</button>
+                <button type="button" data-order-cancel>Cancel</button>
+            </span>
+        </div>
+        <p class="order-help" data-order-edit-only hidden>Drag artworks to reorder, or use arrow keys on a move handle.</p>
+        <p class="order-status" data-order-status role="status" aria-live="polite"></p>
+    </div>
+    {% endif %}
     <div class="collection-tools" data-gallery-controls hidden>
-        <div class="collection-filters" role="group" aria-label="Filter works by technique">
+        <div class="collection-filters" role="group" aria-label="Filter works by technique" data-order-lock>
             <button type="button" class="collection-filter" data-filter="all" aria-pressed="true" aria-controls="gallery-grid" data-description="Discover the collection in full.">All works <span>{{ artworks|length }}</span></button>
             {% for filter in gallery_filters %}
             <button type="button" class="collection-filter" data-filter="{{ filter.key }}" aria-pressed="false" aria-controls="gallery-grid" data-description="{{ filter.description }}">{{ filter.label }} <span>{{ filter.count }}</span></button>
             {% endfor %}
         </div>
-        <button type="button" class="collection-motion" data-motion aria-pressed="false"><span aria-hidden="true">◌</span> <span data-motion-label>Motion off</span></button>
+        <button type="button" class="collection-motion" data-motion data-order-lock aria-pressed="false"><span aria-hidden="true">◌</span> <span data-motion-label>Motion off</span></button>
     </div>
     <div class="collection-index">
         <p data-filter-description>Discover the collection in full.</p>
         <p data-gallery-count role="status" aria-live="polite" aria-atomic="true">{{ artworks|length }} work{{ artworks|length|pluralize }}</p>
     </div>
-    <div class="gallery-grid" id="gallery-grid">
+    <div class="gallery-grid" id="gallery-grid" {% if user.is_staff %}data-order-list{% endif %}>
         {% for artwork in artworks %}
             {% include 'artworks/artwork_card.html' %}
         {% endfor %}
@@ -72,5 +87,6 @@
         </div>
     </dialog>
 </section>
-<script src="{% static 'secondstateapp/gallery.js' %}" defer></script>
+<script src="{% static 'secondstateapp/gallery.js' %}?v=ordering-1" defer></script>
+{% if user.is_staff %}<script src="{% static 'secondstateapp/ordering.js' %}" defer></script>{% endif %}
 {% endblock %}

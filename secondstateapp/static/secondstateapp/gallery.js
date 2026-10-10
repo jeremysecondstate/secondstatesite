@@ -18,7 +18,7 @@
   function updateMotion() {
     gallery.dataset.motionEnabled = String(motionEnabled);
     if (motionButton) {
-      motionButton.disabled = reducedMotion.matches;
+      motionButton.disabled = reducedMotion.matches || gallery.dataset.orderActive === 'true';
       motionButton.title = reducedMotion.matches ? 'Reduced motion is enabled in your device settings.' : 'Toggle artwork motion';
       motionButton.setAttribute('aria-pressed', String(motionEnabled));
       motionButton.querySelector('[data-motion-label]').textContent = motionEnabled ? 'Motion on' : 'Motion off';
@@ -43,6 +43,19 @@
   if (controls) controls.hidden = false;
 
   const filters = Array.from(gallery.querySelectorAll('[data-filter]'));
+  gallery.addEventListener('order:start', () => {
+    filters.find((button) => button.dataset.filter === 'all')?.click();
+    works.forEach((work) => {
+      work.classList.remove('is-entering');
+      resetArtwork(work.querySelector('.gallery-work__visual'));
+    });
+  });
+  gallery.addEventListener('order:change', () => {
+    gallery.querySelectorAll('[data-artwork-id]').forEach((work, index) => {
+      work.querySelector('.gallery-work__number').textContent = String(index + 1).padStart(2, '0');
+    });
+  });
+  gallery.addEventListener('order:finish', updateMotion);
   filters.forEach((button) => button.addEventListener('click', () => {
     const category = button.dataset.filter;
     let count = 0;
@@ -60,7 +73,7 @@
     const visual = work.querySelector('.gallery-work__visual');
     let frame = 0;
     visual.addEventListener('pointermove', (event) => {
-      if (!motionEnabled || !finePointer.matches || event.pointerType === 'touch') return;
+      if (!motionEnabled || gallery.dataset.orderActive === 'true' || !finePointer.matches || event.pointerType === 'touch') return;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const bounds = visual.getBoundingClientRect();

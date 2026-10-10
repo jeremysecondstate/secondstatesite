@@ -1,11 +1,16 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'secondstateapp/ordering.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="container artwork-detail-page">
 
-    <a href="{% url 'artwork_list' %}" class="btn btn-primary back-button">
-        ⬅️ Browse More Artworks
+    <a href="{% url 'artwork_list' %}" class="btn back-button" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 5-7 7 7 7M5 12h14"/></svg>
+        Browse More Artworks
     </a>
     {% if user.is_staff %}
         <a href="{% url 'artwork_edit' artwork.id %}" class="btn btn-outline-light back-button ms-2">Edit Artwork</a>
@@ -18,16 +23,39 @@
     </div>
 
     {% if artwork.images.all %}
+    <div class="artwork-photo-editor"{% if user.is_staff %} data-order-editor data-order-url="{% url 'artwork_image_reorder' artwork.id %}"{% endif %}>
+    {% if user.is_staff %}{% csrf_token %}{% endif %}
     <div class="text-center image-stage">
         <button class="image-nav image-nav-left" onclick="showPrevImage(event)">&#10094;</button>
         <img id="mainImage" src="{{ artwork.images.first.image.url }}" class="img-fluid main-img" alt="{{ artwork.title }}" onclick="openFullscreen(this)">
         <button class="image-nav image-nav-right" onclick="showNextImage(event)">&#10095;</button>
     </div>
 
-    <div class="thumbnails text-center mt-3">
+    {% if user.is_staff %}
+    <div class="order-controls mt-3" data-order-controls hidden>
+        <button type="button" class="btn btn-outline-light" data-order-start>Arrange photos</button>
+        <span data-order-edit-only hidden>
+            <button type="button" class="btn btn-light" data-order-save>Save order</button>
+            <button type="button" class="btn btn-outline-light" data-order-cancel>Cancel</button>
+        </span>
+    </div>
+    <p class="order-instructions" data-order-edit-only hidden>Drag photos to reorder, or use arrow keys on a move handle. The first photo is the gallery thumbnail.</p>
+    <p class="order-status" data-order-status role="status" aria-live="polite"></p>
+    {% endif %}
+    <div class="thumbnails text-center mt-3" data-order-list>
         {% for image in artwork.images.all %}
-            <img src="{{ image.image.url }}" class="thumbnail-img" onclick="changeMainImage(this, {{ forloop.counter0 }})">
+            <div class="artwork-photo-item" data-order-item="{{ image.id }}" data-order-label="Photo {{ forloop.counter }}">
+                <button type="button" class="artwork-photo-select" data-order-drag aria-label="View photo {{ forloop.counter }} of {{ artwork.title }}"{% if forloop.first %} aria-current="true"{% endif %}>
+                    <img src="{{ image.image.url }}" class="thumbnail-img" alt="{{ artwork.title }}, photo {{ forloop.counter }}" draggable="false">
+                </button>
+                {% if user.is_staff %}
+                <button type="button" class="order-handle" data-order-handle hidden aria-label="Move photo {{ forloop.counter }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+                </button>
+                {% endif %}
+            </div>
         {% endfor %}
+    </div>
     </div>
 {% else %}
     <p class="text-center text-muted">No images available</p>
@@ -71,4 +99,5 @@
     </div>
 </div>
 {% include 'artworks/artwork_detail_scripts.html' %}
+{% if user.is_staff %}<script src="{% static 'secondstateapp/ordering.js' %}" defer></script>{% endif %}
 {% endblock %}

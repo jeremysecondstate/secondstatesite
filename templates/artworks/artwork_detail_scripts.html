@@ -4,6 +4,7 @@
     let slideshowInterval = null;
     let imageSwapTimeout = null;
     let imageUrls = [];
+    let isArrangingPhotos = false;
 
     const FADE_DURATION = 1111;
     const SLIDESHOW_DELAY = 6969;
@@ -12,9 +13,33 @@
         const fullscreenImage = document.getElementById("fullscreenImage");
         const overlay = document.getElementById("fullscreenOverlay");
         const closeBtn = document.getElementById("closeFullscreenBtn");
-        const thumbs = document.querySelectorAll(".thumbnail-img");
+        const photoEditor = document.querySelector(".artwork-photo-editor");
 
-        imageUrls = Array.from(thumbs).map(img => img.src);
+        syncPhotoOrder();
+
+        if (photoEditor) {
+            photoEditor.addEventListener("click", function (event) {
+                const button = event.target.closest(".artwork-photo-select");
+                if (!button || isArrangingPhotos) return;
+                changeMainImage(button.querySelector(".thumbnail-img"));
+            });
+            photoEditor.addEventListener("order:start", function () {
+                isArrangingPhotos = true;
+                stopSlideshow();
+                clearTimeout(imageSwapTimeout);
+                const mainImage = document.getElementById("mainImage");
+                if (mainImage) mainImage.classList.remove("fade-out");
+                syncPhotoOrder();
+            });
+            photoEditor.addEventListener("order:change", function () {
+                syncPhotoOrder();
+            });
+            photoEditor.addEventListener("order:finish", function () {
+                isArrangingPhotos = false;
+                syncPhotoOrder(false);
+                restartSlideshow();
+            });
+        }
 
         if (imageUrls.length > 1) {
             startSlideshow();
@@ -55,11 +80,35 @@
         });
     });
 
+    function syncPhotoOrder(preserveActive = true) {
+        const mainImage = document.getElementById("mainImage");
+        const activeUrl = preserveActive && mainImage ? mainImage.src : null;
+        imageUrls = Array.from(document.querySelectorAll(".artwork-photo-editor .thumbnail-img")).map(img => img.src);
+        currentImageIndex = Math.max(0, imageUrls.indexOf(activeUrl));
+        if (!preserveActive && mainImage && imageUrls.length) {
+            clearTimeout(imageSwapTimeout);
+            mainImage.classList.remove("fade-out");
+            mainImage.src = imageUrls[currentImageIndex];
+        }
+        updateActiveThumbnail();
+    }
+
+    function updateActiveThumbnail() {
+        document.querySelectorAll(".artwork-photo-select").forEach((button, index) => {
+            if (index === currentImageIndex) {
+                button.setAttribute("aria-current", "true");
+            } else {
+                button.removeAttribute("aria-current");
+            }
+        });
+    }
+
     function updateMainImage(index) {
         const mainImage = document.getElementById("mainImage");
-        if (!imageUrls.length) return;
+        if (!mainImage || !imageUrls.length || isArrangingPhotos) return;
 
         currentImageIndex = (index + imageUrls.length) % imageUrls.length;
+        updateActiveThumbnail();
 
         clearTimeout(imageSwapTimeout);
         mainImage.classList.add("fade-out");
@@ -72,13 +121,10 @@
         }, FADE_DURATION);
     }
 
-    function changeMainImage(element, index = null) {
-        if (index !== null) {
-            updateMainImage(index);
-        } else {
-            const foundIndex = imageUrls.indexOf(element.src);
-            updateMainImage(foundIndex >= 0 ? foundIndex : 0);
-        }
+    function changeMainImage(element) {
+        if (!element || isArrangingPhotos) return;
+        const foundIndex = imageUrls.indexOf(element.src);
+        updateMainImage(foundIndex >= 0 ? foundIndex : 0);
         restartSlideshow();
     }
 
@@ -96,6 +142,7 @@
 
     function startSlideshow() {
         stopSlideshow();
+        if (isArrangingPhotos || imageUrls.length < 2) return;
         slideshowInterval = setInterval(() => {
             updateMainImage(currentImageIndex + 1);
         }, SLIDESHOW_DELAY);

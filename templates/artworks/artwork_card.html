@@ -1,7 +1,7 @@
 {% load static %}
-<article class="gallery-work" data-artwork-id="{{ artwork.id }}" data-category="{{ artwork.gallery_category }}">
+<article class="gallery-work" data-artwork-id="{{ artwork.id }}" data-category="{{ artwork.gallery_category }}" {% if user.is_staff %}data-order-item="{{ artwork.id }}" data-order-label="{{ artwork.title }}"{% endif %}>
     <div class="gallery-work__visual">
-        <a class="gallery-work__image-link" href="{% url 'artwork_detail' artwork.id %}" aria-label="View {{ artwork.title }} by {{ artwork.artist }}">
+        <a class="gallery-work__image-link" href="{% url 'artwork_detail' artwork.id %}" aria-label="View {{ artwork.title }} by {{ artwork.artist }}" {% if user.is_staff %}data-order-drag{% endif %}>
             {% with primary_image=artwork.images.all.0 %}
                 {% if primary_image and primary_image.image %}
                     <img src="{{ primary_image.image.url }}" class="gallery-work__image" alt="{{ artwork.title }} by {{ artwork.artist }}" {% if forloop.counter > 3 %}loading="lazy"{% endif %} decoding="async" width="800" height="1000">
@@ -12,6 +12,7 @@
             {% endwith %}
         </a>
         <span class="gallery-work__number" aria-hidden="true">{{ forloop.counter|stringformat:'02d' }}</span>
+        {% if user.is_staff %}<button type="button" class="order-handle gallery-work__move" data-order-handle aria-label="Move {{ artwork.title }}" hidden><span aria-hidden="true">⠿</span> Move</button>{% endif %}
         {% if not artwork.is_available %}<span class="gallery-work__unavailable">Unavailable</span>{% endif %}
         {% if artwork.images.all %}
         <button type="button" class="gallery-work__preview" data-quick-look aria-label="Quick look at {{ artwork.title }}" aria-haspopup="dialog" hidden><span aria-hidden="true">⤢</span> Quick look</button>

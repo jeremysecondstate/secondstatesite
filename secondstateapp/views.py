@@ -64,7 +64,7 @@ def contact(request):
 
 def _ordered_gallery_artworks():
     return Artwork.objects.prefetch_related(
-        Prefetch("images", queryset=ArtworkImage.objects.order_by("pk"))
+        Prefetch("images", queryset=ArtworkImage.objects.order_by("display_order", "pk"))
     ).order_by("display_order", "id")
 
 

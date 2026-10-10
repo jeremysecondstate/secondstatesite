@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Max, Q
 from PIL import Image
 from io import BytesIO
@@ -82,9 +82,29 @@ class Artwork(models.Model):
 class ArtworkImage(models.Model):
     artwork = models.ForeignKey("Artwork", related_name="images", on_delete=models.CASCADE)
     image = models.ImageField(upload_to="artworks/")
+    display_order = models.PositiveIntegerField(default=0, db_index=True)
+
+    class Meta:
+        ordering = ["display_order", "id"]
+
+    def __init__(self, *args, **kwargs):
+        self._display_order_was_set = "display_order" in kwargs
+        super().__init__(*args, **kwargs)
 
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)  # save original first so self.image.path exists
+        if self._state.adding and not self._display_order_was_set and self.display_order == 0:
+            # Share the parent lock with photo reordering, so an upload always
+            # appends to the latest saved order without changing existing photos.
+            with transaction.atomic():
+                Artwork.objects.select_for_update().only("pk").get(pk=self.artwork_id)
+                max_order = type(self).objects.filter(artwork_id=self.artwork_id).aggregate(
+                    max_order=Max("display_order")
+                )["max_order"]
+                self.display_order = 0 if max_order is None else max_order + 1
+                super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
+        # Save the original first so self.image.path exists.
         if not self.image:
             return
         img = Image.open(self.image.path)
