@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.db.models import Prefetch
 from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -18,6 +19,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .forms import ArtworkForm, RegisterForm, UserProfileForm
+from .gallery import GALLERY_CATEGORIES, gallery_category_for_medium
 from .models import Artwork, ArtworkImage, UserProfile
 
 
@@ -61,21 +63,32 @@ def contact(request):
 
 
 def _ordered_gallery_artworks():
-    return Artwork.objects.prefetch_related("images").order_by("display_order", "id")
+    return Artwork.objects.prefetch_related(
+        Prefetch("images", queryset=ArtworkImage.objects.order_by("pk"))
+    ).order_by("display_order", "id")
 
 
 def _gallery_template_context(artworks):
+    artworks = list(artworks)
+    category_counts = {category["key"]: 0 for category in GALLERY_CATEGORIES}
+    for artwork in artworks:
+        artwork.gallery_category = gallery_category_for_medium(artwork.medium)
+        category_counts[artwork.gallery_category] += 1
     return {
         "artworks": artworks,
-        "available_count": Artwork.objects.filter(is_available=True).count(),
+        "available_count": sum(artwork.is_available for artwork in artworks),
+        "gallery_filters": [
+            {**category, "count": category_counts[category["key"]]}
+            for category in GALLERY_CATEGORIES
+            if category_counts[category["key"]]
+        ],
     }
 
 
 def gallery(request):
     # Show the same content as /artworks/
     artworks = _ordered_gallery_artworks()
-    # artworks = Artwork.objects.order_by("-id")
-    return render(request, "artworks/artwork_list.html", _gallery_template_context(artworks))
+    return render(request, "gallery.html", _gallery_template_context(artworks))
 
 
 def register(request):

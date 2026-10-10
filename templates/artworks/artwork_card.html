@@ -1,35 +1,30 @@
-{% load static artwork_filters %}
-<article
-    class="auction-card auction-card--{{ card_size|default:'standard' }}"
-    data-artwork-id="{{ artwork.id }}"
-    data-gallery-position="{{ forloop.counter }}"
->
-    <a class="auction-card__image-link" href="{% url 'artwork_detail' artwork.id %}" aria-label="View details for {{ artwork.title }}">
-        <span class="auction-card__image-panel">
-            {% with primary_image=artwork.images.first %}
+{% load static %}
+<article class="gallery-work" data-artwork-id="{{ artwork.id }}" data-category="{{ artwork.gallery_category }}">
+    <div class="gallery-work__visual">
+        <a class="gallery-work__image-link" href="{% url 'artwork_detail' artwork.id %}" aria-label="View {{ artwork.title }} by {{ artwork.artist }}">
+            {% with primary_image=artwork.images.all.0 %}
                 {% if primary_image and primary_image.image %}
-                    <img src="{{ primary_image.image.url }}" class="auction-card__image" alt="{{ artwork.title }}">
+                    <img src="{{ primary_image.image.url }}" class="gallery-work__image" alt="{{ artwork.title }} by {{ artwork.artist }}" {% if forloop.counter > 3 %}loading="lazy"{% endif %} decoding="async" width="800" height="1000">
                 {% else %}
-                    <img src="{% static 'secondstateapp/etching_press.jpg' %}" class="auction-card__image auction-card__image--fallback" alt="Artwork image placeholder for {{ artwork.title }}">
+                    <img src="{% static 'secondstateapp/etching_press.jpg' %}" class="gallery-work__image gallery-work__image--fallback" alt="Artwork image placeholder for {{ artwork.title }}" loading="lazy" width="800" height="1000">
+                    <span class="gallery-work__placeholder">Image coming soon</span>
                 {% endif %}
             {% endwith %}
-        </span>
-    </a>
-
-    <div class="auction-card__meta">
-        <p class="artwork-card-title">{{ artwork.title }}</p>
-
-        <div class="artwork-card-divider"></div>
-
-        <p class="artwork-card-artist">{{ artwork.artist }}</p>
-
-        <p class="artwork-card-medium">{{ artwork.medium|highlight_medium_terms }}</p>
-
-        <div class="auction-card__actions">
-            <a href="{% url 'artwork_detail' artwork.id %}" class="auction-card__action">View Details</a>
-            {% if user.is_staff %}
-                <a href="{% url 'artwork_edit' artwork.id %}" class="auction-card__action auction-card__action--secondary">Edit</a>
-            {% endif %}
+        </a>
+        <span class="gallery-work__number" aria-hidden="true">{{ forloop.counter|stringformat:'02d' }}</span>
+        {% if not artwork.is_available %}<span class="gallery-work__unavailable">Unavailable</span>{% endif %}
+        {% if artwork.images.all %}
+        <button type="button" class="gallery-work__preview" data-quick-look aria-label="Quick look at {{ artwork.title }}" aria-haspopup="dialog" hidden><span aria-hidden="true">⤢</span> Quick look</button>
+        <template data-work-images>{% for image in artwork.images.all %}{% if image.image %}<span data-src="{{ image.image.url }}"></span>{% endif %}{% endfor %}</template>
+        {% endif %}
+    </div>
+    <div class="gallery-work__caption">
+        <h2 class="gallery-work__artist" data-work-artist>{{ artwork.artist }}</h2>
+        <p class="gallery-work__title" data-work-title>{{ artwork.title }}</p>
+        <p class="gallery-work__medium" data-work-medium>{{ artwork.medium|default:'Work on paper' }}{% if artwork.year and artwork.year != 'nan' %} <span aria-hidden="true">·</span> {{ artwork.year }}{% endif %}</p>
+        <div class="gallery-work__actions">
+            <a href="{% url 'artwork_detail' artwork.id %}" data-work-details>View work <span aria-hidden="true">↗</span></a>
+            {% if user.is_staff %}<a class="gallery-work__edit" href="{% url 'artwork_edit' artwork.id %}">Edit</a>{% endif %}
         </div>
     </div>
 </article>

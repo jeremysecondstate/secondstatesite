@@ -4,20 +4,21 @@ from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from . import catalog_api_views, views
+from .gallery import gallery_category_for_medium
 from .models import Artwork
 
 
 @patch.dict(os.environ, {"CATALOG_API_KEY": "test-key"}, clear=False)
 class ArtworkOrderingTests(TestCase):
-    def create_artwork(self, title, display_order, is_available=True):
+    def create_artwork(self, title, display_order, is_available=True, medium="Screenprint"):
         return Artwork.objects.create(
             title=title,
             artist="Test Artist",
-            medium="Screenprint",
+            medium=medium,
             price=Decimal("100.00"),
             display_order=display_order,
             is_available=is_available,
@@ -92,7 +93,7 @@ class ArtworkOrderingTests(TestCase):
         self.assertEqual(uploaded.display_order, 2)
         self.assertEqual(list(Artwork.objects.values_list("id", flat=True)), [first.id, second.id, uploaded.id])
 
-    def test_gallery_template_keeps_saved_order_with_mosaic_classes(self):
+    def test_gallery_grid_keeps_saved_order_and_unavailable_works(self):
         third = self.create_artwork("Third", 2)
         first = self.create_artwork("First", 0)
         second = self.create_artwork("Second", 1)
@@ -102,9 +103,9 @@ class ArtworkOrderingTests(TestCase):
         response = self.client.get(reverse("gallery"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "auction-mosaic-grid")
-        self.assertContains(response, "auction-card--feature")
-        self.assertContains(response, "auction-card--wide")
+        self.assertContains(response, "gallery-grid")
+        self.assertNotContains(response, "auction-card--feature")
+        self.assertNotContains(response, "auction-card--wide")
         self.assertContains(response, "4 available works")
         html = response.content.decode()
         rendered_positions = [
@@ -112,6 +113,51 @@ class ArtworkOrderingTests(TestCase):
             for artwork in [first, second, third, fourth, fifth]
         ]
         self.assertEqual(rendered_positions, sorted(rendered_positions))
+
+    def test_gallery_filters_count_every_work_and_omit_empty_techniques(self):
+        self.create_artwork("Etched work", 0, medium="Original etching and aquatint")
+        self.create_artwork("Screen print", 1, medium="SCREEN PRINT in colors")
+        self.create_artwork("Sold serigraph", 2, is_available=False, medium="Serigraph")
+        self.create_artwork("Unspecified work", 3, medium=None)
+
+        response = self.client.get(reverse("gallery"))
+
+        self.assertEqual(
+            [(item["key"], item["count"]) for item in response.context["gallery_filters"]],
+            [("intaglio", 1), ("screenprint", 2), ("other", 1)],
+        )
+        self.assertEqual(
+            [artwork.gallery_category for artwork in response.context["artworks"]],
+            ["intaglio", "screenprint", "screenprint", "other"],
+        )
+        self.assertEqual(response.context["available_count"], 3)
+
+    def test_gallery_and_artwork_list_share_the_same_inventory_and_filters(self):
+        self.create_artwork("Second work", 1, medium="Lithograph")
+        self.create_artwork("First work", 0, medium="Drypoint")
+
+        gallery_response = self.client.get(reverse("gallery"))
+        artwork_response = self.client.get(reverse("artwork_list"))
+
+        self.assertEqual(gallery_response.status_code, 200)
+        self.assertEqual(artwork_response.status_code, 200)
+        self.assertEqual(gallery_response.content.strip(), artwork_response.content.strip())
+        self.assertEqual(
+            gallery_response.context["gallery_filters"],
+            artwork_response.context["gallery_filters"],
+        )
+        self.assertTemplateUsed(gallery_response, "gallery.html")
+        self.assertTemplateUsed(artwork_response, "gallery.html")
+
+    def test_empty_gallery_has_no_technique_filters(self):
+        for route in ("gallery", "artwork_list"):
+            with self.subTest(route=route):
+                response = self.client.get(reverse(route))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["artworks"], [])
+                self.assertEqual(response.context["gallery_filters"], [])
+                self.assertEqual(response.context["available_count"], 0)
+                self.assertContains(response, "No artworks are listed")
 
     def test_gallery_uses_default_artwork_image_when_image_is_missing(self):
         self.create_artwork("Missing Image", 0)
@@ -133,6 +179,33 @@ class ArtworkOrderingTests(TestCase):
         response = self.client.get(reverse("gallery"))
 
         self.assertContains(response, edit_url)
+
+
+class GalleryCategoriesTests(SimpleTestCase):
+    def test_recorded_medium_variations_map_to_technique_groups(self):
+        examples = (
+            ("Original Etching, aquatint and drypoint", "intaglio"),
+            ("ENGRAVING on paper", "intaglio"),
+            ("Mezzotint", "intaglio"),
+            ("Dry point", "intaglio"),
+            ("Color LiThO", "lithograph"),
+            ("Lithography", "lithograph"),
+            ("Screenprint", "screenprint"),
+            ("screen print in colors", "screenprint"),
+            ("Screen-print", "screenprint"),
+            ("Serigraph on paper", "screenprint"),
+            ("Woodcut", "other"),
+            (None, "other"),
+            ("", "other"),
+            ("   ", "other"),
+        )
+        for medium, expected in examples:
+            with self.subTest(medium=medium):
+                self.assertEqual(gallery_category_for_medium(medium), expected)
+
+    def test_mixed_techniques_have_one_consistent_category(self):
+        self.assertEqual(gallery_category_for_medium("Lithograph and etching"), "intaglio")
+        self.assertEqual(gallery_category_for_medium("Etching and lithograph"), "intaglio")
 
 
 @patch.dict(os.environ, {"OPENAI_API_KEY": "not-used-in-tests"}, clear=False)

@@ -1,5 +1,76 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}The Collection — SecondState{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'secondstateapp/gallery.css' %}">
+{% endblock %}
+{% block main_class %}collection-shell{% endblock %}
+
 {% block content %}
-<h1>Gallery</h1>
-<p>Coming soon. (This will be populated from inventory.)</p>
+<section class="collection" aria-labelledby="gallery-heading" data-gallery>
+    <header class="collection-header">
+        <div>
+            <p class="collection-eyebrow">SecondState / The gallery</p>
+            <h1 id="gallery-heading">Works on paper<span>.</span></h1>
+        </div>
+        <div class="collection-intro">
+            <p>A closer look at the art of the print.<br>Explore the collection by technique.</p>
+            <span class="collection-availability"><span aria-hidden="true"></span>{{ available_count }} available work{{ available_count|pluralize }}</span>
+        </div>
+    </header>
+
+    {% if artworks %}
+    <div class="collection-tools" data-gallery-controls hidden>
+        <div class="collection-filters" role="group" aria-label="Filter works by technique">
+            <button type="button" class="collection-filter" data-filter="all" aria-pressed="true" aria-controls="gallery-grid" data-description="Discover the collection in full.">All works <span>{{ artworks|length }}</span></button>
+            {% for filter in gallery_filters %}
+            <button type="button" class="collection-filter" data-filter="{{ filter.key }}" aria-pressed="false" aria-controls="gallery-grid" data-description="{{ filter.description }}">{{ filter.label }} <span>{{ filter.count }}</span></button>
+            {% endfor %}
+        </div>
+        <button type="button" class="collection-motion" data-motion aria-pressed="false"><span aria-hidden="true">◌</span> <span data-motion-label>Motion off</span></button>
+    </div>
+    <div class="collection-index">
+        <p data-filter-description>Discover the collection in full.</p>
+        <p data-gallery-count role="status" aria-live="polite" aria-atomic="true">{{ artworks|length }} work{{ artworks|length|pluralize }}</p>
+    </div>
+    <div class="gallery-grid" id="gallery-grid">
+        {% for artwork in artworks %}
+            {% include 'artworks/artwork_card.html' %}
+        {% endfor %}
+    </div>
+    <div class="collection-endnote">
+        <p>Find a work that speaks to you.</p>
+        <a href="{% url 'contact' %}">Get in touch <span aria-hidden="true">↗</span></a>
+    </div>
+    {% else %}
+    <div class="collection-empty">
+        <h2>A new impression is on its way.</h2>
+        <p>No artworks are listed at the moment. Please check back soon.</p>
+        <a href="{% url 'contact' %}">Contact the gallery <span aria-hidden="true">↗</span></a>
+    </div>
+    {% endif %}
+
+    <dialog class="artwork-viewer" data-viewer aria-labelledby="viewer-title">
+        <div class="artwork-viewer__toolbar">
+            <span>SecondState / Quick look</span>
+            <form method="dialog"><button type="submit" class="artwork-viewer__close" aria-label="Close quick look">Close <span aria-hidden="true">×</span></button></form>
+        </div>
+        <div class="artwork-viewer__stage"><img data-viewer-image alt=""></div>
+        <div class="artwork-viewer__bottom">
+            <div class="artwork-viewer__caption">
+                <p data-viewer-artist></p>
+                <h2 id="viewer-title"></h2>
+                <p data-viewer-medium></p>
+            </div>
+            <div class="artwork-viewer__navigation" data-viewer-navigation>
+                <button type="button" data-viewer-previous aria-label="Previous image">←</button>
+                <span data-viewer-counter role="status" aria-live="polite"></span>
+                <button type="button" data-viewer-next aria-label="Next image">→</button>
+            </div>
+            <a class="artwork-viewer__details" data-viewer-details href="#">View work <span aria-hidden="true">↗</span></a>
+        </div>
+    </dialog>
+</section>
+<script src="{% static 'secondstateapp/gallery.js' %}" defer></script>
 {% endblock %}
