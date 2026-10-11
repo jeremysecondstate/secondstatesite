@@ -9,6 +9,7 @@ from docx import Document
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from tkinter import scrolledtext
 
+from catalogapp.catalog_paths import resolve_catalog_path
 from catalogapp.watchlist_ui import ArtistWatchlistPanel
 from secondstate.environment import load_project_environment
 
@@ -17,7 +18,6 @@ BASE_URL = os.environ.get("SECONDSTATE_BASE_URL", "https://secondstate.art").rst
 APP_TITLE = "Art Catalog Uploader"
 APP_MIN_W, APP_MIN_H = 1180, 820
 CATALOG_API_KEY = os.environ.get("CATALOG_API_KEY", "").strip()
-DEFAULT_CATALOG_PATH = r"I:\Shared drives\SECONDSTATE\THE BOOKS\SUPREME.xlsx"
 DEFAULT_CATALOG_SHEET = "Inventory for Fall 2026"
 
 
@@ -227,9 +227,7 @@ class ArtCatalogApp:
 
     def load_excel(self):
         try:
-            if not os.path.exists(DEFAULT_CATALOG_PATH):
-                raise FileNotFoundError(f"Shared catalog file not found:\n{DEFAULT_CATALOG_PATH}")
-            self._load_excel_from_path(DEFAULT_CATALOG_PATH)
+            self._load_excel_from_path(resolve_catalog_path())
         except Exception as e:
             messagebox.showerror("Load Error", f"Failed to load Excel file:\n{e}")
 
