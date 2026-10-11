@@ -45,12 +45,12 @@
     visible = false;
     windows.forEach(({ mask, hero }) => {
       const rect = hero.getBoundingClientRect();
-      // Clip inside the border, preserving its rounded outline.
-      mask.setAttribute('x', rect.left + 1);
-      mask.setAttribute('y', rect.top + 1);
-      mask.setAttribute('width', Math.max(0, rect.width - 2));
-      mask.setAttribute('height', Math.max(0, rect.height - 2));
-      mask.setAttribute('rx', Math.max(0, parseFloat(getComputedStyle(hero).borderRadius) - 1));
+      // Cover the full window so the still image cannot form a bright rim.
+      mask.setAttribute('x', rect.left);
+      mask.setAttribute('y', rect.top);
+      mask.setAttribute('width', Math.max(0, rect.width));
+      mask.setAttribute('height', Math.max(0, rect.height));
+      mask.setAttribute('rx', parseFloat(getComputedStyle(hero).borderRadius));
       if (rect.bottom > 0 && rect.top < window.innerHeight) visible = true;
     });
 
@@ -68,7 +68,10 @@
   }
 
   function configureMotion() {
-    scene.classList.toggle('is-ready', motionAllowed() && video.readyState >= 2);
+    const videoReady = motionAllowed() && video.readyState >= 2;
+    scene.classList.toggle('is-ready', videoReady);
+    // Hide the fallback only once a frame is ready, including at clipped corners.
+    windows.forEach(({ hero }) => hero.classList.toggle('has-video', videoReady));
     if (motionAllowed() && !video.getAttribute('src')) {
       video.muted = true;
       video.src = video.dataset.src;

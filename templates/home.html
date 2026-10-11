@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'secondstateapp/home-media.css' %}">
+<link rel="stylesheet" href="{% static 'secondstateapp/home-media.css' %}?v=2">
 {% endblock %}
 
 {% block before_nav %}
@@ -62,5 +62,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'secondstateapp/home-media.js' %}" defer></script>
+<script src="{% static 'secondstateapp/home-media.js' %}?v=2" defer></script>
 {% endblock %}
