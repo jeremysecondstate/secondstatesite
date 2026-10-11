@@ -568,6 +568,241 @@ class AuctionCalendarViewTests(TestCase):
         self.assertContains(response, "moveLotBrowser(-1)")
         self.assertEqual(response.context["weeks"][0][0]["date"].weekday(), 0)
 
+    def test_selected_day_lists_every_distinct_sale_before_lot_browser(self):
+        sale_titles = [
+            "Modern Prints & Works on Paper: A Particularly Long Morning Session",
+            "Modern Prints: Afternoon Session",
+            "Postwar Editions",
+            "Evening Session",
+            "Evening Session",
+        ]
+        sale_urls = [f"https://www.invaluable.com/catalog/sale-{index}" for index in range(5)]
+        for index, (sale_title, sale_url) in enumerate(zip(sale_titles, sale_urls)):
+            watch_lot(
+                source_lot_id=f"sale-{index}-lot-1",
+                auction_house="Bonhams",
+                sale_title=sale_title,
+                sale_url=sale_url,
+                event_at=datetime(2026, 7, 25, 9 + index, tzinfo=CALENDAR_ZONE),
+            )
+        watch_lot(
+            source_lot_id="sale-0-lot-2",
+            auction_house="Bonhams",
+            sale_title=sale_titles[0],
+            sale_url=sale_urls[0],
+            event_at=datetime(2026, 7, 25, 9, tzinfo=CALENDAR_ZONE),
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        sales = response.context["calendar_sales_data"]["2026-07-25"]
+        self.assertEqual(len(sales), 5)
+        self.assertEqual([sale["sale_title"] for sale in sales], sale_titles)
+        self.assertEqual([sale["auction_house"] for sale in sales], ["Bonhams"] * 5)
+        self.assertEqual([sale["lot_count"] for sale in sales], [2, 1, 1, 1, 1])
+        self.assertEqual([sale["time_label"] for sale in sales], [
+            "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "1:00 PM",
+        ])
+        self.assertEqual([sale["sale_url"] for sale in sales], sale_urls)
+        self.assertEqual(len(response.context["calendar_data"]["2026-07-25"]), 6)
+        day = next(
+            day for week in response.context["weeks"] for day in week
+            if day["iso"] == "2026-07-25"
+        )
+        self.assertEqual(len(day["event_groups"]), 3)
+        self.assertEqual(day["more_count"], 2)
+        self.assertNotIn("2026-07-24", response.context["calendar_sales_data"])
+
+        html = response.content.decode()
+        self.assertIn('<script id="auction-calendar-sales-data" type="application/json">', html)
+        self.assertContains(response, "Auctions Happening This Day")
+        self.assertContains(response, "Suggested Lots")
+        self.assertContains(response, "+2 more auctions")
+        self.assertContains(
+            response,
+            '<span class="event-title">Modern Prints &amp; Works on Paper: A Particularly Long Morning Session</span>',
+            html=True,
+        )
+        self.assertLess(html.index('id="selected-day-title"'), html.index('id="selected-day-sales"'))
+        self.assertLess(html.index('id="selected-day-sales"'), html.index('id="suggested-lots-heading"'))
+        self.assertLess(html.index('id="suggested-lots-heading"'), html.index('id="day-lot-browser-launch"'))
+
+    def test_selected_day_uses_available_metadata_from_all_lots_in_a_sale(self):
+        watch_lot(source_lot_id="sparse-metadata", sale_title="", auction_house="")
+        watch_lot(source_lot_id="complete-metadata")
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        sales = response.context["calendar_sales_data"]["2026-07-25"]
+        self.assertEqual(len(sales), 1)
+        self.assertEqual(sales[0]["sale_title"], "Modern Prints")
+        self.assertEqual(sales[0]["auction_house"], "Bonhams")
+        self.assertEqual(sales[0]["lot_count"], 2)
+
+    def test_selected_day_groups_url_less_sales_without_using_a_lot_link(self):
+        watch_lot(source_lot_id="no-sale-url-1", sale_url="")
+        watch_lot(source_lot_id="no-sale-url-2", sale_url="")
+        watch_lot(
+            source_lot_id="no-sale-url-later-session",
+            sale_url="",
+            event_at=datetime(2026, 7, 25, 16, tzinfo=CALENDAR_ZONE),
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        sales = response.context["calendar_sales_data"]["2026-07-25"]
+        self.assertEqual(len(sales), 2)
+        self.assertEqual([sale["lot_count"] for sale in sales], [2, 1])
+        self.assertEqual([sale["sale_url"] for sale in sales], ["", ""])
+        self.assertEqual([sale["time_label"] for sale in sales], ["1:30 PM", "4:00 PM"])
+
+    def test_selected_day_sales_follow_local_midnight_instead_of_utc_date(self):
+        watch_lot(
+            source_lot_id="before-local-midnight",
+            sale_title="Late Auction",
+            sale_url="https://www.invaluable.com/catalog/late-auction",
+            event_at=datetime(2026, 7, 25, 6, 59, tzinfo=ZoneInfo("UTC")),
+        )
+        watch_lot(
+            source_lot_id="at-local-midnight",
+            sale_title="Midnight Auction",
+            sale_url="https://www.invaluable.com/catalog/midnight-auction",
+            event_at=datetime(2026, 7, 25, 7, tzinfo=ZoneInfo("UTC")),
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        sales = response.context["calendar_sales_data"]
+        self.assertEqual([sale["sale_title"] for sale in sales["2026-07-24"]], ["Late Auction"])
+        self.assertEqual([sale["sale_title"] for sale in sales["2026-07-25"]], ["Midnight Auction"])
+        self.assertEqual(sales["2026-07-24"][0]["time_label"], "11:59 PM")
+        self.assertEqual(sales["2026-07-25"][0]["time_label"], "12:00 AM")
+
+    def test_selected_day_sale_data_includes_upcoming_date_outside_displayed_month(self):
+        watch_lot(
+            source_lot_id="august-upcoming",
+            sale_title="August Auction",
+            sale_url="https://www.invaluable.com/catalog/august-auction",
+            event_at=datetime(2026, 8, 3, 14, tzinfo=CALENDAR_ZONE),
+        )
+        self.client.force_login(self.staff)
+
+        with patch(
+            "secondstateapp.calendar_views.timezone.now",
+            return_value=datetime(2026, 7, 20, 12, tzinfo=CALENDAR_ZONE),
+        ):
+            response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        self.assertIn("2026-08-03", response.context["calendar_data"])
+        self.assertEqual(
+            response.context["calendar_sales_data"]["2026-08-03"][0]["sale_title"],
+            "August Auction",
+        )
+        self.assertNotIn("2026-08-04", response.context["calendar_sales_data"])
+
+    def test_upcoming_selected_day_includes_ended_sales_like_the_month_grid(self):
+        watch_lot(
+            source_lot_id="august-upcoming",
+            sale_title="August Auction",
+            sale_url="https://www.invaluable.com/catalog/august-auction",
+            event_at=datetime(2026, 8, 3, 14, tzinfo=CALENDAR_ZONE),
+        )
+        watch_lot(
+            source_lot_id="august-ended",
+            sale_title="August Morning Auction",
+            sale_url="https://www.invaluable.com/catalog/august-morning-auction",
+            event_at=datetime(2026, 8, 3, 9, tzinfo=CALENDAR_ZONE),
+            active=False,
+        )
+        self.client.force_login(self.staff)
+
+        with patch(
+            "secondstateapp.calendar_views.timezone.now",
+            return_value=datetime(2026, 8, 3, 12, tzinfo=CALENDAR_ZONE),
+        ):
+            outside_grid = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+            inside_grid = self.client.get(reverse("auction_calendar"), {"month": "2026-08"})
+
+        sales = outside_grid.context["calendar_sales_data"]["2026-08-03"]
+        self.assertEqual(len(sales), 2)
+        self.assertEqual(sales, inside_grid.context["calendar_sales_data"]["2026-08-03"])
+        self.assertEqual(
+            outside_grid.context["calendar_data"]["2026-08-03"],
+            inside_grid.context["calendar_data"]["2026-08-03"],
+        )
+
+    def test_adjacent_month_grid_day_has_complete_selected_day_data(self):
+        watch_lot(
+            source_lot_id="june-adjacent",
+            sale_title="June Fine Prints",
+            sale_url="https://www.invaluable.com/catalog/june-fine-prints",
+            event_at=datetime(2026, 6, 30, 10, tzinfo=CALENDAR_ZONE),
+        )
+        self.client.force_login(self.staff)
+
+        with patch(
+            "secondstateapp.calendar_views.timezone.now",
+            return_value=datetime(2026, 7, 20, 12, tzinfo=CALENDAR_ZONE),
+        ):
+            response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        grid_day = next(
+            day for week in response.context["weeks"] for day in week
+            if day["iso"] == "2026-06-30"
+        )
+        self.assertFalse(grid_day["in_month"])
+        self.assertEqual(grid_day["lot_count"], 1)
+        self.assertEqual(grid_day["event_groups"][0]["sale_title"], "June Fine Prints")
+        self.assertEqual(len(response.context["calendar_data"]["2026-06-30"]), 1)
+        self.assertEqual(
+            response.context["calendar_sales_data"]["2026-06-30"][0]["sale_title"],
+            "June Fine Prints",
+        )
+
+    def test_out_of_month_upcoming_day_is_complete_beyond_upcoming_query_limit(self):
+        event_at = datetime(2026, 8, 3, 14, tzinfo=CALENDAR_ZONE)
+        AuctionWatchLot.objects.bulk_create([
+            AuctionWatchLot(
+                source="Invaluable",
+                source_lot_id=f"august-lot-{index}",
+                artist="Joan Miró",
+                title=f"Artwork {index}",
+                auction_house="Bonhams",
+                sale_title="August Auction",
+                sale_url="https://www.invaluable.com/catalog/august-auction",
+                event_at=event_at,
+                active=True,
+            )
+            for index in range(1001)
+        ])
+        watch_lot(
+            source_lot_id="august-later-auction",
+            sale_title="August Evening Auction",
+            sale_url="https://www.invaluable.com/catalog/august-evening-auction",
+            event_at=datetime(2026, 8, 3, 18, tzinfo=CALENDAR_ZONE),
+        )
+        self.client.force_login(self.staff)
+
+        with patch(
+            "secondstateapp.calendar_views.timezone.now",
+            return_value=datetime(2026, 7, 20, 12, tzinfo=CALENDAR_ZONE),
+        ):
+            response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        self.assertEqual(len(response.context["calendar_data"]["2026-08-03"]), 1002)
+        self.assertEqual(
+            response.context["calendar_sales_data"]["2026-08-03"][0]["lot_count"],
+            1001,
+        )
+        self.assertEqual(
+            [sale["sale_title"] for sale in response.context["calendar_sales_data"]["2026-08-03"]],
+            ["August Auction", "August Evening Auction"],
+        )
+
     def test_calendar_serializes_and_renders_only_valid_imported_artist_links(self):
         imported_url = (
             "https://www.artprice.com/artist/28011/antoni-tapies/lots/pasts"

@@ -298,6 +298,8 @@
 }
 
 .calendar-day {
+  display: flex;
+  flex-direction: column;
   position: relative;
   min-width: 0;
   min-height: 145px;
@@ -357,14 +359,15 @@
 .day-events {
   display: grid;
   gap: 6px;
+  width: 100%;
   margin-top: 10px;
 }
 
 .event-chip {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 5px;
+  gap: 3px 5px;
   min-width: 0;
   padding: 6px 7px 6px 9px;
   border-left: 2px solid var(--calendar-gold);
@@ -378,14 +381,31 @@
   opacity: .55;
 }
 
+.event-title,
 .event-house {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.event-title {
+  grid-column: 1 / -1;
+  -webkit-line-clamp: 3;
+  font-weight: 600;
+}
+
+.event-house {
+  -webkit-line-clamp: 2;
+  color: var(--calendar-muted);
+  font-size: 10px;
 }
 
 .event-count {
+  grid-column: 2;
   min-width: 20px;
   padding: 1px 5px;
   border-radius: 999px;
@@ -394,8 +414,9 @@
 }
 
 .more-events {
-  color: var(--calendar-muted);
+  color: var(--calendar-gold);
   font-size: 10px;
+  font-weight: 700;
 }
 
 .calendar-sidebar {
@@ -414,6 +435,129 @@
   border-radius: 4px;
   background: var(--calendar-panel);
   padding: 22px;
+}
+
+.selected-day-card {
+  scroll-margin-top: 18px;
+}
+
+.selected-day-sales {
+  min-width: 0;
+  margin-top: 17px;
+  padding-top: 15px;
+  border-top: 1px solid var(--calendar-line);
+}
+
+.selected-day-sales[hidden] {
+  display: none;
+}
+
+.selected-day-sales-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.selected-day-sales-heading h3,
+.suggested-lots > h3 {
+  margin: 0;
+  color: var(--calendar-gold);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.selected-day-sales-count {
+  display: inline-grid;
+  min-width: 23px;
+  height: 23px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--calendar-gold);
+  background: var(--calendar-gold-soft);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.selected-day-sales-list {
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selected-sale {
+  min-width: 0;
+  padding: 11px 0;
+  border-top: 1px solid var(--calendar-line);
+}
+
+.selected-sale:first-child {
+  border-top: 0;
+}
+
+.selected-sale-house,
+.selected-sale-title,
+.selected-sale-meta {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.selected-sale-house {
+  color: var(--calendar-gold);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.selected-sale-title {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, .94);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.selected-sale-meta {
+  margin-top: 4px;
+  color: var(--calendar-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.selected-sale-link {
+  color: inherit;
+  text-decoration-color: rgba(217, 184, 120, .5);
+  text-underline-offset: 3px;
+}
+
+.selected-sale-link:hover,
+.selected-sale-link:focus-visible {
+  color: var(--calendar-gold);
+  text-decoration-color: currentColor;
+}
+
+.selected-sale-link:focus-visible {
+  outline: 2px solid var(--calendar-gold);
+  outline-offset: 3px;
+}
+
+.suggested-lots {
+  min-width: 0;
+  margin-top: 17px;
+  padding-top: 15px;
+  border-top: 1px solid var(--calendar-line);
+}
+
+.selected-sale-empty {
+  padding: 12px 0 0;
+  color: var(--calendar-muted);
+  font-size: 12px;
 }
 
 .lot-browser-launch {

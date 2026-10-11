@@ -84,7 +84,7 @@
       <div class="calendar-toolbar">
         <div>
           <h2>{{ month_title }}</h2>
-          <p>Choose a day to inspect every watched piece.</p>
+          <p>Choose a day to see every auction and its suggested lots.</p>
         </div>
         <nav class="month-nav" aria-label="Calendar month navigation">
           <a href="?month={{ previous_month }}" aria-label="Previous month">← Previous</a>
@@ -103,18 +103,20 @@
                 class="calendar-day{% if not day.in_month %} is-outside{% endif %}{% if day.is_today %} is-today{% endif %}{% if day.lot_count %} has-events{% endif %}"
                 type="button"
                 data-calendar-day="{{ day.iso }}"
-                aria-label="{{ day.date|date:'l, F j, Y' }}{% if day.lot_count %}, {{ day.lot_count }} watched lot{{ day.lot_count|pluralize }}{% endif %}"
+                aria-controls="selected-day-sales selected-day-lots"
+                aria-label="{{ day.date|date:'l, F j, Y' }}{% if day.lot_count %}, {{ day.lot_count }} watched lot{{ day.lot_count|pluralize }} in {{ day.sale_count }} auction{{ day.sale_count|pluralize }}{% endif %}. Select to view the complete auction list below."
                 role="gridcell"
               >
                 <span class="day-number">{{ day.day_number }}</span>
                 <span class="day-events">
                   {% for event in day.event_groups %}
-                    <span class="event-chip{% if event.ended %} is-ended{% endif %}">
-                      <span class="event-house">{{ event.auction_house }}</span>
-                      <span class="event-count">{{ event.lot_count }}</span>
+                    <span class="event-chip{% if event.ended %} is-ended{% endif %}" title="{% if event.sale_title %}{{ event.sale_title }} · {% endif %}{{ event.auction_house }} · {{ event.lot_count }} watched lot{{ event.lot_count|pluralize }}">
+                      <span class="event-title">{% firstof event.sale_title event.auction_house %}</span>
+                      {% if event.sale_title %}<span class="event-house">{{ event.auction_house }}</span>{% endif %}
+                      <span class="event-count" aria-label="{{ event.lot_count }} watched lot{{ event.lot_count|pluralize }}">{{ event.lot_count }}</span>
                     </span>
                   {% endfor %}
-                  {% if day.more_count %}<span class="more-events">+{{ day.more_count }} more sale{{ day.more_count|pluralize }}</span>{% endif %}
+                  {% if day.more_count %}<span class="more-events">+{{ day.more_count }} more auction{{ day.more_count|pluralize }}</span>{% endif %}
                 </span>
               </button>
             {% endfor %}
@@ -125,15 +127,25 @@
 
     <aside class="calendar-sidebar">
       <section class="sidebar-card selected-day-card" aria-live="polite">
-        <p class="sidebar-label">Selected day</p>
-        <h2 id="selected-day-title">Choose a date</h2>
-        <button id="day-lot-browser-launch" class="lot-browser-launch" type="button" hidden>
-          Browse lots
-        </button>
-        <span id="calendar-csrf-token" data-token="{{ csrf_token }}" hidden></span>
-        <div id="selected-day-lots" class="selected-day-lots">
-          <p class="sidebar-empty">Select a calendar day to see its lots.</p>
-        </div>
+        <p class="sidebar-label">Selected date</p>
+        <h2 id="selected-day-title" tabindex="-1">Choose a date</h2>
+        <section id="selected-day-sales" class="selected-day-sales" aria-labelledby="selected-day-sales-heading" hidden>
+          <div class="selected-day-sales-heading">
+            <h3 id="selected-day-sales-heading">Auctions Happening This Day</h3>
+            <span id="selected-day-sales-count" class="selected-day-sales-count"></span>
+          </div>
+          <ol id="selected-day-sales-list" class="selected-day-sales-list"></ol>
+        </section>
+        <section class="suggested-lots" aria-labelledby="suggested-lots-heading">
+          <h3 id="suggested-lots-heading">Suggested Lots</h3>
+          <button id="day-lot-browser-launch" class="lot-browser-launch" type="button" hidden>
+            Browse lots
+          </button>
+          <span id="calendar-csrf-token" data-token="{{ csrf_token }}" hidden></span>
+          <div id="selected-day-lots" class="selected-day-lots">
+            <p class="sidebar-empty">Select a calendar day to see its lots.</p>
+          </div>
+        </section>
       </section>
 
       <section class="sidebar-card upcoming-card">
@@ -204,10 +216,17 @@
 </section>
 
 {{ calendar_data|json_script:"auction-calendar-data" }}
+{{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
+  const salesData = JSON.parse(document.getElementById("auction-calendar-sales-data").textContent);
   const title = document.getElementById("selected-day-title");
+  const selectedDayCard = document.querySelector(".selected-day-card");
+  const sidebar = document.querySelector(".calendar-sidebar");
+  const salesSection = document.getElementById("selected-day-sales");
+  const salesCount = document.getElementById("selected-day-sales-count");
+  const salesList = document.getElementById("selected-day-sales-list");
   const list = document.getElementById("selected-day-lots");
   const dayButtons = Array.from(document.querySelectorAll(".calendar-day"));
   const csrfToken = document.getElementById("calendar-csrf-token").dataset.token;
@@ -1366,10 +1385,48 @@
     }
   });
 
+  const renderDaySales = (isoDate) => {
+    const sales = salesData[isoDate] || [];
+    salesSection.hidden = false;
+    salesCount.textContent = String(sales.length);
+    salesCount.setAttribute("aria-label", `${sales.length} auction${sales.length === 1 ? "" : "s"}`);
+    salesList.replaceChildren();
+
+    if (!sales.length) {
+      appendText(salesList, "li", "selected-sale-empty", "No auctions on this date.");
+      return;
+    }
+
+    sales.forEach((sale) => {
+      const item = document.createElement("li");
+      item.className = "selected-sale";
+      const saleTitle = sale.sale_title || sale.auction_house;
+      if (sale.sale_title) appendText(item, "p", "selected-sale-house", sale.auction_house);
+      const heading = document.createElement("h4");
+      heading.className = "selected-sale-title";
+      if (sale.sale_url) {
+        const link = externalLink(sale.sale_url, "selected-sale-link", saleTitle);
+        link.setAttribute("aria-label", `View ${saleTitle} at ${sale.auction_house} (opens in a new tab)`);
+        heading.appendChild(link);
+      } else {
+        heading.textContent = saleTitle;
+      }
+      item.appendChild(heading);
+      appendText(
+        item,
+        "p",
+        "selected-sale-meta",
+        `${sale.time_label} · ${sale.lot_count} watched lot${sale.lot_count === 1 ? "" : "s"}${sale.sale_url ? "" : " · Auction link unavailable"}`
+      );
+      salesList.appendChild(item);
+    });
+  };
+
   const showDay = (isoDate) => {
     selectedDay = isoDate;
-    const dayLabel = formatCalendarDay(isoDate, {weekday: "long", month: "long", day: "numeric"});
+    const dayLabel = formatCalendarDay(isoDate, {weekday: "long", year: "numeric", month: "long", day: "numeric"});
     title.textContent = dayLabel;
+    renderDaySales(isoDate);
     list.replaceChildren();
     dayButtons.forEach((button) => {
       const selected = button.dataset.calendarDay === isoDate;
@@ -1385,10 +1442,7 @@
       lots.length === 1 ? `Browse the lot for ${dayLabel}` : `Browse all ${lots.length} lots for ${dayLabel}`
     );
     if (!lots.length) {
-      const empty = document.createElement("p");
-      empty.className = "sidebar-empty";
-      empty.textContent = "No watched lots on this date.";
-      list.appendChild(empty);
+      appendText(list, "p", "sidebar-empty", "No suggested lots on this date.");
       return;
     }
 
@@ -1417,7 +1471,17 @@
   };
 
   document.querySelectorAll("[data-calendar-day]").forEach((button) => {
-    button.addEventListener("click", () => showDay(button.dataset.calendarDay));
+    button.addEventListener("click", () => {
+      showDay(button.dataset.calendarDay);
+      sidebar.scrollTop = 0;
+      if (window.matchMedia("(max-width: 1180px)").matches) {
+        title.focus({preventScroll: true});
+        selectedDayCard.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+          block: "start",
+        });
+      }
+    });
   });
 
   const initialDay = "{{ initial_day|escapejs }}";

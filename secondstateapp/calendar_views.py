@@ -161,21 +161,34 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
     groups = []
     for sale_lots in grouped.values():
         first = sale_lots[0]
+        auction_house = next((lot.auction_house for lot in sale_lots if lot.auction_house), first.source or "Auction")
+        sale_title = next((lot.sale_title for lot in sale_lots if lot.sale_title), "")
         artists = sorted({_artist_label(lot) for lot in sale_lots}, key=str.casefold)
         groups.append(
             {
-                "auction_house": first.auction_house or first.source or "Auction",
-                "sale_title": first.sale_title,
+                "auction_house": auction_house,
+                "sale_title": sale_title,
                 "lot_count": len(sale_lots),
                 "artists": ", ".join(artists[:3]),
                 "additional_artists": max(0, len(artists) - 3),
                 "time_label": _time_label(first, zone),
                 "url": first.sale_url or first.lot_url,
+                "sale_url": first.sale_url,
                 "ended": all(not lot.active for lot in sale_lots),
                 "sort_at": first.event_at,
             }
         )
     return sorted(groups, key=lambda item: (item["sort_at"], item["auction_house"]))
+
+
+def _sale_json(group: dict) -> dict:
+    return {
+        "auction_house": group["auction_house"],
+        "sale_title": group["sale_title"],
+        "lot_count": group["lot_count"],
+        "time_label": group["time_label"],
+        "sale_url": group["sale_url"],
+    }
 
 
 def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None) -> dict:
@@ -217,7 +230,8 @@ def auction_calendar(request):
     now_local = timezone.localtime(timezone.now(), zone)
     selected_month = _month_start(request.GET.get("month"), now_local.date())
     following_month = _next_month(selected_month)
-    range_start, range_end = _utc_bounds(selected_month, following_month, zone)
+    month_weeks = month_calendar.Calendar(firstweekday=0).monthdatescalendar(selected_month.year, selected_month.month)
+    range_start, range_end = _utc_bounds(month_weeks[0][0], month_weeks[-1][-1] + timedelta(days=1), zone)
 
     active_email_batch = (
         AuctionEmailBatch.objects.filter(is_active=True)
@@ -238,7 +252,7 @@ def auction_calendar(request):
         lots_by_day[timezone.localtime(lot.event_at, zone).date()].append(lot)
 
     weeks = []
-    for week in month_calendar.Calendar(firstweekday=0).monthdatescalendar(selected_month.year, selected_month.month):
+    for week in month_weeks:
         week_items = []
         for day in week:
             day_lots = lots_by_day.get(day, [])
@@ -252,6 +266,7 @@ def auction_calendar(request):
                     "is_today": day == now_local.date(),
                     "event_groups": event_groups[:3],
                     "more_count": max(0, len(event_groups) - 3),
+                    "sale_count": len(event_groups),
                     "lot_count": len(day_lots),
                 }
             )
@@ -259,6 +274,10 @@ def auction_calendar(request):
 
     calendar_data = {
         day.isoformat(): [_lot_json(lot, zone, selected_lot_ids) for lot in lots]
+        for day, lots in sorted(lots_by_day.items())
+    }
+    calendar_sales_data = {
+        day.isoformat(): [_sale_json(group) for group in _group_lots(lots, zone)]
         for day, lots in sorted(lots_by_day.items())
     }
 
@@ -269,17 +288,9 @@ def auction_calendar(request):
         .order_by("event_at", "auction_house", "artist", "id")[:1000]
     )
     upcoming_by_day_and_sale: dict[tuple[date, str], list[AuctionWatchLot]] = {}
-    upcoming_by_day: dict[date, list[AuctionWatchLot]] = defaultdict(list)
     for lot in upcoming_lots:
         local_day = timezone.localtime(lot.event_at, zone).date()
         upcoming_by_day_and_sale.setdefault((local_day, _sale_identity(lot)), []).append(lot)
-        upcoming_by_day[local_day].append(lot)
-
-    for local_day, day_lots in upcoming_by_day.items():
-        calendar_data.setdefault(
-            local_day.isoformat(),
-            [_lot_json(lot, zone, selected_lot_ids) for lot in day_lots],
-        )
 
     upcoming_groups = []
     for (local_day, _identity), sale_lots in upcoming_by_day_and_sale.items():
@@ -288,6 +299,32 @@ def auction_calendar(request):
         group["date_label"] = local_day.strftime("%a, %b %d").replace(" 0", " ")
         upcoming_groups.append(group)
     upcoming_groups.sort(key=lambda item: (item["date_iso"], item["sort_at"], item["auction_house"]))
+    visible_upcoming_groups = upcoming_groups[:10]
+
+    # The upcoming list is capped for display, but each date it can select must
+    # include every lot even when the initial upcoming query stops at 1,000.
+    for day_iso in sorted({group["date_iso"] for group in visible_upcoming_groups}):
+        if day_iso in calendar_data:
+            continue
+        local_day = date.fromisoformat(day_iso)
+        day_start, day_end = _utc_bounds(local_day, local_day + timedelta(days=1), zone)
+        day_lots = list(
+            AuctionWatchLot.objects.filter(event_at__gte=day_start, event_at__lt=day_end)
+            .select_related("watchlist_artist")
+            .order_by("event_at", "auction_house", "artist", "id")
+        )
+        calendar_data[day_iso] = [_lot_json(lot, zone, selected_lot_ids) for lot in day_lots]
+        calendar_sales_data[day_iso] = [_sale_json(group) for group in _group_lots(day_lots, zone)]
+
+    in_month_days = sorted(day for day in lots_by_day if selected_month <= day < following_month)
+    if now_local.date() in in_month_days:
+        initial_day = now_local.date().isoformat()
+    elif in_month_days:
+        initial_day = in_month_days[0].isoformat()
+    elif visible_upcoming_groups:
+        initial_day = visible_upcoming_groups[0]["date_iso"]
+    else:
+        initial_day = next(iter(calendar_data), "")
 
     last_sent_batch = (
         AuctionEmailBatch.objects.filter(status=AuctionEmailBatch.Status.SENT, is_active=False)
@@ -304,8 +341,9 @@ def auction_calendar(request):
         "next_month": following_month.strftime("%Y-%m"),
         "weeks": weeks,
         "calendar_data": calendar_data,
-        "initial_day": now_local.date().isoformat() if now_local.date() in lots_by_day else next(iter(calendar_data), ""),
-        "upcoming_groups": upcoming_groups[:10],
+        "calendar_sales_data": calendar_sales_data,
+        "initial_day": initial_day,
+        "upcoming_groups": visible_upcoming_groups,
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
         "synced_lot_count": AuctionWatchLot.objects.count(),
         "email_batch": active_email_batch,
