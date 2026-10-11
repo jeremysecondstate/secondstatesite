@@ -16,6 +16,7 @@
 </head>
 
 <body>
+  {% block before_nav %}{% endblock %}
   <header class="nav">
     <a class="brand" href="{% url 'home' %}">SecondState</a>
     <nav>
@@ -46,5 +47,6 @@
   <footer class="footer">
     <div>© {% now "Y" %} SecondState — Fine Art Prints</div>
   </footer>
+  {% block extra_js %}{% endblock %}
 </body>
 </html>

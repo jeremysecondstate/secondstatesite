@@ -1,53 +1,48 @@
-<div class="hero">
-    <div class="hero-overlay">
+{% extends "base.html" %}
+{% load static %}
 
-        <h1>Second State Galleries</h1>
-        <div class="hero-divider"></div>
-        <div>
-            <a href="/gallery/" class="btn">View Gallery</a>
-            <a href="/contact/" class="btn">Contact</a>
-        </div>
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'secondstateapp/home-media.css' %}">
+{% endblock %}
 
-    </div>
+{% block before_nav %}
+<svg class="etching-mask" aria-hidden="true" width="0" height="0">
+  <defs>
+    <clipPath id="etching-windows" clipPathUnits="userSpaceOnUse">
+      <rect data-etching-window="etching-intro" />
+      <rect data-etching-window="etching-detail" />
+    </clipPath>
+  </defs>
+</svg>
+<div class="etching-scene" aria-hidden="true">
+  <video class="etching-video" muted loop playsinline preload="none"
+         disablepictureinpicture disableremoteplayback tabindex="-1"
+         data-src="{% static 'secondstateapp/etching_background.mp4' %}"></video>
 </div>
 
+<section id="etching-intro" class="hero hero--video">
+  <div class="hero-overlay">
+    <h1>Second State Galleries</h1>
+    <div class="hero-divider"></div>
+    <div>
+      <a href="{% url 'gallery' %}" class="btn">View Gallery</a>
+      <a href="{% url 'contact' %}" class="btn">Contact</a>
+    </div>
+  </div>
+  <button class="motion-toggle" type="button" data-motion-toggle hidden>Pause animation</button>
+</section>
+{% endblock %}
 
-{% extends "base.html" %}
 {% block content %}
-
-
-
-<section class="hero hero--clean">
-  <div class="hero-copy reveal-on-scroll">
+<section id="etching-detail" class="hero hero--clean hero--video">
+  <div class="hero-copy">
     <p class="kicker">FINE ART PRINTS</p>
-      <br>
+    <br>
     <p class="kicker">SecondState Alternative Assets</p>
     <div class="gallery-title-line"></div>
   </div>
+  <button class="motion-toggle" type="button" data-motion-toggle hidden>Pause animation</button>
 </section>
-
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-visible");
-          observer.unobserve(entry.target);
-        }
-      });
-    }, {
-      threshold: 0.22,
-      threshold: 0.62
-    });
-
-    document.querySelectorAll(".reveal-on-scroll").forEach((el) => {
-      observer.observe(el);
-    });
-  });
-</script>
-
-
-
 
 <section class="home-tiles">
   <div class="tile">
@@ -63,4 +58,9 @@
     <p>Guidance on fit, framing, and long-term care.</p>
   </div>
 </section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'secondstateapp/home-media.js' %}" defer></script>
 {% endblock %}

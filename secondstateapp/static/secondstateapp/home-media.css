@@ -1,0 +1,63 @@
+/* One fixed scene, seen through the two existing rounded windows. */
+.etching-mask {
+  position: absolute;
+  pointer-events: none;
+}
+
+.etching-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  clip-path: url("#etching-windows");
+  opacity: 0;
+}
+
+.etching-scene.is-ready { opacity: 1; }
+
+.etching-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Avoid a separate stacking context: copy sits above the shared video. */
+.hero--video {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.hero--video::after { z-index: 3; }
+.hero--video .hero-overlay,
+.hero--video .hero-copy { z-index: 4; }
+
+.hero--video .motion-toggle {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 5;
+}
+
+.motion-toggle {
+  border: 1px solid rgba(200, 169, 106, .6);
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: var(--gold-soft);
+  background: rgba(7, 8, 11, .86);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.motion-toggle:focus-visible {
+  outline: 2px solid var(--gold-soft);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .etching-scene,
+  .motion-toggle { display: none; }
+  .hero--video { background-attachment: scroll; }
+}
