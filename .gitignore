@@ -14,6 +14,7 @@ media/
 private_data/
 
 # Env / secrets
+env
 .env
 .env.*
 !.env.example
