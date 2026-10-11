@@ -1,0 +1,1 @@
+(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-directive-loading"],{"5f80":function(t,e,n){"use strict";n.r(e),e["default"]={inserted:function(t,e){var n;"loading"in HTMLImageElement.prototype&&(t.setAttribute("loading","lazy"),t.src=null!==(n=t.getAttribute("data-src"))&&void 0!==n?n:t.src)}}}}]);
