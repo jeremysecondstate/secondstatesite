@@ -79,7 +79,13 @@
     {% endif %}
   </section>
 
-  <div class="calendar-layout">
+  <div class="calendar-view-switch" role="group" aria-label="Auction calendar view">
+    <span>View day as</span>
+    <button id="calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="true">Calendar</button>
+    <button id="catalog-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Gallery Catalog</button>
+  </div>
+
+  <div id="calendar-layout" class="calendar-layout">
     <div class="calendar-board">
       <div class="calendar-toolbar">
         <div>
@@ -168,6 +174,45 @@
     </aside>
   </div>
 
+  <section id="day-gallery-catalog" class="day-gallery-catalog" aria-labelledby="day-gallery-title" hidden>
+    <header class="day-gallery-header">
+      <div>
+        <p id="day-gallery-date" class="calendar-kicker">Auction Calendar</p>
+        <h2 id="day-gallery-title">The day’s catalog<span aria-hidden="true">.</span></h2>
+        <p id="day-gallery-summary">Choose a day to browse its watched lots.</p>
+      </div>
+      <div class="day-gallery-header-actions">
+        <div class="day-gallery-day-nav" aria-label="Watched day navigation">
+          <button id="day-gallery-previous" type="button" aria-label="Previous day with watched lots">← Previous day</button>
+          <button id="day-gallery-next" type="button" aria-label="Next day with watched lots">Next day →</button>
+          <button id="day-gallery-browser-launch" class="day-gallery-browser-launch" type="button">Browse one by one →</button>
+        </div>
+        <nav class="month-nav day-gallery-month-nav" aria-label="Catalog month navigation">
+          <a href="?month={{ previous_month }}">← Previous month</a>
+          <a href="?month={{ next_month }}">Next month →</a>
+        </nav>
+      </div>
+    </header>
+    <div class="day-gallery-tools">
+      <div id="day-gallery-filters" class="day-gallery-filters" role="group" aria-label="Filter the day's lots"></div>
+      <label for="day-gallery-sort">Sort
+        <select id="day-gallery-sort" class="day-gallery-sort">
+          <option value="catalog">Catalog order</option>
+          <option value="artist">Artist A–Z</option>
+          <option value="house">Auction house</option>
+        </select>
+      </label>
+    </div>
+    <div class="day-gallery-count" aria-live="polite">
+      <span id="day-gallery-description">A catalog across auction houses</span>
+      <span id="day-gallery-results">0 lots</span>
+    </div>
+    <div id="day-gallery-grid" class="day-gallery-grid"></div>
+    <div class="day-gallery-pagination">
+      <button id="day-gallery-more" type="button" hidden>Show more lots</button>
+    </div>
+  </section>
+
   <dialog
     id="day-lot-browser"
     class="lot-browser"
@@ -239,9 +284,28 @@
   const lotBrowserPrevious = document.getElementById("lot-browser-previous");
   const lotBrowserNext = document.getElementById("lot-browser-next");
   const lotBrowserClose = document.getElementById("lot-browser-close");
+  const calendarLayout = document.getElementById("calendar-layout");
+  const calendarViewToggle = document.getElementById("calendar-view-toggle");
+  const catalogViewToggle = document.getElementById("catalog-view-toggle");
+  const galleryCatalog = document.getElementById("day-gallery-catalog");
+  const galleryDate = document.getElementById("day-gallery-date");
+  const gallerySummary = document.getElementById("day-gallery-summary");
+  const galleryFilters = document.getElementById("day-gallery-filters");
+  const gallerySort = document.getElementById("day-gallery-sort");
+  const galleryDescription = document.getElementById("day-gallery-description");
+  const galleryResults = document.getElementById("day-gallery-results");
+  const galleryGrid = document.getElementById("day-gallery-grid");
+  const galleryMore = document.getElementById("day-gallery-more");
+  const galleryPrevious = document.getElementById("day-gallery-previous");
+  const galleryNext = document.getElementById("day-gallery-next");
+  const galleryBrowserLaunch = document.getElementById("day-gallery-browser-launch");
   let selectedDay = "";
   let lotBrowserIndex = 0;
   let lotBrowserReturnFocus = null;
+  let galleryFilter = "all";
+  let galleryVisibleCount = 24;
+  let activeView = "calendar";
+  let sidebarRenderedDay = "";
   const updateEmailTrayCount = (count) => {
     document.querySelectorAll("[data-email-tray-count]").forEach((node) => {
       node.textContent = String(count);
@@ -478,6 +542,7 @@
         lot.email_tray_selected = Boolean(payload.selected);
         syncLotInstances(artpriceEditorInstances, lot.id, lot);
         updateEmailTrayCount(Number(payload.selected_count) || 0);
+        refreshGalleryLot(lot);
         trayStatus.textContent = payload.message;
         trayStatus.classList.add("is-success");
       } catch (error) {
@@ -538,6 +603,7 @@
         lot.email_tray_selected = Boolean(payload.email_tray_selected);
         syncLotInstances(artpriceEditorInstances, lot.id, lot);
         updateEmailTrayCount(Number(payload.selected_count) || 0);
+        refreshGalleryLot(lot);
         status.textContent = payload.message;
         status.classList.add("is-success");
         saveButton.textContent = "Saved";
@@ -1186,6 +1252,225 @@
     return lot.images.filter((url) => typeof url === "string" && url.trim());
   };
 
+  const galleryDays = Object.keys(data)
+    .filter((day) => (data[day] || []).length)
+    .sort();
+  const previousGalleryDay = () => galleryDays.filter((day) => day < selectedDay).pop();
+  const nextGalleryDay = () => galleryDays.find((day) => day > selectedDay);
+
+  const updateGalleryEmailButton = (button, lot) => {
+    button.setAttribute("aria-pressed", lot.email_tray_selected ? "true" : "false");
+    button.setAttribute(
+      "aria-label",
+      lot.artprice_url
+        ? `${lot.email_tray_selected ? "Remove" : "Add"} ${lot.title} ${lot.email_tray_selected ? "from" : "to"} the Email Tray`
+        : `Open ${lot.title} to save an Artprice link before adding it to the Email Tray`
+    );
+    button.title = lot.artprice_url
+      ? (lot.email_tray_selected ? "Remove from Email Tray" : "Add to Email Tray")
+      : "Save an Artprice link in Quick look to use the Email Tray";
+    button.textContent = lot.email_tray_selected ? "★" : "☆";
+  };
+
+  const visibleGalleryLots = () => {
+    const lots = (data[selectedDay] || []).map((lot, index) => ({lot, index}));
+    const filtered = lots.filter(({lot}) => {
+      if (galleryFilter === "tray") return Boolean(lot.email_tray_selected);
+      return galleryFilter === "all" || lot.auction_house === galleryFilter.slice(6);
+    });
+    if (gallerySort.value === "artist") {
+      filtered.sort((a, b) => a.lot.artist.localeCompare(b.lot.artist) || a.index - b.index);
+    } else if (gallerySort.value === "house") {
+      filtered.sort((a, b) => a.lot.auction_house.localeCompare(b.lot.auction_house) || a.index - b.index);
+    }
+    return filtered;
+  };
+
+  const renderGalleryFilters = () => {
+    const lots = data[selectedDay] || [];
+    const houseCounts = new Map();
+    lots.forEach((lot) => houseCounts.set(lot.auction_house, (houseCounts.get(lot.auction_house) || 0) + 1));
+    const choices = [
+      {key: "all", label: "All houses", count: houseCounts.size},
+      ...Array.from(houseCounts, ([house, count]) => ({key: `house:${house}`, label: house, count})),
+      {key: "tray", label: "Email Tray", count: lots.filter((lot) => lot.email_tray_selected).length},
+    ];
+    galleryFilters.replaceChildren();
+    choices.forEach(({key, label, count}) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "day-gallery-filter";
+      button.dataset.galleryFilter = key;
+      button.setAttribute("aria-pressed", String(galleryFilter === key));
+      button.textContent = label;
+      const number = document.createElement("span");
+      number.textContent = String(count);
+      button.appendChild(number);
+      button.addEventListener("click", () => {
+        galleryFilter = key;
+        galleryVisibleCount = 24;
+        renderGalleryFilters();
+        renderGalleryCards();
+        Array.from(galleryFilters.querySelectorAll("button"))
+          .find((candidate) => candidate.dataset.galleryFilter === key)?.focus({preventScroll: true});
+      });
+      galleryFilters.appendChild(button);
+    });
+  };
+
+  const galleryImage = (lot) => {
+    const images = lotImages(lot);
+    const fallback = document.createElement("span");
+    fallback.className = "day-gallery-placeholder";
+    fallback.setAttribute("role", "img");
+    fallback.setAttribute("aria-label", `No image available for ${lot.title}`);
+    fallback.textContent = "No lot image available";
+    if (!images.length) return [fallback];
+    const image = document.createElement("img");
+    image.className = "day-gallery-image";
+    image.src = images[0];
+    image.alt = `${lot.title}${lot.artist ? ` by ${lot.artist}` : ""}`;
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.referrerPolicy = "no-referrer";
+    fallback.hidden = true;
+    image.addEventListener("error", () => {
+      image.hidden = true;
+      fallback.hidden = false;
+    });
+    return [image, fallback];
+  };
+
+  const galleryCard = (lot, index) => {
+    const card = document.createElement("article");
+    card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}`;
+    const visual = document.createElement("div");
+    visual.className = "day-gallery-visual";
+    const open = document.createElement("button");
+    open.className = "day-gallery-open";
+    open.type = "button";
+    open.setAttribute("aria-label", `Quick look at ${lot.title}${lot.artist ? ` by ${lot.artist}` : ""}`);
+    open.append(...galleryImage(lot));
+    open.addEventListener("click", () => openLotBrowser(index));
+    visual.appendChild(open);
+    appendText(visual, "span", "day-gallery-lot-number", lot.lot_number ? `LOT ${lot.lot_number}` : "WATCHED LOT");
+    const emailButton = document.createElement("button");
+    emailButton.type = "button";
+    emailButton.className = "day-gallery-email";
+    emailButton.dataset.galleryEmailLotId = String(lot.id);
+    updateGalleryEmailButton(emailButton, lot);
+    emailButton.addEventListener("click", () => toggleGalleryEmail(lot, index, emailButton));
+    visual.appendChild(emailButton);
+    const caption = document.createElement("div");
+    caption.className = "day-gallery-caption";
+    const artist = document.createElement("div");
+    artist.className = "day-gallery-artist";
+    appendArtistLabel(artist, lot);
+    caption.appendChild(artist);
+    appendText(caption, "h3", "day-gallery-title", lot.title);
+    appendText(caption, "p", "day-gallery-meta", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
+    appendText(caption, "p", "day-gallery-meta", [lot.medium, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.time].filter(Boolean).join(" · "));
+    appendText(caption, "p", "day-gallery-estimate", lot.estimate);
+    appendText(caption, "p", "day-gallery-bid", lot.bid);
+    if (lot.ended) appendText(caption, "p", "day-gallery-ended", "Sale ended");
+    const actions = document.createElement("div");
+    actions.className = "day-gallery-actions";
+    const quickLook = document.createElement("button");
+    quickLook.type = "button";
+    quickLook.className = "day-gallery-quick-look";
+    quickLook.textContent = "Quick look ↗";
+    quickLook.addEventListener("click", () => openLotBrowser(index));
+    actions.appendChild(quickLook);
+    if (lot.url) actions.appendChild(externalLink(lot.url, "day-gallery-auction-link", "Auction ↗"));
+    caption.appendChild(actions);
+    card.append(visual, caption);
+    return card;
+  };
+
+  const renderGalleryCards = () => {
+    const lots = visibleGalleryLots();
+    galleryGrid.replaceChildren();
+    lots.slice(0, galleryVisibleCount).forEach(({lot, index}) => galleryGrid.appendChild(galleryCard(lot, index)));
+    if (!lots.length) {
+      appendText(galleryGrid, "p", "day-gallery-empty", galleryFilter === "tray"
+        ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Quick look, then add it to the tray."
+        : "No watched lots match this view.");
+    }
+    galleryDescription.textContent = galleryFilter === "all"
+      ? "A catalog across auction houses"
+      : galleryFilter === "tray" ? "Lots selected for the next email" : galleryFilter.slice(6);
+    galleryResults.textContent = lots.length
+      ? `Showing ${Math.min(galleryVisibleCount, lots.length)} of ${lots.length} watched lot${lots.length === 1 ? "" : "s"}`
+      : "0 watched lots";
+    galleryMore.hidden = galleryVisibleCount >= lots.length;
+    galleryMore.textContent = `Show ${Math.min(24, lots.length - galleryVisibleCount)} more lots`;
+  };
+
+  const renderGalleryCatalog = () => {
+    const lots = data[selectedDay] || [];
+    galleryDate.textContent = selectedDay
+      ? `Auction Calendar / ${formatCalendarDay(selectedDay, {weekday: "long", year: "numeric", month: "long", day: "numeric"})}`
+      : "Auction Calendar / Choose a date";
+    const houses = new Set(lots.map((lot) => lot.auction_house));
+    gallerySummary.textContent = `${lots.length} watched lot${lots.length === 1 ? "" : "s"} · ${houses.size} auction house${houses.size === 1 ? "" : "s"}`;
+    galleryPrevious.disabled = !previousGalleryDay();
+    galleryNext.disabled = !nextGalleryDay();
+    galleryBrowserLaunch.disabled = !lots.length;
+    if (galleryFilter !== "all" && galleryFilter !== "tray" && !houses.has(galleryFilter.slice(6))) galleryFilter = "all";
+    renderGalleryFilters();
+    renderGalleryCards();
+  };
+
+  const refreshGalleryLot = (lot) => {
+    if (activeView !== "catalog") return;
+    if (galleryFilter === "tray") {
+      renderGalleryCatalog();
+      return;
+    }
+    Array.from(galleryGrid.querySelectorAll("[data-gallery-email-lot-id]"))
+      .filter((button) => button.dataset.galleryEmailLotId === String(lot.id))
+      .forEach((button) => updateGalleryEmailButton(button, lot));
+    renderGalleryFilters();
+  };
+
+  const toggleGalleryEmail = async (lot, index, button) => {
+    if (!lot.artprice_url) {
+      openLotBrowser(index);
+      return;
+    }
+    const selected = !lot.email_tray_selected;
+    button.disabled = true;
+    try {
+      const response = await fetch(lot.email_tray_update_url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+          "X-CSRFToken": csrfToken,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: new URLSearchParams({selected: selected ? "true" : "false"}),
+      });
+      const responseType = response.headers.get("content-type") || "";
+      const payload = responseType.includes("application/json") ? await response.json() : {};
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "The Email Tray could not be updated.");
+      lot.email_tray_selected = Boolean(payload.selected);
+      syncLotInstances(artpriceEditorInstances, lot.id, lot);
+      updateEmailTrayCount(Number(payload.selected_count) || 0);
+      refreshGalleryLot(lot);
+      if (galleryFilter !== "tray") {
+        button.disabled = false;
+        button.focus({preventScroll: true});
+      } else {
+        Array.from(galleryFilters.querySelectorAll("button"))
+          .find((filter) => filter.dataset.galleryFilter === "tray")?.focus({preventScroll: true});
+      }
+    } catch (error) {
+      button.disabled = false;
+      window.alert(error instanceof Error ? error.message : "The Email Tray could not be updated.");
+    }
+  };
+
   const appendLotBrowserMedia = (lot) => {
     const media = document.createElement("div");
     media.className = "lot-browser-media";
@@ -1326,10 +1611,10 @@
     renderLotBrowser();
   };
 
-  const openLotBrowser = () => {
+  const openLotBrowser = (index = 0) => {
     const lots = data[selectedDay] || [];
     if (!lots.length) return;
-    lotBrowserIndex = 0;
+    lotBrowserIndex = Math.max(0, Math.min(index, lots.length - 1));
     lotBrowserReturnFocus = document.activeElement;
     renderLotBrowser();
     if (typeof lotBrowser.showModal === "function") {
@@ -1349,7 +1634,8 @@
     }
   };
 
-  lotBrowserLaunch.addEventListener("click", openLotBrowser);
+  lotBrowserLaunch.addEventListener("click", () => openLotBrowser());
+  galleryBrowserLaunch.addEventListener("click", () => openLotBrowser());
   lotBrowserClose.addEventListener("click", closeLotBrowser);
   lotBrowserPrevious.addEventListener("click", () => moveLotBrowser(-1));
   lotBrowserNext.addEventListener("click", () => moveLotBrowser(1));
@@ -1383,6 +1669,56 @@
       lotBrowserIndex = Math.max(0, (data[selectedDay] || []).length - 1);
       renderLotBrowser();
     }
+  });
+
+  const updateCalendarLocation = () => {
+    const url = new URL(window.location.href);
+    if (activeView === "catalog") url.searchParams.set("view", "catalog");
+    else url.searchParams.delete("view");
+    if (selectedDay) url.searchParams.set("day", selectedDay);
+    else url.searchParams.delete("day");
+    window.history.replaceState(window.history.state, "", url);
+    document.querySelectorAll(".month-nav a").forEach((link) => {
+      const monthUrl = new URL(link.href);
+      monthUrl.searchParams.delete("day");
+      if (activeView === "catalog") monthUrl.searchParams.set("view", "catalog");
+      else monthUrl.searchParams.delete("view");
+      link.href = monthUrl;
+    });
+  };
+
+  const setCalendarView = (view) => {
+    activeView = view === "catalog" ? "catalog" : "calendar";
+    calendarLayout.hidden = activeView !== "calendar";
+    galleryCatalog.hidden = activeView !== "catalog";
+    calendarViewToggle.setAttribute("aria-pressed", String(activeView === "calendar"));
+    catalogViewToggle.setAttribute("aria-pressed", String(activeView === "catalog"));
+    if (activeView === "catalog") renderGalleryCatalog();
+    else if (selectedDay && sidebarRenderedDay !== selectedDay) renderSidebarLots(data[selectedDay] || []);
+    updateCalendarLocation();
+  };
+
+  calendarViewToggle.addEventListener("click", () => setCalendarView("calendar"));
+  catalogViewToggle.addEventListener("click", () => setCalendarView("catalog"));
+  gallerySort.addEventListener("change", () => {
+    galleryVisibleCount = 24;
+    renderGalleryCards();
+  });
+  galleryMore.addEventListener("click", () => {
+    const previousCount = galleryVisibleCount;
+    galleryVisibleCount += 24;
+    renderGalleryCards();
+    if (galleryMore.hidden) {
+      galleryGrid.querySelectorAll(".day-gallery-open")[previousCount]?.focus({preventScroll: true});
+    }
+  });
+  galleryPrevious.addEventListener("click", () => {
+    const day = previousGalleryDay();
+    if (day) showDay(day);
+  });
+  galleryNext.addEventListener("click", () => {
+    const day = nextGalleryDay();
+    if (day) showDay(day);
   });
 
   const renderDaySales = (isoDate) => {
@@ -1422,25 +1758,9 @@
     });
   };
 
-  const showDay = (isoDate) => {
-    selectedDay = isoDate;
-    const dayLabel = formatCalendarDay(isoDate, {weekday: "long", year: "numeric", month: "long", day: "numeric"});
-    title.textContent = dayLabel;
-    renderDaySales(isoDate);
+  const renderSidebarLots = (lots) => {
     list.replaceChildren();
-    dayButtons.forEach((button) => {
-      const selected = button.dataset.calendarDay === isoDate;
-      button.classList.toggle("is-selected", selected);
-      button.setAttribute("aria-selected", selected ? "true" : "false");
-    });
-
-    const lots = data[isoDate] || [];
-    lotBrowserLaunch.hidden = !lots.length;
-    lotBrowserLaunch.textContent = lots.length === 1 ? "Browse this lot" : `Browse all ${lots.length} lots`;
-    lotBrowserLaunch.setAttribute(
-      "aria-label",
-      lots.length === 1 ? `Browse the lot for ${dayLabel}` : `Browse all ${lots.length} lots for ${dayLabel}`
-    );
+    sidebarRenderedDay = selectedDay;
     if (!lots.length) {
       appendText(list, "p", "sidebar-empty", "No suggested lots on this date.");
       return;
@@ -1470,6 +1790,35 @@
     });
   };
 
+  const showDay = (isoDate) => {
+    if (selectedDay !== isoDate) {
+      galleryFilter = "all";
+      galleryVisibleCount = 24;
+      sidebarRenderedDay = "";
+      if (activeView === "catalog") list.replaceChildren();
+    }
+    selectedDay = isoDate;
+    const dayLabel = formatCalendarDay(isoDate, {weekday: "long", year: "numeric", month: "long", day: "numeric"});
+    title.textContent = dayLabel;
+    renderDaySales(isoDate);
+    dayButtons.forEach((button) => {
+      const selected = button.dataset.calendarDay === isoDate;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-selected", selected ? "true" : "false");
+    });
+
+    const lots = data[isoDate] || [];
+    lotBrowserLaunch.hidden = !lots.length;
+    lotBrowserLaunch.textContent = lots.length === 1 ? "Browse this lot" : `Browse all ${lots.length} lots`;
+    lotBrowserLaunch.setAttribute(
+      "aria-label",
+      lots.length === 1 ? `Browse the lot for ${dayLabel}` : `Browse all ${lots.length} lots for ${dayLabel}`
+    );
+    if (activeView === "catalog") renderGalleryCatalog();
+    else renderSidebarLots(lots);
+    updateCalendarLocation();
+  };
+
   document.querySelectorAll("[data-calendar-day]").forEach((button) => {
     button.addEventListener("click", () => {
       showDay(button.dataset.calendarDay);
@@ -1485,7 +1834,13 @@
   });
 
   const initialDay = "{{ initial_day|escapejs }}";
-  if (initialDay) showDay(initialDay);
+  const requestedView = new URLSearchParams(window.location.search).get("view");
+  const requestedDay = new URLSearchParams(window.location.search).get("day");
+  const validRequestedDay = requestedDay && /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
+    && (Object.hasOwn(data, requestedDay) || dayButtons.some((button) => button.dataset.calendarDay === requestedDay));
+  activeView = requestedView === "catalog" ? "catalog" : "calendar";
+  if (validRequestedDay || initialDay) showDay(validRequestedDay ? requestedDay : initialDay);
+  setCalendarView(requestedView);
 })();
 </script>
 {% endblock %}

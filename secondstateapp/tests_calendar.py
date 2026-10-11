@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import re
 from datetime import datetime
 from decimal import Decimal
 from io import StringIO
@@ -567,6 +568,74 @@ class AuctionCalendarViewTests(TestCase):
         self.assertContains(response, 'image.referrerPolicy = "no-referrer"')
         self.assertContains(response, "moveLotBrowser(-1)")
         self.assertEqual(response.context["weeks"][0][0]["date"].weekday(), 0)
+
+    def test_gallery_catalog_is_available_beside_the_calendar_and_lot_browser(self):
+        watch_lot()
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        self.assertEqual(response.status_code, 200)
+        for element_id in (
+            "calendar-view-toggle",
+            "catalog-view-toggle",
+            "calendar-layout",
+            "day-gallery-catalog",
+            "day-gallery-grid",
+            "day-lot-browser",
+            "day-lot-browser-launch",
+        ):
+            with self.subTest(element_id=element_id):
+                self.assertContains(response, f'id="{element_id}"')
+
+    def test_gallery_catalog_receives_the_selected_day_lots_from_multiple_houses(self):
+        artist_url = "https://www.artprice.com/artist/15155/alex-katz/lots/pasts?idcategory=2"
+        artist = AuctionWatchArtist.objects.create(
+            name="Alex Katz",
+            normalized_name="alex katz",
+            artprice_url=artist_url,
+        )
+        image_url = "https://image.invaluable.com/housePhotos/Bonhams/catalog-lot.jpg"
+        linked_lot = watch_lot(
+            source_lot_id="catalog-heritage",
+            auction_house="Heritage Auctions",
+            artist="Alex Katz",
+            artist_watchlist_name="Alex Katz",
+            watchlist_artist=artist,
+            image_url=image_url,
+        )
+        second_house_lot = watch_lot(
+            source_lot_id="catalog-chiswick",
+            auction_house="Chiswick Auctions",
+            artist="David Hockney",
+            artist_watchlist_name="David Hockney",
+            image_url="",
+        )
+        next_day_lot = watch_lot(
+            source_lot_id="catalog-next-day",
+            auction_house="Bonhams",
+            event_at=datetime(2026, 7, 26, 13, 30, tzinfo=CALENDAR_ZONE),
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        match = re.search(
+            r'<script id="auction-calendar-data" type="application/json">(.*?)</script>',
+            response.content.decode(),
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        rendered_days = json.loads(match.group(1))
+        selected_day = {lot["id"]: lot for lot in rendered_days["2026-07-25"]}
+        self.assertEqual(set(selected_day), {linked_lot.pk, second_house_lot.pk})
+        self.assertEqual(selected_day[linked_lot.pk]["auction_house"], "Heritage Auctions")
+        self.assertEqual(selected_day[linked_lot.pk]["artist_artprice_url"], artist_url)
+        self.assertEqual(selected_day[linked_lot.pk]["images"], [image_url])
+        self.assertEqual(selected_day[second_house_lot.pk]["auction_house"], "Chiswick Auctions")
+        self.assertEqual(selected_day[second_house_lot.pk]["artist_artprice_url"], "")
+        self.assertEqual(selected_day[second_house_lot.pk]["images"], [])
+        self.assertEqual([lot["id"] for lot in rendered_days["2026-07-26"]], [next_day_lot.pk])
 
     def test_selected_day_lists_every_distinct_sale_before_lot_browser(self):
         sale_titles = [
