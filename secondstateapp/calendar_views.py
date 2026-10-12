@@ -49,6 +49,7 @@ from .calendar_images import (
 )
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
 from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, normalize_candidate
+from .liveart_search import merge_search_lots, parse_search_terms, search_query_limits
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -1153,6 +1154,10 @@ def auction_lot_artprice_analysis(request, lot_id: int):
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
 
+def _liveart_search_context(research: dict) -> dict:
+    return {key: research[key] for key in ("search_terms_used", "search_summary", "search_title_used") if key in research}
+
+
 def _liveart_analysis_json(analysis: LiveArtResaleAnalysis) -> dict:
     analysis = _refresh_saved_resale_from_artprice(analysis.lot, allow_unestimable=True) or analysis
     return {
@@ -1171,6 +1176,7 @@ def _liveart_analysis_json(analysis: LiveArtResaleAnalysis) -> dict:
         "created_at": analysis.created_at.isoformat(),
         "updated_at": analysis.updated_at.isoformat(),
         "estimate_notice": "Resale values and maximum hammer bids are estimates, not guaranteed profit.",
+        **_liveart_search_context(analysis.search_context or {}),
     }
 
 
@@ -1215,7 +1221,52 @@ def _add_liveart_du(total: float | None, page) -> float | None:
     return total + cost if total is not None and cost is not None else None
 
 
-def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "", search_title: str = "") -> dict:
+def _research_liveart_terms(lot, client, *, artist_id, terms: tuple[str, ...], units: float | None) -> dict:
+    raw_comps = []
+    summary = []
+    for term, limit in zip(terms, search_query_limits(len(terms))):
+        page = client.list_lots(
+            artist_id=artist_id, status="sold", search=term, sort="SALE_DATE_DESC", limit=limit,
+        )
+        units = _add_liveart_du(units, page)
+        rows = page.items[:limit]
+        raw_comps.extend({**item, "_retrieved_at": page.retrieved_at, "_search_terms": [term]} for item in rows)
+        result = {
+            "term": term, "returned_count": len(rows),
+            "has_more": bool(page.has_more or len(page.items) > limit),
+        }
+        if page.total_count is not None:
+            result["total_count"] = page.total_count
+        summary.append(result)
+    candidates = []
+    for raw in merge_search_lots(raw_comps):
+        candidate = normalize_candidate(raw, None, lot)
+        # A query discovers candidate sales, not verified artwork identities.
+        # Every result needs an explicit selection even if its title matches.
+        candidate["selected"] = False
+        candidate["match_type"] = "related_work"
+        candidate["search_terms"] = raw["_search_terms"]
+        candidate["match_notes"] = [
+            *(candidate.get("match_notes") or []),
+            "Found by a search term; review the work before selecting this sale",
+        ]
+        candidates.append(candidate)
+    candidates.sort(key=lambda item: str(item.get("sale_date") or ""), reverse=True)
+    return {
+        "subject_matches": [], "subject_match": None, "candidates": candidates,
+        "selected_ids": [], "retrieved_at": timezone.now().isoformat(),
+        "data_units_spent": units, "requires_subject_choice": False,
+        "search_terms_used": list(terms), "search_summary": summary,
+        "message": (
+            f"Found {len(candidates)} distinct sold results across {len(terms)} search terms; review and select sales to use."
+            if candidates else "No sold results were returned for these search terms and this artist."
+        ),
+    }
+
+
+def _research_liveart_lot(
+    lot: AuctionWatchLot, *, subject_id: str = "", search_title: str = "", search_terms: tuple[str, ...] = (),
+) -> dict:
     artist_name = (lot.artist or lot.artist_watchlist_name or "").strip()
     if not artist_name or not lot.title.strip():
         raise ValueError("This Calendar lot needs an artist and title for LiveArt research.")
@@ -1245,9 +1296,12 @@ def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "", search_
             "data_units_spent": units,
             "requires_subject_choice": False,
             "message": "No LiveArt artist matched this Calendar artist. No sold prices were used.",
+            **({"search_terms_used": list(search_terms), "search_summary": []} if search_terms else {}),
         }
 
     artist_id = artist["id"]
+    if search_terms:
+        return _research_liveart_terms(lot, client, artist_id=artist_id, terms=search_terms, units=units)
     artwork_page = client.list_artworks(artist_id=artist_id, search=title_query[:200], limit=5)
     units = _add_liveart_du(units, artwork_page)
     matches = artwork_matches(
@@ -1350,7 +1404,10 @@ def auction_lot_liveart_research(request, lot_id: int):
         if not isinstance(raw_search_title, str) or len(raw_search_title.strip()) > 200:
             raise ValueError("Invalid LiveArt title variant.")
         search_title = raw_search_title.strip()
-        research = _research_liveart_lot(lot, subject_id=subject_id, search_title=search_title)
+        search_terms = parse_search_terms(payload.get("search_terms", ""))
+        if search_terms and subject_id:
+            raise ValueError("Select sales directly from term search results; an artwork reference cannot be chosen for this search.")
+        research = _research_liveart_lot(lot, subject_id=subject_id, search_title=search_title, search_terms=search_terms)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"ok": False, "error": "Research request must be valid JSON."}, status=400)
     except LiveArtConfigurationError as exc:
@@ -1429,6 +1486,7 @@ def auction_lot_liveart_analysis(request, lot_id: int):
             "candidates": existing.candidates,
             "retrieved_at": existing.retrieved_at.isoformat(),
             "data_units_spent": existing.data_units_spent,
+            **_liveart_search_context(existing.search_context or {}),
         }
     if not research_id and not isinstance(research, dict) and AuctionMaxBidAnalysis.objects.filter(lot=lot).exists():
         research = {
@@ -1471,6 +1529,7 @@ def auction_lot_liveart_analysis(request, lot_id: int):
         "assumptions": normalized_assumptions,
         "scenarios": scenarios,
         "source_summary": source_summary,
+        "search_context": _liveart_search_context(research),
         "retrieved_at": retrieved_at,
         "data_units_spent": research.get("data_units_spent"),
         "created_by": request.user,

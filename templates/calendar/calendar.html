@@ -650,7 +650,7 @@
     heading.textContent = "Sold comps for resale bids";
     const intro = document.createElement("p");
     intro.className = "artprice-analysis-intro";
-    intro.textContent = "USD sales with a matching named artist from saved Artprice HTML are preselected for resale bids, up to the 25 sale limit. Review the records below and uncheck any sale you want to exclude; then save to recalculate. LiveArt sales of this work and similar works can be added. Each LiveArt search is capped at 4 requests and 40 Data Units.";
+    intro.textContent = "USD sales with a matching named artist from saved Artprice HTML are preselected for resale bids, up to the 25 sale limit. Review the records below and uncheck any sale you want to exclude; then save to recalculate. LiveArt term searches combine up to 5 words or quoted phrases and retrieve up to 20 sold records in total. Review and select the relevant sales before saving.";
     const searchFacts = document.createElement("p");
     searchFacts.className = "liveart-search-facts";
     searchFacts.textContent = `LiveArt search: ${[
@@ -663,7 +663,7 @@
     const findButton = document.createElement("button");
     findButton.type = "button";
     findButton.className = "is-primary";
-    findButton.textContent = "Search artwork again";
+    findButton.textContent = "Search LiveArt again";
     findButton.hidden = true;
     actions.appendChild(findButton);
     const status = document.createElement("p");
@@ -752,6 +752,7 @@
     let refreshQueued = false;
     let hasUnsavedChanges = false;
     let currentSubjectMatches = [];
+    let currentSearchInfo = {};
     let pendingSourceRefresh = false;
     let sourceRefreshVersion = 0;
 
@@ -765,6 +766,12 @@
       const artpriceCount = candidates.filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html").length;
       const liveartCount = candidates.length - artpriceCount;
       const parts = [];
+      const searchTerms = Array.isArray(data?.search_terms_used) ? data.search_terms_used
+        : [...new Set(candidates.flatMap((candidate) => Array.isArray(candidate.search_terms) ? candidate.search_terms : []))];
+      if (searchTerms.length) parts.push(`LiveArt searches: ${searchTerms.map((term) => `“${term}”`).join(" OR ")}.`);
+      if (Array.isArray(data?.search_summary) && data.search_summary.length) {
+        parts.push(data.search_summary.map((query) => `“${query.term}”: ${query.returned_count} returned${query.has_more ? " (more available; refine this term)" : ""}`).join("; ") + ".");
+      }
       if (artpriceCount) {
         const filenames = [...new Set(candidates
           .filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html")
@@ -773,7 +780,7 @@
         parts.push(`${artpriceCount} unique Artprice HTML sale${artpriceCount === 1 ? "" : "s"} ingested${filenames.length ? ` from ${filenames.join(", ")}` : " from saved files"}.`);
       }
       if (liveartCount) parts.push(`${liveartCount} LiveArt sale${liveartCount === 1 ? "" : "s"} retrieved ${formatAnalysisTimestamp(data?.retrieved_at || researchRetrievedAt)}.`);
-      if (liveartCount && data?.data_units_spent != null) parts.push(`${data.data_units_spent} LiveArt Data Units used in ${saved ? "saved research" : "this search"}.`);
+      if (data?.data_units_spent != null) parts.push(`${data.data_units_spent} LiveArt Data Units used in ${saved ? "saved research" : "this search"}.`);
       if (candidates.length) parts.push("Only eligible USD hammer prices enter resale estimates; premiums and estimates are excluded.");
       return parts.join(" ");
     };
@@ -839,7 +846,8 @@
         if (candidate.match_type === "exact_work" || candidate.match_type === "related_work") {
           const relationship = document.createElement("span");
           relationship.className = `liveart-work-type is-${candidate.match_type}`;
-          relationship.textContent = candidate.match_type === "exact_work" ? "This work" : "Similar work";
+          relationship.textContent = candidate.match_type === "exact_work" ? "This work"
+            : candidate.search_terms?.length ? "Search result" : "Similar work";
           top.appendChild(relationship);
         }
       }
@@ -859,7 +867,7 @@
         choose.dataset.canChoose = String(Boolean(candidate.can_choose));
         choose.textContent = candidate.verified ? "Research this artwork"
           : candidate.can_choose ? "Review and research this artwork" : "Artwork match unverified";
-        choose.addEventListener("click", () => performResearch(candidate.id));
+        choose.addEventListener("click", () => performResearch(candidate.id, candidate.matched_title || ""));
         top.appendChild(choose);
       }
       card.appendChild(top);
@@ -921,6 +929,9 @@
         appendFact(facts, "Source record ID", candidate.source_id || candidate.id);
       } else {
         appendFact(facts, "Sale status", candidate.status);
+        if (Array.isArray(candidate.search_terms) && candidate.search_terms.length) {
+          appendFact(facts, "Found by search", candidate.search_terms.join(" · "));
+        }
       }
       appendFact(facts, "Sale date", date);
       appendFact(facts, "Auction house", house);
@@ -997,7 +1008,9 @@
       } else if (hasResearch && currentCandidates.some((candidate) => candidate.provider !== "Artprice")) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
-        note.textContent = "No exact artwork reference was found. Review the similar sold works below and their differences before using them.";
+        note.textContent = currentCandidates.some((candidate) => candidate.search_terms?.length)
+          ? "These searches match words in titles or catalogue descriptions. Review the artwork, medium, edition, and sale details before selecting comparables."
+          : "No exact artwork reference was found. Review the similar sold works below and their differences before using them.";
         subjectResults.appendChild(note);
       }
       if (!hasResearch) return;
@@ -1014,7 +1027,7 @@
       }
       const groups = [
         ["exact_work", "Sales of this work", "An artwork ID can cover different print impressions. Check edition, signature, size, and condition for each sale."],
-        ["related_work", "Similar sold works", "Compare the medium, edition, signature, size, and condition before selecting a sale."],
+        ["related_work", currentCandidates.some((candidate) => candidate.search_terms?.length) ? "LiveArt term search results" : "Similar sold works", "Compare the medium, edition, signature, size, and condition before selecting a sale."],
         ["artprice_html", "Saved Artprice HTML sales", "These sold records combine your saved HTML files. Overlapping sales count once. Review each date, price, source file, and missing detail."],
         ["other", "Other candidate sold results", "Review the artwork identity and sale details before selecting a sale."],
       ];
@@ -1202,6 +1215,7 @@
     const applyAnalysis = (analysis) => {
       hasUnsavedChanges = false;
       currentAnalysis = analysis || null;
+      currentSearchInfo = {search_terms_used: analysis?.search_terms_used, search_summary: analysis?.search_summary, data_units_spent: analysis?.data_units_spent};
       currentResearchId = "";
       if (analysis) {
         currentCandidates = Array.isArray(analysis.candidates) ? analysis.candidates : [];
@@ -1275,23 +1289,23 @@
       }
       await load();
     };
-    const performResearch = async (subjectId = null) => {
+    const performResearch = async (subjectId = null, subjectTitle = "") => {
       if (busy || !lot.liveart_research_url) return;
-      const searchTitle = options.titleVariantInput?.value.trim() || "";
-      if (searchTitle.length > 200) {
-        options.titleVariantInput.setCustomValidity("Title variant must be 200 characters or fewer.");
+      const searchTerms = options.titleVariantInput?.value.trim() || "";
+      if (subjectId === null && searchTerms.length > 200) {
+        options.titleVariantInput.setCustomValidity("Search terms must be 200 characters or fewer.");
         options.titleVariantInput.reportValidity();
         return;
       }
       if (options.titleVariantInput) options.titleVariantInput.setCustomValidity("");
       setBusy(true);
-      setStatus("Searching LiveArt artwork and sold records…", "loading");
+      setStatus(subjectId === null && searchTerms ? "Searching LiveArt sold records for each term…" : "Searching LiveArt artwork and sold records…", "loading");
       try {
         const payload = await requestAnalysisJson(lot.liveart_research_url, {
           method: "POST",
           credentials: "same-origin",
           headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
-          body: JSON.stringify({...(subjectId === null ? {} : {subject_id: subjectId}), search_title: searchTitle}),
+          body: JSON.stringify(subjectId === null ? {search_terms: searchTerms} : {subject_id: subjectId, search_title: subjectTitle}),
         }, "LiveArt research could not be completed.");
         const previousArtpriceIds = new Set(currentCandidates
           .filter(isArtpriceCandidate).map(candidateSelectionKey));
@@ -1309,6 +1323,7 @@
         currentResearchId = payload.research_id || "";
         researchRetrievedAt = payload.retrieved_at || "";
         hasResearch = true;
+        currentSearchInfo = {search_terms_used: payload.search_terms_used, search_summary: payload.search_summary, data_units_spent: payload.data_units_spent};
         subjectNeedsChoice = Boolean(payload.requires_subject_choice);
         findButton.hidden = false;
         const subjectMatches = Array.isArray(payload.subject_matches) ? payload.subject_matches : (payload.subject_match ? [payload.subject_match] : []);
@@ -1359,6 +1374,8 @@
           headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
           body: JSON.stringify(requestData),
         }, "The resale bid analysis could not be saved.");
+        currentResearchId = "";
+        hasUnsavedChanges = false;
         if (pendingSourceRefresh) {
           liveartAnalysisCache.delete(String(lot.id));
           refreshQueued = true;
@@ -1425,6 +1442,7 @@
         hasResearch,
         subjectNeedsChoice,
         subjectMatches: currentSubjectMatches,
+        searchInfo: currentSearchInfo,
         costs: Object.fromEntries(costDefinitions.map(([name]) => [name, costFields[name].value])),
       } : null;
       pendingSourceRefresh = false;
@@ -1448,8 +1466,9 @@
         researchRetrievedAt = pending.retrievedAt;
         hasResearch = pending.hasResearch || currentCandidates.length > 0;
         subjectNeedsChoice = pending.subjectNeedsChoice;
+        currentSearchInfo = pending.searchInfo;
         costDefinitions.forEach(([name]) => { costFields[name].value = pending.costs[name]; });
-        sourceMeta.textContent = describeSources({candidates: currentCandidates, retrieved_at: researchRetrievedAt}, false);
+        sourceMeta.textContent = describeSources({...currentSearchInfo, candidates: currentCandidates, retrieved_at: researchRetrievedAt}, false);
         renderCandidates(pending.subjectMatches);
         markAnalysisPending("Artprice files updated. Your unsaved research, selections, and costs are retained. Save the resale bid analysis to recalculate.");
         updateButtons();
@@ -1661,13 +1680,13 @@
     titleVariantField.className = "artprice-analysis-field liveart-title-variant-field";
     const titleVariantLabel = document.createElement("label");
     titleVariantLabel.htmlFor = `${idPrefix}liveart-title-variant-${lot.id}`;
-    titleVariantLabel.textContent = "LiveArt title variant (optional)";
+    titleVariantLabel.textContent = "LiveArt search terms (optional)";
     const titleVariantInput = document.createElement("input");
     titleVariantInput.id = titleVariantLabel.htmlFor;
     titleVariantInput.type = "text";
     titleVariantInput.maxLength = 200;
     titleVariantInput.autocomplete = "off";
-    titleVariantInput.placeholder = "English translation or alternate title";
+    titleVariantInput.placeholder = 'Boomerangs Stabiles or "Very Gay Nose and Ears"';
     titleVariantInput.value = liveartTitleVariants.get(String(lot.id)) || "";
     titleVariantInput.dataset.liveartTitleVariantLot = String(lot.id);
     titleVariantInput.addEventListener("input", () => {
@@ -1686,7 +1705,9 @@
       }
     });
     const titleVariantHint = document.createElement("small");
-    titleVariantHint.textContent = "An English translation or alternate spelling replaces the Calendar title for the next LiveArt search. Review returned artworks before selecting.";
+    titleVariantHint.id = `${titleVariantInput.id}-hint`;
+    titleVariantInput.setAttribute("aria-describedby", titleVariantHint.id);
+    titleVariantHint.textContent = 'Each word is a separate search; results from any word are combined. Use double quotes for a phrase, such as "Very Gay Nose and Ears". Up to 5 terms or phrases. Leave blank to search the Calendar title.';
     titleVariantField.append(titleVariantLabel, titleVariantInput, titleVariantHint);
     const recalculateButton = document.createElement("button");
     recalculateButton.type = "button";

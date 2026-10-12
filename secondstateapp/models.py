@@ -290,6 +290,7 @@ class LiveArtResaleAnalysis(models.Model):
     assumptions = models.JSONField(default=dict, blank=True)
     scenarios = models.JSONField(default=list, blank=True)
     source_summary = models.JSONField(default=dict, blank=True)
+    search_context = models.JSONField(default=dict, blank=True)
     retrieved_at = models.DateTimeField()
     data_units_spent = models.DecimalField(max_digits=8, decimal_places=1, null=True, blank=True)
     created_by = models.ForeignKey(
