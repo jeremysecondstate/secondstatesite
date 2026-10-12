@@ -50,6 +50,8 @@ The database permits only one active `draft`, `sending`, or `failed` batch. A se
 
 Staff can expand **Artprice Max-Bid Analysis** beneath a lot's Artprice editor. Upload a saved USD Artprice `.html` or `.htm` results page (maximum 5 MB), review the normalized comparable records and assumptions, and calculate maximum hammer bids. Raw uploaded HTML is parsed in memory and is never stored or rendered. Saved normalized analysis remains attached during later watchlist syncs.
 
+The same normalized sold records feed **Sold comps for resale bids**. USD Artprice hammer sales with a matching named artist are preselected up to the 25-sale limit, alongside any selected LiveArt sales. Staff can uncheck individual records, manually select rows whose artist is missing, and save updated bids. The saved resale analysis displays how many Artprice records were ingested, eligible for automatic selection, selected, and actually used, including any overlap counted once across sources. The source filename appears with those counts.
+
 ## Website and desktop sync configuration
 
 The website and desktop process must use the same `CATALOG_API_KEY`. Production sync requires HTTPS; plain HTTP is accepted only for localhost testing.

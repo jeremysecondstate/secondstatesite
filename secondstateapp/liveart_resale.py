@@ -629,9 +629,65 @@ def _rows(resale: Decimal, assumptions: dict[str, Any]) -> tuple[str, list[dict[
     return _display_money(net), rows
 
 
+def _comparable_date(value: Any) -> date | None:
+    text = _text(value)
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        pass
+    for format_string in ("%d %b %Y", "%d %B %Y"):
+        try:
+            return datetime.strptime(text, format_string).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _same_sale(artprice: Mapping[str, Any], liveart: Mapping[str, Any]) -> bool:
+    """Require a matching date plus strong sale details before dropping an overlap."""
+
+    artprice_date = _comparable_date(artprice.get("sale_date"))
+    if artprice_date is None or artprice_date != _comparable_date(liveart.get("sale_date")):
+        return False
+    house = _key(artprice.get("auction_house"))
+    if not house or house != _key(liveart.get("auction_house")):
+        return False
+    lot = _key(artprice.get("lot_number"))
+    liveart_lot = _key(liveart.get("lot_number"))
+    if lot and liveart_lot:
+        return lot == liveart_lot
+    title = _key(artprice.get("title"))
+    if not title or title in {"untitled", "composition", "abstract"} or title != _key(liveart.get("title")):
+        return False
+    try:
+        artprice_hammer = Decimal(str(artprice.get("hammer_usd")))
+        liveart_hammer = Decimal(str(liveart.get("hammer_usd")))
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+    if not (artprice_hammer.is_finite() and liveart_hammer.is_finite()):
+        return False
+    return abs(artprice_hammer - liveart_hammer) <= max(artprice_hammer, liveart_hammer) * Decimal("0.02")
+
+
 def build_scenarios(
     candidates: list[Mapping[str, Any]], selected_ids: list[str | int], assumptions: Mapping[str, Any] | None
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    normalized, scenarios, _summary = build_scenarios_with_sources(candidates, selected_ids, assumptions)
+    return normalized, scenarios
+
+
+def build_scenarios_with_sources(
+    candidates: list[Mapping[str, Any]],
+    selected_ids: list[str | int],
+    assumptions: Mapping[str, Any] | None,
+    *,
+    artprice_sold_count: int | None = None,
+    artprice_source_filename: str | None = None,
+    artprice_analysis_updated_at: str | None = None,
+    allow_unestimable: bool = False,
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     """Calculate scenario maximum hammer bids from selected verified sales.
 
     A selected candidate may have a visible medium/edition mismatch, but it
@@ -664,6 +720,8 @@ def build_scenarios(
 
     selected = {str(item) for item in selected_ids}
     values: list[Decimal] = []
+    liveart_sales: list[Mapping[str, Any]] = []
+    artprice_sales: list[tuple[Mapping[str, Any], Decimal]] = []
     for candidate in candidates:
         if str(candidate.get("id")) not in selected or candidate.get("status") != "sold":
             continue
@@ -674,15 +732,56 @@ def build_scenarios(
         except (InvalidOperation, TypeError, ValueError):
             continue
         if hammer.is_finite() and 0 < hammer <= MAX_MONEY:
-            values.append(hammer)
+            if candidate.get("provider") == "Artprice":
+                artprice_sales.append((candidate, hammer))
+            else:
+                values.append(hammer)
+                liveart_sales.append(candidate)
+    artprice_included_count = 0
+    artprice_duplicate_count = 0
+    for candidate, hammer in artprice_sales:
+        if any(_same_sale(candidate, liveart) for liveart in liveart_sales):
+            artprice_duplicate_count += 1
+            continue
+        values.append(hammer)
+        artprice_included_count += 1
+    source_summary = {
+        "liveart_selected_count": len(liveart_sales),
+        "artprice_sold_count": artprice_sold_count if artprice_sold_count is not None else sum(
+            1 for item in candidates if item.get("provider") == "Artprice"
+        ),
+        "artprice_eligible_count": sum(
+            1 for item in candidates
+            if item.get("provider") == "Artprice" and item.get("status") == "sold"
+            and item.get("credible") is True and bool(_text(item.get("artist")))
+        ),
+        "artprice_selected_count": len(artprice_sales),
+        "artprice_included_count": artprice_included_count,
+        "artprice_duplicate_count": artprice_duplicate_count,
+        "artprice_source_filename": artprice_source_filename,
+        "artprice_analysis_updated_at": artprice_analysis_updated_at,
+        "combined_comp_count": len(values),
+    }
     if not values:
-        return merged, []
+        return merged, [], source_summary
 
+    if artprice_included_count and liveart_sales:
+        source_label = "selected LiveArt and saved Artprice sold USD hammers"
+    elif artprice_included_count:
+        source_label = "saved Artprice sold USD hammers"
+    else:
+        source_label = "selected LiveArt sold USD hammers"
     estimates = (
-        ("downside", min(values) * downside, f"{downside:.0%} of the lowest selected sold USD hammer"),
-        ("typical", Decimal(str(median(values))), "Median selected sold USD hammer"),
-        ("upside", max(values) * upside, f"{upside:.0%} of the highest selected sold USD hammer"),
+        ("downside", min(values) * downside, f"{downside:.0%} of the lowest {source_label}"),
+        ("typical", Decimal(str(median(values))), f"Median of {source_label}"),
+        ("upside", max(values) * upside, f"{upside:.0%} of the highest {source_label}"),
     )
+    if any(resale > MAX_MONEY for _name, resale, _basis in estimates):
+        message = "Combined resale estimate exceeds the supported range."
+        if allow_unestimable:
+            source_summary["calculation_error"] = message
+            return merged, [], source_summary
+        raise ArtpriceAnalysisError(message)
     scenarios = []
     for name, resale, basis in estimates:
         net, rows = _rows(resale, merged)
@@ -700,4 +799,4 @@ def build_scenarios(
                 "estimate_notice": "Resale and maximum hammer bids are estimates, not guaranteed profit.",
             }
         )
-    return merged, scenarios
+    return merged, scenarios, source_summary

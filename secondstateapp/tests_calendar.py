@@ -18,6 +18,7 @@ from django.urls import reverse
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_sync import CalendarSyncError, sync_watchlist_lots
 from secondstateapp.artprice_max_bid import (
+    ArtpriceAnalysisError,
     analyze_artprice_comparables,
     analyze_artprice_html,
     calculate_bid_rows,
@@ -27,7 +28,7 @@ from secondstateapp.artprice_max_bid import (
     parse_auction_results,
 )
 from secondstateapp.auction_email import GMAIL_SEND_SCOPE, build_mime_message, compose_auction_email, send_auction_email
-from secondstateapp.calendar_views import _uploaded_artprice_html
+from secondstateapp.calendar_views import _selected_resale_ids, _uploaded_artprice_html
 from secondstateapp.liveart_client import LiveArtAPIError
 from secondstateapp.models import (
     AuctionEmailBatch,
@@ -1465,6 +1466,7 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
             "sale_date": "26 Mar 2026",
             "hammer_price": hammer,
             "auction_house": "Dawson's",
+            "artist": self.lot.artist,
             "title": title or self.lot.title,
             "lot_number": "42",
             "estimate_low": "1000.00",
@@ -1687,8 +1689,8 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
         self.assertEqual(artprice_comp["hammer_usd"], "2000.00")
         self.assertEqual(artprice_comp["status"], "sold")
         self.assertTrue(artprice_comp["credible"])
-        self.assertFalse(artprice_comp["selected"])
-        self.assertNotIn(artprice_comp["id"], payload["selected_ids"])
+        self.assertTrue(artprice_comp["selected"])
+        self.assertIn(artprice_comp["id"], payload["selected_ids"])
         self.assertIn("sold-comp", {item["id"] for item in payload["candidates"]})
 
         saved = self.save(["sold-comp", artprice_comp["id"]], research_id=payload["research_id"])
@@ -1714,7 +1716,9 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
                 item for item in pool["candidates"] if item["provider"] == "Artprice"
             )
             self.assertEqual(artprice_comp["hammer_usd"], "2000.00")
-            self.assertFalse(artprice_comp["selected"])
+            self.assertTrue(artprice_comp["selected"])
+            self.assertEqual(pool["source_summary"]["artprice_included_count"], 1)
+            self.assertEqual(pool["source_summary"]["artprice_source_filename"], "saved-results.html")
             saved = self.save([artprice_comp["id"]])
             client_class.assert_not_called()
 
@@ -1755,16 +1759,143 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         analysis = response.json()["analysis"]
-        self.assertEqual(analysis["selected_ids"], ["sold-comp"])
+        artprice_comp = next(
+            item for item in analysis["candidates"] if item["provider"] == "Artprice"
+        )
+        self.assertEqual(analysis["selected_ids"], ["sold-comp", artprice_comp["id"]])
         self.assertEqual(
             {item["provider"] for item in analysis["candidates"]},
             {"LiveArt", "Artprice"},
         )
-        artprice_comp = next(
-            item for item in analysis["candidates"] if item["provider"] == "Artprice"
+        self.assertTrue(artprice_comp["selected"])
+        self.assertEqual(analysis["source_summary"]["artprice_included_count"], 1)
+        stored = LiveArtResaleAnalysis.objects.get(lot=self.lot)
+        self.assertEqual(stored.selected_ids, analysis["selected_ids"])
+        self.assertEqual(stored.source_summary, analysis["source_summary"])
+
+    def test_deliberate_artprice_deselection_survives_get_recalculation_and_research(self):
+        self.stored_artprice()
+        self.client.force_login(self.staff)
+        preview = self.client.get(self.analysis_url).json()["analysis"]
+        artprice_id = next(item["id"] for item in preview["candidates"] if item["provider"] == "Artprice")
+        self.assertIn(artprice_id, preview["selected_ids"])
+
+        saved = self.save([])
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["analysis"]["selected_ids"], [])
+        after_get = self.client.get(self.analysis_url).json()["analysis"]
+        self.assertEqual(after_get["selected_ids"], [])
+        self.assertEqual(after_get["source_summary"]["artprice_eligible_count"], 1)
+        self.assertEqual(after_get["source_summary"]["artprice_selected_count"], 0)
+        self.assertEqual(after_get["source_summary"]["artprice_included_count"], 0)
+
+        recalculated = self.client.post(
+            reverse("auction_lot_artprice_analysis", args=(self.lot.pk,)),
+            {"action": "recalculate", "method": "mean"},
         )
-        self.assertFalse(artprice_comp["selected"])
-        self.assertNotIn(artprice_comp["id"], analysis["selected_ids"])
+        self.assertEqual(recalculated.status_code, 200)
+        self.assertEqual(self.client.get(self.analysis_url).json()["analysis"]["selected_ids"], [])
+
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            self.mock_client(client_class)
+            research = self.research()
+        self.assertEqual(research.status_code, 200)
+        self.assertNotIn(artprice_id, research.json()["selected_ids"])
+        self.assertEqual(self.save(research.json()["selected_ids"], research_id=research.json()["research_id"]).status_code, 200)
+        refreshed = self.client.get(self.analysis_url).json()["analysis"]
+        self.assertNotIn(artprice_id, refreshed["selected_ids"])
+        self.assertEqual(refreshed["source_summary"]["artprice_included_count"], 0)
+
+    def test_legacy_partial_artprice_selection_is_preserved(self):
+        artprice = self.stored_artprice()
+        artprice.comparables.append({
+            **artprice.comparables[0], "sale_date": "25 Mar 2026", "hammer_price": "2500.00", "lot_number": "43",
+        })
+        artprice.sold_records_count = 2
+        artprice.save(update_fields=("comparables", "sold_records_count"))
+        self.client.force_login(self.staff)
+        preview = self.client.get(self.analysis_url).json()["analysis"]
+        first_id = preview["candidates"][0]["id"]
+        LiveArtResaleAnalysis.objects.create(
+            lot=self.lot,
+            candidates=preview["candidates"],
+            selected_ids=[first_id],
+            assumptions=self.assumptions(),
+            retrieved_at=datetime(2026, 10, 12, tzinfo=ZoneInfo("UTC")),
+            created_by=self.staff,
+        )
+        saved = self.client.get(self.analysis_url).json()["analysis"]
+        self.assertEqual(saved["selected_ids"], [first_id])
+        self.assertEqual(saved["source_summary"]["artprice_eligible_count"], 2)
+        self.assertEqual(saved["source_summary"]["artprice_selected_count"], 1)
+
+    def test_default_artprice_selection_respects_existing_25_comp_limit(self):
+        liveart = [
+            {"id": f"live-{index}", "provider": "LiveArt", "status": "sold", "credible": True}
+            for index in range(25)
+        ]
+        artprice = {
+            "id": "artprice:one", "provider": "Artprice", "status": "sold", "credible": True,
+            "artist": self.lot.artist,
+        }
+        selected = _selected_resale_ids(
+            [*liveart, artprice], [item["id"] for item in liveart], initialize_artprice=True,
+        )
+        self.assertEqual(len(selected), 25)
+        self.assertNotIn(artprice["id"], selected)
+
+    def test_missing_artprice_artist_requires_manual_selection(self):
+        artprice = self.stored_artprice()
+        artprice.comparables[0].pop("artist")
+        artprice.save(update_fields=("comparables",))
+        self.client.force_login(self.staff)
+        preview = self.client.get(self.analysis_url).json()["analysis"]
+        candidate = next(item for item in preview["candidates"] if item["provider"] == "Artprice")
+        self.assertTrue(candidate["credible"])
+        self.assertEqual(preview["selected_ids"], [])
+        self.assertEqual(preview["source_summary"]["artprice_eligible_count"], 0)
+        saved = self.save([candidate["id"]])
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["analysis"]["source_summary"]["artprice_included_count"], 1)
+
+    def test_extreme_saved_hammer_preview_explains_unestimable_bid(self):
+        self.stored_artprice(hammer="1000000000000.00")
+        self.client.force_login(self.staff)
+        response = self.client.get(self.analysis_url)
+        self.assertEqual(response.status_code, 200)
+        preview = response.json()["analysis"]
+        self.assertEqual(preview["scenarios"], [])
+        self.assertIn("supported range", preview["source_summary"]["calculation_error"])
+        self.assertEqual(self.save(preview["selected_ids"]).status_code, 400)
+
+    def test_artprice_upload_and_recalculation_roll_back_if_resale_refresh_fails(self):
+        artprice = self.stored_artprice()
+        original_comparables = artprice.comparables
+        self.client.force_login(self.staff)
+        with patch(
+            "secondstateapp.calendar_views._refresh_saved_resale_from_artprice",
+            side_effect=ArtpriceAnalysisError("Combined resale calculation failed."),
+        ):
+            upload = self.client.post(
+                reverse("auction_lot_artprice_analysis", args=(self.lot.pk,)),
+                {"action": "analyze", "artprice_html": artprice_upload(
+                    "replacement.html", lots=[{
+                        "id": "replacement", "title": self.lot.title, "price": "$ 3,000",
+                        "saleDtStart": "4 Apr 2026", "auctioneerName": "Replacement House",
+                        "artistOrAssociation": self.lot.artist, "lotstatus": 1,
+                    }],
+                )},
+            )
+            recalculate = self.client.post(
+                reverse("auction_lot_artprice_analysis", args=(self.lot.pk,)),
+                {"action": "recalculate", "method": "mean"},
+            )
+        self.assertEqual(upload.status_code, 400)
+        self.assertEqual(recalculate.status_code, 400)
+        artprice.refresh_from_db()
+        self.assertEqual(artprice.comparables, original_comparables)
+        self.assertEqual(artprice.source_filename, "saved-results.html")
+        self.assertEqual(artprice.resale_method, "median")
 
     def test_non_usd_or_missing_artprice_hammer_cannot_enter_scenarios(self):
         artprice = self.stored_artprice()
@@ -1826,6 +1957,7 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
             "price": "$ 3,000",
             "saleDtStart": "4 Apr 2026",
             "auctioneerName": "Replacement House",
+            "artistOrAssociation": self.lot.artist,
             "lotstatus": 1,
         }])
         with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
@@ -1846,7 +1978,12 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
         self.assertEqual(new_comp["hammer_usd"], "3000.00")
         self.assertNotIn(old_id, {item["id"] for item in combined["candidates"]})
         self.assertNotIn(old_id, combined["selected_ids"])
-        self.assertEqual(combined["scenarios"], [])
+        self.assertIn(new_comp["id"], combined["selected_ids"])
+        self.assertEqual(combined["source_summary"]["artprice_included_count"], 1)
+        self.assertEqual(
+            next(item for item in combined["scenarios"] if item["name"] == "typical")["resale_hammer"],
+            "3000.00",
+        )
         artprice.refresh_from_db()
         self.assertEqual(artprice.pk, original_artprice_pk)
         self.assertEqual(artprice.comparables[0]["hammer_price"], "3000.00")

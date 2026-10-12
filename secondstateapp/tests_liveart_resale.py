@@ -5,7 +5,9 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase, override_settings
 
-from secondstateapp.liveart_resale import build_scenarios, normalize_candidate, subject_matches
+from secondstateapp.liveart_resale import (
+    build_scenarios, build_scenarios_with_sources, normalize_candidate, subject_matches,
+)
 
 
 def lot(
@@ -246,3 +248,35 @@ class LiveArtResaleTests(SimpleTestCase):
         _, scenarios = build_scenarios([candidate], [candidate["id"]], {})
         self.assertEqual(scenarios[0]["bid_rows"][0]["break_even_max_bid"], None)
         self.assertEqual(scenarios[0]["bid_rows"][0]["target_profit_max_bid"], None)
+
+    def test_cross_source_overlap_requires_same_house_and_compatible_lot(self):
+        liveart = {
+            "id": "live-42", "provider": "LiveArt", "status": "sold", "credible": True,
+            "hammer_usd": "1000.00", "sale_date": "2025-05-02T10:00:00Z",
+            "auction_house": "Rago", "lot_number": "42", "title": "Test Print",
+        }
+        duplicate = {
+            "id": "artprice:42", "provider": "Artprice", "status": "sold", "credible": True,
+            "hammer_usd": "1010.00", "sale_date": "2 May 2025",
+            "auction_house": "Rago", "lot_number": "42", "title": "Test Print", "artist": "Pablo Picasso",
+        }
+        distinct = {
+            **duplicate, "id": "artprice:43", "lot_number": "43",
+        }
+        _, scenarios, sources = build_scenarios_with_sources(
+            [liveart, duplicate, distinct], ["live-42", "artprice:42", "artprice:43"], {},
+            artprice_sold_count=2, artprice_source_filename="saved-results.html",
+        )
+        self.assertEqual(sources["artprice_sold_count"], 2)
+        self.assertEqual(sources["artprice_eligible_count"], 2)
+        self.assertEqual(sources["artprice_selected_count"], 2)
+        self.assertEqual(sources["artprice_included_count"], 1)
+        self.assertEqual(sources["artprice_duplicate_count"], 1)
+        self.assertEqual(sources["combined_comp_count"], 2)
+        self.assertEqual(scenarios[1]["resale_hammer"], "1005.00")
+
+        different_house = {**duplicate, "id": "artprice:other", "auction_house": "Other House"}
+        _, _, sources = build_scenarios_with_sources(
+            [liveart, different_house], ["live-42", "artprice:other"], {}
+        )
+        self.assertEqual(sources["artprice_duplicate_count"], 0)

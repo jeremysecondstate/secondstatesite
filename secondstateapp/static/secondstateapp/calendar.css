@@ -1672,6 +1672,17 @@ body:has(.lot-browser[open]) {
   margin: 10px 0;
 }
 
+.liveart-ingestion-note {
+  margin: 9px 0;
+  padding: 9px 10px;
+  border-left: 2px solid var(--calendar-gold-soft);
+  background: rgba(217, 184, 120, .09);
+  color: rgba(255, 255, 255, .92);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .liveart-group-note {
   margin: -3px 0 9px;
   color: var(--calendar-muted);

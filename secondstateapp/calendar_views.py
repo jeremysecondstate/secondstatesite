@@ -48,7 +48,7 @@ from .calendar_images import (
     store_saved_calendar_image,
 )
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
-from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios, normalize_candidate
+from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, normalize_candidate
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -62,6 +62,7 @@ from .models import (
 MAX_SYNC_LOTS = 1000
 MAX_SYNC_BYTES = 2_000_000
 MAX_ARTPRICE_HTML_BYTES = 5 * 1024 * 1024
+MAX_SELECTED_RESALE_COMPS = 25
 ARTPRICE_PRELOADED_STATE_MARKER = "window.__PRELOADED_STATE__"
 ARTPRICE_REACT_STORE_MARKER = 'data-js-react-on-rails-store="artpriceStore"'
 LIVEART_ARTIST_YEAR_MARKER = re.compile(
@@ -714,7 +715,7 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
 
     The upload is already tied to this private Calendar lot.  Historical saved
     comparables have fewer descriptive fields than newer Artprice pages, so
-    missing attributes stay visible and every candidate starts unselected.
+    missing attributes stay visible. Selection is resolved against saved choices.
     """
 
     analysis = AuctionMaxBidAnalysis.objects.filter(lot=lot).first()
@@ -837,21 +838,93 @@ def _merged_resale_candidates(lot: AuctionWatchLot, candidates: object) -> list[
     return liveart + _artprice_candidates(lot)
 
 
-def _refresh_saved_resale_from_artprice(lot: AuctionWatchLot) -> None:
-    """Keep a saved mixed analysis in step with a changed Artprice upload."""
+def _selected_resale_ids(
+    candidates: list[dict],
+    selected_ids: list[str | int],
+    *,
+    previous_candidates: list[dict] | None = None,
+    initialize_artprice: bool = False,
+) -> list[str]:
+    """Include eligible new Artprice sales while retaining explicit later choices."""
+
+    allowed = {str(item.get("id")) for item in candidates if item.get("credible") and item.get("status") == "sold"}
+    selected = list(dict.fromkeys(str(item) for item in selected_ids if str(item) in allowed))[:MAX_SELECTED_RESALE_COMPS]
+    previous_artprice_ids = {
+        str(item.get("id")) for item in previous_candidates or [] if item.get("provider") == "Artprice"
+    }
+    for candidate in candidates:
+        identifier = str(candidate.get("id"))
+        if (
+            candidate.get("provider") == "Artprice"
+            and identifier in allowed
+            and bool(str(candidate.get("artist") or "").strip())
+            and identifier not in selected
+            and (initialize_artprice or identifier not in previous_artprice_ids)
+            and len(selected) < MAX_SELECTED_RESALE_COMPS
+        ):
+            selected.append(identifier)
+    return selected
+
+
+def _candidates_with_selection(candidates: list[dict], selected_ids: list[str]) -> list[dict]:
+    selected = set(selected_ids)
+    return [{**candidate, "selected": str(candidate.get("id")) in selected} for candidate in candidates]
+
+
+def _initialize_legacy_artprice(saved: LiveArtResaleAnalysis | None) -> bool:
+    if saved is None:
+        return True
+    return not saved.source_summary and not any(
+        str(item).startswith("artprice:") for item in saved.selected_ids
+    )
+
+
+def _lot_resale_scenarios(
+    lot: AuctionWatchLot, candidates: list[dict], selected_ids: list[str], assumptions: dict,
+    *, allow_unestimable: bool = False,
+) -> tuple[dict, list[dict], dict]:
+    artprice = AuctionMaxBidAnalysis.objects.filter(lot=lot).first()
+    return build_scenarios_with_sources(
+        candidates,
+        selected_ids,
+        assumptions,
+        artprice_sold_count=artprice.sold_records_count if artprice is not None else 0,
+        artprice_source_filename=artprice.source_filename if artprice is not None else None,
+        artprice_analysis_updated_at=artprice.updated_at.isoformat() if artprice is not None else None,
+        allow_unestimable=allow_unestimable,
+    )
+
+
+def _refresh_saved_resale_from_artprice(
+    lot: AuctionWatchLot, *, allow_unestimable: bool = False,
+) -> LiveArtResaleAnalysis | None:
+    """Persist source-aware bids whenever the saved Artprice history changes."""
 
     saved = LiveArtResaleAnalysis.objects.filter(lot=lot).first()
     if saved is None:
-        return
+        return None
     candidates = _merged_resale_candidates(lot, saved.candidates)
-    allowed = {str(item.get("id")) for item in candidates if item.get("credible")}
-    selected_ids = [str(item) for item in saved.selected_ids if str(item) in allowed]
-    assumptions, scenarios = build_scenarios(candidates, selected_ids, saved.assumptions)
-    saved.candidates = candidates
-    saved.selected_ids = selected_ids
-    saved.assumptions = assumptions
-    saved.scenarios = scenarios
-    saved.save(update_fields=("candidates", "selected_ids", "assumptions", "scenarios", "updated_at"))
+    selected_ids = _selected_resale_ids(
+        candidates, saved.selected_ids,
+        previous_candidates=saved.candidates,
+        initialize_artprice=_initialize_legacy_artprice(saved),
+    )
+    candidates = _candidates_with_selection(candidates, selected_ids)
+    assumptions, scenarios, source_summary = _lot_resale_scenarios(
+        lot, candidates, selected_ids, saved.assumptions, allow_unestimable=allow_unestimable,
+    )
+    if (
+        saved.candidates != candidates or saved.selected_ids != selected_ids
+        or saved.assumptions != assumptions or saved.scenarios != scenarios
+        or saved.source_summary != source_summary
+    ):
+        saved.candidates = candidates
+        saved.selected_ids = selected_ids
+        saved.assumptions = assumptions
+        saved.scenarios = scenarios
+        saved.source_summary = source_summary
+        saved.save(update_fields=("candidates", "selected_ids", "assumptions", "scenarios", "source_summary", "updated_at"))
+    return saved
 
 
 @staff_member_required
@@ -875,13 +948,14 @@ def auction_lot_artprice_analysis(request, lot_id: int):
         if action == "analyze":
             source_filename, html_text = _uploaded_artprice_html(request)
             result = analyze_artprice_html(html_text, **_analysis_options(request.POST))
-            analysis = _replace_artprice_analysis(
-                lot,
-                result,
-                source_filename=source_filename,
-                created_by=request.user,
-            )
-            _refresh_saved_resale_from_artprice(lot)
+            with transaction.atomic():
+                analysis = _replace_artprice_analysis(
+                    lot,
+                    result,
+                    source_filename=source_filename,
+                    created_by=request.user,
+                )
+                _refresh_saved_resale_from_artprice(lot)
             return JsonResponse(
                 {
                     "ok": True,
@@ -901,13 +975,14 @@ def auction_lot_artprice_analysis(request, lot_id: int):
                 currency=existing.currency,
                 **_analysis_options(request.POST),
             )
-            analysis = _replace_artprice_analysis(
-                lot,
-                result,
-                source_filename=existing.source_filename,
-                created_by=request.user,
-            )
-            _refresh_saved_resale_from_artprice(lot)
+            with transaction.atomic():
+                analysis = _replace_artprice_analysis(
+                    lot,
+                    result,
+                    source_filename=existing.source_filename,
+                    created_by=request.user,
+                )
+                _refresh_saved_resale_from_artprice(lot)
             return JsonResponse(
                 {
                     "ok": True,
@@ -936,23 +1011,18 @@ def auction_lot_artprice_analysis(request, lot_id: int):
 
 
 def _liveart_analysis_json(analysis: LiveArtResaleAnalysis) -> dict:
-    candidates = _merged_resale_candidates(analysis.lot, analysis.candidates)
-    allowed = {str(item.get("id")) for item in candidates if item.get("credible")}
-    selected_ids = [str(item) for item in analysis.selected_ids if str(item) in allowed]
-    if candidates != analysis.candidates or selected_ids != analysis.selected_ids:
-        assumptions, scenarios = build_scenarios(candidates, selected_ids, analysis.assumptions)
-    else:
-        assumptions, scenarios = analysis.assumptions, analysis.scenarios
+    analysis = _refresh_saved_resale_from_artprice(analysis.lot, allow_unestimable=True) or analysis
     return {
         "provider": "Resale",
         "saved": True,
         "subject_match": analysis.subject_match or None,
         "subject_matches": analysis.subject_matches,
-        "candidates": candidates,
-        "selected_ids": selected_ids,
-        "assumptions": assumptions,
-        "scenarios": scenarios,
-        "no_credible_comps": not bool(selected_ids),
+        "candidates": analysis.candidates,
+        "selected_ids": analysis.selected_ids,
+        "assumptions": analysis.assumptions,
+        "scenarios": analysis.scenarios,
+        "source_summary": analysis.source_summary,
+        "no_credible_comps": not bool(analysis.scenarios),
         "retrieved_at": analysis.retrieved_at.isoformat(),
         "data_units_spent": float(analysis.data_units_spent) if analysis.data_units_spent is not None else None,
         "created_at": analysis.created_at.isoformat(),
@@ -965,7 +1035,11 @@ def _artprice_resale_preview(lot: AuctionWatchLot) -> dict | None:
     candidates = _artprice_candidates(lot)
     if not candidates:
         return None
-    assumptions, _scenarios = build_scenarios(candidates, [], {})
+    selected_ids = _selected_resale_ids(candidates, [], initialize_artprice=True)
+    candidates = _candidates_with_selection(candidates, selected_ids)
+    assumptions, scenarios, source_summary = _lot_resale_scenarios(
+        lot, candidates, selected_ids, {}, allow_unestimable=True,
+    )
     source = AuctionMaxBidAnalysis.objects.get(lot=lot)
     return {
         "provider": "Resale",
@@ -973,10 +1047,11 @@ def _artprice_resale_preview(lot: AuctionWatchLot) -> dict | None:
         "subject_match": None,
         "subject_matches": [],
         "candidates": candidates,
-        "selected_ids": [],
+        "selected_ids": selected_ids,
         "assumptions": assumptions,
-        "scenarios": [],
-        "no_credible_comps": True,
+        "scenarios": scenarios,
+        "source_summary": source_summary,
+        "no_credible_comps": not bool(scenarios),
         "retrieved_at": source.updated_at.isoformat(),
         "data_units_spent": None,
         "created_at": None,
@@ -1150,7 +1225,23 @@ def auction_lot_liveart_research(request, lot_id: int):
 
     research["research_id"] = secrets.token_hex(16)
     request.session[f"liveart_research_{lot.pk}"] = research
-    response_research = {**research, "candidates": _merged_resale_candidates(lot, research.get("candidates"))}
+    existing = LiveArtResaleAnalysis.objects.filter(lot=lot).first()
+    candidates = _merged_resale_candidates(lot, research.get("candidates"))
+    selected_ids = list(research.get("selected_ids") or [])
+    if existing is not None:
+        selected_ids.extend(
+            str(item) for item in existing.selected_ids if str(item).startswith("artprice:")
+        )
+    selected_ids = _selected_resale_ids(
+        candidates, selected_ids,
+        previous_candidates=existing.candidates if existing is not None else None,
+        initialize_artprice=_initialize_legacy_artprice(existing),
+    )
+    response_research = {
+        **research,
+        "candidates": _candidates_with_selection(candidates, selected_ids),
+        "selected_ids": selected_ids,
+    }
     return JsonResponse({"ok": True, **response_research})
 
 
@@ -1213,14 +1304,17 @@ def auction_lot_liveart_analysis(request, lot_id: int):
     assumptions = payload.get("assumptions", {})
     if not isinstance(candidates, list) or not isinstance(selected_ids, list) or not isinstance(assumptions, dict):
         return JsonResponse({"ok": False, "error": "Invalid resale analysis selections."}, status=400)
-    if len(selected_ids) > 25 or any(not isinstance(item, (str, int)) for item in selected_ids):
+    if len(selected_ids) > MAX_SELECTED_RESALE_COMPS or any(not isinstance(item, (str, int)) for item in selected_ids):
         return JsonResponse({"ok": False, "error": "Invalid resale comp selection."}, status=400)
     selected_ids = list(dict.fromkeys(str(item) for item in selected_ids))
     allowed = {str(item.get("id")) for item in candidates if isinstance(item, dict) and item.get("credible")}
     if any(item not in allowed for item in selected_ids):
         return JsonResponse({"ok": False, "error": "Select only eligible sold USD hammer comps."}, status=400)
+    candidates = _candidates_with_selection(candidates, selected_ids)
     try:
-        normalized_assumptions, scenarios = build_scenarios(candidates, selected_ids, assumptions)
+        normalized_assumptions, scenarios, source_summary = _lot_resale_scenarios(
+            lot, candidates, selected_ids, assumptions
+        )
     except ValueError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
     retrieved_at = parse_datetime(str(research.get("retrieved_at") or "")) or timezone.now()
@@ -1233,6 +1327,7 @@ def auction_lot_liveart_analysis(request, lot_id: int):
         "selected_ids": selected_ids,
         "assumptions": normalized_assumptions,
         "scenarios": scenarios,
+        "source_summary": source_summary,
         "retrieved_at": retrieved_at,
         "data_units_spent": research.get("data_units_spent"),
         "created_by": request.user,

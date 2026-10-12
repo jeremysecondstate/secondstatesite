@@ -650,7 +650,7 @@
     heading.textContent = "Sold comps for resale bids";
     const intro = document.createElement("p");
     intro.className = "artprice-analysis-intro";
-    intro.textContent = "Saved Artprice HTML sales appear here with LiveArt sales of this work and similar works. Select the records you trust for one resale bid estimate. Each LiveArt search is capped at 4 requests and 40 Data Units.";
+    intro.textContent = "USD sales with a matching named artist from saved Artprice HTML are preselected for resale bids, up to the 25 sale limit. Review the records below and uncheck any sale you want to exclude; then save to recalculate. LiveArt sales of this work and similar works can be added. Each LiveArt search is capped at 4 requests and 40 Data Units.";
     const searchFacts = document.createElement("p");
     searchFacts.className = "liveart-search-facts";
     searchFacts.textContent = `LiveArt search: ${[
@@ -757,10 +757,13 @@
       const artpriceCount = candidates.filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html").length;
       const liveartCount = candidates.length - artpriceCount;
       const parts = [];
-      if (artpriceCount) parts.push(`${artpriceCount} Artprice HTML sale${artpriceCount === 1 ? "" : "s"} from the saved file.`);
+      if (artpriceCount) {
+        const filename = candidates.find((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html")?.source_filename;
+        parts.push(`${artpriceCount} Artprice HTML sale${artpriceCount === 1 ? "" : "s"} ingested${filename ? ` from ${filename}` : " from the saved file"}.`);
+      }
       if (liveartCount) parts.push(`${liveartCount} LiveArt sale${liveartCount === 1 ? "" : "s"} retrieved ${formatAnalysisTimestamp(data?.retrieved_at || researchRetrievedAt)}.`);
       if (liveartCount && data?.data_units_spent != null) parts.push(`${data.data_units_spent} LiveArt Data Units used in ${saved ? "saved research" : "this search"}.`);
-      if (candidates.length) parts.push("Only verified USD hammer prices enter resale estimates; premiums and estimates are excluded.");
+      if (candidates.length) parts.push("Only eligible USD hammer prices enter resale estimates; premiums and estimates are excluded.");
       return parts.join(" ");
     };
     const setStatus = (message = "", tone = "") => {
@@ -804,12 +807,18 @@
         checkbox.disabled = !candidate.credible || candidate.hammer_usd === null || candidate.hammer_usd === undefined;
         checkbox.setAttribute("aria-label", `Use ${candidate.title || "untitled"} as a comparable`);
         checkbox.addEventListener("change", () => {
+          if (checkbox.checked && selectedIds.size >= 25) {
+            checkbox.checked = false;
+            setStatus("Select at most 25 sold records for a resale bid analysis.", "error");
+            return;
+          }
           if (checkbox.checked) selectedIds.add(checkbox.value);
           else selectedIds.delete(checkbox.value);
+          setStatus("");
           markAnalysisPending();
         });
         const copy = document.createElement("span");
-        copy.textContent = checkbox.disabled ? "Excluded — unsuitable or unverified" : "Use as comp";
+        copy.textContent = checkbox.disabled ? "Excluded — unsuitable or unverified" : "Use in resale bid";
         label.append(checkbox, copy);
         top.appendChild(label);
         const sourceBadge = document.createElement("span");
@@ -886,8 +895,8 @@
       const price = document.createElement("p");
       price.className = "liveart-price-line";
       price.textContent = candidate.hammer_usd === null || candidate.hammer_usd === undefined
-        ? "Verified USD hammer unavailable — excluded from valuation"
-        : `Verified USD hammer: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}`;
+        ? "USD hammer unavailable — excluded from valuation"
+        : `${isArtprice ? "Artprice HTML USD hammer" : "Verified LiveArt USD hammer"}: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}`;
       card.appendChild(price);
       const facts = document.createElement("div");
       facts.className = "liveart-facts";
@@ -988,7 +997,7 @@
       } else if (!currentCandidates.some((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined)) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
-        note.textContent = "None of these sold results has a credible verified USD hammer comp. You can save the research without a bid estimate.";
+        note.textContent = "None of these sold results has an eligible USD hammer comp. You can save the research without a bid estimate.";
         candidateResults.appendChild(note);
       }
       const groups = [
@@ -1027,29 +1036,56 @@
       if (!currentAnalysis) return;
       const heading = document.createElement("h4");
       heading.textContent = currentAnalysis.saved === false ? "Resale bid analysis · ready to save" : "Saved resale bid analysis · estimates";
+      const sourceSummary = currentAnalysis.source_summary || {};
+      const artpriceCandidates = currentCandidates.filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html");
+      const artpriceSoldCount = Number(sourceSummary.artprice_sold_count ?? artpriceCandidates.length);
+      const artpriceEligibleCount = Number(sourceSummary.artprice_eligible_count ?? artpriceCandidates.filter((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined).length);
+      const artpriceSelectedCount = Number(sourceSummary.artprice_selected_count ?? artpriceCandidates.filter((candidate) => selectedIds.has(String(candidate.id))).length);
+      const artpriceUsedCount = Number(sourceSummary.artprice_included_count ?? artpriceSelectedCount);
+      const artpriceFilename = sourceSummary.artprice_source_filename || artpriceCandidates[0]?.source_filename || "";
+      const ingestionNote = document.createElement("p");
+      ingestionNote.className = "liveart-ingestion-note";
+      ingestionNote.textContent = artpriceSoldCount
+        ? `Saved Artprice HTML sales history ingested: ${artpriceSoldCount} sold record${artpriceSoldCount === 1 ? "" : "s"}${artpriceFilename ? ` from ${artpriceFilename}` : ""}. ${artpriceEligibleCount} eligible for automatic selection, ${artpriceSelectedCount} selected; ${artpriceUsedCount} unique Artprice sale${artpriceUsedCount === 1 ? "" : "s"} used in ${currentAnalysis.saved === false ? "this bid preview" : "the saved resale bids"}.`
+        : "No saved Artprice HTML sales history is available for this lot's resale bids.";
       const summary = document.createElement("dl");
       summary.className = "artprice-analysis-summary-grid";
-      addResultItem(summary, "Selected verified comps", String(selectedIds.size));
-      addResultItem(summary, "Retrieved", formatAnalysisTimestamp(currentAnalysis.retrieved_at || researchRetrievedAt));
-      savedResults.append(heading, summary);
+      addResultItem(summary, "Unique comps used", String(sourceSummary.combined_comp_count ?? selectedIds.size));
+      addResultItem(summary, "Artprice sales used", String(artpriceUsedCount));
+      if (currentCandidates.some((candidate) => candidate.provider !== "Artprice" && candidate.match_type !== "artprice_html")) {
+        addResultItem(summary, "LiveArt retrieved", formatAnalysisTimestamp(currentAnalysis.retrieved_at || researchRetrievedAt));
+      }
+      if (artpriceSoldCount) {
+        addResultItem(summary, "Artprice analyzed", formatAnalysisTimestamp(sourceSummary.artprice_analysis_updated_at || currentAnalysis.retrieved_at));
+      }
+      savedResults.append(heading, ingestionNote, summary);
+      if (Number(sourceSummary.artprice_duplicate_count || 0) > 0) {
+        const overlapNote = document.createElement("p");
+        overlapNote.className = "artprice-analysis-explanation";
+        overlapNote.textContent = `${sourceSummary.artprice_duplicate_count} selected Artprice sale${Number(sourceSummary.artprice_duplicate_count) === 1 ? " was" : "s were"} already represented by selected LiveArt sales and counted once.`;
+        savedResults.appendChild(overlapNote);
+      }
       const scenarios = Array.isArray(currentAnalysis.scenarios) ? currentAnalysis.scenarios : [];
       if (currentAnalysis.saved === false) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
-        note.textContent = "Select Artprice or LiveArt sold records above, then save to calculate combined bid estimates.";
+        note.textContent = scenarios.length
+          ? "These bid estimates are a preview. Save the resale bid analysis to keep them."
+          : "Review the selected Artprice and LiveArt sales above, then save to calculate resale bid estimates.";
         savedResults.appendChild(note);
-        return;
+        if (!scenarios.length) return;
       }
       if (currentAnalysis.no_credible_comps || !scenarios.length) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
-        note.textContent = "No credible selected comps support a resale bid estimate. Research further before setting a bid.";
+        note.textContent = sourceSummary.calculation_error
+          || "No eligible selected comps support a resale bid estimate. Research further before setting a bid.";
         savedResults.appendChild(note);
         return;
       }
       const explanation = document.createElement("p");
       explanation.className = "artprice-analysis-explanation";
-      explanation.textContent = "Downside, typical, and upside resale estimates use the selected verified USD hammer sales. Bids include the editable costs above; projected profit is not guaranteed.";
+      explanation.textContent = "Downside, typical, and upside resale estimates use the selected eligible USD hammer sales. Bids include the editable costs above; projected profit is not guaranteed.";
       savedResults.appendChild(explanation);
       scenarios.forEach((scenario) => {
         const scenarioHeading = document.createElement("h4");
@@ -1219,13 +1255,19 @@
           headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
           body: JSON.stringify({...(subjectId === null ? {} : {subject_id: subjectId}), search_title: searchTitle}),
         }, "LiveArt research could not be completed.");
+        const previousArtpriceIds = new Set(currentCandidates
+          .filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html")
+          .map((candidate) => String(candidate.id)));
         const selectedArtpriceIds = new Set(currentCandidates
-          .filter((candidate) => candidate.provider === "Artprice" && selectedIds.has(String(candidate.id)))
+          .filter((candidate) => (candidate.provider === "Artprice" || candidate.match_type === "artprice_html") && selectedIds.has(String(candidate.id)))
           .map((candidate) => String(candidate.id)));
         currentCandidates = Array.isArray(payload.candidates) ? payload.candidates : [];
+        const responseSelectedIds = new Set((Array.isArray(payload.selected_ids) ? payload.selected_ids : []).map(String));
         selectedIds = new Set(currentCandidates
           .filter((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined
-            && (candidate.selected || (candidate.provider === "Artprice" && selectedArtpriceIds.has(String(candidate.id)))))
+            && ((candidate.provider === "Artprice" || candidate.match_type === "artprice_html") && previousArtpriceIds.has(String(candidate.id))
+              ? selectedArtpriceIds.has(String(candidate.id))
+              : responseSelectedIds.has(String(candidate.id)) || candidate.selected))
           .map((candidate) => String(candidate.id)));
         currentResearchId = payload.research_id || "";
         researchRetrievedAt = payload.retrieved_at || "";
@@ -1702,6 +1744,11 @@
       );
       appendSummaryItem(summaryGrid, "Source file", String(analysis.source_filename || "Not available"), true);
 
+      const ingestionNote = document.createElement("p");
+      ingestionNote.className = "liveart-ingestion-note";
+      const soldCount = Number(analysis.sold_records_count || 0);
+      ingestionNote.textContent = `Saved Artprice HTML sales history ingested: ${soldCount} sold record${soldCount === 1 ? "" : "s"}${analysis.source_filename ? ` from ${analysis.source_filename}` : ""}. Eligible USD sales are available in Sold comps for resale bids, which shows how many were used.`;
+
       const explanation = document.createElement("p");
       explanation.className = "artprice-analysis-explanation";
       explanation.textContent = "Figures are estimates based on extracted sold records and the assumptions entered above. Profit is not guaranteed.";
@@ -1787,6 +1834,7 @@
       results.append(
         heading,
         summaryGrid,
+        ingestionNote,
         explanation,
         bidHeading,
         bidTableWrap,

@@ -103,23 +103,26 @@ def _reject_json_constant(_value: str) -> None:
 
 
 class _ReactStoreParser(HTMLParser):
-    """Extract only the Artprice store JSON; never execute saved page scripts."""
+    """Extract Artprice JSON data without executing saved page scripts."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=False)
-        self._capturing = False
+        self._capturing: str | None = None
         self._chunks: list[str] = []
         self.stores: list[str] = []
+        self.searchbars: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag != "script":
             return
         attributes = dict(attrs)
-        if (
-            (attributes.get("type") or "").casefold() == "application/json"
-            and attributes.get("data-js-react-on-rails-store") == REACT_STORE_NAME
-        ):
-            self._capturing = True
+        if (attributes.get("type") or "").casefold() != "application/json":
+            return
+        if attributes.get("data-js-react-on-rails-store") == REACT_STORE_NAME:
+            self._capturing = "store"
+        elif (attributes.get("data-component-name") or "").startswith("Lots::Searchbars::"):
+            self._capturing = "searchbar"
+        if self._capturing:
             self._chunks = []
 
     def handle_data(self, data: str) -> None:
@@ -128,17 +131,20 @@ class _ReactStoreParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "script" and self._capturing:
-            self.stores.append("".join(self._chunks))
-            self._capturing = False
+            if self._capturing == "store":
+                self.stores.append("".join(self._chunks))
+            else:
+                self.searchbars.append("".join(self._chunks))
+            self._capturing = None
             self._chunks = []
 
 
-def _react_store_state(html_text: str) -> dict[str, Any] | None:
+def _react_page_data(html_text: str) -> tuple[dict[str, Any] | None, list[str] | None]:
     parser = _ReactStoreParser()
     parser.feed(html_text)
     parser.close()
     if not parser.stores:
-        return None
+        return None, None
     if len(parser.stores) != 1:
         raise ArtpriceAnalysisError("The saved Artprice page contains ambiguous results data.")
     try:
@@ -151,7 +157,33 @@ def _react_store_state(html_text: str) -> dict[str, Any] | None:
         raise ArtpriceAnalysisError("Could not decode the embedded Artprice data.") from exc
     if not isinstance(state, dict):
         raise ArtpriceAnalysisError("The embedded Artprice data is not a JSON object.")
-    return state
+
+    active_ids: list[str] | None = None
+    for raw_searchbar in parser.searchbars:
+        try:
+            searchbar = json.loads(raw_searchbar, parse_constant=_reject_json_constant)
+        except ArtpriceAnalysisError:
+            raise
+        except (json.JSONDecodeError, RecursionError, ValueError) as exc:
+            raise ArtpriceAnalysisError("Could not decode the active Artprice search data.") from exc
+        if not isinstance(searchbar, dict) or "lotIds" not in searchbar:
+            continue
+        raw_ids = searchbar["lotIds"]
+        if (
+            not isinstance(raw_ids, list)
+            or any(
+                isinstance(raw_id, bool)
+                or not isinstance(raw_id, (int, str))
+                or not str(raw_id).isdecimal()
+                for raw_id in raw_ids
+            )
+        ):
+            raise ArtpriceAnalysisError("The active Artprice search lot IDs are invalid.")
+        found_ids = [str(raw_id) for raw_id in raw_ids]
+        if active_ids is not None and active_ids != found_ids:
+            raise ArtpriceAnalysisError("The saved Artprice page contains ambiguous search results.")
+        active_ids = found_ids
+    return state, active_ids
 
 
 def extract_preloaded_state(html_text: str) -> dict[str, Any]:
@@ -166,7 +198,7 @@ def extract_preloaded_state(html_text: str) -> dict[str, Any]:
 
     marker_index = html_text.find(PRELOADED_STATE_MARKER)
     if marker_index == -1:
-        state = _react_store_state(html_text)
+        state, _active_ids = _react_page_data(html_text)
         if state is not None:
             return state
         raise ArtpriceAnalysisError(
@@ -213,14 +245,22 @@ def _looks_like_lot(value: Mapping[str, Any]) -> bool:
     )
 
 
-def find_lot_dicts(node: Any) -> list[dict[str, Any]]:
+def find_lot_dicts(
+    node: Any, *, active_lot_ids: Iterable[str] | None = None,
+) -> list[dict[str, Any]]:
     """Find the largest coherent group of auction lots in a state tree.
 
     Artprice has moved the results container between releases, so traversal is
     iterative and structure-agnostic. Selecting one sibling group avoids
     mixing the search results with lot-shaped records from unrelated
-    cached/account branches.
+    cached/account branches. React pages may also provide explicit current
+    search lot IDs; those take precedence over cached entities.
     """
+
+    active_ids = set(active_lot_ids) if active_lot_ids is not None else None
+
+    def included(lot: Mapping[str, Any]) -> bool:
+        return active_ids is None or str(lot.get("id")) in active_ids
 
     candidates: list[list[dict[str, Any]]] = []
     standalone_lots: list[dict[str, Any]] = []
@@ -229,14 +269,14 @@ def find_lot_dicts(node: Any) -> list[dict[str, Any]]:
     while stack:
         value = stack.pop()
         if isinstance(value, dict):
-            if _looks_like_lot(value):
+            if _looks_like_lot(value) and included(value):
                 standalone_lots.append(value)
 
             children = list(value.values())
             dict_lots = [
                 child
                 for child in children
-                if isinstance(child, dict) and _looks_like_lot(child)
+                if isinstance(child, dict) and _looks_like_lot(child) and included(child)
             ]
             if dict_lots:
                 candidates.append(dict_lots)
@@ -245,7 +285,7 @@ def find_lot_dicts(node: Any) -> list[dict[str, Any]]:
             list_lots = [
                 child
                 for child in value
-                if isinstance(child, dict) and _looks_like_lot(child)
+                if isinstance(child, dict) and _looks_like_lot(child) and included(child)
             ]
             if list_lots:
                 candidates.append(list_lots)
@@ -255,9 +295,27 @@ def find_lot_dicts(node: Any) -> list[dict[str, Any]]:
         return max(candidates, key=len)
     if standalone_lots:
         return standalone_lots
-    raise ArtpriceAnalysisError(
-        "No auction lot records were found in the embedded Artprice data."
-    )
+    if active_ids is not None:
+        raise ArtpriceAnalysisError(
+            "No active search lot records were found in the saved Artprice page."
+        )
+    raise ArtpriceAnalysisError("No auction lot records were found in the embedded Artprice data.")
+
+
+def _react_lot_dicts(
+    state: Mapping[str, Any], active_lot_ids: list[str] | None,
+) -> list[dict[str, Any]]:
+    """Use the React store's lot entities, not other cached state branches."""
+
+    entities = state.get("dbEntities")
+    if not isinstance(entities, Mapping):
+        raise ArtpriceAnalysisError("No Artprice lot entities were found in the saved page.")
+    lots = entities.get("lots")
+    if not isinstance(lots, (dict, list)):
+        raise ArtpriceAnalysisError("No Artprice lot entities were found in the saved page.")
+    if isinstance(lots, dict) and isinstance(lots.get("data"), (dict, list)):
+        lots = lots["data"]
+    return find_lot_dicts(lots, active_lot_ids=active_lot_ids)
 
 
 def _currency_value(value: Any) -> str | None:
@@ -432,6 +490,9 @@ def parse_auction_results(html_text: str) -> list[AuctionResult]:
     """Extract normalized, deduplicated sold results from saved HTML text."""
 
     state = extract_preloaded_state(html_text)
+    if PRELOADED_STATE_MARKER not in html_text:
+        active_ids = _react_page_data(html_text)[1]
+        return _normalize_results(_react_lot_dicts(state, active_ids))
     return _normalize_results(find_lot_dicts(state))
 
 
@@ -839,8 +900,24 @@ def analyze_artprice_html(
     """Analyze sold comparables embedded in a saved Artprice HTML page."""
 
     state = extract_preloaded_state(html_text)
-    currency = _extract_currency(state)
-    results = _normalize_results(find_lot_dicts(state))
+    is_react_page = PRELOADED_STATE_MARKER not in html_text
+    if is_react_page:
+        preferences = state.get("preferences")
+        currency = (
+            _currency_value(preferences.get("currency"))
+            if isinstance(preferences, Mapping) else None
+        )
+    else:
+        currency = _extract_currency(state)
+    if is_react_page and currency is None:
+        raise ArtpriceAnalysisError(
+            "The saved Artprice page does not specify a currency. Save the results page with Artprice set to USD."
+        )
+    if is_react_page:
+        active_ids = _react_page_data(html_text)[1]
+        results = _normalize_results(_react_lot_dicts(state, active_ids))
+    else:
+        results = _normalize_results(find_lot_dicts(state))
     return _build_analysis(
         results,
         currency=currency,
