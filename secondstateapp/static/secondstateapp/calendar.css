@@ -1683,6 +1683,72 @@ body:has(.lot-browser[open]) {
   overflow-wrap: anywhere;
 }
 
+.artprice-source-list {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.artprice-source-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid var(--calendar-line);
+}
+
+.artprice-source-list li > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.artprice-source-list strong,
+.artprice-source-list small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.artprice-source-list small {
+  margin-top: 3px;
+  color: var(--calendar-muted);
+  font-size: 10px;
+}
+
+.artprice-source-list button {
+  flex: none;
+  padding: 7px;
+  border: 1px solid var(--calendar-line);
+  border-radius: 3px;
+  background: transparent;
+  color: #f4aaaa;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.artprice-source-list button:disabled {
+  opacity: .5;
+  cursor: wait;
+}
+
+.artprice-source-list button:focus-visible {
+  outline: 2px solid var(--calendar-gold-soft);
+  outline-offset: 2px;
+}
+
+.liveart-source-breakdown {
+  margin: 9px 0;
+  padding-left: 16px;
+  color: var(--calendar-muted);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
 .liveart-group-note {
   margin: -3px 0 9px;
   color: var(--calendar-muted);

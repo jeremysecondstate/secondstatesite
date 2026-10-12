@@ -267,7 +267,8 @@ class ArtpriceMaxBidParserTests(SimpleTestCase):
                 "title": "Newest sold",
                 "price": "$ 1,266",
                 "saleDtStart": "26 Mar 2026",
-                "auctioneerName": "Duplicate House",
+                "auctioneerName": "Dawson's",
+                "number": "42",
                 "lotstatus": 1,
             },
             {
@@ -301,6 +302,18 @@ class ArtpriceMaxBidParserTests(SimpleTestCase):
         self.assertEqual([record.title for record in records], ["Newest sold", "Older sold"])
         self.assertEqual(records[0].hammer_price, Decimal("1266"))
         self.assertEqual(records[0].estimate_low, Decimal("1066"))
+
+    def test_same_title_date_and_price_at_distinct_sales_are_not_duplicates(self):
+        common = {
+            "title": "Related print", "price": "$ 1,266",
+            "saleDtStart": "26 Mar 2026", "lotstatus": 1,
+        }
+        records = parse_auction_results(artprice_html([
+            {**common, "auctioneerName": "Dawson's", "number": "42"},
+            {**common, "auctioneerName": "Dawson's", "number": "43"},
+            {**common, "auctioneerName": "Another House", "number": "42"},
+        ]))
+        self.assertEqual(len(records), 3)
 
     def test_selects_largest_coherent_lot_group_and_supports_list_layouts(self):
         primary_lots = [
@@ -637,7 +650,7 @@ class AuctionCalendarViewTests(TestCase):
         )
         self.assertNotIn("comparables", saved_detail)
         self.assertContains(response, "Saved Artprice HTML")
-        self.assertContains(response, "Analyze HTML")
+        self.assertContains(response, "Add HTML files")
         self.assertContains(response, "Find LiveArt sales")
         self.assertContains(response, "Resale Bid Analysis")
         self.assertContains(response, 'appendArtpriceEditor(workflow, lot, actionLinks, {idPrefix: "browser"})')

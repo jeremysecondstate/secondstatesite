@@ -685,6 +685,7 @@ def build_scenarios_with_sources(
     *,
     artprice_sold_count: int | None = None,
     artprice_source_filename: str | None = None,
+    artprice_sources: list[Mapping[str, Any]] | None = None,
     artprice_analysis_updated_at: str | None = None,
     allow_unestimable: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
@@ -739,12 +740,30 @@ def build_scenarios_with_sources(
                 liveart_sales.append(candidate)
     artprice_included_count = 0
     artprice_duplicate_count = 0
+    included_artprice_sales = []
     for candidate, hammer in artprice_sales:
         if any(_same_sale(candidate, liveart) for liveart in liveart_sales):
             artprice_duplicate_count += 1
             continue
         values.append(hammer)
         artprice_included_count += 1
+        included_artprice_sales.append(candidate)
+    source_details = []
+    for source in artprice_sources or []:
+        source_id = source["id"]
+        belongs = lambda candidate: source_id in (candidate.get("source_ids") or [])
+        source_details.append({
+            "id": source_id,
+            "filename": source["filename"],
+            "ingested_count": source["sold_records_count"],
+            "eligible_count": sum(
+                1 for candidate in candidates if candidate.get("provider") == "Artprice" and belongs(candidate)
+                and candidate.get("status") == "sold" and candidate.get("credible") is True
+                and bool(_text(candidate.get("artist")))
+            ),
+            "selected_count": sum(1 for candidate, _hammer in artprice_sales if belongs(candidate)),
+            "included_count": sum(1 for candidate in included_artprice_sales if belongs(candidate)),
+        })
     source_summary = {
         "liveart_selected_count": len(liveart_sales),
         "artprice_sold_count": artprice_sold_count if artprice_sold_count is not None else sum(
@@ -759,6 +778,14 @@ def build_scenarios_with_sources(
         "artprice_included_count": artprice_included_count,
         "artprice_duplicate_count": artprice_duplicate_count,
         "artprice_source_filename": artprice_source_filename,
+        "artprice_source_filenames": [source["filename"] for source in artprice_sources or []]
+        or ([artprice_source_filename] if artprice_source_filename else []),
+        "artprice_sources": source_details,
+        "artprice_source_count": len(source_details),
+        "artprice_ingested_count": sum(source["ingested_count"] for source in source_details),
+        "artprice_file_duplicate_count": max(0, sum(source["ingested_count"] for source in source_details) - (
+            artprice_sold_count or sum(1 for item in candidates if item.get("provider") == "Artprice")
+        )),
         "artprice_analysis_updated_at": artprice_analysis_updated_at,
         "combined_comp_count": len(values),
     }

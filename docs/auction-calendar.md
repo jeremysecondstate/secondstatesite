@@ -48,9 +48,11 @@ The database permits only one active `draft`, `sending`, or `failed` batch. A se
 
 ## Artprice max-bid analysis
 
-Staff can expand **Artprice Max-Bid Analysis** beneath a lot's Artprice editor. Upload a saved USD Artprice `.html` or `.htm` results page (maximum 5 MB), review the normalized comparable records and assumptions, and calculate maximum hammer bids. Raw uploaded HTML is parsed in memory and is never stored or rendered. Saved normalized analysis remains attached during later watchlist syncs.
+Staff can expand **Resale Bid Analysis** beneath a lot's Artprice editor. **Add HTML files** accepts multiple saved USD Artprice `.html` or `.htm` results pages from related searches. New files join the lot's saved files, and the file list lets staff remove one source at a time. Up to 10 sources can be saved per lot, with a 5 MB limit per file and 25 MB per upload. An invalid file rejects the entire upload. Raw uploaded HTML is parsed in memory and is never stored or rendered. Saved normalized analysis remains attached during later watchlist syncs.
 
-The same normalized sold records feed **Sold comps for resale bids**. USD Artprice hammer sales with a matching named artist are preselected up to the 25-sale limit, alongside any selected LiveArt sales. Staff can uncheck individual records, manually select rows whose artist is missing, and save updated bids. The saved resale analysis displays how many Artprice records were ingested, eligible for automatic selection, selected, and actually used, including any overlap counted once across sources. The source filename appears with those counts.
+The Artprice estimate uses the combined unique sales across those files. Overlapping records are counted once, with all contributing filenames retained on the sale. Existing single-file analyses become one saved source. Removing a source recalculates the Artprice estimate and any saved resale bids; a sale found in another remaining file stays available. **Remove all Artprice files** clears the lot's Artprice history.
+
+The same normalized sold records feed **Sold comps for resale bids**. USD Artprice hammer sales with a matching named artist are preselected up to the 25-sale limit, alongside any selected LiveArt sales. Staff can uncheck individual records, manually select rows whose artist is missing, and save updated bids. The saved resale analysis displays how many Artprice records were ingested, eligible for automatic selection, selected, and actually used, including any overlap counted once across sources. Each saved filename appears with its own counts. Unsaved resale selections, research, and costs survive file changes and remain pending until saved again.
 
 ## Website and desktop sync configuration
 

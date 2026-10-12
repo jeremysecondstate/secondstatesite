@@ -239,6 +239,7 @@ class AuctionMaxBidAnalysis(models.Model):
         related_name="max_bid_analysis",
     )
     source_filename = models.CharField(max_length=255)
+    sources = models.JSONField(default=list, blank=True)
     currency = models.CharField(max_length=8, default="USD")
     resale_method = models.CharField(max_length=12, choices=ResaleMethod.choices)
     manual_resale_value = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)

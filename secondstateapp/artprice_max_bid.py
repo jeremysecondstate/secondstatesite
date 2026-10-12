@@ -57,6 +57,8 @@ class AuctionResult:
     medium: str | None = None
     edition: str | None = None
     size: str | None = None
+    source_ids: tuple[str, ...] = ()
+    source_filenames: tuple[str, ...] = ()
 
 
 def money_to_decimal(value: Any) -> Decimal | None:
@@ -438,7 +440,7 @@ def _require_two_decimal_places(value: Decimal, *, label: str) -> Decimal:
 
 def _normalize_results(lots: Iterable[Mapping[str, Any]]) -> list[AuctionResult]:
     results: list[AuctionResult] = []
-    seen: set[tuple[str, str, Decimal]] = set()
+    seen: set[tuple] = set()
 
     for lot in lots:
         hammer = money_to_decimal(lot.get("price"))
@@ -473,8 +475,13 @@ def _normalize_results(lots: Iterable[Mapping[str, Any]]) -> list[AuctionResult]
             medium=_optional_lot_text(lot.get("technique")),
             edition=_optional_lot_text(lot.get("numberAndEdition")),
             size=_optional_lot_text(lot.get("dimension")),
+            source_ids=tuple(lot.get("_source_ids") or ()),
+            source_filenames=tuple(lot.get("_source_filenames") or ()),
         )
-        dedupe_key = (result.title, result.sale_date, result.hammer_price)
+        dedupe_key = ("provider", provider_id) if provider_id else (
+            result.title, result.sale_date, result.hammer_price,
+            result.auction_house, result.lot_number, result.artist,
+        )
         if dedupe_key not in seen:
             seen.add(dedupe_key)
             results.append(result)
@@ -700,7 +707,7 @@ def _two_decimal_string(value: Decimal) -> str:
     return format(rounded, ".2f")
 
 
-def _result_to_json(result: AuctionResult) -> dict[str, str | None]:
+def _result_to_json(result: AuctionResult) -> dict[str, Any]:
     normalized = {
         "sale_date": result.sale_date,
         "hammer_price": _two_decimal_string(result.hammer_price),
@@ -722,6 +729,9 @@ def _result_to_json(result: AuctionResult) -> dict[str, str | None]:
         value = getattr(result, key)
         if value is not None:
             normalized[key] = value
+    if result.source_ids:
+        normalized["source_ids"] = list(result.source_ids)
+        normalized["source_filenames"] = list(result.source_filenames)
     return normalized
 
 
@@ -755,9 +765,58 @@ def _results_from_comparables(
                 "technique": comparable.get("medium"),
                 "numberAndEdition": comparable.get("edition"),
                 "dimension": comparable.get("size"),
+                "_source_ids": comparable.get("source_ids"),
+                "_source_filenames": comparable.get("source_filenames"),
             }
         )
     return _normalize_results(lots)
+
+
+def artprice_sale_identity(comparable: Mapping[str, Any]) -> tuple:
+    def clean(key):
+        return " ".join(str(comparable.get(key) or "").casefold().split())
+
+    sale_date = clean("sale_date")
+    for pattern in ("%d %b %Y", "%d %B %Y", "%Y-%m-%d"):
+        try:
+            sale_date = datetime.strptime(sale_date[:10] if pattern == "%Y-%m-%d" else sale_date, pattern).date().isoformat()
+            break
+        except ValueError:
+            continue
+    house, lot = clean("auction_house"), clean("lot_number")
+    if sale_date and house and lot:
+        return ("sale", sale_date, house, lot)
+    return ("detail", sale_date, house, lot, clean("title"), clean("hammer_price"), clean("artist"))
+
+
+def merge_artprice_sources(sources: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Combine normalized saved searches, retaining every file for each sale."""
+
+    merged: list[dict[str, Any]] = []
+    by_provider: dict[str, dict] = {}
+    by_sale: dict[tuple, dict] = {}
+    for source in sources:
+        _require_usd(source.get("currency"))
+        for comparable in source.get("comparables", []):
+            provider_id = str(comparable.get("provider_id") or "")
+            sale_key = artprice_sale_identity(comparable)
+            existing = by_provider.get(provider_id) if provider_id else None
+            existing = existing or by_sale.get(sale_key)
+            if existing is None:
+                existing = {**comparable, "source_ids": [], "source_filenames": []}
+                merged.append(existing)
+            else:
+                # Fill absent descriptions without replacing the first observed price.
+                for key, value in comparable.items():
+                    if key not in {"source_ids", "source_filenames"} and not existing.get(key) and value:
+                        existing[key] = value
+            if provider_id:
+                by_provider[provider_id] = existing
+            by_sale[sale_key] = existing
+            if source["id"] not in existing["source_ids"]:
+                existing["source_ids"].append(source["id"])
+                existing["source_filenames"].append(source["filename"])
+    return merged
 
 
 def _build_analysis(
@@ -774,6 +833,7 @@ def _build_analysis(
     other_resale_costs: Any,
     premium_min: Any,
     premium_max: Any,
+    allow_no_bid: bool = False,
 ) -> dict[str, Any]:
     normalized_currency = _require_usd(currency)
     normalized_method = _normalize_method(method)
@@ -836,16 +896,24 @@ def _build_analysis(
         manual_value=manual,
         recent_count=normalized_recent_count,
     )
-    net_resale_proceeds, rows = calculate_bid_rows(
-        expected_resale_hammer=expected,
-        premium_min=minimum,
-        premium_max=maximum,
-        inbound_shipping=shipping,
-        target_profit=profit,
-        seller_commission_pct=commission,
-        outbound_shipping=outbound,
-        other_resale_costs=other_costs,
-    )
+    try:
+        net_resale_proceeds, rows = calculate_bid_rows(
+            expected_resale_hammer=expected,
+            premium_min=minimum,
+            premium_max=maximum,
+            inbound_shipping=shipping,
+            target_profit=profit,
+            seller_commission_pct=commission,
+            outbound_shipping=outbound,
+            other_resale_costs=other_costs,
+        )
+    except ArtpriceAnalysisError as exc:
+        if not allow_no_bid or not str(exc).startswith("No positive bid"):
+            raise
+        with localcontext() as context:
+            context.prec = 50
+            net_resale_proceeds = expected * (Decimal("1") - commission / Decimal("100")) - outbound - other_costs
+        rows = []
 
     return {
         "currency": normalized_currency,
@@ -948,6 +1016,7 @@ def analyze_artprice_comparables(
     other_resale_costs: Any = 0,
     premium_min: int = 23,
     premium_max: int = 35,
+    allow_no_bid: bool = False,
 ) -> dict[str, Any]:
     """Recalculate from previously persisted JSON-safe sold comparables."""
 
@@ -965,6 +1034,7 @@ def analyze_artprice_comparables(
         other_resale_costs=other_resale_costs,
         premium_min=premium_min,
         premium_max=premium_max,
+        allow_no_bid=allow_no_bid,
     )
 
 

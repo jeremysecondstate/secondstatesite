@@ -32,7 +32,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
 
-from .artprice_max_bid import ArtpriceAnalysisError, analyze_artprice_comparables, analyze_artprice_html
+from .artprice_max_bid import ArtpriceAnalysisError, analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity, merge_artprice_sources
 from .auction_email import (
     AuctionEmailConfigurationError,
     compose_auction_email,
@@ -62,6 +62,8 @@ from .models import (
 MAX_SYNC_LOTS = 1000
 MAX_SYNC_BYTES = 2_000_000
 MAX_ARTPRICE_HTML_BYTES = 5 * 1024 * 1024
+MAX_ARTPRICE_SOURCES = 10
+MAX_ARTPRICE_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_SELECTED_RESALE_COMPS = 25
 ARTPRICE_PRELOADED_STATE_MARKER = "window.__PRELOADED_STATE__"
 ARTPRICE_REACT_STORE_MARKER = 'data-js-react-on-rails-store="artpriceStore"'
@@ -581,6 +583,11 @@ def _uploaded_artprice_html(request) -> tuple[str, str]:
     if upload is None:
         raise _ArtpriceAnalysisRequestError("Choose a saved Artprice HTML file to analyze.")
 
+    filename, html_text, _size = _read_artprice_upload(upload)
+    return filename, html_text
+
+
+def _read_artprice_upload(upload) -> tuple[str, str, int]:
     source_filename = Path(str(upload.name or "")).name
     if not source_filename or Path(source_filename).suffix.casefold() not in {".html", ".htm"}:
         raise _ArtpriceAnalysisRequestError("Upload a saved Artprice page with an .html or .htm extension.")
@@ -602,7 +609,64 @@ def _uploaded_artprice_html(request) -> tuple[str, str]:
         raise _ArtpriceAnalysisRequestError(
             "The file does not contain Artprice preloaded or saved results data. Save the Artprice results page and try again."
         )
-    return source_filename, html_text
+    return source_filename, html_text, len(raw_html)
+
+
+def _uploaded_artprice_sources(request) -> list[dict]:
+    uploads = request.FILES.getlist("artprice_html")
+    if not uploads:
+        raise _ArtpriceAnalysisRequestError("Choose saved Artprice HTML files to analyze.")
+    if len(uploads) > MAX_ARTPRICE_SOURCES:
+        raise _ArtpriceAnalysisRequestError("Save up to 10 Artprice HTML files per lot.")
+    total_bytes = 0
+    sources = []
+    for upload in uploads:
+        filename, html_text, byte_count = _read_artprice_upload(upload)
+        total_bytes += byte_count
+        if total_bytes > MAX_ARTPRICE_UPLOAD_BYTES:
+            raise _ArtpriceAnalysisRequestError("Upload at most 25 MB of Artprice HTML at a time.", status=413)
+        try:
+            result = analyze_artprice_html(html_text, inbound_shipping=0, target_profit=0)
+        except ArtpriceAnalysisError as exc:
+            raise _ArtpriceAnalysisRequestError(f"{filename}: {exc}") from None
+        sources.append({
+            "id": hashlib.sha256(html_text.encode("utf-8")).hexdigest(),
+            "filename": filename,
+            "currency": result["currency"],
+            "comparables": result["comparables"],
+            "uploaded_at": timezone.now().isoformat(),
+        })
+    return sources
+
+
+def _stored_artprice_sources(analysis: AuctionMaxBidAnalysis) -> list[dict]:
+    if analysis.sources:
+        return analysis.sources
+    return [{
+        "id": f"legacy-{analysis.pk}",
+        "filename": analysis.source_filename,
+        "currency": analysis.currency,
+        "comparables": analysis.comparables,
+        "uploaded_at": analysis.updated_at.isoformat(),
+    }]
+
+
+def _source_descriptions(analysis: AuctionMaxBidAnalysis) -> list[dict]:
+    return [{
+        "id": source["id"], "filename": source["filename"],
+        "currency": source["currency"], "sold_records_count": len(source["comparables"]),
+        "uploaded_at": source["uploaded_at"],
+    } for source in _stored_artprice_sources(analysis)]
+
+
+def _saved_artprice_options(analysis: AuctionMaxBidAnalysis) -> dict:
+    return {
+        "method": analysis.resale_method,
+        **{field: getattr(analysis, field) for field in (
+            "manual_resale_value", "recent_count", "inbound_shipping", "target_profit",
+            "seller_commission_pct", "outbound_shipping", "other_resale_costs", "premium_min", "premium_max",
+        )},
+    }
 
 
 def _stored_decimal(value, *, nullable: bool = False) -> Decimal | None:
@@ -662,12 +726,15 @@ def _replace_artprice_analysis(
     *,
     source_filename: str,
     created_by,
+    sources: list[dict] | None = None,
 ) -> AuctionMaxBidAnalysis:
     defaults = _analysis_model_defaults(
         result,
         source_filename=source_filename,
         created_by=created_by,
     )
+    if sources is not None:
+        defaults["sources"] = sources
     with transaction.atomic():
         analysis, _created = AuctionMaxBidAnalysis.objects.update_or_create(
             lot=lot,
@@ -684,8 +751,14 @@ def _decimal_json(value: Decimal | None) -> str | None:
 
 def _analysis_json(analysis: AuctionMaxBidAnalysis) -> dict:
     updated_at = analysis.updated_at.isoformat()
+    sources = _source_descriptions(analysis)
+    raw_count = sum(source["sold_records_count"] for source in sources)
     return {
         "source_filename": analysis.source_filename,
+        "sources": sources,
+        "source_count": len(sources),
+        "raw_sold_records_count": raw_count,
+        "duplicate_records_count": max(0, raw_count - analysis.sold_records_count),
         "currency": analysis.currency,
         "sold_records_count": analysis.sold_records_count,
         "method": analysis.resale_method,
@@ -704,6 +777,7 @@ def _analysis_json(analysis: AuctionMaxBidAnalysis) -> dict:
         },
         "comparables": analysis.comparables,
         "bid_rows": analysis.bid_rows,
+        "no_positive_bid": not bool(analysis.bid_rows),
         "created_at": analysis.created_at.isoformat(),
         "updated_at": updated_at,
         "last_analyzed_at": updated_at,
@@ -722,6 +796,7 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
     if analysis is None:
         return []
     currency = str(analysis.currency or "").strip().upper()
+    legacy_source = _stored_artprice_sources(analysis)[0]
     candidates = []
     seen_ids = set()
     for comparable in analysis.comparables if isinstance(analysis.comparables, list) else []:
@@ -801,12 +876,15 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
             notes.append("Artist is not recorded in this saved Artprice result; verify before selecting")
         candidates.append({
             "id": candidate_id,
+            "sale_identity": json.dumps(artprice_sale_identity(comparable), separators=(",", ":")),
             "provider": "Artprice",
             "provider_id": provider_id,
             "provider_url": source_url,
             "source_id": provider_id,
             "source_url": source_url,
-            "source_filename": analysis.source_filename,
+            "source_filename": (comparable.get("source_filenames") or [analysis.source_filename])[0],
+            "source_filenames": comparable.get("source_filenames") or [analysis.source_filename],
+            "source_ids": comparable.get("source_ids") or [legacy_source["id"]],
             "match_type": "artprice_html",
             "status": "sold",
             "sale_date": str(comparable.get("sale_date") or ""),
@@ -848,10 +926,25 @@ def _selected_resale_ids(
     """Include eligible new Artprice sales while retaining explicit later choices."""
 
     allowed = {str(item.get("id")) for item in candidates if item.get("credible") and item.get("status") == "sold"}
-    selected = list(dict.fromkeys(str(item) for item in selected_ids if str(item) in allowed))[:MAX_SELECTED_RESALE_COMPS]
+    requested = {str(item) for item in selected_ids}
+    previous_artprice_by_sale = {
+        artprice_sale_identity({**item, "hammer_price": item.get("hammer_usd")}): str(item.get("id"))
+        for item in previous_candidates or [] if item.get("provider") == "Artprice"
+    }
+    carried_ids = []
+    retained_artprice_ids = set()
+    for item in candidates:
+        if item.get("provider") != "Artprice":
+            continue
+        previous_id = previous_artprice_by_sale.get(artprice_sale_identity({**item, "hammer_price": item.get("hammer_usd")}))
+        if previous_id is not None:
+            retained_artprice_ids.add(str(item.get("id")))
+            if previous_id in requested:
+                carried_ids.append(str(item.get("id")))
+    selected = list(dict.fromkeys(str(item) for item in [*selected_ids, *carried_ids] if str(item) in allowed))[:MAX_SELECTED_RESALE_COMPS]
     previous_artprice_ids = {
         str(item.get("id")) for item in previous_candidates or [] if item.get("provider") == "Artprice"
-    }
+    } | retained_artprice_ids
     for candidate in candidates:
         identifier = str(candidate.get("id"))
         if (
@@ -890,6 +983,7 @@ def _lot_resale_scenarios(
         assumptions,
         artprice_sold_count=artprice.sold_records_count if artprice is not None else 0,
         artprice_source_filename=artprice.source_filename if artprice is not None else None,
+        artprice_sources=_source_descriptions(artprice) if artprice is not None else [],
         artprice_analysis_updated_at=artprice.updated_at.isoformat() if artprice is not None else None,
         allow_unestimable=allow_unestimable,
     )
@@ -945,15 +1039,30 @@ def auction_lot_artprice_analysis(request, lot_id: int):
 
     action = str(request.POST.get("action") or "").strip().casefold()
     try:
-        if action == "analyze":
-            source_filename, html_text = _uploaded_artprice_html(request)
-            result = analyze_artprice_html(html_text, **_analysis_options(request.POST))
+        if action in {"analyze", "add_sources"}:
+            uploaded_sources = _uploaded_artprice_sources(request)
             with transaction.atomic():
+                # Serialize edits of this lot so simultaneous additions cannot lose a file.
+                AuctionWatchLot.objects.select_for_update().get(pk=lot.pk)
+                existing = AuctionMaxBidAnalysis.objects.filter(lot=lot).first()
+                sources = _stored_artprice_sources(existing) if action == "add_sources" and existing else []
+                existing_ids = {source["id"] for source in sources}
+                sources = list(sources)
+                for source in uploaded_sources:
+                    if source["id"] not in existing_ids:
+                        sources.append(source)
+                        existing_ids.add(source["id"])
+                if len(sources) > MAX_ARTPRICE_SOURCES:
+                    raise _ArtpriceAnalysisRequestError("Save up to 10 Artprice HTML files per lot. Remove a saved file before adding more.")
+                result = analyze_artprice_comparables(
+                    merge_artprice_sources(sources), currency="USD", **_analysis_options(request.POST),
+                )
                 analysis = _replace_artprice_analysis(
                     lot,
                     result,
-                    source_filename=source_filename,
+                    source_filename=sources[0]["filename"],
                     created_by=request.user,
+                    sources=sources,
                 )
                 _refresh_saved_resale_from_artprice(lot)
             return JsonResponse(
@@ -965,22 +1074,25 @@ def auction_lot_artprice_analysis(request, lot_id: int):
             )
 
         if action == "recalculate":
-            existing = AuctionMaxBidAnalysis.objects.filter(lot=lot).first()
-            if existing is None:
-                raise _ArtpriceAnalysisRequestError(
-                    "Analyze a saved Artprice HTML page before recalculating."
-                )
-            result = analyze_artprice_comparables(
-                existing.comparables,
-                currency=existing.currency,
-                **_analysis_options(request.POST),
-            )
             with transaction.atomic():
+                AuctionWatchLot.objects.select_for_update().get(pk=lot.pk)
+                existing = AuctionMaxBidAnalysis.objects.filter(lot=lot).first()
+                if existing is None:
+                    raise _ArtpriceAnalysisRequestError(
+                        "Analyze a saved Artprice HTML page before recalculating."
+                    )
+                sources = _stored_artprice_sources(existing)
+                result = analyze_artprice_comparables(
+                    merge_artprice_sources(sources),
+                    currency=existing.currency,
+                    **_analysis_options(request.POST),
+                )
                 analysis = _replace_artprice_analysis(
                     lot,
                     result,
                     source_filename=existing.source_filename,
                     created_by=request.user,
+                    sources=sources,
                 )
                 _refresh_saved_resale_from_artprice(lot)
             return JsonResponse(
@@ -991,8 +1103,39 @@ def auction_lot_artprice_analysis(request, lot_id: int):
                 }
             )
 
+        if action == "remove_source":
+            source_id = str(request.POST.get("source_id") or "")
+            with transaction.atomic():
+                AuctionWatchLot.objects.select_for_update().get(pk=lot.pk)
+                existing = AuctionMaxBidAnalysis.objects.filter(lot=lot).first()
+                if existing is None:
+                    raise _ArtpriceAnalysisRequestError("The saved Artprice file was not found.", status=404)
+                sources = _stored_artprice_sources(existing)
+                remaining = [source for source in sources if source["id"] != source_id]
+                if len(remaining) == len(sources):
+                    raise _ArtpriceAnalysisRequestError("The saved Artprice file was not found.", status=404)
+                if remaining:
+                    result = analyze_artprice_comparables(
+                        merge_artprice_sources(remaining), currency=existing.currency,
+                        allow_no_bid=True,
+                        **_saved_artprice_options(existing),
+                    )
+                    analysis = _replace_artprice_analysis(
+                        lot, result, source_filename=remaining[0]["filename"],
+                        sources=remaining, created_by=request.user,
+                    )
+                else:
+                    existing.delete()
+                    analysis = None
+                _refresh_saved_resale_from_artprice(lot)
+            return JsonResponse({
+                "ok": True, "analysis": _analysis_json(analysis) if analysis else None,
+                "message": "Artprice HTML file removed.",
+            })
+
         if action == "delete":
             with transaction.atomic():
+                AuctionWatchLot.objects.select_for_update().get(pk=lot.pk)
                 AuctionMaxBidAnalysis.objects.filter(lot=lot).delete()
                 _refresh_saved_resale_from_artprice(lot)
             return JsonResponse(

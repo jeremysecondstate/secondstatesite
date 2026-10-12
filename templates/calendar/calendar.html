@@ -750,6 +750,14 @@
     let loadPromise = null;
     let busy = false;
     let refreshQueued = false;
+    let hasUnsavedChanges = false;
+    let currentSubjectMatches = [];
+    let pendingSourceRefresh = false;
+    let sourceRefreshVersion = 0;
+
+    const isArtpriceCandidate = (candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html";
+    const candidateSelectionKey = (candidate) => isArtpriceCandidate(candidate)
+      ? `artprice:${candidate.sale_identity || candidate.id}` : String(candidate.id);
 
     const textValue = (value) => value === null || value === undefined || value === "" ? "Not reported" : String(value);
     const describeSources = (data, saved) => {
@@ -758,8 +766,11 @@
       const liveartCount = candidates.length - artpriceCount;
       const parts = [];
       if (artpriceCount) {
-        const filename = candidates.find((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html")?.source_filename;
-        parts.push(`${artpriceCount} Artprice HTML sale${artpriceCount === 1 ? "" : "s"} ingested${filename ? ` from ${filename}` : " from the saved file"}.`);
+        const filenames = [...new Set(candidates
+          .filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html")
+          .flatMap((candidate) => Array.isArray(candidate.source_filenames) ? candidate.source_filenames : [candidate.source_filename])
+          .filter(Boolean))];
+        parts.push(`${artpriceCount} unique Artprice HTML sale${artpriceCount === 1 ? "" : "s"} ingested${filenames.length ? ` from ${filenames.join(", ")}` : " from saved files"}.`);
       }
       if (liveartCount) parts.push(`${liveartCount} LiveArt sale${liveartCount === 1 ? "" : "s"} retrieved ${formatAnalysisTimestamp(data?.retrieved_at || researchRetrievedAt)}.`);
       if (liveartCount && data?.data_units_spent != null) parts.push(`${data.data_units_spent} LiveArt Data Units used in ${saved ? "saved research" : "this search"}.`);
@@ -906,7 +917,7 @@
         ? "Not reported" : (originalCurrency ? formatAnalysisMoney(originalHammer, originalCurrency) : `${originalHammer} (currency not reported)`));
       appendFact(facts, "Original currency", originalCurrency);
       if (isArtprice) {
-        appendFact(facts, "Source file", candidate.source_filename);
+        appendFact(facts, "Source files", Array.isArray(candidate.source_filenames) ? candidate.source_filenames.join(", ") : candidate.source_filename);
         appendFact(facts, "Source record ID", candidate.source_id || candidate.id);
       } else {
         appendFact(facts, "Sale status", candidate.status);
@@ -975,6 +986,7 @@
       return card;
     };
     const renderCandidates = (subjectMatches = []) => {
+      currentSubjectMatches = subjectMatches;
       subjectResults.replaceChildren();
       candidateResults.replaceChildren();
       if (subjectMatches.length) {
@@ -1003,7 +1015,7 @@
       const groups = [
         ["exact_work", "Sales of this work", "An artwork ID can cover different print impressions. Check edition, signature, size, and condition for each sale."],
         ["related_work", "Similar sold works", "Compare the medium, edition, signature, size, and condition before selecting a sale."],
-        ["artprice_html", "Saved Artprice HTML sales", "These sold records came from the saved HTML file. Review each date, price, source, and missing detail."],
+        ["artprice_html", "Saved Artprice HTML sales", "These sold records combine your saved HTML files. Overlapping sales count once. Review each date, price, source file, and missing detail."],
         ["other", "Other candidate sold results", "Review the artwork identity and sale details before selecting a sale."],
       ];
       groups.forEach(([type, label, explanation]) => {
@@ -1042,11 +1054,13 @@
       const artpriceEligibleCount = Number(sourceSummary.artprice_eligible_count ?? artpriceCandidates.filter((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined).length);
       const artpriceSelectedCount = Number(sourceSummary.artprice_selected_count ?? artpriceCandidates.filter((candidate) => selectedIds.has(String(candidate.id))).length);
       const artpriceUsedCount = Number(sourceSummary.artprice_included_count ?? artpriceSelectedCount);
-      const artpriceFilename = sourceSummary.artprice_source_filename || artpriceCandidates[0]?.source_filename || "";
+      const artpriceFilenames = Array.isArray(sourceSummary.artprice_source_filenames)
+        ? sourceSummary.artprice_source_filenames
+        : [sourceSummary.artprice_source_filename || artpriceCandidates[0]?.source_filename].filter(Boolean);
       const ingestionNote = document.createElement("p");
       ingestionNote.className = "liveart-ingestion-note";
       ingestionNote.textContent = artpriceSoldCount
-        ? `Saved Artprice HTML sales history ingested: ${artpriceSoldCount} sold record${artpriceSoldCount === 1 ? "" : "s"}${artpriceFilename ? ` from ${artpriceFilename}` : ""}. ${artpriceEligibleCount} eligible for automatic selection, ${artpriceSelectedCount} selected; ${artpriceUsedCount} unique Artprice sale${artpriceUsedCount === 1 ? "" : "s"} used in ${currentAnalysis.saved === false ? "this bid preview" : "the saved resale bids"}.`
+        ? `Saved Artprice HTML sales history ingested: ${artpriceSoldCount} unique sold record${artpriceSoldCount === 1 ? "" : "s"}${artpriceFilenames.length ? ` from ${artpriceFilenames.join(", ")}` : ""}. ${artpriceEligibleCount} eligible for automatic selection, ${artpriceSelectedCount} selected; ${artpriceUsedCount} unique Artprice sale${artpriceUsedCount === 1 ? "" : "s"} used in ${currentAnalysis.saved === false ? "this bid preview" : "the saved resale bids"}.`
         : "No saved Artprice HTML sales history is available for this lot's resale bids.";
       const summary = document.createElement("dl");
       summary.className = "artprice-analysis-summary-grid";
@@ -1059,6 +1073,20 @@
         addResultItem(summary, "Artprice analyzed", formatAnalysisTimestamp(sourceSummary.artprice_analysis_updated_at || currentAnalysis.retrieved_at));
       }
       savedResults.append(heading, ingestionNote, summary);
+      if (Array.isArray(sourceSummary.artprice_sources) && sourceSummary.artprice_sources.length > 1) {
+        const fileBreakdown = document.createElement("ul");
+        fileBreakdown.className = "liveart-source-breakdown";
+        sourceSummary.artprice_sources.forEach((source) => {
+          const row = document.createElement("li");
+          row.textContent = `${source.filename}: ${source.ingested_count} ingested, ${source.eligible_count} eligible for automatic selection, ${source.selected_count} selected, ${source.included_count} used.`;
+          fileBreakdown.appendChild(row);
+        });
+        savedResults.appendChild(fileBreakdown);
+        const sharedNote = document.createElement("p");
+        sharedNote.className = "liveart-group-note";
+        sharedNote.textContent = "A sale found in multiple files appears in each file's count and is used once in the combined bids.";
+        savedResults.appendChild(sharedNote);
+      }
       if (Number(sourceSummary.artprice_duplicate_count || 0) > 0) {
         const overlapNote = document.createElement("p");
         overlapNote.className = "artprice-analysis-explanation";
@@ -1130,7 +1158,7 @@
       });
     };
     const markAnalysisPending = (message = "Comp selections or costs changed. Save the resale bid analysis to recalculate the estimates.") => {
-      if (!currentAnalysis) return;
+      hasUnsavedChanges = true;
       savedResults.replaceChildren();
       const pending = document.createElement("p");
       pending.className = "artprice-analysis-empty";
@@ -1147,7 +1175,7 @@
       });
     };
     const updateButtons = () => {
-      saveButton.disabled = busy || (!hasResearch && !currentAnalysis);
+      saveButton.disabled = busy || pendingSourceRefresh || (!hasResearch && !currentAnalysis);
       deleteButton.hidden = !currentAnalysis || currentAnalysis.saved === false;
       saveButton.textContent = currentAnalysis && currentAnalysis.saved !== false ? "Update resale bid analysis" : "Save resale bid analysis";
     };
@@ -1168,10 +1196,11 @@
       updateButtons();
       if (!value && refreshQueued) {
         refreshQueued = false;
-        Promise.resolve().then(() => refresh());
+        Promise.resolve().then(() => load());
       }
     };
     const applyAnalysis = (analysis) => {
+      hasUnsavedChanges = false;
       currentAnalysis = analysis || null;
       currentResearchId = "";
       if (analysis) {
@@ -1204,9 +1233,10 @@
       if (busy) return;
       if (liveartAnalysisCache.has(String(lot.id))) {
         loaded = true;
-        applyAnalysis(liveartAnalysisCache.get(String(lot.id)));
+        receiveAnalysis(liveartAnalysisCache.get(String(lot.id)));
         return;
       }
+      const requestVersion = sourceRefreshVersion;
       loadPromise = (async () => {
         setBusy(true);
         try {
@@ -1215,6 +1245,13 @@
             credentials: "same-origin",
             headers: {"X-Requested-With": "XMLHttpRequest"},
           }, "The saved resale bid analysis could not be loaded.");
+          if (requestVersion !== sourceRefreshVersion) {
+            if (pendingSourceRefresh) {
+              loaded = false;
+              refreshQueued = true;
+            }
+            return;
+          }
           loaded = true;
           liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
           syncLotInstances(liveartAnalysisInstances, lot.id, payload.analysis || null);
@@ -1230,6 +1267,7 @@
     };
     const refresh = async () => {
       liveartAnalysisCache.delete(String(lot.id));
+      syncLotInstances(liveartAnalysisInstances, lot.id, {refresh_pending: true});
       loaded = false;
       if (busy || loadPromise) {
         refreshQueued = true;
@@ -1256,17 +1294,16 @@
           body: JSON.stringify({...(subjectId === null ? {} : {subject_id: subjectId}), search_title: searchTitle}),
         }, "LiveArt research could not be completed.");
         const previousArtpriceIds = new Set(currentCandidates
-          .filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html")
-          .map((candidate) => String(candidate.id)));
+          .filter(isArtpriceCandidate).map(candidateSelectionKey));
         const selectedArtpriceIds = new Set(currentCandidates
-          .filter((candidate) => (candidate.provider === "Artprice" || candidate.match_type === "artprice_html") && selectedIds.has(String(candidate.id)))
-          .map((candidate) => String(candidate.id)));
+          .filter((candidate) => isArtpriceCandidate(candidate) && selectedIds.has(String(candidate.id)))
+          .map(candidateSelectionKey));
         currentCandidates = Array.isArray(payload.candidates) ? payload.candidates : [];
         const responseSelectedIds = new Set((Array.isArray(payload.selected_ids) ? payload.selected_ids : []).map(String));
         selectedIds = new Set(currentCandidates
           .filter((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined
-            && ((candidate.provider === "Artprice" || candidate.match_type === "artprice_html") && previousArtpriceIds.has(String(candidate.id))
-              ? selectedArtpriceIds.has(String(candidate.id))
+            && (isArtpriceCandidate(candidate) && previousArtpriceIds.has(candidateSelectionKey(candidate))
+              ? selectedArtpriceIds.has(candidateSelectionKey(candidate))
               : responseSelectedIds.has(String(candidate.id)) || candidate.selected))
           .map((candidate) => String(candidate.id)));
         currentResearchId = payload.research_id || "";
@@ -1295,7 +1332,7 @@
     };
     findButton.addEventListener("click", find);
     saveButton.addEventListener("click", async () => {
-      if (busy || !lot.liveart_analysis_url || (!hasResearch && !currentAnalysis)) return;
+      if (busy || pendingSourceRefresh || !lot.liveart_analysis_url || (!hasResearch && !currentAnalysis)) return;
       costFields.premium_max.setCustomValidity("");
       const controls = costDefinitions.map(([name]) => costFields[name]);
       const invalid = controls.find((control) => !control.checkValidity());
@@ -1322,9 +1359,14 @@
           headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
           body: JSON.stringify(requestData),
         }, "The resale bid analysis could not be saved.");
-        loaded = true;
-        liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
-        syncLotInstances(liveartAnalysisInstances, lot.id, payload.analysis || null);
+        if (pendingSourceRefresh) {
+          liveartAnalysisCache.delete(String(lot.id));
+          refreshQueued = true;
+        } else {
+          loaded = true;
+          liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
+          syncLotInstances(liveartAnalysisInstances, lot.id, payload.analysis || null);
+        }
         setStatus(payload.message || "Resale bid analysis saved.", "success");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : "The resale bid analysis could not be saved.", "error");
@@ -1354,10 +1396,67 @@
       }
     });
     costFields.premium_max.addEventListener("input", () => costFields.premium_max.setCustomValidity(""));
-    registerLotInstance(liveartAnalysisInstances, lot.id, section, (analysis) => {
+    const receiveAnalysis = (analysis) => {
+      if (analysis?.refresh_pending) {
+        pendingSourceRefresh = true;
+        sourceRefreshVersion += 1;
+        loaded = false;
+        savedResults.replaceChildren();
+        const pendingNote = document.createElement("p");
+        pendingNote.className = "artprice-analysis-empty";
+        pendingNote.textContent = "Artprice files changed. Refreshing resale bids before displaying estimates.";
+        savedResults.appendChild(pendingNote);
+        if (busy || loadPromise) refreshQueued = true;
+        updateButtons();
+        setStatus("Artprice files changed. Refreshing resale bids…", "loading");
+        return;
+      }
+      // A research or save response must settle before capturing its latest edits.
+      if (pendingSourceRefresh && busy && !loadPromise) {
+        loaded = false;
+        refreshQueued = true;
+        return;
+      }
+      const pending = pendingSourceRefresh && hasUnsavedChanges ? {
+        candidates: currentCandidates,
+        selectedIds: new Set(selectedIds),
+        researchId: currentResearchId,
+        retrievedAt: researchRetrievedAt,
+        hasResearch,
+        subjectNeedsChoice,
+        subjectMatches: currentSubjectMatches,
+        costs: Object.fromEntries(costDefinitions.map(([name]) => [name, costFields[name].value])),
+      } : null;
+      pendingSourceRefresh = false;
       loaded = true;
       applyAnalysis(analysis);
-    });
+      if (pending) {
+        const oldArtpriceIds = new Set(pending.candidates.filter(isArtpriceCandidate).map(candidateSelectionKey));
+        const previousSelection = new Set(pending.candidates
+          .filter((candidate) => pending.selectedIds.has(String(candidate.id))).map(candidateSelectionKey));
+        const artpriceCandidates = currentCandidates.filter(isArtpriceCandidate);
+        currentCandidates = [...pending.candidates.filter((candidate) => !isArtpriceCandidate(candidate)), ...artpriceCandidates];
+        selectedIds = new Set(currentCandidates
+          .filter((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined
+            && previousSelection.has(candidateSelectionKey(candidate)))
+          .map((candidate) => String(candidate.id)));
+        artpriceCandidates.forEach((candidate) => {
+          const identifier = String(candidate.id);
+          if (selectedIds.size < 25 && candidate.selected && !oldArtpriceIds.has(candidateSelectionKey(candidate))) selectedIds.add(identifier);
+        });
+        currentResearchId = pending.researchId;
+        researchRetrievedAt = pending.retrievedAt;
+        hasResearch = pending.hasResearch || currentCandidates.length > 0;
+        subjectNeedsChoice = pending.subjectNeedsChoice;
+        costDefinitions.forEach(([name]) => { costFields[name].value = pending.costs[name]; });
+        sourceMeta.textContent = describeSources({candidates: currentCandidates, retrieved_at: researchRetrievedAt}, false);
+        renderCandidates(pending.subjectMatches);
+        markAnalysisPending("Artprice files updated. Your unsaved research, selections, and costs are retained. Save the resale bid analysis to recalculate.");
+        updateButtons();
+      }
+      setStatus("");
+    };
+    registerLotInstance(liveartAnalysisInstances, lot.id, section, receiveAnalysis);
     if (liveartAnalysisCache.has(String(lot.id))) {
       loaded = true;
       applyAnalysis(liveartAnalysisCache.get(String(lot.id)));
@@ -1392,7 +1491,7 @@
 
     const intro = document.createElement("p");
     intro.className = "artprice-analysis-intro";
-    intro.textContent = "Estimate resale bids from a saved Artprice HTML page or on-demand LiveArt artwork sales history and similar sold works. Review sources and assumptions before bidding.";
+    intro.textContent = "Estimate resale bids from saved Artprice HTML pages or on-demand LiveArt artwork sales history and similar sold works. Combine related Artprice searches, then review the sales and assumptions before bidding.";
 
     const artpriceHeading = document.createElement("h4");
     artpriceHeading.className = "resale-source-heading";
@@ -1429,6 +1528,7 @@
       control.id = inputId;
       control.name = name;
       if (options.accept) control.accept = options.accept;
+      if (options.multiple) control.multiple = true;
       if (options.inputMode) control.inputMode = options.inputMode;
       if (options.min !== undefined) control.min = options.min;
       if (options.max !== undefined) control.max = options.max;
@@ -1445,12 +1545,16 @@
 
     const grid = document.createElement("div");
     grid.className = "artprice-analysis-grid";
-    const htmlField = addInput("artprice_html", "Saved Artprice HTML page", {
+    const htmlField = addInput("artprice_html", "Saved Artprice HTML files", {
       type: "file",
       accept: ".html,.htm,text/html",
+      multiple: true,
       required: true,
       wide: true,
     });
+    const htmlHint = document.createElement("small");
+    htmlHint.textContent = "Choose one or more related searches, or add more later. Up to 10 saved files; 5 MB each and 25 MB per upload. Overlapping sales count once.";
+    htmlField.appendChild(htmlHint);
     const advancedFields = [
       addInput("method", "Resale valuation method", {
         options: Object.entries(maxBidMethodLabels),
@@ -1548,7 +1652,7 @@
     const analyzeButton = document.createElement("button");
     analyzeButton.className = "is-primary";
     analyzeButton.type = "submit";
-    analyzeButton.textContent = "Analyze HTML";
+    analyzeButton.textContent = "Add HTML files";
     const researchButton = document.createElement("button");
     researchButton.className = "is-primary";
     researchButton.type = "button";
@@ -1591,7 +1695,7 @@
     const deleteButton = document.createElement("button");
     deleteButton.className = "is-danger";
     deleteButton.type = "button";
-    deleteButton.textContent = "Remove Analysis";
+    deleteButton.textContent = "Remove all Artprice files";
     deleteButton.hidden = true;
     actions.append(analyzeButton, researchButton, recalculateButton, deleteButton);
 
@@ -1657,13 +1761,14 @@
       Array.from(form.elements).forEach((control) => {
         control.disabled = value;
       });
+      results.querySelectorAll("button").forEach((control) => { control.disabled = value; });
       if (!value) updateMethodFields();
       details.classList.toggle("is-loading", value);
     };
 
     const updateActionState = () => {
       const hasAnalysis = Boolean(currentAnalysis);
-      analyzeButton.textContent = hasAnalysis ? "Replace HTML" : "Analyze HTML";
+      analyzeButton.textContent = "Add HTML files";
       recalculateButton.hidden = !hasAnalysis;
       deleteButton.hidden = !hasAnalysis;
       updateSummaryBadge();
@@ -1706,7 +1811,7 @@
       if (!analysis) {
         const empty = document.createElement("p");
         empty.className = "artprice-analysis-empty";
-        empty.textContent = "No saved analysis yet. Choose a saved Artprice HTML page to begin.";
+        empty.textContent = "No saved Artprice files yet. Choose one or more HTML files to begin.";
         results.appendChild(empty);
         return;
       }
@@ -1716,7 +1821,7 @@
       heading.textContent = "Saved Artprice analysis · estimates";
       const summaryGrid = document.createElement("dl");
       summaryGrid.className = "artprice-analysis-summary-grid";
-      appendSummaryItem(summaryGrid, "Sold records", String(analysis.sold_records_count ?? 0));
+      appendSummaryItem(summaryGrid, "Unique sold records", String(analysis.sold_records_count ?? 0));
       appendSummaryItem(
         summaryGrid,
         "Valuation method",
@@ -1742,12 +1847,41 @@
         "Last analyzed",
         formatAnalysisTimestamp(analysis.updated_at || analysis.created_at)
       );
-      appendSummaryItem(summaryGrid, "Source file", String(analysis.source_filename || "Not available"), true);
+      const sources = Array.isArray(analysis.sources) ? analysis.sources : [];
+      appendSummaryItem(summaryGrid, "Saved HTML files", String(analysis.source_count ?? sources.length));
 
       const ingestionNote = document.createElement("p");
       ingestionNote.className = "liveart-ingestion-note";
       const soldCount = Number(analysis.sold_records_count || 0);
-      ingestionNote.textContent = `Saved Artprice HTML sales history ingested: ${soldCount} sold record${soldCount === 1 ? "" : "s"}${analysis.source_filename ? ` from ${analysis.source_filename}` : ""}. Eligible USD sales are available in Sold comps for resale bids, which shows how many were used.`;
+      const rawSoldCount = Number(analysis.raw_sold_records_count ?? soldCount);
+      const duplicateCount = Number(analysis.duplicate_records_count || 0);
+      ingestionNote.textContent = `Saved Artprice HTML sales history ingested: ${rawSoldCount} sold record${rawSoldCount === 1 ? "" : "s"} across ${sources.length || 1} file${sources.length === 1 ? "" : "s"}; ${soldCount} unique sale${soldCount === 1 ? "" : "s"}.${duplicateCount ? ` ${duplicateCount} overlapping record${duplicateCount === 1 ? " is" : "s are"} counted once.` : ""} The resale bid analysis below shows how many sales were used.`;
+      const sourceList = document.createElement("ul");
+      sourceList.className = "artprice-source-list";
+      sourceList.setAttribute("aria-label", "Saved Artprice HTML files");
+      sources.forEach((source) => {
+        const row = document.createElement("li");
+        const sourceInfo = document.createElement("div");
+        const filename = document.createElement("strong");
+        filename.textContent = source.filename;
+        const count = document.createElement("small");
+        count.textContent = `${source.sold_records_count} sold record${Number(source.sold_records_count) === 1 ? "" : "s"} · Added ${formatAnalysisTimestamp(source.uploaded_at)}`;
+        sourceInfo.append(filename, count);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "Remove";
+        remove.disabled = busy;
+        remove.setAttribute("aria-label", `Remove ${source.filename} from Artprice analysis`);
+        remove.addEventListener("click", () => {
+          if (busy) return;
+          const formData = new FormData();
+          formData.append("action", "remove_source");
+          formData.append("source_id", source.id);
+          postAnalysis("remove_source", formData, `Removing ${source.filename}…`, "The Artprice file could not be removed.");
+        });
+        row.append(sourceInfo, remove);
+        sourceList.appendChild(row);
+      });
 
       const explanation = document.createElement("p");
       explanation.className = "artprice-analysis-explanation";
@@ -1785,6 +1919,10 @@
       });
       bidTable.append(bidHead, bidBody);
       bidTableWrap.appendChild(bidTable);
+      if (analysis.no_positive_bid) {
+        bidTableWrap.replaceChildren();
+        appendText(bidTableWrap, "p", "artprice-analysis-disclaimer", "The remaining sales do not support a positive hammer bid after the saved costs and target profit. Review the assumptions or add more relevant sales.");
+      }
 
       const comparables = Array.isArray(analysis.comparables) ? analysis.comparables : [];
       const comparableDetails = document.createElement("details");
@@ -1812,6 +1950,8 @@
         const titleCell = appendTableCell(row, "td", String(comparable.title || "Untitled"));
         const secondaryParts = [];
         if (comparable.lot_number) secondaryParts.push(`Lot ${comparable.lot_number}`);
+        const sourceNames = Array.isArray(comparable.source_filenames) ? comparable.source_filenames : [];
+        if (sourceNames.length) secondaryParts.push(`Files: ${sourceNames.join(", ")}`);
         if (comparable.estimate_low || comparable.estimate_high) {
           const low = formatAnalysisMoney(comparable.estimate_low, currency);
           const high = formatAnalysisMoney(comparable.estimate_high, currency);
@@ -1835,6 +1975,7 @@
         heading,
         summaryGrid,
         ingestionNote,
+        sourceList,
         explanation,
         bidHeading,
         bidTableWrap,
@@ -1928,7 +2069,7 @@
     const postAnalysis = async (action, formData, loadingMessage, fallbackMessage) => {
       setBusy(true);
       setStatus(loadingMessage, "loading");
-      if (action === "analyze") analyzeButton.textContent = currentAnalysis ? "Replacing…" : "Analyzing…";
+      if (action === "add_sources") analyzeButton.textContent = "Adding…";
       if (action === "recalculate") recalculateButton.textContent = "Recalculating…";
       if (action === "delete") deleteButton.textContent = "Removing…";
       try {
@@ -1958,7 +2099,7 @@
         setBusy(false);
         updateActionState();
         recalculateButton.textContent = "Recalculate";
-        deleteButton.textContent = "Remove Analysis";
+        deleteButton.textContent = "Remove all Artprice files";
       }
     };
 
@@ -1973,31 +2114,37 @@
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (busy) return;
       if (!validateAssumptions()) return;
-      const file = fields.artprice_html.files?.[0];
-      if (!file) {
-        fields.artprice_html.setCustomValidity("Choose a saved Artprice .html or .htm file.");
+      const files = Array.from(fields.artprice_html.files || []);
+      if (!files.length) {
+        fields.artprice_html.setCustomValidity("Choose one or more saved Artprice .html or .htm files.");
         fields.artprice_html.reportValidity();
         return;
       }
       fields.artprice_html.setCustomValidity("");
-      if (file.size > 5 * 1024 * 1024) {
-        fields.artprice_html.setCustomValidity("The saved HTML file must be 5 MB or smaller.");
+      if (files.length > 10 || files.reduce((total, file) => total + file.size, 0) > 25 * 1024 * 1024) {
+        fields.artprice_html.setCustomValidity("Choose up to 10 HTML files totaling 25 MB or less.");
         fields.artprice_html.reportValidity();
         return;
       }
-      if (!/\.html?$/i.test(file.name)) {
-        fields.artprice_html.setCustomValidity("Choose a file ending in .html or .htm.");
+      if (files.some((file) => file.size > 5 * 1024 * 1024)) {
+        fields.artprice_html.setCustomValidity("Each saved HTML file must be 5 MB or smaller.");
         fields.artprice_html.reportValidity();
         return;
       }
-      const formData = buildAssumptionData("analyze");
-      formData.append("artprice_html", file, file.name);
+      if (files.some((file) => !/\.html?$/i.test(file.name))) {
+        fields.artprice_html.setCustomValidity("Every file must end in .html or .htm.");
+        fields.artprice_html.reportValidity();
+        return;
+      }
+      const formData = buildAssumptionData("add_sources");
+      files.forEach((file) => formData.append("artprice_html", file, file.name));
       postAnalysis(
-        "analyze",
+        "add_sources",
         formData,
-        currentAnalysis ? "Replacing saved analysis…" : "Analyzing saved Artprice page…",
-        "The Artprice HTML could not be analyzed."
+        `Adding ${files.length} Artprice HTML file${files.length === 1 ? "" : "s"}…`,
+        "The Artprice HTML files could not be added."
       );
     });
 
@@ -2012,7 +2159,7 @@
     });
 
     deleteButton.addEventListener("click", () => {
-      if (!window.confirm("Remove this saved Artprice analysis? The normalized comparables and results will be deleted.")) {
+      if (!window.confirm("Remove all saved Artprice files and their analysis for this lot? Resale bids will be recalculated using any remaining LiveArt sales.")) {
         return;
       }
       const formData = new FormData();
