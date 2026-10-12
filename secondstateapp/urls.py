@@ -34,6 +34,16 @@ urlpatterns = [
         name="auction_lot_artprice_analysis",
     ),
     path(
+        "calendar/lots/<int:lot_id>/liveart-research/",
+        calendar_views.auction_lot_liveart_research,
+        name="auction_lot_liveart_research",
+    ),
+    path(
+        "calendar/lots/<int:lot_id>/liveart-analysis/",
+        calendar_views.auction_lot_liveart_analysis,
+        name="auction_lot_liveart_analysis",
+    ),
+    path(
         "calendar/lots/<int:lot_id>/email-tray/",
         calendar_views.update_auction_email_selection,
         name="auction_email_lot_selection",

@@ -274,6 +274,41 @@ class AuctionMaxBidAnalysis(models.Model):
         return f"{self.lot} ({self.get_resale_method_display()})"
 
 
+class LiveArtResaleAnalysis(models.Model):
+    """Private, normalized LiveArt research kept separate from Artprice uploads."""
+
+    lot = models.OneToOneField(
+        AuctionWatchLot,
+        on_delete=models.CASCADE,
+        related_name="liveart_resale_analysis",
+    )
+    subject_match = models.JSONField(default=dict, blank=True)
+    subject_matches = models.JSONField(default=list, blank=True)
+    candidates = models.JSONField(default=list, blank=True)
+    selected_ids = models.JSONField(default=list, blank=True)
+    assumptions = models.JSONField(default=dict, blank=True)
+    scenarios = models.JSONField(default=list, blank=True)
+    retrieved_at = models.DateTimeField()
+    data_units_spent = models.PositiveIntegerField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        verbose_name = "LiveArt resale analysis"
+        verbose_name_plural = "LiveArt resale analyses"
+
+    def __str__(self):
+        return f"{self.lot} (LiveArt resale)"
+
+
 class AuctionReminderDelivery(models.Model):
     """Idempotency and delivery audit record for one daily reminder digest."""
 

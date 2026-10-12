@@ -3,6 +3,7 @@ from __future__ import annotations
 import calendar as month_calendar
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
@@ -25,6 +26,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 
 from catalogapp.artprice_artist_links import artist_identity_key
@@ -45,12 +47,15 @@ from .calendar_images import (
     prepare_saved_calendar_image,
     store_saved_calendar_image,
 )
+from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
+from .liveart_resale import build_scenarios, normalize_candidate, subject_matches as score_liveart_subject_matches
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
     AuctionMaxBidAnalysis,
     AuctionWatchArtist,
     AuctionWatchLot,
+    LiveArtResaleAnalysis,
 )
 
 
@@ -218,12 +223,15 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
         "artprice_analysis_url": reverse("auction_lot_artprice_analysis", args=(lot.pk,)),
+        "liveart_research_url": reverse("auction_lot_liveart_research", args=(lot.pk,)),
+        "liveart_analysis_url": reverse("auction_lot_liveart_analysis", args=(lot.pk,)),
         "email_tray_selected": lot.pk in selected_lot_ids,
         "email_tray_update_url": reverse("auction_email_lot_selection", args=(lot.pk,)),
         "ended": not lot.active,
     }
 
 
+@never_cache
 @staff_member_required
 def auction_calendar(request):
     zone = _calendar_zone()
@@ -773,6 +781,266 @@ def auction_lot_artprice_analysis(request, lot_id: int):
         return JsonResponse({"ok": False, "error": str(exc)}, status=exc.status)
     except ArtpriceAnalysisError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+
+def _liveart_analysis_json(analysis: LiveArtResaleAnalysis) -> dict:
+    return {
+        "provider": "LiveArt",
+        "subject_match": analysis.subject_match or None,
+        "subject_matches": analysis.subject_matches,
+        "candidates": analysis.candidates,
+        "selected_ids": analysis.selected_ids,
+        "assumptions": analysis.assumptions,
+        "scenarios": analysis.scenarios,
+        "no_credible_comps": not bool(analysis.selected_ids),
+        "retrieved_at": analysis.retrieved_at.isoformat(),
+        "data_units_spent": analysis.data_units_spent,
+        "created_at": analysis.created_at.isoformat(),
+        "updated_at": analysis.updated_at.isoformat(),
+        "estimate_notice": "Resale values and maximum hammer bids are estimates, not guaranteed profit.",
+    }
+
+
+def _liveart_du(page) -> int | None:
+    """Use the metered response header when present; never infer a larger bill."""
+
+    value = getattr(page, "data_units", None)
+    return int(value) if value is not None and value >= 0 else None
+
+
+def _add_liveart_du(total: int | None, page) -> int | None:
+    cost = _liveart_du(page)
+    return total + cost if total is not None and cost is not None else None
+
+
+def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "") -> dict:
+    if not lot.event_at or not lot.lot_number.strip():
+        raise ValueError("This Calendar lot needs an auction date and lot number for LiveArt matching.")
+    if not (_artist_label(lot).strip() and lot.title.strip() and lot.auction_house.strip()):
+        raise ValueError("This Calendar lot needs a house, artist, and title for LiveArt matching.")
+
+    local_date = timezone.localtime(lot.event_at, _calendar_zone()).date()
+    start = (local_date - timedelta(days=2)).isoformat()
+    end = (local_date + timedelta(days=2)).isoformat()
+    client = LiveArtClient()
+    subject_page = client.list_lots(
+        lot_num=lot.lot_number.strip(),
+        search=lot.title[:200],
+        sale_datetime__gte=start,
+        sale_datetime__lte=end,
+        limit=12,
+    )
+    units = _liveart_du(subject_page)
+    matches = score_liveart_subject_matches(lot, subject_page.items)
+    verified = [item for item in matches if item.get("verified")]
+    chosen = None
+    if subject_id:
+        chosen = next((item for item in verified if str(item.get("id")) == subject_id), None)
+        if chosen is None:
+            raise ValueError("The selected LiveArt lot does not match this Calendar lot.")
+    elif len(verified) == 1:
+        chosen = verified[0]
+
+    retrieved_at = timezone.now().isoformat()
+    if chosen is None:
+        return {
+            "subject_matches": matches,
+            "subject_match": None,
+            "candidates": [],
+            "retrieved_at": retrieved_at,
+            "data_units_spent": units,
+            "requires_subject_choice": len(verified) > 1,
+            "message": (
+                "Choose the matching LiveArt lot before fetching sold comps."
+                if len(verified) > 1
+                else "No LiveArt lot matched the Calendar house, date, lot number, artist, and title."
+            ),
+        }
+
+    raw_subject = next(
+        (item for item in subject_page.items if str(item.get("id")) == str(chosen.get("id"))),
+        None,
+    )
+    if raw_subject is None:
+        raise ValueError("The selected LiveArt lot is unavailable; request research again.")
+    artwork = raw_subject.get("artwork") if isinstance(raw_subject.get("artwork"), dict) else {}
+    artwork_id = raw_subject.get("artwork_id") or artwork.get("id")
+    artist_id = artwork.get("artist_id")
+    if artist_id is None and isinstance(artwork.get("artist"), dict):
+        artist_id = artwork["artist"].get("id")
+
+    raw_comps: list[dict] = []
+    if artwork_id is not None:
+        artwork_page = client.list_lots(artwork_id=artwork_id, status="sold", limit=10)
+        units = _add_liveart_du(units, artwork_page)
+        raw_comps.extend({**item, "_retrieved_at": artwork_page.retrieved_at} for item in artwork_page.items)
+    if artist_id is not None:
+        artist_page = client.list_lots(
+            artist_id=artist_id,
+            search=str(chosen.get("title") or lot.title)[:200],
+            status="sold",
+            sort="SALE_DATE_DESC",
+            limit=12,
+        )
+        units = _add_liveart_du(units, artist_page)
+        raw_comps.extend({**item, "_retrieved_at": artist_page.retrieved_at} for item in artist_page.items)
+    elif not artwork_id:
+        # A name search is a bounded fallback when the subject lacks stable IDs.
+        artist_page = client.list_lots(search=lot.title[:200], status="sold", limit=10)
+        units = _add_liveart_du(units, artist_page)
+        raw_comps.extend({**item, "_retrieved_at": artist_page.retrieved_at} for item in artist_page.items)
+
+    candidates = []
+    seen_ids = set()
+    seen_sales = set()
+    subject_sale_key = (str(raw_subject.get("sale_id") or ""), str(raw_subject.get("lot_num") or ""))
+    for raw in raw_comps:
+        candidate_id = str(raw.get("id") or "")
+        if not candidate_id or candidate_id == str(chosen.get("id")) or candidate_id in seen_ids:
+            continue
+        sale_key = (str(raw.get("sale_id") or ""), str(raw.get("lot_num") or ""))
+        if all(sale_key) and (sale_key == subject_sale_key or sale_key in seen_sales):
+            continue
+        seen_ids.add(candidate_id)
+        if all(sale_key):
+            seen_sales.add(sale_key)
+        candidate = normalize_candidate(raw, raw_subject, lot)
+        candidate["retrieved_at"] = raw.get("_retrieved_at") or timezone.now().isoformat()
+        candidates.append(candidate)
+    candidates.sort(key=lambda item: str(item.get("sale_date") or ""), reverse=True)
+    selected_ids = [str(item["id"]) for item in candidates if item.get("selected") and item.get("credible")]
+    return {
+        "subject_matches": matches,
+        "subject_match": chosen,
+        "candidates": candidates,
+        "selected_ids": selected_ids,
+        "retrieved_at": timezone.now().isoformat(),
+        "data_units_spent": units,
+        "requires_subject_choice": False,
+        "message": (
+            f"Found {len(candidates)} candidate sold results; review selection and print details before saving."
+            if candidates else "No candidate sold results were returned for this LiveArt lot."
+        ),
+    }
+
+
+@never_cache
+@staff_member_required
+@require_POST
+def auction_lot_liveart_research(request, lot_id: int):
+    lot = AuctionWatchLot.objects.filter(pk=lot_id).first()
+    if lot is None:
+        return JsonResponse({"ok": False, "error": "Auction lot not found."}, status=404)
+    if len(request.body) > 2_000:
+        return JsonResponse({"ok": False, "error": "Research request is too large."}, status=413)
+    try:
+        payload = json.loads(request.body or b"{}")
+        if not isinstance(payload, dict):
+            raise ValueError("Research request must be a JSON object.")
+        subject_id = str(payload.get("subject_id") or "").strip()
+        if len(subject_id) > 80:
+            raise ValueError("Invalid LiveArt lot ID.")
+        research = _research_liveart_lot(lot, subject_id=subject_id)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Research request must be valid JSON."}, status=400)
+    except LiveArtConfigurationError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=503)
+    except LiveArtAPIError as exc:
+        response = JsonResponse(
+            {"ok": False, "error": str(exc)},
+            status=exc.status_code if exc.status_code == 429 else 503,
+        )
+        if exc.status_code == 429 and exc.retry_after is not None:
+            response["Retry-After"] = str(math.ceil(exc.retry_after))
+        return response
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+    research["research_id"] = secrets.token_hex(16)
+    request.session[f"liveart_research_{lot.pk}"] = research
+    return JsonResponse({"ok": True, **research})
+
+
+@never_cache
+@staff_member_required
+@require_http_methods(["GET", "POST"])
+def auction_lot_liveart_analysis(request, lot_id: int):
+    lot = AuctionWatchLot.objects.filter(pk=lot_id).first()
+    if lot is None:
+        return JsonResponse({"ok": False, "error": "Auction lot not found."}, status=404)
+    existing = LiveArtResaleAnalysis.objects.filter(lot=lot).first()
+    if request.method == "GET":
+        return JsonResponse(
+            {"ok": True, "analysis": _liveart_analysis_json(existing) if existing else None}
+        )
+    if len(request.body) > 20_000:
+        return JsonResponse({"ok": False, "error": "Analysis request is too large."}, status=413)
+    try:
+        payload = json.loads(request.body or b"{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Analysis request must be valid JSON."}, status=400)
+    if not isinstance(payload, dict):
+        return JsonResponse({"ok": False, "error": "Analysis request must be a JSON object."}, status=400)
+    action = str(payload.get("action") or "save").strip().casefold()
+    if action == "delete":
+        if existing:
+            existing.delete()
+        request.session.pop(f"liveart_research_{lot.pk}", None)
+        return JsonResponse({"ok": True, "analysis": None, "message": "LiveArt analysis removed."})
+    if action != "save":
+        return JsonResponse({"ok": False, "error": "Choose a valid LiveArt analysis action."}, status=400)
+    research_id = str(payload.get("research_id") or "")
+    research = request.session.get(f"liveart_research_{lot.pk}")
+    if research_id and (not isinstance(research, dict) or research.get("research_id") != research_id):
+        return JsonResponse(
+            {"ok": False, "error": "This research was replaced in another tab. Find LiveArt comps again."}, status=409
+        )
+    if not research_id and existing is not None:
+        research = {
+            "subject_match": existing.subject_match or None,
+            "subject_matches": existing.subject_matches,
+            "candidates": existing.candidates,
+            "retrieved_at": existing.retrieved_at.isoformat(),
+            "data_units_spent": existing.data_units_spent,
+        }
+    if not isinstance(research, dict):
+        return JsonResponse(
+            {"ok": False, "error": "Find LiveArt comps before saving an analysis."}, status=400
+        )
+    candidates = research.get("candidates")
+    selected_ids = payload.get("selected_ids", [])
+    assumptions = payload.get("assumptions", {})
+    if not isinstance(candidates, list) or not isinstance(selected_ids, list) or not isinstance(assumptions, dict):
+        return JsonResponse({"ok": False, "error": "Invalid LiveArt analysis selections."}, status=400)
+    if len(selected_ids) > 25 or any(not isinstance(item, (str, int)) for item in selected_ids):
+        return JsonResponse({"ok": False, "error": "Invalid LiveArt comp selection."}, status=400)
+    selected_ids = list(dict.fromkeys(str(item) for item in selected_ids))
+    allowed = {str(item.get("id")) for item in candidates if isinstance(item, dict) and item.get("credible")}
+    if any(item not in allowed for item in selected_ids):
+        return JsonResponse({"ok": False, "error": "Select only verified sold LiveArt comps."}, status=400)
+    try:
+        normalized_assumptions, scenarios = build_scenarios(candidates, selected_ids, assumptions)
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+    retrieved_at = parse_datetime(str(research.get("retrieved_at") or "")) or timezone.now()
+    if timezone.is_naive(retrieved_at):
+        retrieved_at = timezone.make_aware(retrieved_at, datetime_timezone.utc)
+    defaults = {
+        "subject_match": research.get("subject_match") or {},
+        "subject_matches": research.get("subject_matches") or [],
+        "candidates": candidates,
+        "selected_ids": selected_ids,
+        "assumptions": normalized_assumptions,
+        "scenarios": scenarios,
+        "retrieved_at": retrieved_at,
+        "data_units_spent": research.get("data_units_spent"),
+        "created_by": request.user,
+    }
+    analysis, _created = LiveArtResaleAnalysis.objects.update_or_create(lot=lot, defaults=defaults)
+    request.session.pop(f"liveart_research_{lot.pk}", None)
+    return JsonResponse(
+        {"ok": True, "analysis": _liveart_analysis_json(analysis), "message": "LiveArt resale bid analysis saved."}
+    )
 
 
 def _email_item_sort_key(item: AuctionEmailBatchItem) -> tuple:

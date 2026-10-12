@@ -326,6 +326,12 @@
     premium_min: "23",
     premium_max: "35",
   };
+  const liveartDefaults = {
+    ...maxBidDefaults,
+    other_buying_costs: "0.00",
+    downside_factor: "0.80",
+    upside_factor: "1.10",
+  };
   const maxBidMethodLabels = {
     median: "Median",
     mean: "Mean",
@@ -338,6 +344,8 @@
   const artpriceEditorInstances = new Map();
   const artpriceAnalysisInstances = new Map();
   const artpriceAnalysisCache = new Map();
+  const liveartAnalysisInstances = new Map();
+  const liveartAnalysisCache = new Map();
 
   const registerLotInstance = (registry, lotId, node, applyState) => {
     const key = String(lotId);
@@ -427,7 +435,10 @@
       const fallback = sessionExpired
         ? "Your session expired. Refresh the page and sign in again."
         : fallbackMessage;
-      throw new Error(payload.error || fallback);
+      let message = payload.error || fallback;
+      const retryAfter = response.status === 429 ? response.headers.get("Retry-After") : "";
+      if (retryAfter) message += ` Retry after ${/^\d+$/.test(retryAfter) ? `${retryAfter} seconds` : retryAfter}.`;
+      throw new Error(message);
     }
     return payload;
   };
@@ -629,6 +640,600 @@
     item.appendChild(form);
   };
 
+  const appendLiveArtResearch = (panel, lot, options = {}) => {
+    const section = document.createElement("section");
+    section.className = "liveart-analysis";
+    section.setAttribute("aria-label", "LiveArt resale research");
+    const heading = document.createElement("h4");
+    heading.className = "resale-source-heading";
+    heading.textContent = "LiveArt sold comps";
+    const intro = document.createElement("p");
+    intro.className = "artprice-analysis-intro";
+    intro.textContent = "Search this lot's auction, date, lot number, artist, and title on demand. Each search is capped at 3 requests and 40 Data Units. Results are a limited sample; review verified USD hammer comps before saving an estimate.";
+    const searchFacts = document.createElement("p");
+    searchFacts.className = "liveart-search-facts";
+    searchFacts.textContent = [
+      lot.auction_house,
+      lot.sale_date || selectedDay,
+      lot.lot_number ? `Lot ${lot.lot_number}` : "Lot number unavailable",
+      lot.artist || "Artist unavailable",
+      lot.title || "Title unavailable",
+    ].filter(Boolean).join(" · ");
+    const actions = document.createElement("div");
+    actions.className = "artprice-analysis-actions";
+    const findButton = document.createElement("button");
+    findButton.type = "button";
+    findButton.className = "is-primary";
+    findButton.textContent = "Search LiveArt again";
+    findButton.hidden = true;
+    actions.appendChild(findButton);
+    const status = document.createElement("p");
+    status.className = "artprice-analysis-status";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    const sourceMeta = document.createElement("p");
+    sourceMeta.className = "liveart-source-meta";
+    const subjectResults = document.createElement("div");
+    subjectResults.className = "liveart-subject-results";
+    const candidateResults = document.createElement("div");
+    candidateResults.className = "liveart-candidate-results";
+    const savedResults = document.createElement("div");
+    savedResults.className = "artprice-analysis-results liveart-saved-results";
+
+    const assumptions = document.createElement("details");
+    assumptions.className = "artprice-analysis-advanced liveart-assumptions";
+    const assumptionsSummary = document.createElement("summary");
+    assumptionsSummary.textContent = "Adjust buying and selling costs";
+    const assumptionsGrid = document.createElement("div");
+    assumptionsGrid.className = "artprice-analysis-grid";
+    const costFields = {};
+    const costDefinitions = [
+      ["inbound_shipping", "Inbound shipping (USD)"],
+      ["other_buying_costs", "Other buying costs, tax and insurance (USD)"],
+      ["target_profit", "Target profit (USD)"],
+      ["seller_commission_pct", "Seller commission (%)"],
+      ["outbound_shipping", "Outbound shipping (USD)"],
+      ["other_resale_costs", "Other resale costs (USD)"],
+      ["premium_min", "Minimum buyer premium (%)"],
+      ["premium_max", "Maximum buyer premium (%)"],
+      ["downside_factor", "Downside factor (0.80 = 80% of lowest comp)"],
+      ["upside_factor", "Upside factor (1.10 = 110% of highest comp)"],
+    ];
+    costDefinitions.forEach(([name, labelText]) => {
+      const group = document.createElement("div");
+      group.className = "artprice-analysis-field";
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "number";
+      input.inputMode = "decimal";
+      input.min = name === "downside_factor" ? "0.25" : name === "upside_factor" ? "1" : "0";
+      input.max = name === "downside_factor" ? "1" : name === "upside_factor" ? "2" : name === "seller_commission_pct" ? "99.99" : name.startsWith("premium_") ? "100" : "";
+      input.step = name.startsWith("premium_") ? "1" : "0.01";
+      input.required = true;
+      input.id = `${options.idPrefix || ""}liveart-${name}-${lot.id}`;
+      input.name = name;
+      input.value = liveartDefaults[name];
+      label.htmlFor = input.id;
+      label.textContent = labelText;
+      group.append(label, input);
+      assumptionsGrid.appendChild(group);
+      costFields[name] = input;
+    });
+    assumptions.append(assumptionsSummary, assumptionsGrid);
+
+    const saveActions = document.createElement("div");
+    saveActions.className = "artprice-analysis-actions";
+    const saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.className = "is-primary";
+    saveButton.textContent = "Save LiveArt analysis";
+    saveButton.disabled = true;
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "is-danger";
+    deleteButton.textContent = "Remove LiveArt analysis";
+    deleteButton.hidden = true;
+    saveActions.append(saveButton, deleteButton);
+    section.append(
+      heading, intro, searchFacts, actions, status, sourceMeta,
+      subjectResults, candidateResults, assumptions, saveActions, savedResults
+    );
+    panel.appendChild(section);
+
+    let currentAnalysis = null;
+    let currentCandidates = [];
+    let selectedIds = new Set();
+    let researchRetrievedAt = "";
+    let hasResearch = false;
+    let subjectNeedsChoice = false;
+    let currentResearchId = "";
+    let loaded = false;
+    let loadPromise = null;
+    let busy = false;
+
+    const textValue = (value) => value === null || value === undefined || value === "" ? "Not reported" : String(value);
+    const setStatus = (message = "", tone = "") => {
+      status.textContent = message;
+      status.className = "artprice-analysis-status";
+      if (tone) status.classList.add(`is-${tone}`);
+    };
+    const providerLink = (url, label) => {
+      if (typeof url !== "string") return null;
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== "https:" || parsed.username || parsed.password) return null;
+        return externalLink(parsed.href, "liveart-provider-link", label);
+      } catch (_error) {
+        return null;
+      }
+    };
+    const appendFact = (parent, label, value) => {
+      const item = document.createElement("div");
+      item.className = "liveart-fact";
+      const term = document.createElement("span");
+      term.textContent = label;
+      const detail = document.createElement("strong");
+      detail.textContent = textValue(value);
+      item.append(term, detail);
+      parent.appendChild(item);
+    };
+    const renderCandidateCard = (candidate, selectable) => {
+      const card = document.createElement("article");
+      card.className = "liveart-candidate";
+      const top = document.createElement("div");
+      top.className = "liveart-candidate-top";
+      if (selectable) {
+        const label = document.createElement("label");
+        label.className = "liveart-select-label";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = String(candidate.id);
+        checkbox.checked = selectedIds.has(String(candidate.id));
+        checkbox.disabled = !candidate.credible || candidate.hammer_usd === null || candidate.hammer_usd === undefined;
+        checkbox.setAttribute("aria-label", `Use ${candidate.title || "untitled"} as a comparable`);
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) selectedIds.add(checkbox.value);
+          else selectedIds.delete(checkbox.value);
+          markAnalysisPending();
+        });
+        const copy = document.createElement("span");
+        copy.textContent = checkbox.disabled ? "Excluded — unsuitable or unverified" : "Use as comp";
+        label.append(checkbox, copy);
+        top.appendChild(label);
+      }
+      const providerUrl = candidate.provider_url || "";
+      const provider = providerUrl && /(^|\.)liveart\.ai$/i.test((() => {
+        try { return new URL(providerUrl).hostname; } catch (_error) { return ""; }
+      })()) ? providerLink(providerUrl, "LiveArt API record ↗") : null;
+      if (provider) top.appendChild(provider);
+      const sourceUrl = candidate.lot_url || (!provider ? providerUrl : "");
+      const source = providerLink(sourceUrl, "Original auction lot ↗");
+      if (source && source.href !== provider?.href) top.appendChild(source);
+      if (!selectable && subjectNeedsChoice) {
+        const choose = document.createElement("button");
+        choose.type = "button";
+        choose.className = "liveart-subject-choice";
+        choose.disabled = !candidate.verified;
+        choose.dataset.verified = String(Boolean(candidate.verified));
+        choose.textContent = candidate.verified ? "Match this auction lot" : "Match unverified";
+        choose.addEventListener("click", () => performResearch(candidate.id));
+        top.appendChild(choose);
+      }
+      card.appendChild(top);
+      const title = document.createElement("h5");
+      title.textContent = [candidate.artist, candidate.title].filter(Boolean).join(" · ") || "Untitled lot";
+      card.appendChild(title);
+      const sale = document.createElement("p");
+      sale.className = "liveart-sale-line";
+      const house = candidate.auction_house || candidate.house;
+      const date = candidate.sale_date || candidate.date;
+      const lotNumber = candidate.lot_number || candidate.lot;
+      sale.textContent = [house, date, lotNumber ? `Lot ${lotNumber}` : ""].filter(Boolean).join(" · ") || "Sale details not reported";
+      card.appendChild(sale);
+      if (!selectable) {
+        const facts = document.createElement("div");
+        facts.className = "liveart-facts";
+        appendFact(facts, "Auction house", house);
+        appendFact(facts, "Sale date", date);
+        appendFact(facts, "Lot number", lotNumber);
+        appendFact(facts, "Artist", candidate.artist);
+        appendFact(facts, "Title", candidate.title);
+        appendFact(facts, "LiveArt lot ID", candidate.provider_id || candidate.id);
+        appendFact(facts, "Sale ID", candidate.sale_id);
+        appendFact(facts, "Artwork ID", candidate.artwork_id);
+        card.appendChild(facts);
+        const matchChecks = document.createElement("p");
+        matchChecks.className = "liveart-candidate-notes";
+        const matches = candidate.matches && typeof candidate.matches === "object" ? candidate.matches : {};
+        matchChecks.textContent = `Calendar lot checks: ${["house", "date", "lot", "artist", "title"].map((field) => `${field} ${matches[field] ? "matches" : "differs or missing"}`).join(" · ")}`;
+        card.appendChild(matchChecks);
+        const notes = Array.isArray(candidate.match_notes) ? candidate.match_notes : [];
+        if (notes.length) {
+          const note = document.createElement("p");
+          note.className = "liveart-missing-data";
+          note.textContent = notes.join(" · ");
+          card.appendChild(note);
+        }
+        return card;
+      }
+      const price = document.createElement("p");
+      price.className = "liveart-price-line";
+      price.textContent = candidate.hammer_usd === null || candidate.hammer_usd === undefined
+        ? "Verified USD hammer unavailable — excluded from valuation"
+        : `Verified USD hammer: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}`;
+      card.appendChild(price);
+      const facts = document.createElement("div");
+      facts.className = "liveart-facts";
+      const originalHammer = candidate.original_hammer ?? candidate.hammer_original;
+      const originalCurrency = candidate.original_currency || candidate.currency;
+      appendFact(facts, "Original hammer", originalHammer === null || originalHammer === undefined
+        ? "Not reported" : (originalCurrency ? formatAnalysisMoney(originalHammer, originalCurrency) : `${originalHammer} (currency not reported)`));
+      appendFact(facts, "Original currency", originalCurrency);
+      appendFact(facts, "Sale status", candidate.status);
+      appendFact(facts, "Edition", candidate.edition);
+      appendFact(facts, "Medium", candidate.medium);
+      appendFact(facts, "Signature", candidate.signature);
+      appendFact(facts, "Size", candidate.size);
+      appendFact(facts, "Condition", candidate.condition);
+      appendFact(facts, "LiveArt lot ID", candidate.provider_id || candidate.id);
+      appendFact(facts, "Sale ID", candidate.sale_id);
+      appendFact(facts, "Artwork ID", candidate.artwork_id);
+      appendFact(facts, "Retrieved", formatAnalysisTimestamp(candidate.retrieved_at || researchRetrievedAt));
+      card.appendChild(facts);
+      const notesValue = candidate.match_notes || candidate.exclusion_reasons;
+      const notes = Array.isArray(notesValue) ? notesValue : (notesValue ? [notesValue] : []);
+      if (notes.length) {
+        const note = document.createElement("p");
+        note.className = "liveart-candidate-notes";
+        note.textContent = `Match notes: ${notes.join(" · ")}`;
+        card.appendChild(note);
+      }
+      const differences = candidate.differences && typeof candidate.differences === "object" ? candidate.differences : null;
+      if (differences && Object.keys(differences).length) {
+        const comparisonHeading = document.createElement("p");
+        comparisonHeading.className = "liveart-candidate-notes";
+        comparisonHeading.textContent = "Print attributes compared with the matched auction lot";
+        card.appendChild(comparisonHeading);
+        const comparisonList = document.createElement("div");
+        comparisonList.className = "liveart-comparisons";
+        Object.entries(differences).forEach(([field, difference]) => {
+          const row = document.createElement("div");
+          row.className = `liveart-comparison is-${difference?.status || "unknown"}`;
+          const label = document.createElement("strong");
+          label.textContent = field;
+          const compared = document.createElement("span");
+          compared.textContent = difference && typeof difference === "object"
+            ? `Matched lot: ${textValue(difference.subject)} · Comp: ${textValue(difference.comp)} · ${textValue(difference.status)}`
+            : textValue(difference);
+          row.append(label, compared);
+          comparisonList.appendChild(row);
+        });
+        card.appendChild(comparisonList);
+      }
+      if (!provider) {
+        const providerMissing = document.createElement("p");
+        providerMissing.className = "liveart-missing-data";
+        providerMissing.textContent = "LiveArt lot page link not provided; use the LiveArt lot ID above.";
+        card.appendChild(providerMissing);
+      }
+      const missing = Array.isArray(candidate.missing_data) ? candidate.missing_data : (candidate.missing_data ? [candidate.missing_data] : []);
+      const missingNote = document.createElement("p");
+      missingNote.className = "liveart-missing-data";
+      missingNote.textContent = `Missing data: ${missing.length ? missing.join(", ") : "None flagged"}`;
+      card.appendChild(missingNote);
+      return card;
+    };
+    const renderCandidates = (subjectMatches = []) => {
+      subjectResults.replaceChildren();
+      candidateResults.replaceChildren();
+      if (subjectMatches.length) {
+        const heading = document.createElement("h5");
+        heading.textContent = `Auction lot match${subjectMatches.length === 1 ? "" : "es"}`;
+        subjectResults.appendChild(heading);
+        subjectMatches.forEach((match) => subjectResults.appendChild(renderCandidateCard(match, false)));
+      } else if (hasResearch) {
+        const note = document.createElement("p");
+        note.className = "artprice-analysis-empty";
+        note.textContent = "No verified auction lot match was found. LiveArt comps cannot be used for this lot.";
+        subjectResults.appendChild(note);
+      }
+      if (!hasResearch || subjectNeedsChoice) return;
+      const heading = document.createElement("h5");
+      heading.textContent = `Candidate sold comps (${currentCandidates.length})`;
+      candidateResults.appendChild(heading);
+      if (!currentCandidates.length) {
+        const note = document.createElement("p");
+        note.className = "artprice-analysis-empty";
+        note.textContent = "No credible sold comps were found. No maximum bid can be estimated from LiveArt yet.";
+        candidateResults.appendChild(note);
+      } else if (!currentCandidates.some((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined)) {
+        const note = document.createElement("p");
+        note.className = "artprice-analysis-empty";
+        note.textContent = "None of these sold results has a credible verified USD hammer comp. You can save the research without a bid estimate.";
+        candidateResults.appendChild(note);
+      }
+      currentCandidates.forEach((candidate) => candidateResults.appendChild(renderCandidateCard(candidate, true)));
+    };
+    const addResultItem = (parent, label, value) => {
+      const item = document.createElement("div");
+      item.className = "artprice-analysis-summary-item";
+      const term = document.createElement("dt");
+      term.textContent = label;
+      const description = document.createElement("dd");
+      description.textContent = value;
+      item.append(term, description);
+      parent.appendChild(item);
+    };
+    const renderAnalysis = () => {
+      savedResults.replaceChildren();
+      if (!currentAnalysis) return;
+      const heading = document.createElement("h4");
+      heading.textContent = "Saved LiveArt analysis · estimates";
+      const summary = document.createElement("dl");
+      summary.className = "artprice-analysis-summary-grid";
+      addResultItem(summary, "Selected verified comps", String(selectedIds.size));
+      addResultItem(summary, "Retrieved", formatAnalysisTimestamp(currentAnalysis.retrieved_at || researchRetrievedAt));
+      savedResults.append(heading, summary);
+      const scenarios = Array.isArray(currentAnalysis.scenarios) ? currentAnalysis.scenarios : [];
+      if (currentAnalysis.no_credible_comps || !scenarios.length) {
+        const note = document.createElement("p");
+        note.className = "artprice-analysis-empty";
+        note.textContent = "No credible selected comps support a resale bid estimate. Research further before setting a bid.";
+        savedResults.appendChild(note);
+        return;
+      }
+      const explanation = document.createElement("p");
+      explanation.className = "artprice-analysis-explanation";
+      explanation.textContent = "Downside, typical, and upside resale estimates use selected verified USD hammer comps. Bids include the editable costs above; projected profit is not guaranteed.";
+      savedResults.appendChild(explanation);
+      scenarios.forEach((scenario) => {
+        const scenarioHeading = document.createElement("h4");
+        scenarioHeading.textContent = `${textValue(scenario.name || scenario.label || scenario.key)} resale · ${formatAnalysisMoney(scenario.resale_hammer, "USD")}`;
+        const net = document.createElement("p");
+        net.className = "artprice-analysis-explanation";
+        net.textContent = `Estimated net resale proceeds: ${formatAnalysisMoney(scenario.net_resale_proceeds, "USD")}`;
+        const basis = document.createElement("p");
+        basis.className = "artprice-analysis-explanation";
+        basis.textContent = scenario.basis ? `Basis: ${scenario.basis}` : "";
+        const wrap = document.createElement("div");
+        wrap.className = "artprice-analysis-table-wrap";
+        wrap.tabIndex = 0;
+        wrap.setAttribute("aria-label", `${textValue(scenario.name || scenario.label || scenario.key)} maximum hammer bids, horizontally scrollable`);
+        const table = document.createElement("table");
+        table.className = "artprice-analysis-table is-liveart-bids";
+        const head = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        ["Buyer premium", "Break-even max hammer bid", "Target-profit max hammer bid"].forEach((label) => {
+          const cell = document.createElement("th");
+          cell.textContent = label;
+          headRow.appendChild(cell);
+        });
+        head.appendChild(headRow);
+        const body = document.createElement("tbody");
+        (Array.isArray(scenario.bid_rows) ? scenario.bid_rows : []).forEach((row) => {
+          const tr = document.createElement("tr");
+          const breakEven = row.break_even_max_bid ?? row.break_even_max_hammer_bid;
+          const targetBid = row.target_profit_max_bid ?? row.target_profit_max_hammer_bid;
+          [String(row.premium_pct ?? "—") + "%", breakEven == null ? "No positive bid" : formatAnalysisMoney(breakEven, "USD"), targetBid == null ? "No positive bid" : formatAnalysisMoney(targetBid, "USD")].forEach((value) => {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            tr.appendChild(cell);
+          });
+          body.appendChild(tr);
+        });
+        table.append(head, body);
+        wrap.appendChild(table);
+        savedResults.append(scenarioHeading, net);
+        if (scenario.basis) savedResults.appendChild(basis);
+        savedResults.appendChild(wrap);
+      });
+    };
+    const markAnalysisPending = (message = "Comp selections or costs changed. Save the LiveArt analysis to recalculate the estimates.") => {
+      if (!currentAnalysis) return;
+      savedResults.replaceChildren();
+      const pending = document.createElement("p");
+      pending.className = "artprice-analysis-empty";
+      pending.textContent = message;
+      savedResults.appendChild(pending);
+    };
+    costDefinitions.forEach(([name]) => {
+      costFields[name].addEventListener("input", () => markAnalysisPending());
+    });
+    const populateAssumptions = (analysis) => {
+      costDefinitions.forEach(([name]) => {
+        const value = analysis?.assumptions?.[name];
+        costFields[name].value = value === null || value === undefined ? liveartDefaults[name] : String(value);
+      });
+    };
+    const updateButtons = () => {
+      saveButton.disabled = busy || subjectNeedsChoice || (!hasResearch && !currentAnalysis);
+      deleteButton.hidden = !currentAnalysis;
+      saveButton.textContent = currentAnalysis ? "Update LiveArt analysis" : "Save LiveArt analysis";
+    };
+    const setBusy = (value) => {
+      busy = value;
+      section.querySelectorAll("button, input").forEach((control) => { control.disabled = value; });
+      if (options.researchButton) options.researchButton.disabled = value;
+      if (!value) {
+        candidateResults.querySelectorAll('input[type="checkbox"]').forEach((control) => {
+          const candidate = currentCandidates.find((item) => String(item.id) === control.value);
+          control.disabled = !candidate?.credible || candidate.hammer_usd === null || candidate.hammer_usd === undefined;
+        });
+        subjectResults.querySelectorAll(".liveart-subject-choice").forEach((button) => {
+          button.disabled = button.dataset.verified !== "true";
+        });
+      }
+      updateButtons();
+    };
+    const applyAnalysis = (analysis) => {
+      currentAnalysis = analysis || null;
+      currentResearchId = "";
+      if (analysis) {
+        currentCandidates = Array.isArray(analysis.candidates) ? analysis.candidates : [];
+        selectedIds = new Set((Array.isArray(analysis.selected_ids) ? analysis.selected_ids : []).map(String));
+        researchRetrievedAt = analysis.retrieved_at || "";
+        hasResearch = true;
+        subjectNeedsChoice = false;
+        sourceMeta.textContent = `LiveArt data retrieved ${formatAnalysisTimestamp(researchRetrievedAt)}. ${analysis.data_units_spent ?? "—"} Data Units used in the saved research. Source prices are USD hammer only; premiums and estimates are excluded.`;
+        renderCandidates(Array.isArray(analysis.subject_matches) && analysis.subject_matches.length
+          ? analysis.subject_matches : (analysis.subject_match ? [analysis.subject_match] : []));
+      } else {
+        currentCandidates = [];
+        selectedIds = new Set();
+        researchRetrievedAt = "";
+        hasResearch = false;
+        subjectNeedsChoice = false;
+        sourceMeta.textContent = "";
+        subjectResults.replaceChildren();
+        candidateResults.replaceChildren();
+      }
+      populateAssumptions(analysis);
+      renderAnalysis();
+      updateButtons();
+      if (options.onSavedChange) options.onSavedChange(Boolean(analysis));
+    };
+    const load = async () => {
+      if (loaded || !lot.liveart_analysis_url) return;
+      if (loadPromise) return loadPromise;
+      if (busy) return;
+      if (liveartAnalysisCache.has(String(lot.id))) {
+        loaded = true;
+        applyAnalysis(liveartAnalysisCache.get(String(lot.id)));
+        return;
+      }
+      loadPromise = (async () => {
+        setBusy(true);
+        try {
+          const payload = await requestAnalysisJson(lot.liveart_analysis_url, {
+            method: "GET",
+            credentials: "same-origin",
+            headers: {"X-Requested-With": "XMLHttpRequest"},
+          }, "The saved LiveArt analysis could not be loaded.");
+          loaded = true;
+          liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
+          applyAnalysis(payload.analysis || null);
+        } catch (error) {
+          setStatus(error instanceof Error ? error.message : "The saved LiveArt analysis could not be loaded.", "error");
+        } finally {
+          setBusy(false);
+          loadPromise = null;
+        }
+      })();
+      return loadPromise;
+    };
+    const performResearch = async (subjectId = null) => {
+      if (busy || !lot.liveart_research_url) return;
+      setBusy(true);
+      setStatus("Searching LiveArt sold records…", "loading");
+      try {
+        const payload = await requestAnalysisJson(lot.liveart_research_url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
+          body: JSON.stringify(subjectId === null ? {} : {subject_id: subjectId}),
+        }, "LiveArt research could not be completed.");
+        currentCandidates = Array.isArray(payload.candidates) ? payload.candidates : [];
+        selectedIds = new Set(currentCandidates.filter((candidate) => candidate.credible && candidate.selected && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined).map((candidate) => String(candidate.id)));
+        currentResearchId = payload.research_id || "";
+        researchRetrievedAt = payload.retrieved_at || "";
+        hasResearch = true;
+        subjectNeedsChoice = Boolean(payload.requires_subject_choice) || !payload.subject_match;
+        findButton.hidden = false;
+        const subjectMatches = Array.isArray(payload.subject_matches) ? payload.subject_matches : (payload.subject_match ? [payload.subject_match] : []);
+        sourceMeta.textContent = `LiveArt data retrieved ${formatAnalysisTimestamp(researchRetrievedAt)}. ${payload.data_units_spent ?? "—"} Data Units used in this search. Prices shown for valuation are verified USD hammer only.`;
+        renderCandidates(subjectMatches);
+        markAnalysisPending("This research is not saved yet. Save this selection before using updated LiveArt bid estimates.");
+        setStatus(payload.message || (subjectNeedsChoice
+          ? (subjectMatches.length ? "Choose the matching auction lot to continue research." : "No verified auction lot match was found. No LiveArt bid estimate is available.")
+          : "Review and select sold comps, then save the analysis."), subjectMatches.length || payload.subject_match ? "success" : "error");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "LiveArt research could not be completed.", "error");
+      } finally {
+        setBusy(false);
+      }
+    };
+    const find = async () => {
+      await load();
+      if (!loaded) return;
+      section.scrollIntoView({block: "nearest", behavior: "smooth"});
+      performResearch();
+    };
+    findButton.addEventListener("click", find);
+    saveButton.addEventListener("click", async () => {
+      if (busy || !lot.liveart_analysis_url || (!hasResearch && !currentAnalysis)) return;
+      costFields.premium_max.setCustomValidity("");
+      const controls = costDefinitions.map(([name]) => costFields[name]);
+      const invalid = controls.find((control) => !control.checkValidity());
+      if (invalid) {
+        assumptions.open = true;
+        invalid.reportValidity();
+        return;
+      }
+      if (Number(costFields.premium_max.value) < Number(costFields.premium_min.value)) {
+        assumptions.open = true;
+        costFields.premium_max.setCustomValidity("Maximum premium must be at least the minimum premium.");
+        costFields.premium_max.reportValidity();
+        return;
+      }
+      const assumptionValues = Object.fromEntries(costDefinitions.map(([name]) => [name, costFields[name].value]));
+      const requestData = {action: "save", selected_ids: [...selectedIds], assumptions: assumptionValues};
+      if (currentResearchId) requestData.research_id = currentResearchId;
+      setBusy(true);
+      setStatus("Saving LiveArt resale estimates…", "loading");
+      try {
+        const payload = await requestAnalysisJson(lot.liveart_analysis_url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
+          body: JSON.stringify(requestData),
+        }, "The LiveArt analysis could not be saved.");
+        loaded = true;
+        liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
+        syncLotInstances(liveartAnalysisInstances, lot.id, payload.analysis || null);
+        setStatus(payload.message || "LiveArt analysis saved.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "The LiveArt analysis could not be saved.", "error");
+      } finally {
+        setBusy(false);
+      }
+    });
+    deleteButton.addEventListener("click", async () => {
+      if (!window.confirm("Remove the saved LiveArt analysis and selected comps? The Artprice analysis will remain.")) return;
+      setBusy(true);
+      setStatus("Removing saved LiveArt analysis…", "loading");
+      try {
+        const payload = await requestAnalysisJson(lot.liveart_analysis_url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
+          body: JSON.stringify({action: "delete"}),
+        }, "The LiveArt analysis could not be removed.");
+        liveartAnalysisCache.set(String(lot.id), null);
+        syncLotInstances(liveartAnalysisInstances, lot.id, null);
+        setStatus(payload.message || "LiveArt analysis removed.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "The LiveArt analysis could not be removed.", "error");
+      } finally {
+        setBusy(false);
+      }
+    });
+    costFields.premium_max.addEventListener("input", () => costFields.premium_max.setCustomValidity(""));
+    registerLotInstance(liveartAnalysisInstances, lot.id, section, (analysis) => {
+      loaded = true;
+      applyAnalysis(analysis);
+    });
+    if (liveartAnalysisCache.has(String(lot.id))) {
+      loaded = true;
+      applyAnalysis(liveartAnalysisCache.get(String(lot.id)));
+    } else {
+      updateButtons();
+    }
+    return {
+      load,
+      find,
+    };
+  };
+
   const appendArtpriceAnalysis = (item, lot, options = {}) => {
     const idPrefix = options.idPrefix ? `${options.idPrefix}-` : "";
     const quick = Boolean(options.quick);
@@ -639,7 +1244,7 @@
     const summary = document.createElement("summary");
     const summaryLabel = document.createElement("span");
     summaryLabel.className = "artprice-analysis-summary-label";
-    summaryLabel.textContent = quick ? "Quick Artprice HTML Analysis" : "Artprice Max-Bid Analysis";
+    summaryLabel.textContent = "Resale Bid Analysis";
     const summaryBadge = document.createElement("span");
     summaryBadge.className = "artprice-analysis-badge";
     summaryBadge.hidden = true;
@@ -650,9 +1255,11 @@
 
     const intro = document.createElement("p");
     intro.className = "artprice-analysis-intro";
-    intro.textContent = quick
-      ? "Upload a saved Artprice results page and analyze it with the default assumptions, or expand the assumptions to adjust them first."
-      : "Upload a saved Artprice results page, then adjust the assumptions used to calculate maximum hammer bids.";
+    intro.textContent = "Estimate resale bids from a saved Artprice HTML page or on-demand LiveArt sold comps. Review sources and assumptions before bidding.";
+
+    const artpriceHeading = document.createElement("h4");
+    artpriceHeading.className = "resale-source-heading";
+    artpriceHeading.textContent = "Saved Artprice HTML";
 
     const form = document.createElement("form");
     form.className = "artprice-analysis-form";
@@ -805,6 +1412,10 @@
     analyzeButton.className = "is-primary";
     analyzeButton.type = "submit";
     analyzeButton.textContent = "Analyze HTML";
+    const researchButton = document.createElement("button");
+    researchButton.className = "is-primary";
+    researchButton.type = "button";
+    researchButton.textContent = "Find LiveArt comps";
     const recalculateButton = document.createElement("button");
     recalculateButton.type = "button";
     recalculateButton.textContent = "Recalculate";
@@ -814,7 +1425,7 @@
     deleteButton.type = "button";
     deleteButton.textContent = "Remove Analysis";
     deleteButton.hidden = true;
-    actions.append(analyzeButton, recalculateButton, deleteButton);
+    actions.append(analyzeButton, researchButton, recalculateButton, deleteButton);
 
     const status = document.createElement("p");
     status.id = `${idPrefix}artprice-analysis-status-${lot.id}`;
@@ -828,13 +1439,30 @@
     form.append(grid);
     if (quick) form.append(advanced);
     form.append(actions);
-    panel.append(intro, form, status, results);
-    details.append(summary, panel);
-    item.appendChild(details);
-
+    panel.append(intro, artpriceHeading, form, status, results);
     let currentAnalysis = null;
+    let hasLiveartAnalysis = false;
     let loaded = false;
     let busy = false;
+    const updateSummaryBadge = () => {
+      const sources = [currentAnalysis ? "Artprice" : "", hasLiveartAnalysis ? "LiveArt" : ""].filter(Boolean);
+      summaryBadge.hidden = !sources.length;
+      summaryBadge.textContent = sources.length ? "Saved" : "";
+      summaryBadge.title = sources.length ? `${sources.join(" and ")} analysis saved` : "";
+    };
+    const liveart = appendLiveArtResearch(panel, lot, {
+      idPrefix,
+      quick,
+      researchButton,
+      onSavedChange: (saved) => {
+        hasLiveartAnalysis = saved;
+        lot.has_liveart_analysis = saved;
+        updateSummaryBadge();
+      },
+    });
+    researchButton.addEventListener("click", liveart.find);
+    details.append(summary, panel);
+    item.appendChild(details);
 
     const setStatus = (message = "", tone = "") => {
       status.textContent = message;
@@ -868,8 +1496,7 @@
       analyzeButton.textContent = hasAnalysis ? "Replace HTML" : "Analyze HTML";
       recalculateButton.hidden = !hasAnalysis;
       deleteButton.hidden = !hasAnalysis;
-      summaryBadge.hidden = !hasAnalysis;
-      summaryBadge.textContent = hasAnalysis ? "Saved" : "";
+      updateSummaryBadge();
       lot.has_artprice_analysis = hasAnalysis;
     };
 
@@ -916,7 +1543,7 @@
 
       const currency = analysis.currency || "USD";
       const heading = document.createElement("h4");
-      heading.textContent = "Saved analysis";
+      heading.textContent = "Saved Artprice analysis · estimates";
       const summaryGrid = document.createElement("dl");
       summaryGrid.className = "artprice-analysis-summary-grid";
       appendSummaryItem(summaryGrid, "Sold records", String(analysis.sold_records_count ?? 0));
@@ -949,10 +1576,10 @@
 
       const explanation = document.createElement("p");
       explanation.className = "artprice-analysis-explanation";
-      explanation.textContent = "Figures are based on the extracted sold records and the assumptions entered above.";
+      explanation.textContent = "Figures are estimates based on extracted sold records and the assumptions entered above. Profit is not guaranteed.";
 
       const bidHeading = document.createElement("h4");
-      bidHeading.textContent = "Maximum hammer bids";
+      bidHeading.textContent = "Estimated maximum hammer bids";
       const bidTableWrap = document.createElement("div");
       bidTableWrap.className = "artprice-analysis-table-wrap";
       bidTableWrap.tabIndex = 0;
@@ -1222,7 +1849,10 @@
     });
 
     details.addEventListener("toggle", () => {
-      if (details.open) loadAnalysis();
+      if (details.open) {
+        loadAnalysis();
+        liveart.load();
+      }
     });
 
     registerLotInstance(artpriceAnalysisInstances, lot.id, details, (analysis) => {
@@ -1239,6 +1869,7 @@
     if (quick) {
       details.open = true;
       loadAnalysis();
+      liveart.load();
     }
   };
 
@@ -1597,7 +2228,7 @@
     workflow.className = "lot-browser-workflow";
     const workflowLabel = document.createElement("p");
     workflowLabel.className = "lot-browser-workflow-label";
-    workflowLabel.textContent = "Artprice quick workflow";
+    workflowLabel.textContent = "Private research workflow";
     workflow.appendChild(workflowLabel);
     copy.appendChild(workflow);
     appendArtpriceEditor(workflow, lot, actionLinks, {idPrefix: "browser"});

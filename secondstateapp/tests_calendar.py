@@ -28,12 +28,14 @@ from secondstateapp.artprice_max_bid import (
 )
 from secondstateapp.auction_email import GMAIL_SEND_SCOPE, build_mime_message, compose_auction_email, send_auction_email
 from secondstateapp.calendar_views import _uploaded_artprice_html
+from secondstateapp.liveart_client import LiveArtAPIError
 from secondstateapp.models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
     AuctionMaxBidAnalysis,
     AuctionWatchArtist,
     AuctionWatchLot,
+    LiveArtResaleAnalysis,
 )
 
 
@@ -135,6 +137,61 @@ def watch_lot(**overrides):
     }
     values.update(overrides)
     return AuctionWatchLot.objects.create(**values)
+
+
+def liveart_page(items, *, data_units=3):
+    return SimpleNamespace(
+        items=items,
+        has_more=False,
+        total_count=len(items),
+        retrieved_at="2026-10-12T12:00:00+00:00",
+        data_units=data_units,
+        request_id="mock-request",
+        remaining_data_units=Decimal("990"),
+        limit=20,
+        offset=0,
+    )
+
+
+def liveart_lot(
+    lot_id,
+    *,
+    sale_id="sale-2026",
+    lot_num="25",
+    sale_date="2026-07-25T13:30:00-07:00",
+    artist_id="artist-miro",
+    artist="Joan Miró",
+    title="Jeune fille aux papillons",
+    medium="Lithograph",
+    status="sold",
+    hammer_usd=1205,
+    original_hammer=1205,
+    currency="USD",
+):
+    return {
+        "id": lot_id,
+        "sale_id": sale_id,
+        "lot_num": lot_num,
+        "status": status,
+        "lot_url": f"https://www.liveart.ai/lot/{lot_id}",
+        "auction_house_name": "Bonhams",
+        "sale": {"id": sale_id, "start_datetime": sale_date},
+        "artwork": {
+            "id": f"artwork-{lot_id}",
+            "name": title,
+            "artist_id": artist_id,
+            "artist": {"id": artist_id, "name": artist},
+            "materials": medium,
+            "markings": "Signed and numbered 25/100",
+            "measurements_height_cm": 50,
+            "measurements_width_cm": 40,
+        },
+        "price": {
+            "currency": currency,
+            "hammer": original_hammer,
+            "hammer_usd": hammer_usd,
+        },
+    }
 
 
 class ArtpriceMaxBidParserTests(SimpleTestCase):
@@ -554,10 +611,10 @@ class AuctionCalendarViewTests(TestCase):
             reverse("auction_lot_artprice_analysis", args=(saved_lot.pk,)),
         )
         self.assertNotIn("comparables", saved_detail)
-        self.assertContains(response, "Artprice Max-Bid Analysis")
+        self.assertContains(response, "Saved Artprice HTML")
         self.assertContains(response, "Analyze HTML")
-        self.assertContains(response, "Artprice quick workflow")
-        self.assertContains(response, "Quick Artprice HTML Analysis")
+        self.assertContains(response, "Find LiveArt comps")
+        self.assertContains(response, "Resale Bid Analysis")
         self.assertContains(response, 'appendArtpriceEditor(workflow, lot, actionLinks, {idPrefix: "browser"})')
         self.assertContains(response, 'appendArtpriceAnalysis(workflow, lot, {idPrefix: "browser", quick: true})')
         self.assertContains(response, 'event.target.closest(".artprice-form, .artprice-analysis")')
@@ -1310,6 +1367,418 @@ class AuctionArtpriceAnalysisViewTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+class AuctionLiveArtAnalysisViewTests(TestCase):
+    def setUp(self):
+        self.staff = get_user_model().objects.create_user(
+            "liveart-admin", password="test-pass", is_staff=True
+        )
+        self.lot = watch_lot()
+        self.research_url = reverse("auction_lot_liveart_research", args=(self.lot.pk,))
+        self.analysis_url = reverse("auction_lot_liveart_analysis", args=(self.lot.pk,))
+        self.subject = liveart_lot("subject-lot", hammer_usd=2100)
+        self.comp = liveart_lot(
+            "sold-comp",
+            sale_id="sale-2025",
+            lot_num="72",
+            sale_date="2025-06-12T12:00:00-04:00",
+            hammer_usd=1205,
+            original_hammer=1000,
+            currency="EUR",
+        )
+
+    @staticmethod
+    def assumptions(**overrides):
+        values = {
+            "inbound_shipping": "200",
+            "target_profit": "100",
+            "seller_commission_pct": "10",
+            "outbound_shipping": "50",
+            "other_resale_costs": "25",
+            "premium_min": "23",
+            "premium_max": "25",
+        }
+        values.update(overrides)
+        return values
+
+    def mock_client(self, client_class, *, lots=None):
+        client = client_class.return_value
+        client.get_usage.return_value = {"data_units_remaining": 990}
+        client.list_sales.return_value = liveart_page(
+            [
+                {
+                    "id": "sale-2026",
+                    "auction_house_name": "Bonhams",
+                    "start_datetime": "2026-07-25T13:30:00-07:00",
+                    "name": "Modern Prints",
+                    "auction_url": "https://www.liveart.ai/sale/sale-2026",
+                }
+            ]
+        )
+        client.list_lots.return_value = liveart_page(
+            [self.subject, self.comp] if lots is None else lots
+        )
+        return client
+
+    def save(self, selected_ids, *, research_id=None, **assumption_overrides):
+        payload = {
+            "action": "save",
+            "selected_ids": selected_ids,
+            "assumptions": self.assumptions(**assumption_overrides),
+        }
+        if research_id is not None:
+            payload["research_id"] = research_id
+        return self.client.post(
+            self.analysis_url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+    def research(self, **payload):
+        return self.client.post(
+            self.research_url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+    def test_research_and_saved_analysis_are_staff_only_and_calendar_never_calls_liveart(self):
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            for endpoint, method in (
+                (self.research_url, "post"),
+                (self.analysis_url, "get"),
+                (self.analysis_url, "post"),
+            ):
+                with self.subTest(endpoint=endpoint, method=method):
+                    response = getattr(self.client, method)(endpoint)
+                    self.assertEqual(response.status_code, 302)
+                    self.assertIn("login", response.url)
+
+            ordinary = get_user_model().objects.create_user("liveart-reader", password="test-pass")
+            self.client.force_login(ordinary)
+            for endpoint, method in (
+                (self.research_url, "post"),
+                (self.analysis_url, "get"),
+                (self.analysis_url, "post"),
+            ):
+                with self.subTest(endpoint=endpoint, method=method):
+                    response = getattr(self.client, method)(endpoint)
+                    self.assertEqual(response.status_code, 302)
+                    self.assertIn("login", response.url)
+
+            self.client.force_login(self.staff)
+            calendar = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+            self.assertEqual(calendar.status_code, 200)
+            detail = calendar.context["calendar_data"]["2026-07-25"][0]
+            self.assertEqual(detail["liveart_research_url"], self.research_url)
+            self.assertEqual(detail["liveart_analysis_url"], self.analysis_url)
+            self.assertNotIn("candidates", detail)
+            self.assertNotIn("subject_match", detail)
+            self.assertEqual(self.client.get(self.analysis_url).json(), {"ok": True, "analysis": None})
+            client_class.assert_not_called()
+
+    def test_research_matches_subject_and_shows_verified_usd_hammers(self):
+        missing_hammer = liveart_lot(
+            "missing-hammer",
+            sale_id="sale-2024",
+            sale_date="2024-03-02T12:00:00-05:00",
+            hammer_usd=None,
+            original_hammer=3200,
+            currency="GBP",
+        )
+        different_artist = liveart_lot(
+            "different-artist",
+            sale_id="sale-2023",
+            sale_date="2023-02-01T12:00:00-05:00",
+            artist_id="artist-other",
+            artist="Other Artist",
+            hammer_usd=9000,
+        )
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(
+                client_class,
+                lots=[self.subject, self.comp, missing_hammer, different_artist],
+            )
+            response = self.research()
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["subject_match"]["id"], "subject-lot")
+        candidates = {item["id"]: item for item in payload["candidates"]}
+        self.assertIn("sold-comp", candidates)
+        self.assertTrue(candidates["sold-comp"]["credible"])
+        self.assertEqual(candidates["sold-comp"]["hammer_usd"], "1205.00")
+        self.assertEqual(candidates["sold-comp"]["original_currency"], "EUR")
+        self.assertEqual(candidates["sold-comp"]["original_hammer"], "1000")
+        self.assertEqual(candidates["sold-comp"]["provider_id"], "sold-comp")
+        self.assertEqual(candidates["sold-comp"]["lot_url"], "https://www.liveart.ai/lot/sold-comp")
+        self.assertEqual(candidates["sold-comp"]["edition"], "25/100")
+        self.assertEqual(candidates["sold-comp"]["signature"], "signed (method unspecified)")
+        self.assertEqual(candidates["sold-comp"]["size"], "50 × 40 cm")
+        self.assertEqual(
+            set(candidates["sold-comp"]["differences"]),
+            {"medium", "edition", "signature", "size", "condition"},
+        )
+        self.assertNotEqual(candidates["sold-comp"]["hammer_usd"], "1000.00")
+        self.assertFalse(candidates["missing-hammer"]["credible"])
+        self.assertIsNone(candidates["missing-hammer"]["hammer_usd"])
+        self.assertIn("hammer_usd", candidates["missing-hammer"]["missing_data"])
+        self.assertFalse(candidates.get("different-artist", {}).get("credible", False))
+        self.assertTrue(payload["retrieved_at"])
+        self.assertGreaterEqual(payload["data_units_spent"], 0)
+        client.list_sales.assert_not_called()
+        client.list_lots.assert_called()
+        lookup = client.list_lots.call_args_list[0].kwargs
+        self.assertEqual(lookup["lot_num"], self.lot.lot_number)
+        self.assertEqual(lookup["limit"], 12)
+
+    def test_no_subject_match_does_not_offer_unrelated_comps(self):
+        wrong_lot = liveart_lot("wrong-lot", lot_num="999", artist="Other Artist")
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            self.mock_client(client_class, lots=[wrong_lot])
+            response = self.research()
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIsNone(payload["subject_match"])
+        self.assertEqual(payload["candidates"], [])
+        self.assertFalse(payload["subject_matches"][0]["verified"])
+
+    @patch.dict(os.environ, {"LIVEART_API_KEY": ""}, clear=False)
+    def test_missing_api_key_fails_without_requesting_liveart(self):
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.liveart_client.requests.Session") as session_class:
+            response = self.research()
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("LIVEART_API_KEY", response.json()["error"])
+        session_class.assert_not_called()
+        self.assertFalse(LiveArtResaleAnalysis.objects.exists())
+
+    def test_rate_limit_returns_retry_after_without_mutating_saved_analysis(self):
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class)
+            failure = LiveArtAPIError(
+                "LiveArt rate limit reached; please try again later.",
+                status_code=429,
+                retry_after=3,
+            )
+            client.list_sales.side_effect = failure
+            client.list_lots.side_effect = failure
+            response = self.research()
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response["Retry-After"], "3")
+        self.assertFalse(LiveArtResaleAnalysis.objects.exists())
+
+    def test_selected_comps_save_independently_of_artprice_and_recalculate_without_api(self):
+        self.client.force_login(self.staff)
+        artprice = stored_analysis(self.lot, created_by=self.staff)
+        original_artprice_pk = artprice.pk
+        original_artprice_comps = artprice.comparables
+
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class)
+            research = self.research()
+            self.assertEqual(research.status_code, 200)
+            initial_request_count = client.list_lots.call_count
+            saved = self.save(["sold-comp"])
+            self.assertEqual(client.list_lots.call_count, initial_request_count)
+
+        self.assertEqual(saved.status_code, 200)
+        analysis = saved.json()["analysis"]
+        self.assertEqual(analysis["selected_ids"], ["sold-comp"])
+        self.assertFalse(analysis["no_credible_comps"])
+        self.assertEqual(len(analysis["scenarios"]), 3)
+        self.assertEqual(
+            {item["name"] for item in analysis["scenarios"]},
+            {"downside", "typical", "upside"},
+        )
+        scenarios = {item["name"]: item for item in analysis["scenarios"]}
+        self.assertEqual(
+            [scenarios[name]["resale_hammer"] for name in ("downside", "typical", "upside")],
+            ["964.00", "1205.00", "1325.50"],
+        )
+        self.assertEqual(scenarios["typical"]["bid_rows"][0], {
+            "premium_pct": 23,
+            "break_even_max_bid": "658.13",
+            "target_profit_max_bid": "576.83",
+        })
+        self.assertIn("estimates", scenarios["typical"]["estimate_notice"])
+        liveart = LiveArtResaleAnalysis.objects.get(lot=self.lot)
+        self.assertEqual(liveart.created_by, self.staff)
+        artprice.refresh_from_db()
+        self.assertEqual(artprice.pk, original_artprice_pk)
+        self.assertEqual(artprice.comparables, original_artprice_comps)
+        self.assertEqual(AuctionMaxBidAnalysis.objects.count(), 1)
+        self.assertEqual(self.client.get(self.analysis_url).json()["analysis"], analysis)
+
+        self.lot.artprice_url = "https://www.artprice.com/artist/1/example/lots/pasts"
+        self.lot.save(update_fields=("artprice_url",))
+        self.client.post(
+            reverse("auction_email_lot_selection", args=(self.lot.pk,)),
+            {"selected": "true"},
+        )
+        tray = self.client.get(reverse("auction_email_tray"))
+        self.assertEqual(tray.status_code, 200)
+        self.assertNotContains(tray, "sold-comp")
+        self.assertNotContains(tray, "www.liveart.ai")
+
+        recalculated = self.save(["sold-comp"], inbound_shipping="100", target_profit="250")
+        self.assertEqual(recalculated.status_code, 200)
+        liveart.refresh_from_db()
+        self.assertEqual(LiveArtResaleAnalysis.objects.get(lot=self.lot).pk, liveart.pk)
+        self.assertEqual(recalculated.json()["analysis"]["assumptions"]["target_profit"], "250.00")
+        artprice.refresh_from_db()
+        self.assertEqual(artprice.comparables, original_artprice_comps)
+
+    def test_research_id_rejects_stale_snapshot_and_saves_current_snapshot(self):
+        replacement = liveart_lot(
+            "replacement-comp",
+            sale_id="sale-2024",
+            lot_num="82",
+            sale_date="2024-04-12T12:00:00-04:00",
+            hammer_usd=2000,
+        )
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class)
+            first = self.research()
+            self.assertEqual(first.status_code, 200)
+            client.list_lots.return_value = liveart_page([self.subject, replacement])
+            second = self.research()
+            self.assertEqual(second.status_code, 200)
+
+        first_id = first.json()["research_id"]
+        second_id = second.json()["research_id"]
+        self.assertNotEqual(first_id, second_id)
+        stale = self.save(["sold-comp"], research_id=first_id)
+        self.assertEqual(stale.status_code, 409)
+        self.assertFalse(LiveArtResaleAnalysis.objects.exists())
+
+        current = self.save(["replacement-comp"], research_id=second_id)
+        self.assertEqual(current.status_code, 200)
+        analysis = current.json()["analysis"]
+        self.assertEqual(analysis["selected_ids"], ["replacement-comp"])
+        self.assertEqual(
+            next(item for item in analysis["scenarios"] if item["name"] == "typical")["resale_hammer"],
+            "2000.00",
+        )
+        self.assertEqual(LiveArtResaleAnalysis.objects.get(lot=self.lot).selected_ids, ["replacement-comp"])
+
+    def test_reload_edit_without_research_id_uses_saved_snapshot(self):
+        replacement = liveart_lot(
+            "unsaved-comp",
+            sale_id="sale-2024",
+            lot_num="82",
+            sale_date="2024-04-12T12:00:00-04:00",
+            hammer_usd=9000,
+        )
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class)
+            first = self.research()
+            self.assertEqual(first.status_code, 200)
+            saved = self.save(["sold-comp"], research_id=first.json()["research_id"])
+            self.assertEqual(saved.status_code, 200)
+
+            client.list_lots.return_value = liveart_page([self.subject, replacement])
+            unsaved = self.research()
+            self.assertEqual(unsaved.status_code, 200)
+            self.assertIn("unsaved-comp", {item["id"] for item in unsaved.json()["candidates"]})
+
+        edited = self.save(["sold-comp"], target_profit="250")
+        self.assertEqual(edited.status_code, 200)
+        analysis = edited.json()["analysis"]
+        self.assertEqual(analysis["selected_ids"], ["sold-comp"])
+        self.assertEqual({item["id"] for item in analysis["candidates"]}, {"sold-comp"})
+        self.assertEqual(
+            next(item for item in analysis["scenarios"] if item["name"] == "typical")["resale_hammer"],
+            "1205.00",
+        )
+        self.assertEqual(analysis["assumptions"]["target_profit"], "250.00")
+
+    def test_unknown_data_units_stay_unknown_and_private_responses_are_not_cached(self):
+        self.client.force_login(self.staff)
+        empty_analysis = self.client.get(self.analysis_url)
+        self.assertEqual(empty_analysis.status_code, 200)
+        self.assertIn("no-store", empty_analysis["Cache-Control"])
+
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class)
+            client.list_lots.return_value = liveart_page([self.subject, self.comp], data_units=None)
+            research = self.research()
+
+        self.assertEqual(research.status_code, 200)
+        self.assertIn("no-store", research["Cache-Control"])
+        self.assertIsNone(research.json()["data_units_spent"])
+        saved = self.save(["sold-comp"], research_id=research.json()["research_id"])
+        self.assertEqual(saved.status_code, 200)
+        self.assertIn("no-store", saved["Cache-Control"])
+        self.assertIsNone(saved.json()["analysis"]["data_units_spent"])
+        self.assertIsNone(LiveArtResaleAnalysis.objects.get(lot=self.lot).data_units_spent)
+
+    def test_no_credible_comps_save_without_a_bid_recommendation(self):
+        missing_hammer = liveart_lot(
+            "missing-hammer",
+            sale_id="sale-2024",
+            sale_date="2024-03-02T12:00:00-05:00",
+            hammer_usd=None,
+        )
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            self.mock_client(client_class, lots=[self.subject, missing_hammer])
+            self.assertEqual(self.research().status_code, 200)
+        response = self.save([])
+
+        self.assertEqual(response.status_code, 200)
+        analysis = response.json()["analysis"]
+        self.assertTrue(analysis["no_credible_comps"])
+        self.assertEqual(analysis["selected_ids"], [])
+        self.assertEqual(analysis["scenarios"], [])
+        self.assertEqual(LiveArtResaleAnalysis.objects.count(), 1)
+
+    def test_unknown_or_noncredible_comp_cannot_be_saved_as_verified_hammer(self):
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            self.mock_client(client_class)
+            self.assertEqual(self.research().status_code, 200)
+
+        for selected_ids in (["invented-id"], ["subject-lot"]):
+            with self.subTest(selected_ids=selected_ids):
+                response = self.save(selected_ids)
+                self.assertEqual(response.status_code, 400)
+                self.assertFalse(LiveArtResaleAnalysis.objects.exists())
+
+    def test_saved_liveart_comp_is_not_rendered_on_public_pages(self):
+        private_marker = "PRIVATE_LIVEART_COMP_129873"
+        LiveArtResaleAnalysis.objects.create(
+            lot=self.lot,
+            subject_match={"id": "subject-lot"},
+            candidates=[{"id": private_marker, "hammer_usd": "1205.00"}],
+            selected_ids=[private_marker],
+            retrieved_at=datetime(2026, 10, 12, tzinfo=ZoneInfo("UTC")),
+        )
+        public_client = Client()
+        for url in (
+            reverse("home"),
+            reverse("gallery"),
+            reverse("public_profile", args=(self.staff.username,)),
+        ):
+            with self.subTest(url=url):
+                response = public_client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn(private_marker, response.content.decode("utf-8"))
+
+    def test_liveart_post_requires_csrf(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.staff)
+        self.assertEqual(csrf_client.post(self.research_url).status_code, 403)
+        self.assertEqual(csrf_client.post(self.analysis_url, {"action": "delete"}).status_code, 403)
+
+
 @override_settings(CALENDAR_TIME_ZONE="America/Los_Angeles")
 class AuctionEmailTraySelectionTests(TestCase):
     def setUp(self):
@@ -1465,6 +1934,17 @@ class CalendarSyncApiTests(TestCase):
         lot.save(update_fields=("artprice_url",))
         analysis = stored_analysis(lot)
         analysis_pk = analysis.pk
+        liveart = LiveArtResaleAnalysis.objects.create(
+            lot=lot,
+            subject_match={"id": "verified-subject"},
+            candidates=[{"id": "verified-comp", "hammer_usd": "1205.00"}],
+            selected_ids=["verified-comp"],
+            assumptions={"target_profit": "100.00"},
+            scenarios=[{"name": "typical", "resale_hammer": "1205.00"}],
+            retrieved_at=datetime(2026, 7, 20, tzinfo=ZoneInfo("UTC")),
+            data_units_spent=6,
+        )
+        liveart_pk = liveart.pk
         batch = AuctionEmailBatch.objects.create()
         tray_item = AuctionEmailBatchItem.objects.create(batch=batch, lot=lot)
 
@@ -1493,6 +1973,10 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(analysis.pk, analysis_pk)
         self.assertEqual(analysis.lot, lot)
         self.assertEqual(analysis.expected_resale_hammer, Decimal("1205.00"))
+        liveart.refresh_from_db()
+        self.assertEqual(liveart.pk, liveart_pk)
+        self.assertEqual(liveart.selected_ids, ["verified-comp"])
+        self.assertEqual(liveart.scenarios[0]["resale_hammer"], "1205.00")
         tray_item.refresh_from_db()
         self.assertEqual(tray_item.lot, lot)
         self.assertNotIn("reminders", response.json())
