@@ -1068,6 +1068,10 @@
     };
     const renderCandidates = (subjectMatches = []) => {
       currentSubjectMatches = subjectMatches;
+      const openGroupKeys = new Set(Array.from(
+        candidateResults.querySelectorAll(".research-candidate-group[open]"),
+        (group) => group.dataset.group,
+      ));
       subjectResults.replaceChildren();
       candidateResults.replaceChildren();
       if (subjectMatches.length) {
@@ -1106,6 +1110,25 @@
           ? !["exact_work", "related_work", "artprice_html"].includes(candidate.match_type)
           : candidate.match_type === type);
         if (!items.length) return;
+        if (options.workspace) {
+          const group = document.createElement("details");
+          group.className = "research-candidate-group";
+          group.dataset.group = type;
+          group.open = openGroupKeys.has(type);
+          const summary = document.createElement("summary");
+          const selectedCount = items.filter((candidate) => selectedIds.has(String(candidate.id))).length;
+          summary.textContent = `${label} (${items.length})${selectedCount ? ` · ${selectedCount} selected` : ""}`;
+          const body = document.createElement("div");
+          body.className = "research-candidate-group-body";
+          const note = document.createElement("p");
+          note.className = "liveart-group-note";
+          note.textContent = explanation;
+          body.appendChild(note);
+          items.forEach((candidate) => body.appendChild(renderCandidateCard(candidate, true)));
+          group.append(summary, body);
+          candidateResults.appendChild(group);
+          return;
+        }
         const heading = document.createElement("h5");
         heading.textContent = `${label} (${items.length})`;
         candidateResults.appendChild(heading);
