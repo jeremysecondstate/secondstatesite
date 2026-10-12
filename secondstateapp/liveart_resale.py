@@ -14,9 +14,6 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from statistics import median
 from typing import Any, Mapping
 from urllib.parse import urlsplit
-from zoneinfo import ZoneInfo
-
-from django.conf import settings
 
 from catalogapp.artprice_artist_links import artist_identity_key
 
@@ -70,10 +67,12 @@ def _key(value: Any) -> str:
     return " ".join(re.sub(r"[^\w]+", " ", value).split())
 
 
-def _lot_key(value: Any) -> str:
-    compact = re.sub(r"[^a-z0-9]", "", _text(value).casefold())
-    match = re.fullmatch(r"0*(\d+)([a-z]*)", compact)
-    return f"{int(match.group(1))}{match.group(2)}" if match else compact
+def _title_identity(expected: Any, candidate: Any) -> bool:
+    expected_key, candidate_key = _key(expected), _key(candidate)
+    return bool(
+        expected_key and candidate_key and expected_key == candidate_key
+        and expected_key not in {"untitled", "composition", "abstract", "study"}
+    )
 
 
 def _sale(raw: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -86,10 +85,58 @@ def _artwork(raw: Mapping[str, Any]) -> Mapping[str, Any]:
     return artwork if isinstance(artwork, Mapping) else {}
 
 
+def _description(artwork: Mapping[str, Any]) -> Mapping[str, Any]:
+    description = artwork.get("description")
+    return description if isinstance(description, Mapping) else artwork
+
+
+def _artist_id(artwork: Mapping[str, Any]) -> Any:
+    description = _description(artwork)
+    artist = description.get("artist") or artwork.get("artist")
+    nested_id = artist.get("id") if isinstance(artist, Mapping) else None
+    return artwork.get("artist_id") or description.get("artist_id") or nested_id
+
+
+def _artist_name(artwork: Mapping[str, Any]) -> str:
+    description = _description(artwork)
+    for artist in (description.get("artist"), artwork.get("artist")):
+        if isinstance(artist, Mapping) and artist.get("name"):
+            return _text(artist["name"])
+        if isinstance(artist, str) and artist.strip():
+            return artist.strip()
+    return ""
+
+
+def _category_id(artwork: Mapping[str, Any]) -> Any:
+    description = _description(artwork)
+    category = description.get("category") or artwork.get("category")
+    nested_id = category.get("id") if isinstance(category, Mapping) else None
+    return description.get("category_id") or artwork.get("category_id") or nested_id
+
+
+def _medium(artwork: Mapping[str, Any]) -> str | None:
+    description = _description(artwork)
+    return _text(description.get("materials") or artwork.get("materials")) or None
+
+
+def _markings(artwork: Mapping[str, Any]) -> str:
+    description = _description(artwork)
+    return _text(description.get("markings") or artwork.get("markings"))
+
+
+def _artwork_edition(artwork: Mapping[str, Any], notes: str = "") -> str | None:
+    description = _description(artwork)
+    current = _text(description.get("edition_current"))
+    size = _text(description.get("edition_size"))
+    if current.isdecimal() and size.isdecimal():
+        return f"{int(current)}/{int(size)}"
+    if size.isdecimal():
+        return f"edition of {int(size)}"
+    return _edition(" ".join((_markings(artwork), notes)))
+
+
 def _artist(raw: Mapping[str, Any]) -> str:
-    artwork = _artwork(raw)
-    artist = artwork.get("artist")
-    return _text(artist.get("name")) if isinstance(artist, Mapping) else ""
+    return _artist_name(_artwork(raw))
 
 
 def _raw_date(raw: Mapping[str, Any]) -> str:
@@ -102,23 +149,11 @@ def _raw_date(raw: Mapping[str, Any]) -> str:
     return match.group() if match else ""
 
 
-def _calendar_date(lot: Any) -> str:
-    event = _value(lot, "event_at")
-    if isinstance(event, datetime):
-        if event.tzinfo:
-            event = event.astimezone(ZoneInfo(settings.CALENDAR_TIME_ZONE))
-        return event.date().isoformat()
-    if isinstance(event, date):
-        return event.isoformat()
-    match = re.match(r"\d{4}-\d{2}-\d{2}", _text(event))
-    return match.group() if match else ""
-
-
 def _subject_fields(raw: Mapping[str, Any]) -> dict[str, Any]:
     artwork = _artwork(raw)
     sale = _sale(raw)
     lot_id = raw.get("id")
-    markings = _text(artwork.get("markings"))
+    markings = _markings(artwork)
     notes = _text(raw.get("catalog_notes"))
     evidence = " ".join((markings, notes))
     return {
@@ -126,61 +161,95 @@ def _subject_fields(raw: Mapping[str, Any]) -> dict[str, Any]:
         "lot_id": lot_id,
         "sale_id": raw.get("sale_id") or sale.get("id"),
         "artwork_id": raw.get("artwork_id") or artwork.get("id"),
-        "artist_id": artwork.get("artist_id"),
+        "artist_id": _artist_id(artwork),
+        "category_id": _category_id(artwork),
         "house": _text(raw.get("auction_house_name")),
         "date": _raw_date(raw),
         "lot": _text(raw.get("lot_num")),
         "artist": _artist(raw),
-        "title": _text(artwork.get("name")),
+        "title": _text(_description(artwork).get("name") or artwork.get("name")),
         "lot_url": _safe_url(raw.get("lot_url")),
-        "medium": _text(artwork.get("materials")) or None,
-        "edition": _edition(evidence),
+        "medium": _medium(artwork),
+        "edition": _artwork_edition(artwork, notes),
         "signature": _signature(evidence),
-        "size": _size(artwork),
+        "size": _size(_description(artwork)),
         "condition": _condition(notes),
         "markings": markings or None,
         "catalog_notes": notes or None,
     }
 
 
-def subject_matches(lot: Any, raw_lots: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Rank possible LiveArt records for a Calendar lot.
+def artwork_matches(
+    lot: Any, raw_artworks: list[Mapping[str, Any]], *, artist_id: Any, artist_name: str
+) -> list[dict[str, Any]]:
+    """Rank artwork identities by artist and title, independent of the auction."""
 
-    ``verified`` deliberately requires all five independent identifying fields:
-    auction house, local sale date, lot number, artist and title.  A high score
-    without all five remains a review candidate, never an automatic match.
-    """
-
-    expected = {
-        "house": _text(_value(lot, "auction_house")),
-        "date": _calendar_date(lot),
-        "lot": _text(_value(lot, "lot_number")),
-        "artist": _text(_value(lot, "artist") or _value(lot, "artist_watchlist_name")),
-        "title": _text(_value(lot, "title")),
-    }
+    expected_artist = _text(artist_name or _value(lot, "artist") or _value(lot, "artist_watchlist_name"))
+    expected_title = _text(_value(lot, "title"))
     options: list[dict[str, Any]] = []
-    for raw in raw_lots:
+    for raw in raw_artworks:
         if not isinstance(raw, Mapping):
             continue
-        option = _subject_fields(raw)
-        matches = {
-            "house": bool(expected["house"] and option["house"] and _key(expected["house"]) == _key(option["house"])),
-            "date": bool(expected["date"] and option["date"] and expected["date"] == option["date"]),
-            "lot": bool(expected["lot"] and option["lot"] and _lot_key(expected["lot"]) == _lot_key(option["lot"])),
-            "artist": bool(expected["artist"] and option["artist"] and artist_identity_key(expected["artist"]) == artist_identity_key(option["artist"])),
-            "title": bool(expected["title"] and option["title"] and _key(expected["title"]) == _key(option["title"])),
-        }
-        missing = [name for name in matches if not expected[name] or not option[name]]
-        score = sum(matches.values())
-        option.update(
-            matches=matches,
-            score=score,
-            verified=score == 5,
-            missing_data=missing,
-            match_notes=[f"{name} differs" for name in matches if not matches[name] and name not in missing],
+        artwork_id = _text(raw.get("id"))
+        if not artwork_id:
+            continue
+        description = _description(raw)
+        markings = _markings(raw)
+        candidate_artist_id = _artist_id(raw)
+        candidate_artist = _artist_name(raw)
+        candidate_title = _text(description.get("name") or raw.get("name"))
+        artist_name_matches = bool(
+            expected_artist and candidate_artist
+            and artist_identity_key(expected_artist) == artist_identity_key(candidate_artist)
         )
+        artist_matches = bool(
+            artist_id is not None and candidate_artist_id is not None
+            and _text(artist_id) == _text(candidate_artist_id)
+        ) if artist_id is not None else artist_name_matches
+        title_matches = _title_identity(expected_title, candidate_title)
+        matches = {
+            "artist": artist_matches,
+            "title": title_matches,
+        }
+        missing = [name for name, value in (("artist", candidate_artist), ("title", candidate_title), ("medium", _medium(raw)), ("edition", _artwork_edition(raw)), ("signature", _signature(markings)), ("size", _size(description))) if not value]
+        if not candidate_artist_id:
+            missing.append("artist_id")
+        score = sum(matches.values())
+        notes = []
+        if artist_id is not None and candidate_artist_id is not None and not artist_matches:
+            notes.append("Artist ID differs")
+        elif not artist_name_matches:
+            notes.append("Artist name differs or is missing")
+        if not title_matches:
+            notes.append("Artwork title differs or is too generic to verify")
+        option = {
+            "id": artwork_id,
+            "artwork_id": artwork_id,
+            "artist_id": candidate_artist_id,
+            "category_id": _category_id(raw),
+            "artist": candidate_artist,
+            "title": candidate_title,
+            "medium": _medium(raw),
+            "edition": _artwork_edition(raw),
+            "signature": _signature(markings),
+            "size": _size(description),
+            "condition": None,
+            "markings": markings or None,
+            "matches": matches,
+            "score": score,
+            "verified": artist_matches and title_matches,
+            "missing_data": missing,
+            "match_notes": notes,
+            "provider_url": f"https://api.liveart.ai/v1/artworks?id={artwork_id}&limit=1" if artwork_id.isdecimal() else None,
+        }
         options.append(option)
     return sorted(options, key=lambda item: (-int(item["verified"]), -item["score"], item["id"]))
+
+
+def subject_matches(lot: Any, raw_artworks: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Compatibility wrapper for artwork identity matching."""
+
+    return artwork_matches(lot, raw_artworks, artist_id=None, artist_name="")
 
 
 _EDITION_RE = re.compile(r"\b(?:edition\s+(?:of\s+)?|numbered\s+)?(\d{1,4})\s*/\s*(\d{1,4})\b", re.I)
@@ -254,9 +323,35 @@ _MEDIUM_TERMS = (
 )
 
 
+_SPECIFIC_MEDIUM_ALIASES = (
+    ("screenprint", "screenprint"), ("screen print", "screenprint"),
+    ("silkscreen", "screenprint"), ("serigraph", "screenprint"),
+    ("lithograph", "lithograph"), ("lithography", "lithograph"),
+    ("etching", "etching"), ("aquatint", "aquatint"),
+    ("woodcut", "woodcut"), ("linocut", "linocut"),
+    ("giclee", "giclee"), ("pigment print", "pigment print"),
+    ("digital print", "digital print"), ("photograph", "photograph"),
+    ("oil", "oil"), ("acrylic", "acrylic"),
+    ("watercolor", "watercolor"), ("gouache", "gouache"),
+    ("bronze", "bronze"),
+)
+
+
+def _specific_medium(value: Any) -> str | None:
+    key = _key(value)
+    for phrase, canonical in _SPECIFIC_MEDIUM_ALIASES:
+        if re.search(rf"\b{re.escape(phrase)}\b", key):
+            return canonical
+    return None
+
+
 def _medium_comparison(subject: str | None, comp: str | None) -> dict[str, str | None]:
     comparison = _comparison(subject, comp)
     if not subject or not comp:
+        return comparison
+    subject_specific, comp_specific = _specific_medium(subject), _specific_medium(comp)
+    if subject_specific and subject_specific == comp_specific:
+        comparison["status"] = "same"
         return comparison
     subject_key, comp_key = _key(subject), _key(comp)
     subject_terms = {term for term in _MEDIUM_TERMS if term in subject_key}
@@ -280,49 +375,70 @@ def _size_from_text(text: Any) -> str | None:
     return " × ".join(part for part in match.groups() if part) + " cm"
 
 
-def normalize_candidate(raw: Mapping[str, Any], subject: Mapping[str, Any], calendar_lot: Any) -> dict[str, Any]:
+def normalize_candidate(raw: Mapping[str, Any], subject: Mapping[str, Any] | None, calendar_lot: Any) -> dict[str, Any]:
     """Build one reviewable comp, retaining missing data and mismatches."""
 
-    raw_subject = subject if "artwork" in subject else {}
-    if raw_subject:
-        subject = _subject_fields(raw_subject)
+    reference = subject if isinstance(subject, Mapping) else {}
+    if isinstance(reference.get("artwork"), Mapping):
+        reference = _subject_fields(reference)
     artwork = _artwork(raw)
+    description = _description(artwork)
     price = raw.get("price") if isinstance(raw.get("price"), Mapping) else {}
-    markings = _text(artwork.get("markings"))
+    markings = _markings(artwork)
     notes = _text(raw.get("catalog_notes"))
     evidence = " ".join((markings, notes))
-    medium = _text(artwork.get("materials")) or None
-    edition = _edition(evidence)
+    medium = _medium(artwork)
+    edition = _artwork_edition(artwork, notes)
     signature = _signature(evidence)
-    size = _size(artwork)
+    size = _size(description)
     condition = _condition(notes)
     calendar_medium = _text(_value(calendar_lot, "medium")) or None
-    subject_artwork = _artwork(raw_subject)
-    subject_notes = " ".join((_text(subject_artwork.get("markings")), _text(raw_subject.get("catalog_notes"))))
-    subject_medium = _text(subject_artwork.get("materials")) or calendar_medium
-    subject_edition = _edition(subject_notes) or _edition(calendar_medium)
-    subject_signature = _signature(subject_notes) or _signature(calendar_medium)
+    subject_medium = _text(reference.get("medium")) or calendar_medium
+    subject_edition = _text(reference.get("edition")) or _edition(calendar_medium)
+    subject_signature = _text(reference.get("signature")) or _signature(calendar_medium)
+    subject_size = _text(reference.get("size")) or _size_from_text(calendar_medium)
+    subject_condition = _text(reference.get("condition")) or _condition(calendar_medium)
     differences = {
         "medium": _medium_comparison(subject_medium, medium),
         "edition": _comparison(subject_edition, edition),
         "signature": _comparison(subject_signature, signature),
-        "size": _comparison(_size(subject_artwork) or _size_from_text(calendar_medium), size),
-        "condition": _comparison(_condition(subject_notes) or _condition(calendar_medium), condition),
+        "size": _comparison(subject_size, size),
+        "condition": _comparison(subject_condition, condition),
     }
     hammer = verify_sold_hammer_usd(raw)
     candidate_artist = _artist(raw)
-    expected_artist = _text(subject.get("artist") or _value(calendar_lot, "artist"))
+    candidate_artist_id = _artist_id(artwork)
+    expected_artist = _text(reference.get("artist") or _value(calendar_lot, "artist") or _value(calendar_lot, "artist_watchlist_name"))
     if candidate_artist and expected_artist:
         artist_matches = artist_identity_key(candidate_artist) == artist_identity_key(expected_artist)
     else:
-        artist_matches = bool(subject.get("artist_id") and subject.get("artist_id") == artwork.get("artist_id"))
-    candidate_title = _text(artwork.get("name"))
-    expected_title = _text(subject.get("title") or _value(calendar_lot, "title"))
-    same_artwork = bool(subject.get("artwork_id") and subject.get("artwork_id") == (raw.get("artwork_id") or artwork.get("id")))
-    title_key = _key(candidate_title)
-    title_matches = same_artwork or bool(
-        title_key and title_key == _key(expected_title) and title_key not in {"untitled", "composition", "abstract"}
+        artist_matches = bool(
+            reference.get("artist_id") and candidate_artist_id
+            and _text(reference["artist_id"]) == _text(candidate_artist_id)
+        )
+    candidate_title = _text(description.get("name") or artwork.get("name"))
+    expected_title = _text(reference.get("title") or _value(calendar_lot, "title"))
+    candidate_artwork_id = raw.get("artwork_id") or artwork.get("id")
+    same_artwork = bool(
+        reference.get("artwork_id") and candidate_artwork_id
+        and _text(reference["artwork_id"]) == _text(candidate_artwork_id)
     )
+    title_matches = _title_identity(expected_title, candidate_title)
+    exact_work = artist_matches and (same_artwork or title_matches)
+    match_type = "exact_work" if exact_work else "related_work"
+    candidate_category_id = _category_id(artwork)
+    reference_category_id = reference.get("category_id")
+    same_category = bool(
+        reference_category_id and candidate_category_id
+        and _text(reference_category_id) == _text(candidate_category_id)
+    )
+    subject_specific_medium = _specific_medium(subject_medium)
+    candidate_specific_medium = _specific_medium(medium)
+    same_specific_medium = bool(
+        subject_specific_medium and candidate_specific_medium
+        and subject_specific_medium == candidate_specific_medium
+    )
+    related_compatible = same_category or same_specific_medium
     medium_differs = differences["medium"]["status"] == "different"
     edition_differs = differences["edition"]["status"] == "different"
     edition_incompatible = edition_differs and _edition_size(subject_edition) != _edition_size(edition)
@@ -334,15 +450,25 @@ def normalize_candidate(raw: Mapping[str, Any], subject: Mapping[str, Any], cale
         date_is_past_or_today = bool(sale_date and date.fromisoformat(sale_date) <= datetime.now(timezone.utc).date())
     except ValueError:
         date_is_past_or_today = False
-    credible = bool(hammer and artist_matches and title_matches and (not sale_date or date_is_past_or_today))
-    selected = credible and not any((medium_differs, edition_incompatible, signature_differs, size_differs, condition_differs)) and date_is_past_or_today
+    credible = bool(
+        hammer is not None and artist_matches and (exact_work or related_compatible)
+        and (not sale_date or date_is_past_or_today)
+    )
+    selected = bool(
+        credible and exact_work and same_specific_medium and date_is_past_or_today
+        and not any((medium_differs, edition_incompatible, signature_differs, size_differs, condition_differs))
+    )
     reasons = []
     if hammer is None:
         reasons.append("No verified sold USD hammer price")
     if not artist_matches:
         reasons.append("Artist does not match")
     if not title_matches:
-        reasons.append("Title or artwork does not match closely")
+        reasons.append("Title differs")
+    if not exact_work and not related_compatible:
+        reasons.append("Related work has no matching category or specific medium")
+    if exact_work and not same_specific_medium:
+        reasons.append("Specific medium differs or is not reported; review before using")
     if medium_differs:
         reasons.append("Medium differs")
     if edition_differs:
@@ -372,8 +498,10 @@ def normalize_candidate(raw: Mapping[str, Any], subject: Mapping[str, Any], cale
         "provider_url": f"https://api.liveart.ai/v1/lots?id={candidate_id}&limit=1" if candidate_id.isdecimal() else None,
         "lot_url": _safe_url(raw.get("lot_url")),
         "sale_id": raw.get("sale_id") or _sale(raw).get("id"),
-        "artwork_id": raw.get("artwork_id") or artwork.get("id"),
-        "artist_id": artwork.get("artist_id"),
+        "artwork_id": candidate_artwork_id,
+        "artist_id": candidate_artist_id,
+        "category_id": candidate_category_id,
+        "match_type": match_type,
         "auction_house": _text(raw.get("auction_house_name")),
         "sale_date": sale_date,
         "lot_number": _text(raw.get("lot_num")),

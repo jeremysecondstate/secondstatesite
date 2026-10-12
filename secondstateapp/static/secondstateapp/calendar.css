@@ -1662,6 +1662,13 @@ body:has(.lot-browser[open]) {
   margin: 10px 0;
 }
 
+.liveart-group-note {
+  margin: -3px 0 9px;
+  color: var(--calendar-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
 .liveart-subject-results > h5,
 .liveart-candidate-results > h5 {
   margin: 15px 0 8px;
@@ -1703,6 +1710,30 @@ body:has(.lot-browser[open]) {
   width: auto;
   min-height: 0;
   accent-color: var(--calendar-gold);
+}
+
+.liveart-work-type {
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 2px;
+  color: rgba(255, 255, 255, .8);
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.liveart-work-type.is-exact_work {
+  border-color: var(--calendar-gold);
+  color: var(--calendar-gold);
+}
+
+.liveart-work-type.is-artprice {
+  border-color: rgba(143, 190, 217, .7);
+  color: #a8d5ee;
+}
+
+.liveart-work-type.is-liveart {
+  border-color: rgba(218, 181, 112, .7);
+  color: var(--calendar-gold);
 }
 
 .liveart-provider-link {

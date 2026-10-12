@@ -48,6 +48,23 @@ def lot(
     }
 
 
+def artwork(artwork_id, *, artist="Pablo Picasso", title="Test Print", materials="screenprint on paper"):
+    return {
+        "id": artwork_id,
+        "artist_id": 7,
+        "artist": {"id": 7, "name": artist},
+        "description": {
+            "name": title,
+            "artist_id": 7,
+            "artist": {"id": 7, "name": artist},
+            "materials": materials,
+            "markings": "Signed and numbered 12/50",
+            "measurements_height_cm": 30,
+            "measurements_width_cm": 40,
+        },
+    }
+
+
 @override_settings(CALENDAR_TIME_ZONE="America/New_York")
 class LiveArtResaleTests(SimpleTestCase):
     def setUp(self):
@@ -61,22 +78,35 @@ class LiveArtResaleTests(SimpleTestCase):
         )
         self.subject = lot(10, status="upcoming", hammer=None, markings="Signed and numbered 12/50")
 
-    def test_subject_requires_all_five_identifiers(self):
+    def test_subject_matches_artwork_across_houses_dates_and_lot_numbers(self):
         options = subject_matches(
             self.calendar_lot,
-            [lot(11, house="Other House"), self.subject],
+            [
+                artwork(100),
+                artwork(101, artist="Henri Matisse"),
+                artwork(102, title="Another Print"),
+            ],
         )
-        self.assertEqual(options[0]["id"], "10")
+        self.assertEqual(options[0]["id"], "100")
         self.assertTrue(options[0]["verified"])
-        self.assertEqual(options[0]["score"], 5)
+        self.assertTrue(options[0]["matches"]["artist"])
+        self.assertTrue(options[0]["matches"]["title"])
         self.assertFalse(options[1]["verified"])
-        self.assertEqual(options[1]["matches"]["house"], False)
+        self.assertFalse(options[2]["verified"])
 
-    def test_subject_missing_field_is_never_verified(self):
-        target = SimpleNamespace(**{**self.calendar_lot.__dict__, "lot_number": ""})
-        option = subject_matches(target, [self.subject])[0]
-        self.assertFalse(option["verified"])
-        self.assertIn("lot", option["missing_data"])
+    def test_subject_does_not_require_calendar_auction_metadata(self):
+        target = SimpleNamespace(
+            **{
+                **self.calendar_lot.__dict__,
+                "auction_house": "",
+                "event_at": None,
+                "lot_number": "",
+            }
+        )
+        option = subject_matches(target, [artwork(100)])[0]
+        self.assertTrue(option["verified"])
+        self.assertEqual(option["artist"], "Pablo Picasso")
+        self.assertEqual(option["title"], "Test Print")
 
     def test_print_attributes_and_verified_hammer_are_visible(self):
         candidate = normalize_candidate(lot(21), self.subject, self.calendar_lot)
@@ -99,11 +129,49 @@ class LiveArtResaleTests(SimpleTestCase):
         _, scenarios = build_scenarios([candidate], [candidate["id"]], {})
         self.assertEqual(scenarios[1]["resale_hammer"], "1000.00")
 
-    def test_different_title_and_artwork_are_not_credible(self):
+    def test_related_work_with_different_title_is_reviewable_not_auto_selected(self):
         candidate = normalize_candidate(lot(28, title="Test Portrait", artwork_id=101), self.subject, self.calendar_lot)
-        self.assertFalse(candidate["credible"])
+        self.assertTrue(candidate["credible"])
+        self.assertEqual(candidate["match_type"], "related_work")
         self.assertFalse(candidate["selected"])
-        self.assertIn("Title or artwork does not match closely", candidate["exclusion_reasons"])
+        self.assertIn("Title differs", candidate["exclusion_reasons"])
+
+    def test_same_artwork_id_does_not_hide_print_differences(self):
+        raw = lot(
+            40,
+            artwork_id=100,
+            materials="oil on canvas",
+            markings="Signed and numbered 4/500",
+        )
+        raw["artwork"]["measurements_height_cm"] = 80
+        raw["artwork"]["measurements_width_cm"] = 100
+        candidate = normalize_candidate(raw, self.subject, self.calendar_lot)
+        self.assertEqual(candidate["match_type"], "exact_work")
+        self.assertFalse(candidate["selected"])
+        self.assertEqual(candidate["differences"]["medium"]["status"], "different")
+        self.assertEqual(candidate["differences"]["edition"]["status"], "different")
+        self.assertEqual(candidate["differences"]["size"]["status"], "different")
+
+    def test_related_same_category_with_other_medium_needs_manual_review(self):
+        subject = lot(41, status="upcoming", hammer=None)
+        subject["artwork"]["category_id"] = 2
+        raw = lot(42, artwork_id=101, title="Another Print", materials="etching")
+        raw["artwork"]["category_id"] = 2
+        candidate = normalize_candidate(raw, subject, self.calendar_lot)
+        self.assertEqual(candidate["match_type"], "related_work")
+        self.assertTrue(candidate["credible"])
+        self.assertFalse(candidate["selected"])
+        self.assertEqual(candidate["differences"]["medium"]["status"], "different")
+
+    def test_generic_medium_does_not_auto_select_even_exact_artwork(self):
+        subject = lot(43, status="upcoming", hammer=None, materials="prints")
+        candidate = normalize_candidate(
+            lot(44, artwork_id=100, materials="prints"), subject, self.calendar_lot
+        )
+        self.assertEqual(candidate["match_type"], "exact_work")
+        self.assertTrue(candidate["credible"])
+        self.assertFalse(candidate["selected"])
+        self.assertIn("Specific medium differs or is not reported; review before using", candidate["exclusion_reasons"])
 
     def test_pencil_and_plate_signatures_are_distinct(self):
         subject = lot(30, status="upcoming", hammer=None, markings="Pencil signed and numbered 12/50")

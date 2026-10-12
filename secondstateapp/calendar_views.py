@@ -48,7 +48,7 @@ from .calendar_images import (
     store_saved_calendar_image,
 )
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
-from .liveart_resale import build_scenarios, normalize_candidate, subject_matches as score_liveart_subject_matches
+from .liveart_resale import artwork_matches, build_scenarios, normalize_candidate
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -63,6 +63,7 @@ MAX_SYNC_LOTS = 1000
 MAX_SYNC_BYTES = 2_000_000
 MAX_ARTPRICE_HTML_BYTES = 5 * 1024 * 1024
 ARTPRICE_PRELOADED_STATE_MARKER = "window.__PRELOADED_STATE__"
+ARTPRICE_REACT_STORE_MARKER = 'data-js-react-on-rails-store="artpriceStore"'
 # Heritage serves lot photographs separately from its bookmarked auction pages.
 CALENDAR_IMAGE_DOMAINS = (*DEFAULT_ALLOWED_DOMAINS, "heritagestatic.com")
 
@@ -593,9 +594,9 @@ def _uploaded_artprice_html(request) -> tuple[str, str]:
         )
 
     html_text = raw_html.decode("utf-8", errors="replace")
-    if ARTPRICE_PRELOADED_STATE_MARKER not in html_text:
+    if not any(marker in html_text for marker in (ARTPRICE_PRELOADED_STATE_MARKER, ARTPRICE_REACT_STORE_MARKER)):
         raise _ArtpriceAnalysisRequestError(
-            "The file does not contain the Artprice preloaded results data. Save the Artprice results page and try again."
+            "The file does not contain Artprice preloaded or saved results data. Save the Artprice results page and try again."
         )
     return source_filename, html_text
 
@@ -705,6 +706,151 @@ def _analysis_json(analysis: AuctionMaxBidAnalysis) -> dict:
     }
 
 
+def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
+    """Adapt the saved, normalized Artprice hammers for the resale comp review.
+
+    The upload is already tied to this private Calendar lot.  Historical saved
+    comparables have fewer descriptive fields than newer Artprice pages, so
+    missing attributes stay visible and every candidate starts unselected.
+    """
+
+    analysis = AuctionMaxBidAnalysis.objects.filter(lot=lot).first()
+    if analysis is None:
+        return []
+    currency = str(analysis.currency or "").strip().upper()
+    candidates = []
+    seen_ids = set()
+    for comparable in analysis.comparables if isinstance(analysis.comparables, list) else []:
+        if not isinstance(comparable, dict):
+            continue
+        provider_id = str(comparable.get("provider_id") or "").strip() or None
+        identity = provider_id or hashlib.sha256(
+            json.dumps(
+                [comparable.get(key) for key in ("sale_date", "auction_house", "lot_number", "title", "hammer_price")],
+                sort_keys=True,
+                default=str,
+            ).encode("utf-8")
+        ).hexdigest()[:20]
+        candidate_id = f"artprice:{identity}"
+        if candidate_id in seen_ids:
+            continue
+        seen_ids.add(candidate_id)
+
+        raw_hammer = comparable.get("hammer_price")
+        try:
+            hammer = Decimal(str(raw_hammer))
+        except (InvalidOperation, TypeError, ValueError):
+            hammer = None
+        valid_hammer = bool(hammer is not None and hammer.is_finite() and 0 < hammer <= Decimal("1000000000000"))
+        artist = str(comparable.get("artist") or "").strip() or None
+        calendar_artist = (lot.artist or lot.artist_watchlist_name or "").strip()
+        artist_conflict = bool(
+            artist and calendar_artist and artist_identity_key(artist) != artist_identity_key(calendar_artist)
+        )
+        credible = bool(currency == "USD" and valid_hammer and not artist_conflict)
+        source_url = str(comparable.get("provider_url") or "").strip()
+        parsed_url = urlparse(source_url)
+        if parsed_url.scheme != "https" or parsed_url.hostname not in {"artprice.com", "www.artprice.com"}:
+            source_url = None
+
+        medium = str(comparable.get("medium") or "").strip() or None
+        edition = str(comparable.get("edition") or "").strip() or None
+        size = str(comparable.get("size") or "").strip() or None
+        differences = {}
+        for field, subject, comp in (
+            ("medium", lot.medium, medium),
+            ("edition", None, edition),
+            ("signature", None, None),
+            ("size", None, size),
+            ("condition", None, None),
+        ):
+            subject = str(subject or "").strip() or None
+            differences[field] = {
+                "subject": subject,
+                "comp": comp,
+                "status": (
+                    "unknown" if not subject or not comp else
+                    "same" if subject.casefold() == comp.casefold() else "different"
+                ),
+            }
+        missing = [
+            field for field, value in (
+                ("provider_id", provider_id), ("provider_url", source_url),
+                ("artist", artist), ("title", comparable.get("title")),
+                ("auction_house", comparable.get("auction_house")),
+                ("lot_number", comparable.get("lot_number")),
+                ("sale_date", comparable.get("sale_date")),
+                ("medium", medium), ("edition", edition),
+                ("signature", None), ("size", size), ("condition", None),
+            ) if not value
+        ]
+        if not valid_hammer:
+            missing.append("verified_hammer")
+        notes = []
+        if currency != "USD":
+            notes.append("Original currency is not USD; no verified USD hammer conversion is available")
+        if not valid_hammer:
+            notes.append("No positive numeric hammer price")
+        if artist_conflict:
+            notes.append("Artprice artist differs from this Calendar artist")
+        if artist is None:
+            notes.append("Artist is not recorded in this saved Artprice result; verify before selecting")
+        candidates.append({
+            "id": candidate_id,
+            "provider": "Artprice",
+            "provider_id": provider_id,
+            "provider_url": source_url,
+            "source_id": provider_id,
+            "source_url": source_url,
+            "source_filename": analysis.source_filename,
+            "match_type": "artprice_html",
+            "status": "sold",
+            "sale_date": str(comparable.get("sale_date") or ""),
+            "auction_house": str(comparable.get("auction_house") or ""),
+            "lot_number": str(comparable.get("lot_number") or ""),
+            "artist": artist,
+            "title": str(comparable.get("title") or ""),
+            "hammer_usd": f"{hammer:.2f}" if credible else None,
+            "original_hammer": f"{hammer:.2f}" if valid_hammer else None,
+            "original_currency": currency or None,
+            "medium": medium,
+            "edition": edition,
+            "signature": None,
+            "size": size,
+            "condition": None,
+            "differences": differences,
+            "missing_data": missing,
+            "credible": credible,
+            "selected": False,
+            "exclusion_reasons": notes,
+            "match_notes": notes,
+            "retrieved_at": analysis.updated_at.isoformat(),
+        })
+    return candidates
+
+
+def _merged_resale_candidates(lot: AuctionWatchLot, candidates: object) -> list[dict]:
+    liveart = [item for item in candidates if isinstance(item, dict) and item.get("provider") != "Artprice"] if isinstance(candidates, list) else []
+    return liveart + _artprice_candidates(lot)
+
+
+def _refresh_saved_resale_from_artprice(lot: AuctionWatchLot) -> None:
+    """Keep a saved mixed analysis in step with a changed Artprice upload."""
+
+    saved = LiveArtResaleAnalysis.objects.filter(lot=lot).first()
+    if saved is None:
+        return
+    candidates = _merged_resale_candidates(lot, saved.candidates)
+    allowed = {str(item.get("id")) for item in candidates if item.get("credible")}
+    selected_ids = [str(item) for item in saved.selected_ids if str(item) in allowed]
+    assumptions, scenarios = build_scenarios(candidates, selected_ids, saved.assumptions)
+    saved.candidates = candidates
+    saved.selected_ids = selected_ids
+    saved.assumptions = assumptions
+    saved.scenarios = scenarios
+    saved.save(update_fields=("candidates", "selected_ids", "assumptions", "scenarios", "updated_at"))
+
+
 @staff_member_required
 @require_http_methods(["GET", "POST"])
 def auction_lot_artprice_analysis(request, lot_id: int):
@@ -732,6 +878,7 @@ def auction_lot_artprice_analysis(request, lot_id: int):
                 source_filename=source_filename,
                 created_by=request.user,
             )
+            _refresh_saved_resale_from_artprice(lot)
             return JsonResponse(
                 {
                     "ok": True,
@@ -757,6 +904,7 @@ def auction_lot_artprice_analysis(request, lot_id: int):
                 source_filename=existing.source_filename,
                 created_by=request.user,
             )
+            _refresh_saved_resale_from_artprice(lot)
             return JsonResponse(
                 {
                     "ok": True,
@@ -768,6 +916,7 @@ def auction_lot_artprice_analysis(request, lot_id: int):
         if action == "delete":
             with transaction.atomic():
                 AuctionMaxBidAnalysis.objects.filter(lot=lot).delete()
+                _refresh_saved_resale_from_artprice(lot)
             return JsonResponse(
                 {
                     "ok": True,
@@ -784,130 +933,146 @@ def auction_lot_artprice_analysis(request, lot_id: int):
 
 
 def _liveart_analysis_json(analysis: LiveArtResaleAnalysis) -> dict:
+    candidates = _merged_resale_candidates(analysis.lot, analysis.candidates)
+    allowed = {str(item.get("id")) for item in candidates if item.get("credible")}
+    selected_ids = [str(item) for item in analysis.selected_ids if str(item) in allowed]
+    if candidates != analysis.candidates or selected_ids != analysis.selected_ids:
+        assumptions, scenarios = build_scenarios(candidates, selected_ids, analysis.assumptions)
+    else:
+        assumptions, scenarios = analysis.assumptions, analysis.scenarios
     return {
-        "provider": "LiveArt",
+        "provider": "Resale",
+        "saved": True,
         "subject_match": analysis.subject_match or None,
         "subject_matches": analysis.subject_matches,
-        "candidates": analysis.candidates,
-        "selected_ids": analysis.selected_ids,
-        "assumptions": analysis.assumptions,
-        "scenarios": analysis.scenarios,
-        "no_credible_comps": not bool(analysis.selected_ids),
+        "candidates": candidates,
+        "selected_ids": selected_ids,
+        "assumptions": assumptions,
+        "scenarios": scenarios,
+        "no_credible_comps": not bool(selected_ids),
         "retrieved_at": analysis.retrieved_at.isoformat(),
-        "data_units_spent": analysis.data_units_spent,
+        "data_units_spent": float(analysis.data_units_spent) if analysis.data_units_spent is not None else None,
         "created_at": analysis.created_at.isoformat(),
         "updated_at": analysis.updated_at.isoformat(),
         "estimate_notice": "Resale values and maximum hammer bids are estimates, not guaranteed profit.",
     }
 
 
-def _liveart_du(page) -> int | None:
-    """Use the metered response header when present; never infer a larger bill."""
+def _artprice_resale_preview(lot: AuctionWatchLot) -> dict | None:
+    candidates = _artprice_candidates(lot)
+    if not candidates:
+        return None
+    assumptions, _scenarios = build_scenarios(candidates, [], {})
+    source = AuctionMaxBidAnalysis.objects.get(lot=lot)
+    return {
+        "provider": "Resale",
+        "saved": False,
+        "subject_match": None,
+        "subject_matches": [],
+        "candidates": candidates,
+        "selected_ids": [],
+        "assumptions": assumptions,
+        "scenarios": [],
+        "no_credible_comps": True,
+        "retrieved_at": source.updated_at.isoformat(),
+        "data_units_spent": None,
+        "created_at": None,
+        "updated_at": None,
+        "estimate_notice": "Resale values and maximum hammer bids are estimates, not guaranteed profit.",
+    }
+
+
+def _liveart_du(page) -> float | None:
+    """Keep the metered response's half-unit precision when it is provided."""
 
     value = getattr(page, "data_units", None)
-    return int(value) if value is not None and value >= 0 else None
+    return float(value) if value is not None and value >= 0 else None
 
 
-def _add_liveart_du(total: int | None, page) -> int | None:
+def _add_liveart_du(total: float | None, page) -> float | None:
     cost = _liveart_du(page)
     return total + cost if total is not None and cost is not None else None
 
 
 def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "") -> dict:
-    if not lot.event_at or not lot.lot_number.strip():
-        raise ValueError("This Calendar lot needs an auction date and lot number for LiveArt matching.")
-    if not (_artist_label(lot).strip() and lot.title.strip() and lot.auction_house.strip()):
-        raise ValueError("This Calendar lot needs a house, artist, and title for LiveArt matching.")
+    artist_name = (lot.artist or lot.artist_watchlist_name or "").strip()
+    if not artist_name or not lot.title.strip():
+        raise ValueError("This Calendar lot needs an artist and title for LiveArt research.")
 
-    local_date = timezone.localtime(lot.event_at, _calendar_zone()).date()
-    start = (local_date - timedelta(days=2)).isoformat()
-    end = (local_date + timedelta(days=2)).isoformat()
     client = LiveArtClient()
-    subject_page = client.list_lots(
-        lot_num=lot.lot_number.strip(),
-        search=lot.title[:200],
-        sale_datetime__gte=start,
-        sale_datetime__lte=end,
-        limit=12,
+    artist_page = client.list_artists(q=artist_name[:200], limit=3)
+    units = _liveart_du(artist_page)
+    artist_key = artist_identity_key(artist_name)
+    artist = next(
+        (
+            item for item in artist_page.items
+            if artist_identity_key(str(item.get("name") or "")) == artist_key and item.get("id") is not None
+        ),
+        None,
     )
-    units = _liveart_du(subject_page)
-    matches = score_liveart_subject_matches(lot, subject_page.items)
+    retrieved_at = timezone.now().isoformat()
+    if artist is None:
+        return {
+            "subject_matches": [],
+            "subject_match": None,
+            "candidates": [],
+            "selected_ids": [],
+            "retrieved_at": retrieved_at,
+            "data_units_spent": units,
+            "requires_subject_choice": False,
+            "message": "No LiveArt artist matched this Calendar artist. No sold prices were used.",
+        }
+
+    artist_id = artist["id"]
+    artwork_page = client.list_artworks(artist_id=artist_id, search=lot.title[:200], limit=5)
+    units = _add_liveart_du(units, artwork_page)
+    matches = artwork_matches(
+        lot, artwork_page.items, artist_id=artist_id, artist_name=str(artist.get("name") or artist_name)
+    )
     verified = [item for item in matches if item.get("verified")]
     chosen = None
     if subject_id:
         chosen = next((item for item in verified if str(item.get("id")) == subject_id), None)
         if chosen is None:
-            raise ValueError("The selected LiveArt lot does not match this Calendar lot.")
+            raise ValueError("The selected LiveArt artwork does not match this artist and title.")
     elif len(verified) == 1:
         chosen = verified[0]
 
-    retrieved_at = timezone.now().isoformat()
-    if chosen is None:
-        return {
-            "subject_matches": matches,
-            "subject_match": None,
-            "candidates": [],
-            "retrieved_at": retrieved_at,
-            "data_units_spent": units,
-            "requires_subject_choice": len(verified) > 1,
-            "message": (
-                "Choose the matching LiveArt lot before fetching sold comps."
-                if len(verified) > 1
-                else "No LiveArt lot matched the Calendar house, date, lot number, artist, and title."
-            ),
-        }
-
-    raw_subject = next(
-        (item for item in subject_page.items if str(item.get("id")) == str(chosen.get("id"))),
-        None,
-    )
-    if raw_subject is None:
-        raise ValueError("The selected LiveArt lot is unavailable; request research again.")
-    artwork = raw_subject.get("artwork") if isinstance(raw_subject.get("artwork"), dict) else {}
-    artwork_id = raw_subject.get("artwork_id") or artwork.get("id")
-    artist_id = artwork.get("artist_id")
-    if artist_id is None and isinstance(artwork.get("artist"), dict):
-        artist_id = artwork["artist"].get("id")
-
     raw_comps: list[dict] = []
-    if artwork_id is not None:
-        artwork_page = client.list_lots(artwork_id=artwork_id, status="sold", limit=10)
-        units = _add_liveart_du(units, artwork_page)
-        raw_comps.extend({**item, "_retrieved_at": artwork_page.retrieved_at} for item in artwork_page.items)
-    if artist_id is not None:
-        artist_page = client.list_lots(
-            artist_id=artist_id,
-            search=str(chosen.get("title") or lot.title)[:200],
-            status="sold",
-            sort="SALE_DATE_DESC",
-            limit=12,
-        )
-        units = _add_liveart_du(units, artist_page)
-        raw_comps.extend({**item, "_retrieved_at": artist_page.retrieved_at} for item in artist_page.items)
-    elif not artwork_id:
-        # A name search is a bounded fallback when the subject lacks stable IDs.
-        artist_page = client.list_lots(search=lot.title[:200], status="sold", limit=10)
-        units = _add_liveart_du(units, artist_page)
-        raw_comps.extend({**item, "_retrieved_at": artist_page.retrieved_at} for item in artist_page.items)
+    if chosen is not None:
+        history_page = client.list_lots(artwork_id=chosen["artwork_id"], status="sold", limit=10)
+        units = _add_liveart_du(units, history_page)
+        raw_comps.extend({**item, "_retrieved_at": history_page.retrieved_at} for item in history_page.items)
+
+    # This bounded category search supplies related works with different titles.
+    # A category can be broad (for example, prints), so every result remains a
+    # review candidate and must have a verified USD hammer to enter the math.
+    related_filters = {"artist_id": artist_id, "status": "sold", "sort": "SALE_DATE_DESC", "limit": 10}
+    category_id = chosen.get("category_id") if chosen else None
+    if category_id is not None:
+        related_filters["category_id"] = category_id
+    related_page = client.list_lots(**related_filters)
+    units = _add_liveart_du(units, related_page)
+    raw_comps.extend({**item, "_retrieved_at": related_page.retrieved_at} for item in related_page.items)
 
     candidates = []
     seen_ids = set()
     seen_sales = set()
-    subject_sale_key = (str(raw_subject.get("sale_id") or ""), str(raw_subject.get("lot_num") or ""))
     for raw in raw_comps:
         candidate_id = str(raw.get("id") or "")
-        if not candidate_id or candidate_id == str(chosen.get("id")) or candidate_id in seen_ids:
+        if not candidate_id or candidate_id in seen_ids:
             continue
         sale_key = (str(raw.get("sale_id") or ""), str(raw.get("lot_num") or ""))
-        if all(sale_key) and (sale_key == subject_sale_key or sale_key in seen_sales):
+        if all(sale_key) and sale_key in seen_sales:
             continue
         seen_ids.add(candidate_id)
         if all(sale_key):
             seen_sales.add(sale_key)
-        candidate = normalize_candidate(raw, raw_subject, lot)
+        candidate = normalize_candidate(raw, chosen, lot)
         candidate["retrieved_at"] = raw.get("_retrieved_at") or timezone.now().isoformat()
         candidates.append(candidate)
     candidates.sort(key=lambda item: str(item.get("sale_date") or ""), reverse=True)
+    candidates.sort(key=lambda item: item.get("match_type") != "exact_work")
     selected_ids = [str(item["id"]) for item in candidates if item.get("selected") and item.get("credible")]
     return {
         "subject_matches": matches,
@@ -916,10 +1081,10 @@ def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "") -> dict
         "selected_ids": selected_ids,
         "retrieved_at": timezone.now().isoformat(),
         "data_units_spent": units,
-        "requires_subject_choice": False,
+        "requires_subject_choice": len(verified) > 1,
         "message": (
-            f"Found {len(candidates)} candidate sold results; review selection and print details before saving."
-            if candidates else "No candidate sold results were returned for this LiveArt lot."
+            f"Found {len(candidates)} sold results for this work and related works; review each before saving."
+            if candidates else "No suitable sold results were returned for this artist and artwork search."
         ),
     }
 
@@ -939,7 +1104,7 @@ def auction_lot_liveart_research(request, lot_id: int):
             raise ValueError("Research request must be a JSON object.")
         subject_id = str(payload.get("subject_id") or "").strip()
         if len(subject_id) > 80:
-            raise ValueError("Invalid LiveArt lot ID.")
+            raise ValueError("Invalid LiveArt artwork ID.")
         research = _research_liveart_lot(lot, subject_id=subject_id)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"ok": False, "error": "Research request must be valid JSON."}, status=400)
@@ -958,7 +1123,8 @@ def auction_lot_liveart_research(request, lot_id: int):
 
     research["research_id"] = secrets.token_hex(16)
     request.session[f"liveart_research_{lot.pk}"] = research
-    return JsonResponse({"ok": True, **research})
+    response_research = {**research, "candidates": _merged_resale_candidates(lot, research.get("candidates"))}
+    return JsonResponse({"ok": True, **response_research})
 
 
 @never_cache
@@ -971,7 +1137,7 @@ def auction_lot_liveart_analysis(request, lot_id: int):
     existing = LiveArtResaleAnalysis.objects.filter(lot=lot).first()
     if request.method == "GET":
         return JsonResponse(
-            {"ok": True, "analysis": _liveart_analysis_json(existing) if existing else None}
+            {"ok": True, "analysis": _liveart_analysis_json(existing) if existing else _artprice_resale_preview(lot)}
         )
     if len(request.body) > 20_000:
         return JsonResponse({"ok": False, "error": "Analysis request is too large."}, status=413)
@@ -986,9 +1152,9 @@ def auction_lot_liveart_analysis(request, lot_id: int):
         if existing:
             existing.delete()
         request.session.pop(f"liveart_research_{lot.pk}", None)
-        return JsonResponse({"ok": True, "analysis": None, "message": "LiveArt analysis removed."})
+        return JsonResponse({"ok": True, "analysis": _artprice_resale_preview(lot), "message": "Resale bid analysis removed."})
     if action != "save":
-        return JsonResponse({"ok": False, "error": "Choose a valid LiveArt analysis action."}, status=400)
+        return JsonResponse({"ok": False, "error": "Choose a valid resale analysis action."}, status=400)
     research_id = str(payload.get("research_id") or "")
     research = request.session.get(f"liveart_research_{lot.pk}")
     if research_id and (not isinstance(research, dict) or research.get("research_id") != research_id):
@@ -1003,21 +1169,29 @@ def auction_lot_liveart_analysis(request, lot_id: int):
             "retrieved_at": existing.retrieved_at.isoformat(),
             "data_units_spent": existing.data_units_spent,
         }
+    if not research_id and not isinstance(research, dict) and AuctionMaxBidAnalysis.objects.filter(lot=lot).exists():
+        research = {
+            "subject_match": None,
+            "subject_matches": [],
+            "candidates": [],
+            "retrieved_at": timezone.now().isoformat(),
+            "data_units_spent": None,
+        }
     if not isinstance(research, dict):
         return JsonResponse(
-            {"ok": False, "error": "Find LiveArt comps before saving an analysis."}, status=400
+            {"ok": False, "error": "Find LiveArt comps or upload Artprice HTML before saving an analysis."}, status=400
         )
-    candidates = research.get("candidates")
+    candidates = _merged_resale_candidates(lot, research.get("candidates"))
     selected_ids = payload.get("selected_ids", [])
     assumptions = payload.get("assumptions", {})
     if not isinstance(candidates, list) or not isinstance(selected_ids, list) or not isinstance(assumptions, dict):
-        return JsonResponse({"ok": False, "error": "Invalid LiveArt analysis selections."}, status=400)
+        return JsonResponse({"ok": False, "error": "Invalid resale analysis selections."}, status=400)
     if len(selected_ids) > 25 or any(not isinstance(item, (str, int)) for item in selected_ids):
-        return JsonResponse({"ok": False, "error": "Invalid LiveArt comp selection."}, status=400)
+        return JsonResponse({"ok": False, "error": "Invalid resale comp selection."}, status=400)
     selected_ids = list(dict.fromkeys(str(item) for item in selected_ids))
     allowed = {str(item.get("id")) for item in candidates if isinstance(item, dict) and item.get("credible")}
     if any(item not in allowed for item in selected_ids):
-        return JsonResponse({"ok": False, "error": "Select only verified sold LiveArt comps."}, status=400)
+        return JsonResponse({"ok": False, "error": "Select only eligible sold USD hammer comps."}, status=400)
     try:
         normalized_assumptions, scenarios = build_scenarios(candidates, selected_ids, assumptions)
     except ValueError as exc:
@@ -1039,7 +1213,7 @@ def auction_lot_liveart_analysis(request, lot_id: int):
     analysis, _created = LiveArtResaleAnalysis.objects.update_or_create(lot=lot, defaults=defaults)
     request.session.pop(f"liveart_research_{lot.pk}", None)
     return JsonResponse(
-        {"ok": True, "analysis": _liveart_analysis_json(analysis), "message": "LiveArt resale bid analysis saved."}
+        {"ok": True, "analysis": _liveart_analysis_json(analysis), "message": "Resale bid analysis saved."}
     )
 
 

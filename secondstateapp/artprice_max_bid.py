@@ -18,9 +18,12 @@ from decimal import (
     localcontext,
 )
 from typing import Any
+from html.parser import HTMLParser
+from urllib.parse import urlsplit
 
 
 PRELOADED_STATE_MARKER = "window.__PRELOADED_STATE__"
+REACT_STORE_NAME = "artpriceStore"
 SUPPORTED_METHODS = frozenset({"median", "mean", "recent", "max", "min", "manual"})
 DEFAULT_CURRENCY = "USD"
 MAX_MONEY_AMOUNT = Decimal("1000000000000")
@@ -47,6 +50,13 @@ class AuctionResult:
     lot_number: str
     estimate_low: Decimal | None
     estimate_high: Decimal | None
+    provider_id: str | None = None
+    provider_url: str | None = None
+    artist: str | None = None
+    category: str | None = None
+    medium: str | None = None
+    edition: str | None = None
+    size: str | None = None
 
 
 def money_to_decimal(value: Any) -> Decimal | None:
@@ -92,8 +102,60 @@ def _reject_json_constant(_value: str) -> None:
     raise ArtpriceAnalysisError("The embedded Artprice data contains an invalid number.")
 
 
+class _ReactStoreParser(HTMLParser):
+    """Extract only the Artprice store JSON; never execute saved page scripts."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self._capturing = False
+        self._chunks: list[str] = []
+        self.stores: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "script":
+            return
+        attributes = dict(attrs)
+        if (
+            (attributes.get("type") or "").casefold() == "application/json"
+            and attributes.get("data-js-react-on-rails-store") == REACT_STORE_NAME
+        ):
+            self._capturing = True
+            self._chunks = []
+
+    def handle_data(self, data: str) -> None:
+        if self._capturing:
+            self._chunks.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self._capturing:
+            self.stores.append("".join(self._chunks))
+            self._capturing = False
+            self._chunks = []
+
+
+def _react_store_state(html_text: str) -> dict[str, Any] | None:
+    parser = _ReactStoreParser()
+    parser.feed(html_text)
+    parser.close()
+    if not parser.stores:
+        return None
+    if len(parser.stores) != 1:
+        raise ArtpriceAnalysisError("The saved Artprice page contains ambiguous results data.")
+    try:
+        state = json.loads(
+            parser.stores[0], parse_float=Decimal, parse_constant=_reject_json_constant,
+        )
+    except ArtpriceAnalysisError:
+        raise
+    except (json.JSONDecodeError, RecursionError, ValueError) as exc:
+        raise ArtpriceAnalysisError("Could not decode the embedded Artprice data.") from exc
+    if not isinstance(state, dict):
+        raise ArtpriceAnalysisError("The embedded Artprice data is not a JSON object.")
+    return state
+
+
 def extract_preloaded_state(html_text: str) -> dict[str, Any]:
-    """Decode the JSON assigned to ``window.__PRELOADED_STATE__``.
+    """Decode either supported embedded Artprice results format.
 
     ``raw_decode`` permits normal JavaScript trailing text such as a semicolon
     without relying on the saved page's line structure.
@@ -104,9 +166,11 @@ def extract_preloaded_state(html_text: str) -> dict[str, Any]:
 
     marker_index = html_text.find(PRELOADED_STATE_MARKER)
     if marker_index == -1:
+        state = _react_store_state(html_text)
+        if state is not None:
+            return state
         raise ArtpriceAnalysisError(
-            "Could not find the Artprice preloaded state marker "
-            "(window.__PRELOADED_STATE__) in the uploaded page."
+            "Could not find Artprice preloaded results data in the uploaded page."
         )
 
     equals_index = html_text.find("=", marker_index + len(PRELOADED_STATE_MARKER))
@@ -276,6 +340,37 @@ def _rounded_money(value: Decimal) -> Decimal:
     return rounded
 
 
+def _optional_lot_text(value: Any) -> str | None:
+    if value is None or isinstance(value, (dict, list, bool)):
+        return None
+    text = str(value).strip()
+    return text[:500] if text else None
+
+
+def _artprice_lot_url(value: Any) -> str | None:
+    candidate = _optional_lot_text(value)
+    if not candidate or len(candidate) > 500:
+        return None
+    try:
+        parsed = urlsplit(candidate)
+        if parsed.scheme or parsed.netloc:
+            if (
+                parsed.scheme != "https"
+                or parsed.hostname != "www.artprice.com"
+                or parsed.username
+                or parsed.password
+                or parsed.port not in (None, 443)
+            ):
+                return None
+        elif not candidate.startswith("/") or candidate.startswith("//"):
+            return None
+        if not re.match(r"^/artist/\d+/", parsed.path):
+            return None
+    except ValueError:
+        return None
+    return candidate if parsed.scheme else f"https://www.artprice.com{candidate}"
+
+
 def _require_two_decimal_places(value: Decimal, *, label: str) -> Decimal:
     rounded = _rounded_money(value)
     if value != rounded:
@@ -298,6 +393,8 @@ def _normalize_results(lots: Iterable[Mapping[str, Any]]) -> list[AuctionResult]
             estimation = {}
         estimate_low = money_to_decimal(estimation.get("low"))
         estimate_high = money_to_decimal(estimation.get("high"))
+        raw_id = _optional_lot_text(lot.get("id"))
+        provider_id = raw_id if raw_id and raw_id.isdecimal() else None
 
         result = AuctionResult(
             title=str(lot.get("title") or "Untitled"),
@@ -311,6 +408,13 @@ def _normalize_results(lots: Iterable[Mapping[str, Any]]) -> list[AuctionResult]
             estimate_high=(
                 _rounded_money(estimate_high) if estimate_high is not None else None
             ),
+            provider_id=provider_id,
+            provider_url=_artprice_lot_url(lot.get("url")),
+            artist=_optional_lot_text(lot.get("artistOrAssociation")),
+            category=_optional_lot_text(lot.get("category")),
+            medium=_optional_lot_text(lot.get("technique")),
+            edition=_optional_lot_text(lot.get("numberAndEdition")),
+            size=_optional_lot_text(lot.get("dimension")),
         )
         dedupe_key = (result.title, result.sale_date, result.hammer_price)
         if dedupe_key not in seen:
@@ -536,7 +640,7 @@ def _two_decimal_string(value: Decimal) -> str:
 
 
 def _result_to_json(result: AuctionResult) -> dict[str, str | None]:
-    return {
+    normalized = {
         "sale_date": result.sale_date,
         "hammer_price": _two_decimal_string(result.hammer_price),
         "auction_house": result.auction_house,
@@ -553,6 +657,11 @@ def _result_to_json(result: AuctionResult) -> dict[str, str | None]:
             else None
         ),
     }
+    for key in ("provider_id", "provider_url", "artist", "category", "medium", "edition", "size"):
+        value = getattr(result, key)
+        if value is not None:
+            normalized[key] = value
+    return normalized
 
 
 def _results_from_comparables(
@@ -578,6 +687,13 @@ def _results_from_comparables(
                     "low": comparable.get("estimate_low"),
                     "high": comparable.get("estimate_high"),
                 },
+                "id": comparable.get("provider_id"),
+                "url": comparable.get("provider_url"),
+                "artistOrAssociation": comparable.get("artist"),
+                "category": comparable.get("category"),
+                "technique": comparable.get("medium"),
+                "numberAndEdition": comparable.get("edition"),
+                "dimension": comparable.get("size"),
             }
         )
     return _normalize_results(lots)

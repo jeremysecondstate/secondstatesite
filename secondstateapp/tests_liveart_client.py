@@ -62,6 +62,59 @@ class LiveArtClientTests(TestCase):
         self.assertEqual(sale_request.kwargs["headers"]["Authorization"], "Bearer private-test-key")
         self.assertEqual(sale_request.kwargs["timeout"], (3.05, 10))
 
+    def test_artist_and_artwork_lookup_use_documented_response_shapes(self):
+        self.session.get.side_effect = [
+            _response(
+                {"artists": [{"id": 516, "name": "Alexander Calder"}], "total": 2},
+                headers={"X-LiveArt-DataUnits": "3"},
+            ),
+            _response(
+                {"items": [{"id": 2707811, "description": {"name": "Nez et oreilles tres gais"}}],
+                 "total_count": 1},
+                headers={"X-LiveArt-DataUnits": "3.5"},
+            ),
+        ]
+        artists = self.client.list_artists(q=" Alexander Calder ", limit=1)
+        artworks = self.client.list_artworks(
+            artist_id=516, search="Nez et oreilles tres gais", limit=5,
+        )
+
+        self.assertEqual(artists.items[0]["id"], 516)
+        self.assertEqual(artists.total_count, 2)
+        self.assertTrue(artists.has_more)
+        self.assertEqual(artists.data_units, Decimal("3"))
+        self.assertEqual(artworks.items[0]["id"], 2707811)
+        self.assertFalse(artworks.has_more)
+        self.assertEqual(artworks.data_units, Decimal("3.5"))
+        artist_request, artwork_request = self.session.get.call_args_list
+        self.assertEqual(artist_request.args[0], "https://api.liveart.ai/v1/artists")
+        self.assertEqual(artist_request.kwargs["params"]["q"], "Alexander Calder")
+        self.assertEqual(artwork_request.args[0], "https://api.liveart.ai/v1/artworks")
+        self.assertEqual(artwork_request.kwargs["params"]["artist_id"], 516)
+        self.assertEqual(artwork_request.kwargs["params"]["search"], "Nez et oreilles tres gais")
+        self.assertEqual(artwork_request.kwargs["headers"]["Authorization"], "Bearer private-test-key")
+
+    def test_artist_and_artwork_lookup_remain_bounded(self):
+        for lookup in (
+            lambda: self.client.list_artists(q=""),
+            lambda: self.client.list_artists(q="Calder", limit=100),
+            lambda: self.client.list_artworks(),
+            lambda: self.client.list_artworks(artist_id=516, limit=100),
+            lambda: self.client.list_artworks(artist_id=516, unsupported="value"),
+        ):
+            with self.subTest(lookup=lookup):
+                with self.assertRaises(ValueError):
+                    lookup()
+        self.session.get.assert_not_called()
+
+    def test_related_sold_lots_can_be_bounded_by_artist_and_category(self):
+        self.session.get.return_value = _response({"items": [], "has_more": False})
+        self.client.list_lots(artist_id=516, category_id=7, status="sold", limit=10)
+        self.assertEqual(
+            self.session.get.call_args.kwargs["params"],
+            {"artist_id": 516, "category_id": 7, "status": "sold", "limit": 10, "offset": 0},
+        )
+
     def test_filters_and_page_sizes_prevent_broad_expensive_queries(self):
         for kwargs in ({}, {"status": "sold"}, {"artist_id": 7, "limit": 100}, {"bogus": "x"}):
             with self.subTest(kwargs=kwargs):

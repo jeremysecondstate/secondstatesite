@@ -643,28 +643,26 @@
   const appendLiveArtResearch = (panel, lot, options = {}) => {
     const section = document.createElement("section");
     section.className = "liveart-analysis";
-    section.setAttribute("aria-label", "LiveArt resale research");
+    section.setAttribute("aria-label", "Combined resale comparables");
     const heading = document.createElement("h4");
     heading.className = "resale-source-heading";
-    heading.textContent = "LiveArt sold comps";
+    heading.textContent = "Sold comps for resale bids";
     const intro = document.createElement("p");
     intro.className = "artprice-analysis-intro";
-    intro.textContent = "Search this lot's auction, date, lot number, artist, and title on demand. Each search is capped at 3 requests and 40 Data Units. Results are a limited sample; review verified USD hammer comps before saving an estimate.";
+    intro.textContent = "Saved Artprice HTML sales appear here with LiveArt sales of this work and similar works. Select the records you trust for one resale bid estimate. Each LiveArt search is capped at 4 requests and 40 Data Units.";
     const searchFacts = document.createElement("p");
     searchFacts.className = "liveart-search-facts";
-    searchFacts.textContent = [
-      lot.auction_house,
-      lot.sale_date || selectedDay,
-      lot.lot_number ? `Lot ${lot.lot_number}` : "Lot number unavailable",
+    searchFacts.textContent = `LiveArt search: ${[
       lot.artist || "Artist unavailable",
       lot.title || "Title unavailable",
-    ].filter(Boolean).join(" · ");
+      lot.medium || "Medium unavailable",
+    ].filter(Boolean).join(" · ")}`;
     const actions = document.createElement("div");
     actions.className = "artprice-analysis-actions";
     const findButton = document.createElement("button");
     findButton.type = "button";
     findButton.className = "is-primary";
-    findButton.textContent = "Search LiveArt again";
+    findButton.textContent = "Search artwork again";
     findButton.hidden = true;
     actions.appendChild(findButton);
     const status = document.createElement("p");
@@ -726,12 +724,12 @@
     const saveButton = document.createElement("button");
     saveButton.type = "button";
     saveButton.className = "is-primary";
-    saveButton.textContent = "Save LiveArt analysis";
+    saveButton.textContent = "Save resale bid analysis";
     saveButton.disabled = true;
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "is-danger";
-    deleteButton.textContent = "Remove LiveArt analysis";
+    deleteButton.textContent = "Remove saved resale analysis";
     deleteButton.hidden = true;
     saveActions.append(saveButton, deleteButton);
     section.append(
@@ -750,8 +748,20 @@
     let loaded = false;
     let loadPromise = null;
     let busy = false;
+    let refreshQueued = false;
 
     const textValue = (value) => value === null || value === undefined || value === "" ? "Not reported" : String(value);
+    const describeSources = (data, saved) => {
+      const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+      const artpriceCount = candidates.filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html").length;
+      const liveartCount = candidates.length - artpriceCount;
+      const parts = [];
+      if (artpriceCount) parts.push(`${artpriceCount} Artprice HTML sale${artpriceCount === 1 ? "" : "s"} from the saved file.`);
+      if (liveartCount) parts.push(`${liveartCount} LiveArt sale${liveartCount === 1 ? "" : "s"} retrieved ${formatAnalysisTimestamp(data?.retrieved_at || researchRetrievedAt)}.`);
+      if (liveartCount && data?.data_units_spent != null) parts.push(`${data.data_units_spent} LiveArt Data Units used in ${saved ? "saved research" : "this search"}.`);
+      if (candidates.length) parts.push("Only verified USD hammer prices enter resale estimates; premiums and estimates are excluded.");
+      return parts.join(" ");
+    };
     const setStatus = (message = "", tone = "") => {
       status.textContent = message;
       status.className = "artprice-analysis-status";
@@ -761,7 +771,7 @@
       if (typeof url !== "string") return null;
       try {
         const parsed = new URL(url);
-        if (parsed.protocol !== "https:" || parsed.username || parsed.password) return null;
+        if (!["https:", "http:"].includes(parsed.protocol) || parsed.username || parsed.password) return null;
         return externalLink(parsed.href, "liveart-provider-link", label);
       } catch (_error) {
         return null;
@@ -782,6 +792,7 @@
       card.className = "liveart-candidate";
       const top = document.createElement("div");
       top.className = "liveart-candidate-top";
+      const isArtprice = candidate.provider === "Artprice" || candidate.match_type === "artprice_html";
       if (selectable) {
         const label = document.createElement("label");
         label.className = "liveart-select-label";
@@ -800,14 +811,24 @@
         copy.textContent = checkbox.disabled ? "Excluded — unsuitable or unverified" : "Use as comp";
         label.append(checkbox, copy);
         top.appendChild(label);
+        const sourceBadge = document.createElement("span");
+        sourceBadge.className = `liveart-work-type ${isArtprice ? "is-artprice" : "is-liveart"}`;
+        sourceBadge.textContent = isArtprice ? "Artprice HTML" : "LiveArt";
+        top.appendChild(sourceBadge);
+        if (candidate.match_type === "exact_work" || candidate.match_type === "related_work") {
+          const relationship = document.createElement("span");
+          relationship.className = `liveart-work-type is-${candidate.match_type}`;
+          relationship.textContent = candidate.match_type === "exact_work" ? "This work" : "Similar work";
+          top.appendChild(relationship);
+        }
       }
       const providerUrl = candidate.provider_url || "";
       const provider = providerUrl && /(^|\.)liveart\.ai$/i.test((() => {
         try { return new URL(providerUrl).hostname; } catch (_error) { return ""; }
       })()) ? providerLink(providerUrl, "LiveArt API record ↗") : null;
       if (provider) top.appendChild(provider);
-      const sourceUrl = candidate.lot_url || (!provider ? providerUrl : "");
-      const source = providerLink(sourceUrl, "Original auction lot ↗");
+      const sourceUrl = candidate.source_url || candidate.lot_url || (!provider ? providerUrl : "");
+      const source = providerLink(sourceUrl, isArtprice ? "Artprice source record ↗" : "Original auction lot ↗");
       if (source && source.href !== provider?.href) top.appendChild(source);
       if (!selectable && subjectNeedsChoice) {
         const choose = document.createElement("button");
@@ -815,38 +836,42 @@
         choose.className = "liveart-subject-choice";
         choose.disabled = !candidate.verified;
         choose.dataset.verified = String(Boolean(candidate.verified));
-        choose.textContent = candidate.verified ? "Match this auction lot" : "Match unverified";
+        choose.textContent = candidate.verified ? "Research this artwork" : "Artwork match unverified";
         choose.addEventListener("click", () => performResearch(candidate.id));
         top.appendChild(choose);
       }
       card.appendChild(top);
       const title = document.createElement("h5");
-      title.textContent = [candidate.artist, candidate.title].filter(Boolean).join(" · ") || "Untitled lot";
+      title.textContent = [candidate.artist, candidate.title].filter(Boolean).join(" · ") || "Untitled work";
       card.appendChild(title);
-      const sale = document.createElement("p");
-      sale.className = "liveart-sale-line";
       const house = candidate.auction_house || candidate.house;
       const date = candidate.sale_date || candidate.date;
       const lotNumber = candidate.lot_number || candidate.lot;
-      sale.textContent = [house, date, lotNumber ? `Lot ${lotNumber}` : ""].filter(Boolean).join(" · ") || "Sale details not reported";
-      card.appendChild(sale);
+      if (selectable || house || date || lotNumber) {
+        const sale = document.createElement("p");
+        sale.className = "liveart-sale-line";
+        sale.textContent = [house, date, lotNumber ? `Lot ${lotNumber}` : ""].filter(Boolean).join(" · ") || "Sale details not reported";
+        card.appendChild(sale);
+      }
       if (!selectable) {
         const facts = document.createElement("div");
         facts.className = "liveart-facts";
-        appendFact(facts, "Auction house", house);
-        appendFact(facts, "Sale date", date);
-        appendFact(facts, "Lot number", lotNumber);
         appendFact(facts, "Artist", candidate.artist);
         appendFact(facts, "Title", candidate.title);
-        appendFact(facts, "LiveArt lot ID", candidate.provider_id || candidate.id);
-        appendFact(facts, "Sale ID", candidate.sale_id);
-        appendFact(facts, "Artwork ID", candidate.artwork_id);
+        if (candidate.medium) appendFact(facts, "Medium", candidate.medium);
+        if (candidate.edition) appendFact(facts, "Edition", candidate.edition);
+        if (candidate.signature) appendFact(facts, "Signature", candidate.signature);
+        if (candidate.size) appendFact(facts, "Size", candidate.size);
+        appendFact(facts, "Artwork ID", candidate.artwork_id || candidate.id);
+        if (candidate.lot_id) appendFact(facts, "LiveArt lot ID", candidate.lot_id);
         card.appendChild(facts);
         const matchChecks = document.createElement("p");
         matchChecks.className = "liveart-candidate-notes";
         const matches = candidate.matches && typeof candidate.matches === "object" ? candidate.matches : {};
-        matchChecks.textContent = `Calendar lot checks: ${["house", "date", "lot", "artist", "title"].map((field) => `${field} ${matches[field] ? "matches" : "differs or missing"}`).join(" · ")}`;
-        card.appendChild(matchChecks);
+        if (Object.keys(matches).length) {
+          matchChecks.textContent = `Artwork checks: ${["artist", "title"].map((field) => `${field} ${matches[field] ? "matches" : "differs or missing"}`).join(" · ")}`;
+          card.appendChild(matchChecks);
+        }
         const notes = Array.isArray(candidate.match_notes) ? candidate.match_notes : [];
         if (notes.length) {
           const note = document.createElement("p");
@@ -869,15 +894,25 @@
       appendFact(facts, "Original hammer", originalHammer === null || originalHammer === undefined
         ? "Not reported" : (originalCurrency ? formatAnalysisMoney(originalHammer, originalCurrency) : `${originalHammer} (currency not reported)`));
       appendFact(facts, "Original currency", originalCurrency);
-      appendFact(facts, "Sale status", candidate.status);
+      if (isArtprice) {
+        appendFact(facts, "Source file", candidate.source_filename);
+        appendFact(facts, "Source record ID", candidate.source_id || candidate.id);
+      } else {
+        appendFact(facts, "Sale status", candidate.status);
+      }
+      appendFact(facts, "Sale date", date);
+      appendFact(facts, "Auction house", house);
+      appendFact(facts, "Lot number", lotNumber);
       appendFact(facts, "Edition", candidate.edition);
       appendFact(facts, "Medium", candidate.medium);
       appendFact(facts, "Signature", candidate.signature);
       appendFact(facts, "Size", candidate.size);
       appendFact(facts, "Condition", candidate.condition);
-      appendFact(facts, "LiveArt lot ID", candidate.provider_id || candidate.id);
-      appendFact(facts, "Sale ID", candidate.sale_id);
-      appendFact(facts, "Artwork ID", candidate.artwork_id);
+      if (!isArtprice) {
+        appendFact(facts, "LiveArt lot ID", candidate.provider_id || candidate.id);
+        appendFact(facts, "Sale ID", candidate.sale_id);
+        appendFact(facts, "Artwork ID", candidate.artwork_id);
+      }
       appendFact(facts, "Retrieved", formatAnalysisTimestamp(candidate.retrieved_at || researchRetrievedAt));
       card.appendChild(facts);
       const notesValue = candidate.match_notes || candidate.exclusion_reasons;
@@ -892,7 +927,7 @@
       if (differences && Object.keys(differences).length) {
         const comparisonHeading = document.createElement("p");
         comparisonHeading.className = "liveart-candidate-notes";
-        comparisonHeading.textContent = "Print attributes compared with the matched auction lot";
+        comparisonHeading.textContent = "Print attributes compared with the reference work";
         card.appendChild(comparisonHeading);
         const comparisonList = document.createElement("div");
         comparisonList.className = "liveart-comparisons";
@@ -903,18 +938,23 @@
           label.textContent = field;
           const compared = document.createElement("span");
           compared.textContent = difference && typeof difference === "object"
-            ? `Matched lot: ${textValue(difference.subject)} · Comp: ${textValue(difference.comp)} · ${textValue(difference.status)}`
+            ? `Reference: ${textValue(difference.subject)} · Sale: ${textValue(difference.comp)} · ${textValue(difference.status)}`
             : textValue(difference);
           row.append(label, compared);
           comparisonList.appendChild(row);
         });
         card.appendChild(comparisonList);
       }
-      if (!provider) {
+      if (!isArtprice && !provider) {
         const providerMissing = document.createElement("p");
         providerMissing.className = "liveart-missing-data";
         providerMissing.textContent = "LiveArt lot page link not provided; use the LiveArt lot ID above.";
         card.appendChild(providerMissing);
+      } else if (isArtprice && !source) {
+        const sourceMissing = document.createElement("p");
+        sourceMissing.className = "liveart-missing-data";
+        sourceMissing.textContent = "No source record link was found in the saved Artprice HTML; use the filename and record ID above.";
+        card.appendChild(sourceMissing);
       }
       const missing = Array.isArray(candidate.missing_data) ? candidate.missing_data : (candidate.missing_data ? [candidate.missing_data] : []);
       const missingNote = document.createElement("p");
@@ -928,23 +968,20 @@
       candidateResults.replaceChildren();
       if (subjectMatches.length) {
         const heading = document.createElement("h5");
-        heading.textContent = `Auction lot match${subjectMatches.length === 1 ? "" : "es"}`;
+        heading.textContent = `Artwork reference${subjectMatches.length === 1 ? "" : "s"}`;
         subjectResults.appendChild(heading);
         subjectMatches.forEach((match) => subjectResults.appendChild(renderCandidateCard(match, false)));
-      } else if (hasResearch) {
+      } else if (hasResearch && currentCandidates.some((candidate) => candidate.provider !== "Artprice")) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
-        note.textContent = "No verified auction lot match was found. LiveArt comps cannot be used for this lot.";
+        note.textContent = "No exact artwork reference was found. Review the similar sold works below and their differences before using them.";
         subjectResults.appendChild(note);
       }
-      if (!hasResearch || subjectNeedsChoice) return;
-      const heading = document.createElement("h5");
-      heading.textContent = `Candidate sold comps (${currentCandidates.length})`;
-      candidateResults.appendChild(heading);
+      if (!hasResearch) return;
       if (!currentCandidates.length) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
-        note.textContent = "No credible sold comps were found. No maximum bid can be estimated from LiveArt yet.";
+        note.textContent = "No sold results were found in this limited search. No maximum bid can be estimated from LiveArt yet.";
         candidateResults.appendChild(note);
       } else if (!currentCandidates.some((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined)) {
         const note = document.createElement("p");
@@ -952,7 +989,26 @@
         note.textContent = "None of these sold results has a credible verified USD hammer comp. You can save the research without a bid estimate.";
         candidateResults.appendChild(note);
       }
-      currentCandidates.forEach((candidate) => candidateResults.appendChild(renderCandidateCard(candidate, true)));
+      const groups = [
+        ["exact_work", "Sales of this work", "An artwork ID can cover different print impressions. Check edition, signature, size, and condition for each sale."],
+        ["related_work", "Similar sold works", "Compare the medium, edition, signature, size, and condition before selecting a sale."],
+        ["artprice_html", "Saved Artprice HTML sales", "These sold records came from the saved HTML file. Review each date, price, source, and missing detail."],
+        ["other", "Other candidate sold results", "Review the artwork identity and sale details before selecting a sale."],
+      ];
+      groups.forEach(([type, label, explanation]) => {
+        const items = currentCandidates.filter((candidate) => type === "other"
+          ? !["exact_work", "related_work", "artprice_html"].includes(candidate.match_type)
+          : candidate.match_type === type);
+        if (!items.length) return;
+        const heading = document.createElement("h5");
+        heading.textContent = `${label} (${items.length})`;
+        candidateResults.appendChild(heading);
+        const note = document.createElement("p");
+        note.className = "liveart-group-note";
+        note.textContent = explanation;
+        candidateResults.appendChild(note);
+        items.forEach((candidate) => candidateResults.appendChild(renderCandidateCard(candidate, true)));
+      });
     };
     const addResultItem = (parent, label, value) => {
       const item = document.createElement("div");
@@ -968,13 +1024,20 @@
       savedResults.replaceChildren();
       if (!currentAnalysis) return;
       const heading = document.createElement("h4");
-      heading.textContent = "Saved LiveArt analysis · estimates";
+      heading.textContent = currentAnalysis.saved === false ? "Resale bid analysis · ready to save" : "Saved resale bid analysis · estimates";
       const summary = document.createElement("dl");
       summary.className = "artprice-analysis-summary-grid";
       addResultItem(summary, "Selected verified comps", String(selectedIds.size));
       addResultItem(summary, "Retrieved", formatAnalysisTimestamp(currentAnalysis.retrieved_at || researchRetrievedAt));
       savedResults.append(heading, summary);
       const scenarios = Array.isArray(currentAnalysis.scenarios) ? currentAnalysis.scenarios : [];
+      if (currentAnalysis.saved === false) {
+        const note = document.createElement("p");
+        note.className = "artprice-analysis-empty";
+        note.textContent = "Select Artprice or LiveArt sold records above, then save to calculate combined bid estimates.";
+        savedResults.appendChild(note);
+        return;
+      }
       if (currentAnalysis.no_credible_comps || !scenarios.length) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
@@ -984,7 +1047,7 @@
       }
       const explanation = document.createElement("p");
       explanation.className = "artprice-analysis-explanation";
-      explanation.textContent = "Downside, typical, and upside resale estimates use selected verified USD hammer comps. Bids include the editable costs above; projected profit is not guaranteed.";
+      explanation.textContent = "Downside, typical, and upside resale estimates use the selected verified USD hammer sales. Bids include the editable costs above; projected profit is not guaranteed.";
       savedResults.appendChild(explanation);
       scenarios.forEach((scenario) => {
         const scenarioHeading = document.createElement("h4");
@@ -1028,7 +1091,7 @@
         savedResults.appendChild(wrap);
       });
     };
-    const markAnalysisPending = (message = "Comp selections or costs changed. Save the LiveArt analysis to recalculate the estimates.") => {
+    const markAnalysisPending = (message = "Comp selections or costs changed. Save the resale bid analysis to recalculate the estimates.") => {
       if (!currentAnalysis) return;
       savedResults.replaceChildren();
       const pending = document.createElement("p");
@@ -1046,9 +1109,9 @@
       });
     };
     const updateButtons = () => {
-      saveButton.disabled = busy || subjectNeedsChoice || (!hasResearch && !currentAnalysis);
-      deleteButton.hidden = !currentAnalysis;
-      saveButton.textContent = currentAnalysis ? "Update LiveArt analysis" : "Save LiveArt analysis";
+      saveButton.disabled = busy || (!hasResearch && !currentAnalysis);
+      deleteButton.hidden = !currentAnalysis || currentAnalysis.saved === false;
+      saveButton.textContent = currentAnalysis && currentAnalysis.saved !== false ? "Update resale bid analysis" : "Save resale bid analysis";
     };
     const setBusy = (value) => {
       busy = value;
@@ -1064,6 +1127,10 @@
         });
       }
       updateButtons();
+      if (!value && refreshQueued) {
+        refreshQueued = false;
+        Promise.resolve().then(() => refresh());
+      }
     };
     const applyAnalysis = (analysis) => {
       currentAnalysis = analysis || null;
@@ -1074,7 +1141,7 @@
         researchRetrievedAt = analysis.retrieved_at || "";
         hasResearch = true;
         subjectNeedsChoice = false;
-        sourceMeta.textContent = `LiveArt data retrieved ${formatAnalysisTimestamp(researchRetrievedAt)}. ${analysis.data_units_spent ?? "—"} Data Units used in the saved research. Source prices are USD hammer only; premiums and estimates are excluded.`;
+        sourceMeta.textContent = describeSources(analysis, analysis.saved !== false);
         renderCandidates(Array.isArray(analysis.subject_matches) && analysis.subject_matches.length
           ? analysis.subject_matches : (analysis.subject_match ? [analysis.subject_match] : []));
       } else {
@@ -1090,7 +1157,7 @@
       populateAssumptions(analysis);
       renderAnalysis();
       updateButtons();
-      if (options.onSavedChange) options.onSavedChange(Boolean(analysis));
+      if (options.onSavedChange) options.onSavedChange(Boolean(analysis && analysis.saved !== false));
     };
     const load = async () => {
       if (loaded || !lot.liveart_analysis_url) return;
@@ -1108,12 +1175,13 @@
             method: "GET",
             credentials: "same-origin",
             headers: {"X-Requested-With": "XMLHttpRequest"},
-          }, "The saved LiveArt analysis could not be loaded.");
+          }, "The saved resale bid analysis could not be loaded.");
           loaded = true;
           liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
-          applyAnalysis(payload.analysis || null);
+          syncLotInstances(liveartAnalysisInstances, lot.id, payload.analysis || null);
+          setStatus("");
         } catch (error) {
-          setStatus(error instanceof Error ? error.message : "The saved LiveArt analysis could not be loaded.", "error");
+          setStatus(error instanceof Error ? error.message : "The saved resale bid analysis could not be loaded.", "error");
         } finally {
           setBusy(false);
           loadPromise = null;
@@ -1121,10 +1189,19 @@
       })();
       return loadPromise;
     };
+    const refresh = async () => {
+      liveartAnalysisCache.delete(String(lot.id));
+      loaded = false;
+      if (busy || loadPromise) {
+        refreshQueued = true;
+        return;
+      }
+      await load();
+    };
     const performResearch = async (subjectId = null) => {
       if (busy || !lot.liveart_research_url) return;
       setBusy(true);
-      setStatus("Searching LiveArt sold records…", "loading");
+      setStatus("Searching LiveArt artwork and sold records…", "loading");
       try {
         const payload = await requestAnalysisJson(lot.liveart_research_url, {
           method: "POST",
@@ -1132,20 +1209,26 @@
           headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
           body: JSON.stringify(subjectId === null ? {} : {subject_id: subjectId}),
         }, "LiveArt research could not be completed.");
+        const selectedArtpriceIds = new Set(currentCandidates
+          .filter((candidate) => candidate.provider === "Artprice" && selectedIds.has(String(candidate.id)))
+          .map((candidate) => String(candidate.id)));
         currentCandidates = Array.isArray(payload.candidates) ? payload.candidates : [];
-        selectedIds = new Set(currentCandidates.filter((candidate) => candidate.credible && candidate.selected && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined).map((candidate) => String(candidate.id)));
+        selectedIds = new Set(currentCandidates
+          .filter((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined
+            && (candidate.selected || (candidate.provider === "Artprice" && selectedArtpriceIds.has(String(candidate.id)))))
+          .map((candidate) => String(candidate.id)));
         currentResearchId = payload.research_id || "";
         researchRetrievedAt = payload.retrieved_at || "";
         hasResearch = true;
-        subjectNeedsChoice = Boolean(payload.requires_subject_choice) || !payload.subject_match;
+        subjectNeedsChoice = Boolean(payload.requires_subject_choice);
         findButton.hidden = false;
         const subjectMatches = Array.isArray(payload.subject_matches) ? payload.subject_matches : (payload.subject_match ? [payload.subject_match] : []);
-        sourceMeta.textContent = `LiveArt data retrieved ${formatAnalysisTimestamp(researchRetrievedAt)}. ${payload.data_units_spent ?? "—"} Data Units used in this search. Prices shown for valuation are verified USD hammer only.`;
+        sourceMeta.textContent = describeSources(payload, false);
         renderCandidates(subjectMatches);
-        markAnalysisPending("This research is not saved yet. Save this selection before using updated LiveArt bid estimates.");
+        markAnalysisPending("This research is not saved yet. Save this selection before using updated resale bid estimates.");
         setStatus(payload.message || (subjectNeedsChoice
-          ? (subjectMatches.length ? "Choose the matching auction lot to continue research." : "No verified auction lot match was found. No LiveArt bid estimate is available.")
-          : "Review and select sold comps, then save the analysis."), subjectMatches.length || payload.subject_match ? "success" : "error");
+          ? "Choose an artwork reference for its sale history. You can also review and save similar sold works below."
+          : "Review and select sold results, then save the analysis."), "success");
       } catch (error) {
         setStatus(error instanceof Error ? error.message : "LiveArt research could not be completed.", "error");
       } finally {
@@ -1179,40 +1262,41 @@
       const requestData = {action: "save", selected_ids: [...selectedIds], assumptions: assumptionValues};
       if (currentResearchId) requestData.research_id = currentResearchId;
       setBusy(true);
-      setStatus("Saving LiveArt resale estimates…", "loading");
+      setStatus("Saving resale bid estimates…", "loading");
       try {
         const payload = await requestAnalysisJson(lot.liveart_analysis_url, {
           method: "POST",
           credentials: "same-origin",
           headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
           body: JSON.stringify(requestData),
-        }, "The LiveArt analysis could not be saved.");
+        }, "The resale bid analysis could not be saved.");
         loaded = true;
         liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
         syncLotInstances(liveartAnalysisInstances, lot.id, payload.analysis || null);
-        setStatus(payload.message || "LiveArt analysis saved.", "success");
+        setStatus(payload.message || "Resale bid analysis saved.", "success");
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : "The LiveArt analysis could not be saved.", "error");
+        setStatus(error instanceof Error ? error.message : "The resale bid analysis could not be saved.", "error");
       } finally {
         setBusy(false);
       }
     });
     deleteButton.addEventListener("click", async () => {
-      if (!window.confirm("Remove the saved LiveArt analysis and selected comps? The Artprice analysis will remain.")) return;
+      if (!window.confirm("Remove the saved resale bid analysis and selected comps? The Artprice HTML analysis will remain.")) return;
       setBusy(true);
-      setStatus("Removing saved LiveArt analysis…", "loading");
+      setStatus("Removing saved resale bid analysis…", "loading");
       try {
         const payload = await requestAnalysisJson(lot.liveart_analysis_url, {
           method: "POST",
           credentials: "same-origin",
           headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
           body: JSON.stringify({action: "delete"}),
-        }, "The LiveArt analysis could not be removed.");
-        liveartAnalysisCache.set(String(lot.id), null);
-        syncLotInstances(liveartAnalysisInstances, lot.id, null);
-        setStatus(payload.message || "LiveArt analysis removed.", "success");
+        }, "The resale bid analysis could not be removed.");
+        liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
+        syncLotInstances(liveartAnalysisInstances, lot.id, payload.analysis || null);
+        setStatus(payload.message || "Resale bid analysis removed.", "success");
+        await refresh();
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : "The LiveArt analysis could not be removed.", "error");
+        setStatus(error instanceof Error ? error.message : "The resale bid analysis could not be removed.", "error");
       } finally {
         setBusy(false);
       }
@@ -1231,6 +1315,7 @@
     return {
       load,
       find,
+      refresh,
     };
   };
 
@@ -1255,7 +1340,7 @@
 
     const intro = document.createElement("p");
     intro.className = "artprice-analysis-intro";
-    intro.textContent = "Estimate resale bids from a saved Artprice HTML page or on-demand LiveArt sold comps. Review sources and assumptions before bidding.";
+    intro.textContent = "Estimate resale bids from a saved Artprice HTML page or on-demand LiveArt artwork sales history and similar sold works. Review sources and assumptions before bidding.";
 
     const artpriceHeading = document.createElement("h4");
     artpriceHeading.className = "resale-source-heading";
@@ -1415,7 +1500,7 @@
     const researchButton = document.createElement("button");
     researchButton.className = "is-primary";
     researchButton.type = "button";
-    researchButton.textContent = "Find LiveArt comps";
+    researchButton.textContent = "Find LiveArt sales";
     const recalculateButton = document.createElement("button");
     recalculateButton.type = "button";
     recalculateButton.textContent = "Recalculate";
@@ -1441,11 +1526,11 @@
     form.append(actions);
     panel.append(intro, artpriceHeading, form, status, results);
     let currentAnalysis = null;
-    let hasLiveartAnalysis = false;
+    let hasResaleAnalysis = false;
     let loaded = false;
     let busy = false;
     const updateSummaryBadge = () => {
-      const sources = [currentAnalysis ? "Artprice" : "", hasLiveartAnalysis ? "LiveArt" : ""].filter(Boolean);
+      const sources = [currentAnalysis ? "Artprice HTML" : "", hasResaleAnalysis ? "Resale bid" : ""].filter(Boolean);
       summaryBadge.hidden = !sources.length;
       summaryBadge.textContent = sources.length ? "Saved" : "";
       summaryBadge.title = sources.length ? `${sources.join(" and ")} analysis saved` : "";
@@ -1455,7 +1540,7 @@
       quick,
       researchButton,
       onSavedChange: (saved) => {
-        hasLiveartAnalysis = saved;
+        hasResaleAnalysis = saved;
         lot.has_liveart_analysis = saved;
         updateSummaryBadge();
       },
@@ -1775,6 +1860,7 @@
         syncLotInstances(artpriceAnalysisInstances, lot.id, analysis);
         fields.artprice_html.value = "";
         setStatus(payload.message || "Artprice analysis updated.", "success");
+        await liveart.refresh();
       } catch (error) {
         setStatus(error instanceof Error ? error.message : fallbackMessage, "error");
       } finally {

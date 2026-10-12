@@ -43,6 +43,17 @@ _SALE_FILTERS = frozenset(
         "sort",
     }
 )
+_ARTIST_FILTERS = frozenset({"q"})
+_ARTWORK_FILTERS = frozenset(
+    {
+        "artist_id",
+        "search",
+        "category_id",
+        "materials",
+        "last_lot_status",
+        "sort",
+    }
+)
 _LOT_FILTERS = frozenset(
     {
         "id",
@@ -53,6 +64,7 @@ _LOT_FILTERS = frozenset(
         "sale_auction_house_id",
         "artist_id",
         "artwork_id",
+        "category_id",
         "search",
         "sale_datetime__gte",
         "sale_datetime__lte",
@@ -188,6 +200,21 @@ class LiveArtClient:
     def list_sales(self, *, limit: int = 10, offset: int = 0, **filters: Any) -> LiveArtPage:
         return self._list("/v1/sales", filters, _SALE_FILTERS, limit=limit, offset=offset)
 
+    def list_artists(self, *, q: str, limit: int = 3, offset: int = 0) -> LiveArtPage:
+        """Look up a few artist identities by name or known synonym."""
+
+        if not isinstance(q, str) or not q.strip():
+            raise ValueError("An artist search name is required.")
+        return self._list(
+            "/v1/artists", {"q": q.strip()}, _ARTIST_FILTERS,
+            limit=limit, offset=offset, items_key="artists", total_key="total",
+        )
+
+    def list_artworks(self, *, limit: int = 5, offset: int = 0, **filters: Any) -> LiveArtPage:
+        """Search a small page of canonical artworks by artist and title."""
+
+        return self._list("/v1/artworks", filters, _ARTWORK_FILTERS, limit=limit, offset=offset)
+
     def list_lots(self, *, limit: int = 20, offset: int = 0, **filters: Any) -> LiveArtPage:
         return self._list("/v1/lots", filters, _LOT_FILTERS, limit=limit, offset=offset)
 
@@ -199,6 +226,8 @@ class LiveArtClient:
         *,
         limit: int,
         offset: int,
+        items_key: str = "items",
+        total_key: str = "total_count",
     ) -> LiveArtPage:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_PAGE_SIZE:
             raise ValueError(f"LiveArt page limit must be between 1 and {MAX_PAGE_SIZE}.")
@@ -213,10 +242,10 @@ class LiveArtClient:
             raise ValueError("A narrowing LiveArt filter is required to control Data Unit use.")
         params.update(limit=limit, offset=offset)
         payload, headers, retrieved_at = self._get(path, params=params)
-        items = payload.get("items") if isinstance(payload, dict) else None
+        items = payload.get(items_key) if isinstance(payload, dict) else None
         if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
             raise LiveArtAPIError("LiveArt returned an invalid list response.")
-        total = payload.get("total_count")
+        total = payload.get(total_key)
         total_count = total if isinstance(total, int) and not isinstance(total, bool) else None
         has_more = payload.get("has_more")
         if not isinstance(has_more, bool):

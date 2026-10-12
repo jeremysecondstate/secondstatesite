@@ -275,7 +275,7 @@ class AuctionMaxBidAnalysis(models.Model):
 
 
 class LiveArtResaleAnalysis(models.Model):
-    """Private, normalized LiveArt research kept separate from Artprice uploads."""
+    """Private resale bids from LiveArt research and saved Artprice comps."""
 
     lot = models.OneToOneField(
         AuctionWatchLot,
@@ -289,7 +289,7 @@ class LiveArtResaleAnalysis(models.Model):
     assumptions = models.JSONField(default=dict, blank=True)
     scenarios = models.JSONField(default=list, blank=True)
     retrieved_at = models.DateTimeField()
-    data_units_spent = models.PositiveIntegerField(null=True, blank=True)
+    data_units_spent = models.DecimalField(max_digits=8, decimal_places=1, null=True, blank=True)
     created_by = models.ForeignKey(
         User,
         blank=True,
