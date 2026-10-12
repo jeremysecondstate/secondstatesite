@@ -687,6 +687,32 @@ class AuctionCalendarViewTests(TestCase):
             with self.subTest(element_id=element_id):
                 self.assertContains(response, f'id="{element_id}"')
 
+    def test_research_concepts_use_a_linkable_day_and_existing_lot_endpoints(self):
+        lot = watch_lot()
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {
+            "view": "research", "day": "2026-07-25", "lot": str(lot.pk), "look": "bidboard",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["month_title"], "July 2026")
+        self.assertEqual(response.context["calendar_data"]["2026-07-25"][0]["id"], lot.pk)
+        for element_id in (
+            "research-view-toggle", "day-research-workspace", "research-lot-card",
+            "research-lot-search", "research-previous", "research-next",
+        ):
+            with self.subTest(element_id=element_id):
+                self.assertContains(response, f'id="{element_id}"')
+        for look in ("dossier", "workbench", "bidboard"):
+            self.assertContains(response, f'data-research-look="{look}"')
+        self.assertContains(response, "calendar_concepts.css")
+        self.assertContains(response, 'idPrefix: "research", quick: true, workspace: true,')
+        self.assertEqual(
+            response.context["calendar_data"]["2026-07-25"][0]["liveart_analysis_url"],
+            reverse("auction_lot_liveart_analysis", args=(lot.pk,)),
+        )
+
     def test_gallery_catalog_receives_the_selected_day_lots_from_multiple_houses(self):
         artist_url = "https://www.artprice.com/artist/15155/alex-katz/lots/pasts?idcategory=2"
         artist = AuctionWatchArtist.objects.create(

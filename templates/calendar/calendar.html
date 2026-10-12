@@ -3,6 +3,7 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}">
 {% endblock %}
 
 {% block main_class %}calendar-page-shell{% endblock %}
@@ -83,6 +84,7 @@
     <span>View day as</span>
     <button id="calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="true">Calendar</button>
     <button id="catalog-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Gallery Catalog</button>
+    <button id="research-view-toggle" type="button" aria-controls="day-research-workspace" aria-pressed="false">Research Concepts</button>
   </div>
 
   <div id="calendar-layout" class="calendar-layout">
@@ -147,6 +149,9 @@
           <button id="day-lot-browser-launch" class="lot-browser-launch" type="button" hidden>
             Browse lots
           </button>
+          <button id="day-research-launch" class="lot-browser-launch" type="button" hidden>
+            Open research workspace
+          </button>
           <span id="calendar-csrf-token" data-token="{{ csrf_token }}" hidden></span>
           <div id="selected-day-lots" class="selected-day-lots">
             <p class="sidebar-empty">Select a calendar day to see its lots.</p>
@@ -178,14 +183,14 @@
     <header class="day-gallery-header">
       <div>
         <p id="day-gallery-date" class="calendar-kicker">Auction Calendar</p>
-        <h2 id="day-gallery-title">The day’s catalog<span aria-hidden="true">.</span></h2>
+        <h2 id="day-gallery-title" tabindex="-1">The day’s catalog<span aria-hidden="true">.</span></h2>
         <p id="day-gallery-summary">Choose a day to browse its watched lots.</p>
       </div>
       <div class="day-gallery-header-actions">
         <div class="day-gallery-day-nav" aria-label="Watched day navigation">
           <button id="day-gallery-previous" type="button" aria-label="Previous day with watched lots">← Previous day</button>
           <button id="day-gallery-next" type="button" aria-label="Next day with watched lots">Next day →</button>
-          <button id="day-gallery-browser-launch" class="day-gallery-browser-launch" type="button">Browse one by one →</button>
+          <button id="day-gallery-browser-launch" class="day-gallery-browser-launch" type="button">Research this day →</button>
         </div>
         <nav class="month-nav day-gallery-month-nav" aria-label="Catalog month navigation">
           <a href="?month={{ previous_month }}">← Previous month</a>
@@ -210,6 +215,42 @@
     <div id="day-gallery-grid" class="day-gallery-grid"></div>
     <div class="day-gallery-pagination">
       <button id="day-gallery-more" type="button" hidden>Show more lots</button>
+    </div>
+  </section>
+
+  <section id="day-research-workspace" class="research-workspace" data-look="dossier" aria-labelledby="research-workspace-title" hidden>
+    <header class="research-workspace-header">
+      <div class="research-workspace-heading">
+        <button id="research-back-to-gallery" class="research-back" type="button">← Back to calendar views</button>
+        <p class="calendar-kicker">Calendar / Private lot research</p>
+        <h2 id="research-workspace-title" tabindex="-1">Research workspace</h2>
+        <p id="research-workspace-subtitle">Choose a watched lot to begin.</p>
+      </div>
+      <div class="research-workspace-navigation" aria-label="Research lot navigation">
+        <a class="research-tray-link" href="{% url 'auction_email_tray' %}">Email Tray · <span data-email-tray-count>{{ email_selected_count }}</span></a>
+        <span id="research-workspace-count" aria-live="polite"></span>
+        <button id="research-previous" type="button" aria-label="Previous research lot">← Previous</button>
+        <button id="research-next" type="button" aria-label="Next research lot">Next →</button>
+      </div>
+    </header>
+    <div class="research-concept-switch" role="group" aria-label="Compare research workspace layouts">
+      <span>Compare three looks</span>
+      <button type="button" data-research-look="dossier" aria-pressed="true"><strong>01 · Gallery Dossier</strong><small>Artwork first, research below</small></button>
+      <button type="button" data-research-look="workbench" aria-pressed="false"><strong>02 · Day Workbench</strong><small>Fast lot-to-lot review</small></button>
+      <button type="button" data-research-look="bidboard" aria-pressed="false"><strong>03 · Bid Board</strong><small>Decision and scenarios first</small></button>
+    </div>
+    <div class="research-workspace-body">
+      <aside class="research-lot-rail" aria-label="Lots on the selected day">
+        <div class="research-rail-heading">
+          <div><span class="calendar-kicker">Day's lots</span><strong id="research-rail-total"></strong></div>
+          <label for="research-lot-search">Find a lot</label>
+          <input id="research-lot-search" type="search" placeholder="Artist, title, or house" autocomplete="off">
+        </div>
+        <div id="research-lot-list" class="research-lot-list"></div>
+      </aside>
+      <div class="research-stage">
+        <article id="research-lot-card" class="research-lot-card"></article>
+      </div>
     </div>
   </section>
 
@@ -266,6 +307,8 @@
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
   const salesData = JSON.parse(document.getElementById("auction-calendar-sales-data").textContent);
+  const auctionCalendar = document.querySelector(".auction-calendar");
+  const calendarPageShell = document.querySelector(".calendar-page-shell");
   const title = document.getElementById("selected-day-title");
   const selectedDayCard = document.querySelector(".selected-day-card");
   const sidebar = document.querySelector(".calendar-sidebar");
@@ -276,6 +319,7 @@
   const dayButtons = Array.from(document.querySelectorAll(".calendar-day"));
   const csrfToken = document.getElementById("calendar-csrf-token").dataset.token;
   const lotBrowserLaunch = document.getElementById("day-lot-browser-launch");
+  const researchLaunch = document.getElementById("day-research-launch");
   const lotBrowser = document.getElementById("day-lot-browser");
   const lotBrowserTitle = document.getElementById("lot-browser-title");
   const lotBrowserCounter = document.getElementById("lot-browser-counter");
@@ -287,7 +331,20 @@
   const calendarLayout = document.getElementById("calendar-layout");
   const calendarViewToggle = document.getElementById("calendar-view-toggle");
   const catalogViewToggle = document.getElementById("catalog-view-toggle");
+  const researchViewToggle = document.getElementById("research-view-toggle");
   const galleryCatalog = document.getElementById("day-gallery-catalog");
+  const researchWorkspace = document.getElementById("day-research-workspace");
+  const researchTitle = document.getElementById("research-workspace-title");
+  const researchSubtitle = document.getElementById("research-workspace-subtitle");
+  const researchCount = document.getElementById("research-workspace-count");
+  const researchPrevious = document.getElementById("research-previous");
+  const researchNext = document.getElementById("research-next");
+  const researchBack = document.getElementById("research-back-to-gallery");
+  const researchSearch = document.getElementById("research-lot-search");
+  const researchLotList = document.getElementById("research-lot-list");
+  const researchRailTotal = document.getElementById("research-rail-total");
+  const researchLotCard = document.getElementById("research-lot-card");
+  const researchLookButtons = Array.from(document.querySelectorAll("[data-research-look]"));
   const galleryDate = document.getElementById("day-gallery-date");
   const gallerySummary = document.getElementById("day-gallery-summary");
   const galleryFilters = document.getElementById("day-gallery-filters");
@@ -305,6 +362,11 @@
   let galleryFilter = "all";
   let galleryVisibleCount = 24;
   let activeView = "calendar";
+  let researchLook = "dossier";
+  let researchTab = "bids";
+  let researchIndex = 0;
+  let researchRenderedKey = "";
+  let restoringHistory = false;
   let sidebarRenderedDay = "";
   const updateEmailTrayCount = (count) => {
     document.querySelectorAll("[data-email-tray-count]").forEach((node) => {
@@ -1066,6 +1128,7 @@
     };
     const renderAnalysis = () => {
       savedResults.replaceChildren();
+      options.onScenarioSummary?.(currentAnalysis);
       if (!currentAnalysis) return;
       const heading = document.createElement("h4");
       heading.textContent = currentAnalysis.saved === false ? "Resale bid analysis · ready to save" : "Saved resale bid analysis · estimates";
@@ -1136,6 +1199,11 @@
       explanation.className = "artprice-analysis-explanation";
       explanation.textContent = "Downside, typical, and upside resale estimates use the selected eligible USD hammer sales. Bids include the editable costs above; projected profit is not guaranteed.";
       savedResults.appendChild(explanation);
+      const scenarioGrid = options.workspace ? document.createElement("div") : null;
+      if (scenarioGrid) {
+        scenarioGrid.className = "research-scenario-grid";
+        savedResults.appendChild(scenarioGrid);
+      }
       scenarios.forEach((scenario) => {
         const scenarioHeading = document.createElement("h4");
         scenarioHeading.textContent = `${textValue(scenario.name || scenario.label || scenario.key)} resale · ${formatAnalysisMoney(scenario.resale_hammer, "USD")}`;
@@ -1173,13 +1241,43 @@
         });
         table.append(head, body);
         wrap.appendChild(table);
-        savedResults.append(scenarioHeading, net);
-        if (scenario.basis) savedResults.appendChild(basis);
-        savedResults.appendChild(wrap);
+        if (scenarioGrid) {
+          const card = document.createElement("article");
+          card.className = "research-scenario";
+          card.dataset.scenario = String(scenario.key || scenario.name || "").toLowerCase();
+          const rows = Array.isArray(scenario.bid_rows) ? scenario.bid_rows : [];
+          const sample = rows.find((row) => Number(row.premium_pct) === 25) || rows[0];
+          const highlight = document.createElement("div");
+          highlight.className = "research-scenario-highlight";
+          if (sample) {
+            const premium = document.createElement("span");
+            premium.textContent = `At ${sample.premium_pct}% buyer premium`;
+            const bid = document.createElement("strong");
+            const target = sample.target_profit_max_bid ?? sample.target_profit_max_hammer_bid;
+            bid.textContent = target == null ? "No positive bid" : formatAnalysisMoney(target, "USD");
+            const label = document.createElement("small");
+            label.textContent = "Target-profit max hammer bid";
+            highlight.append(premium, bid, label);
+          }
+          const fullTable = document.createElement("details");
+          fullTable.className = "research-scenario-table";
+          const fullTableSummary = document.createElement("summary");
+          fullTableSummary.textContent = `View full premium table (${rows.length} rows)`;
+          fullTable.append(fullTableSummary, wrap);
+          card.append(scenarioHeading, net, highlight);
+          if (scenario.basis) card.appendChild(basis);
+          card.appendChild(fullTable);
+          scenarioGrid.appendChild(card);
+        } else {
+          savedResults.append(scenarioHeading, net);
+          if (scenario.basis) savedResults.appendChild(basis);
+          savedResults.appendChild(wrap);
+        }
       });
     };
     const markAnalysisPending = (message = "Comp selections or costs changed. Save the resale bid analysis to recalculate the estimates.") => {
       hasUnsavedChanges = true;
+      options.onScenarioSummary?.(null);
       savedResults.replaceChildren();
       const pending = document.createElement("p");
       pending.className = "artprice-analysis-empty";
@@ -1196,16 +1294,16 @@
       });
     };
     const updateButtons = () => {
-      saveButton.disabled = busy || pendingSourceRefresh || (!hasResearch && !currentAnalysis);
+      saveButton.disabled = busy || Boolean(options.isParentBusy?.()) || pendingSourceRefresh || (!hasResearch && !currentAnalysis);
       deleteButton.hidden = !currentAnalysis || currentAnalysis.saved === false;
       saveButton.textContent = currentAnalysis && currentAnalysis.saved !== false ? "Update resale bid analysis" : "Save resale bid analysis";
     };
-    const setBusy = (value) => {
-      busy = value;
-      section.querySelectorAll("button, input").forEach((control) => { control.disabled = value; });
-      if (options.researchButton) options.researchButton.disabled = value;
-      if (options.titleVariantInput) options.titleVariantInput.disabled = value;
-      if (!value) {
+    const syncBusyControls = () => {
+      const disabled = busy || Boolean(options.isParentBusy?.());
+      section.querySelectorAll("button, input").forEach((control) => { control.disabled = disabled; });
+      if (options.researchButton) options.researchButton.disabled = disabled;
+      if (options.titleVariantInput) options.titleVariantInput.disabled = disabled;
+      if (!disabled) {
         candidateResults.querySelectorAll('input[type="checkbox"]').forEach((control) => {
           const candidate = currentCandidates.find((item) => String(item.id) === control.value);
           control.disabled = !candidate?.credible || candidate.hammer_usd === null || candidate.hammer_usd === undefined;
@@ -1215,6 +1313,10 @@
         });
       }
       updateButtons();
+    };
+    const setBusy = (value) => {
+      busy = value;
+      syncBusyControls();
       if (!value && refreshQueued) {
         refreshQueued = false;
         Promise.resolve().then(() => load());
@@ -1423,6 +1525,7 @@
     costFields.premium_max.addEventListener("input", () => costFields.premium_max.setCustomValidity(""));
     const receiveAnalysis = (analysis) => {
       if (analysis?.refresh_pending) {
+        options.onScenarioSummary?.(null);
         pendingSourceRefresh = true;
         sourceRefreshVersion += 1;
         loaded = false;
@@ -1494,6 +1597,7 @@
       load,
       find,
       refresh,
+      syncBusyControls,
     };
   };
 
@@ -1759,6 +1863,9 @@
     const liveart = appendLiveArtResearch(panel, lot, {
       idPrefix,
       quick,
+      workspace: Boolean(options.workspace),
+      isParentBusy: () => busy,
+      onScenarioSummary: options.onScenarioSummary,
       researchButton,
       titleVariantInput,
       onSavedChange: (saved) => {
@@ -1768,6 +1875,81 @@
       },
     });
     researchButton.addEventListener("click", liveart.find);
+    if (options.workspace) {
+      details.classList.add("is-workspace");
+      const sourcePanel = document.createElement("section");
+      sourcePanel.className = "research-source-panel";
+      sourcePanel.id = `${idPrefix}research-sources-${lot.id}`;
+      sourcePanel.setAttribute("role", "tabpanel");
+      const sourceResults = document.createElement("details");
+      sourceResults.className = "research-source-results";
+      const sourceResultsSummary = document.createElement("summary");
+      sourceResultsSummary.textContent = "View saved Artprice analysis and full tables";
+      sourceResults.append(sourceResultsSummary, results);
+      sourcePanel.append(intro, artpriceHeading, form, status, sourceResults);
+
+      const liveartSection = panel.querySelector(".liveart-analysis");
+      const liveartChildren = Array.from(liveartSection.children);
+      const compsPanel = document.createElement("div");
+      compsPanel.className = "research-comps-panel";
+      compsPanel.id = `${idPrefix}research-comps-${lot.id}`;
+      compsPanel.setAttribute("role", "tabpanel");
+      const liveartSearch = document.createElement("div");
+      liveartSearch.className = "research-liveart-search";
+      liveartSearch.append(titleVariantField, researchButton);
+      compsPanel.append(liveartSearch, ...liveartChildren.slice(0, 8));
+      const bidsPanel = document.createElement("div");
+      bidsPanel.className = "research-bids-panel";
+      bidsPanel.id = `${idPrefix}research-bids-${lot.id}`;
+      bidsPanel.setAttribute("role", "tabpanel");
+      bidsPanel.append(...liveartChildren.slice(8));
+      liveartSection.append(compsPanel, bidsPanel);
+
+      const tabs = document.createElement("div");
+      tabs.className = "research-tabs";
+      tabs.setAttribute("role", "tablist");
+      tabs.setAttribute("aria-label", "Lot research sections");
+      const panels = {sources: sourcePanel, comps: compsPanel, bids: bidsPanel};
+      const labels = {sources: "01 / Artprice sources", comps: "02 / LiveArt & comps", bids: "03 / Bid scenarios"};
+      const buttons = {};
+      Object.entries(panels).forEach(([key, target]) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.setAttribute("role", "tab");
+        button.setAttribute("aria-controls", target.id);
+        button.dataset.researchTab = key;
+        button.id = `${idPrefix}research-tab-${key}-${lot.id}`;
+        button.textContent = labels[key];
+        target.setAttribute("aria-labelledby", button.id);
+        button.addEventListener("click", () => {
+          researchTab = key;
+          activateTab();
+        });
+        tabs.appendChild(button);
+        buttons[key] = button;
+      });
+      const activateTab = () => {
+        Object.entries(panels).forEach(([key, target]) => {
+          const selected = key === researchTab;
+          target.hidden = !selected;
+          buttons[key].setAttribute("aria-selected", String(selected));
+          buttons[key].tabIndex = selected ? 0 : -1;
+        });
+      };
+      tabs.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const keys = Object.keys(panels);
+        const position = keys.indexOf(researchTab);
+        researchTab = event.key === "Home" ? keys[0]
+          : event.key === "End" ? keys.at(-1)
+          : keys[(position + (event.key === "ArrowRight" ? 1 : -1) + keys.length) % keys.length];
+        activateTab();
+        buttons[researchTab].focus();
+      });
+      panel.replaceChildren(tabs, sourcePanel, liveartSection);
+      activateTab();
+    }
     details.append(summary, panel);
     item.appendChild(details);
 
@@ -1795,6 +1977,7 @@
         control.disabled = value;
       });
       results.querySelectorAll("button").forEach((control) => { control.disabled = value; });
+      liveart.syncBusyControls();
       if (!value) updateMethodFields();
       details.classList.toggle("is-loading", value);
     };
@@ -2252,11 +2435,11 @@
       "aria-label",
       lot.artprice_url
         ? `${lot.email_tray_selected ? "Remove" : "Add"} ${lot.title} ${lot.email_tray_selected ? "from" : "to"} the Email Tray`
-        : `Open ${lot.title} to save an Artprice link before adding it to the Email Tray`
+      : `Open research for ${lot.title} to save an Artprice link before adding it to the Email Tray`
     );
     button.title = lot.artprice_url
       ? (lot.email_tray_selected ? "Remove from Email Tray" : "Add to Email Tray")
-      : "Save an Artprice link in Quick look to use the Email Tray";
+      : "Save an Artprice link in the research workspace to use the Email Tray";
     button.textContent = lot.email_tray_selected ? "★" : "☆";
   };
 
@@ -2337,9 +2520,9 @@
     const open = document.createElement("button");
     open.className = "day-gallery-open";
     open.type = "button";
-    open.setAttribute("aria-label", `Quick look at ${lot.title}${lot.artist ? ` by ${lot.artist}` : ""}`);
+    open.setAttribute("aria-label", `Open research workspace for ${lot.title}${lot.artist ? ` by ${lot.artist}` : ""}`);
     open.append(...galleryImage(lot));
-    open.addEventListener("click", () => openLotBrowser(index));
+    open.addEventListener("click", () => openResearchWorkspace(index));
     visual.appendChild(open);
     appendText(visual, "span", "day-gallery-lot-number", lot.lot_number ? `LOT ${lot.lot_number}` : "WATCHED LOT");
     const emailButton = document.createElement("button");
@@ -2366,8 +2549,8 @@
     const quickLook = document.createElement("button");
     quickLook.type = "button";
     quickLook.className = "day-gallery-quick-look";
-    quickLook.textContent = "Quick look ↗";
-    quickLook.addEventListener("click", () => openLotBrowser(index));
+    quickLook.textContent = "Research this lot →";
+    quickLook.addEventListener("click", () => openResearchWorkspace(index));
     actions.appendChild(quickLook);
     if (lot.url) actions.appendChild(externalLink(lot.url, "day-gallery-auction-link", "Auction ↗"));
     caption.appendChild(actions);
@@ -2381,7 +2564,7 @@
     lots.slice(0, galleryVisibleCount).forEach(({lot, index}) => galleryGrid.appendChild(galleryCard(lot, index)));
     if (!lots.length) {
       appendText(galleryGrid, "p", "day-gallery-empty", galleryFilter === "tray"
-        ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Quick look, then add it to the tray."
+        ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Research, then add it to the tray."
         : "No watched lots match this view.");
     }
     galleryDescription.textContent = galleryFilter === "all"
@@ -2423,7 +2606,7 @@
 
   const toggleGalleryEmail = async (lot, index, button) => {
     if (!lot.artprice_url) {
-      openLotBrowser(index);
+      openResearchWorkspace(index);
       return;
     }
     const selected = !lot.email_tray_selected;
@@ -2540,6 +2723,191 @@
     return media;
   };
 
+  const renderResearchRail = () => {
+    const lots = data[selectedDay] || [];
+    const query = researchSearch.value.trim().toLocaleLowerCase();
+    const matches = lots.map((lot, index) => ({lot, index})).filter(({lot}) =>
+      !query || [lot.artist, lot.title, lot.auction_house, lot.lot_number]
+        .some((value) => String(value || "").toLocaleLowerCase().includes(query))
+    );
+    researchRailTotal.textContent = `${matches.length} of ${lots.length}`;
+    researchLotList.replaceChildren();
+    if (!matches.length) {
+      appendText(researchLotList, "p", "research-rail-empty", "No lots match that search.");
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    matches.forEach(({lot, index}) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "research-lot-button";
+      button.classList.toggle("is-active", index === researchIndex);
+      button.setAttribute("aria-current", index === researchIndex ? "true" : "false");
+      button.setAttribute("aria-label", `Open lot ${index + 1} of ${lots.length}: ${lot.artist || "Unknown artist"}, ${lot.title}`);
+      const thumbnail = document.createElement("span");
+      thumbnail.className = "research-lot-thumb";
+      const imageUrl = lotImages(lot)[0];
+      if (imageUrl) {
+        const image = document.createElement("img");
+        image.src = imageUrl;
+        image.alt = "";
+        image.loading = "lazy";
+        image.referrerPolicy = "no-referrer";
+        thumbnail.appendChild(image);
+      } else {
+        thumbnail.textContent = "◇";
+      }
+      const label = document.createElement("span");
+      label.className = "research-lot-button-label";
+      appendText(label, "small", "", `LOT ${index + 1} · ${lot.auction_house}`);
+      appendText(label, "strong", "", lot.artist || "Artist unavailable");
+      appendText(label, "em", "", lot.title);
+      button.append(thumbnail, label);
+      button.addEventListener("click", () => {
+        researchIndex = index;
+        renderResearchWorkspace();
+        updateCalendarLocation();
+        researchLotCard.querySelector(".research-lot-overview h3")?.focus({preventScroll: true});
+      });
+      fragment.appendChild(button);
+    });
+    researchLotList.appendChild(fragment);
+    const active = researchLotList.querySelector(".research-lot-button.is-active");
+    if (active) {
+      const buttonRect = active.getBoundingClientRect();
+      const listRect = researchLotList.getBoundingClientRect();
+      if (buttonRect.left < listRect.left) researchLotList.scrollLeft -= listRect.left - buttonRect.left;
+      else if (buttonRect.right > listRect.right) researchLotList.scrollLeft += buttonRect.right - listRect.right;
+      if (buttonRect.top < listRect.top) researchLotList.scrollTop -= listRect.top - buttonRect.top;
+      else if (buttonRect.bottom > listRect.bottom) researchLotList.scrollTop += buttonRect.bottom - listRect.bottom;
+    }
+  };
+
+  const renderResearchBidStrip = (strip, analysis) => {
+    strip.replaceChildren();
+    strip.classList.toggle("is-empty", !analysis?.scenarios?.length);
+    const heading = document.createElement("div");
+    heading.className = "research-bid-strip-heading";
+    appendText(heading, "span", "calendar-kicker", "Bid outlook / target-profit maximum hammer");
+    appendText(heading, "p", "", analysis?.scenarios?.length
+      ? "Target-profit maximum hammer bids from selected comparable sales"
+      : "No current bid estimate. Search sales and save an analysis to build the outlook.");
+    strip.appendChild(heading);
+    if (analysis?.scenarios?.length) {
+      const grid = document.createElement("div");
+      grid.className = "research-bid-strip-grid";
+      analysis.scenarios.forEach((scenario) => {
+        const pill = document.createElement("div");
+        pill.className = "research-bid-pill";
+        const rows = Array.isArray(scenario.bid_rows) ? scenario.bid_rows : [];
+        const sample = rows.find((row) => Number(row.premium_pct) === 25) || rows[0];
+        const target = sample?.target_profit_max_bid ?? sample?.target_profit_max_hammer_bid;
+        appendText(pill, "span", "", `${scenario.name || scenario.label || scenario.key || "Scenario"} resale`);
+        appendText(pill, "strong", "", target == null ? "No positive bid" : formatAnalysisMoney(target, "USD"));
+        appendText(pill, "small", "", `${sample ? `${sample.premium_pct}% buyer premium · ` : ""}Resale ${formatAnalysisMoney(scenario.resale_hammer, "USD")}`);
+        grid.appendChild(pill);
+      });
+      strip.appendChild(grid);
+    }
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "research-bid-strip-action";
+    action.textContent = analysis?.scenarios?.length ? "Review full bid scenarios ↓" : "Build bid analysis ↓";
+    action.addEventListener("click", () => {
+      const tab = analysis?.scenarios?.length ? "bids" : "comps";
+      researchLotCard.querySelector(`[data-research-tab="${tab}"]`)?.click();
+      researchLotCard.querySelector(".research-tabs")?.scrollIntoView({behavior: "smooth", block: "start"});
+    });
+    strip.appendChild(action);
+  };
+
+  const renderResearchWorkspace = () => {
+    const lots = data[selectedDay] || [];
+    researchTitle.textContent = selectedDay
+      ? formatCalendarDay(selectedDay, {weekday: "long", month: "long", day: "numeric", year: "numeric"})
+      : "Research workspace";
+    researchSubtitle.textContent = lots.length
+      ? `${lots.length} watched lot${lots.length === 1 ? "" : "s"} · One research workspace, three layout concepts`
+      : "Choose a day with watched lots in the Calendar or Gallery Catalog.";
+    researchPrevious.disabled = lots.length < 2 || researchIndex <= 0;
+    researchNext.disabled = lots.length < 2 || researchIndex >= lots.length - 1;
+    if (!lots.length) {
+      researchCount.textContent = "0 lots";
+      researchRenderedKey = "";
+      researchLotCard.replaceChildren();
+      appendText(researchLotCard, "p", "research-empty", "No watched lots on this date. Choose another day in the Calendar or Gallery Catalog.");
+      renderResearchRail();
+      return;
+    }
+    researchIndex = Math.max(0, Math.min(researchIndex, lots.length - 1));
+    const lot = lots[researchIndex];
+    researchCount.textContent = `Lot ${researchIndex + 1} of ${lots.length}`;
+    researchPrevious.disabled = researchIndex === 0;
+    researchNext.disabled = researchIndex === lots.length - 1;
+    renderResearchRail();
+    const key = `${selectedDay}:${lot.id}`;
+    if (researchRenderedKey === key) return;
+    researchRenderedKey = key;
+    researchLotCard.replaceChildren();
+    researchLotCard.classList.toggle("is-ended", Boolean(lot.ended));
+    const bidStrip = document.createElement("section");
+    bidStrip.className = "research-bid-strip";
+    bidStrip.setAttribute("aria-label", "Current bid outlook");
+    renderResearchBidStrip(bidStrip, null);
+    researchLotCard.appendChild(bidStrip);
+    researchLotCard.appendChild(appendLotBrowserMedia(lot));
+    const overview = document.createElement("section");
+    overview.className = "research-lot-overview";
+    if (lot.ended) appendText(overview, "p", "lot-browser-status", "Sale ended");
+    appendArtistLabel(overview, lot);
+    const heading = document.createElement("h3");
+    heading.className = "lot-title";
+    heading.textContent = lot.title;
+    heading.tabIndex = -1;
+    overview.appendChild(heading);
+    appendText(overview, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
+    appendText(overview, "p", "lot-facts", [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.estimate, lot.medium].filter(Boolean).join(" · "));
+    if (lot.location) appendText(overview, "p", "lot-location", `Location: ${lot.location}`);
+    appendText(overview, "p", "lot-bid", lot.bid);
+    const actionLinks = document.createElement("div");
+    actionLinks.className = "lot-browser-action-links";
+    if (lot.url) actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "Open auction lot ↗"));
+    if (lot.artprice_url) actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
+    overview.appendChild(actionLinks);
+    researchLotCard.appendChild(overview);
+    const workflow = document.createElement("section");
+    workflow.className = "lot-browser-workflow";
+    appendText(workflow, "p", "lot-browser-workflow-label", "Private research workflow");
+    researchLotCard.appendChild(workflow);
+    appendArtpriceEditor(workflow, lot, actionLinks, {idPrefix: "research"});
+    appendArtpriceAnalysis(workflow, lot, {
+      idPrefix: "research", quick: true, workspace: true,
+      onScenarioSummary: (analysis) => renderResearchBidStrip(bidStrip, analysis),
+    });
+  };
+
+  const openResearchWorkspace = (index = 0) => {
+    researchIndex = index;
+    setCalendarView("research", {push: activeView !== "research"});
+    researchWorkspace.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
+    researchTitle.focus({preventScroll: true});
+  };
+
+  const moveResearchLot = (distance) => {
+    const lots = data[selectedDay] || [];
+    const next = Math.max(0, Math.min(researchIndex + distance, lots.length - 1));
+    if (!lots.length || next === researchIndex) return;
+    const query = researchSearch.value.trim().toLocaleLowerCase();
+    if (query && ![lots[next].artist, lots[next].title, lots[next].auction_house, lots[next].lot_number]
+      .some((value) => String(value || "").toLocaleLowerCase().includes(query))) {
+      researchSearch.value = "";
+    }
+    researchIndex = next;
+    renderResearchWorkspace();
+    updateCalendarLocation();
+    researchLotCard.querySelector(".research-lot-overview h3")?.focus({preventScroll: true});
+  };
+
   const renderLotBrowser = () => {
     const lots = data[selectedDay] || [];
     if (!lots.length) return;
@@ -2623,7 +2991,8 @@
   };
 
   lotBrowserLaunch.addEventListener("click", () => openLotBrowser());
-  galleryBrowserLaunch.addEventListener("click", () => openLotBrowser());
+  researchLaunch.addEventListener("click", () => openResearchWorkspace());
+  galleryBrowserLaunch.addEventListener("click", () => openResearchWorkspace());
   lotBrowserClose.addEventListener("click", closeLotBrowser);
   lotBrowserPrevious.addEventListener("click", () => moveLotBrowser(-1));
   lotBrowserNext.addEventListener("click", () => moveLotBrowser(1));
@@ -2659,35 +3028,104 @@
     }
   });
 
-  const updateCalendarLocation = () => {
+  const updateCalendarLocation = ({push = false} = {}) => {
+    if (restoringHistory) return;
     const url = new URL(window.location.href);
-    if (activeView === "catalog") url.searchParams.set("view", "catalog");
+    if (activeView === "catalog" || activeView === "research") url.searchParams.set("view", activeView);
     else url.searchParams.delete("view");
     if (selectedDay) url.searchParams.set("day", selectedDay);
     else url.searchParams.delete("day");
-    window.history.replaceState(window.history.state, "", url);
+    if (activeView === "research") {
+      url.searchParams.set("look", researchLook);
+      const lot = (data[selectedDay] || [])[researchIndex];
+      if (lot) url.searchParams.set("lot", String(lot.id));
+      else url.searchParams.delete("lot");
+    } else {
+      url.searchParams.delete("look");
+      url.searchParams.delete("lot");
+    }
+    const state = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
+    if (push) window.history.pushState({...state, researchEntry: true}, "", url);
+    else window.history.replaceState(state, "", url);
     document.querySelectorAll(".month-nav a").forEach((link) => {
       const monthUrl = new URL(link.href);
       monthUrl.searchParams.delete("day");
-      if (activeView === "catalog") monthUrl.searchParams.set("view", "catalog");
+      monthUrl.searchParams.delete("lot");
+      if (activeView === "catalog" || activeView === "research") monthUrl.searchParams.set("view", activeView);
       else monthUrl.searchParams.delete("view");
+      if (activeView === "research") monthUrl.searchParams.set("look", researchLook);
+      else monthUrl.searchParams.delete("look");
       link.href = monthUrl;
     });
   };
 
-  const setCalendarView = (view) => {
-    activeView = view === "catalog" ? "catalog" : "calendar";
+  const setCalendarView = (view, {push = false} = {}) => {
+    activeView = view === "catalog" || view === "research" ? view : "calendar";
     calendarLayout.hidden = activeView !== "calendar";
     galleryCatalog.hidden = activeView !== "catalog";
+    researchWorkspace.hidden = activeView !== "research";
+    auctionCalendar.classList.toggle("is-research-view", activeView === "research");
+    calendarPageShell.classList.toggle("is-research-layout", activeView === "research");
     calendarViewToggle.setAttribute("aria-pressed", String(activeView === "calendar"));
     catalogViewToggle.setAttribute("aria-pressed", String(activeView === "catalog"));
+    researchViewToggle.setAttribute("aria-pressed", String(activeView === "research"));
     if (activeView === "catalog") renderGalleryCatalog();
+    else if (activeView === "research") renderResearchWorkspace();
     else if (selectedDay && sidebarRenderedDay !== selectedDay) renderSidebarLots(data[selectedDay] || []);
-    updateCalendarLocation();
+    updateCalendarLocation({push});
   };
 
   calendarViewToggle.addEventListener("click", () => setCalendarView("calendar"));
   catalogViewToggle.addEventListener("click", () => setCalendarView("catalog"));
+  researchViewToggle.addEventListener("click", () => openResearchWorkspace(researchIndex));
+  researchBack.addEventListener("click", () => {
+    if (window.history.state?.researchEntry) window.history.back();
+    else {
+      setCalendarView("catalog");
+      document.getElementById("day-gallery-title").focus({preventScroll: true});
+    }
+  });
+  window.addEventListener("popstate", () => {
+    restoringHistory = true;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const day = params.get("day");
+      if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)
+        && (Object.hasOwn(data, day) || dayButtons.some((button) => button.dataset.calendarDay === day))
+        && day !== selectedDay) showDay(day);
+      const look = params.get("look");
+      researchLook = ["dossier", "workbench", "bidboard"].includes(look) ? look : "dossier";
+      researchWorkspace.dataset.look = researchLook;
+      researchLookButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.researchLook === researchLook)));
+      const requestedLot = Number(params.get("lot"));
+      const requestedIndex = (data[selectedDay] || []).findIndex((lot) => lot.id === requestedLot);
+      if (requestedIndex >= 0) researchIndex = requestedIndex;
+      const view = params.get("view");
+      setCalendarView(view);
+      const focusTarget = view === "research" ? researchTitle
+        : view === "catalog" ? document.getElementById("day-gallery-title") : calendarViewToggle;
+      focusTarget.focus({preventScroll: true});
+    } finally {
+      restoringHistory = false;
+    }
+  });
+  researchPrevious.addEventListener("click", () => moveResearchLot(-1));
+  researchNext.addEventListener("click", () => moveResearchLot(1));
+  researchSearch.addEventListener("input", renderResearchRail);
+  researchLookButtons.forEach((button) => button.addEventListener("click", () => {
+    researchLook = button.dataset.researchLook;
+    researchWorkspace.dataset.look = researchLook;
+    researchLookButtons.forEach((choice) => choice.setAttribute("aria-pressed", String(choice === button)));
+    researchTab = researchLook === "bidboard" ? "bids" : researchLook === "workbench" ? "sources" : "comps";
+    researchLotCard.querySelector(`[data-research-tab="${researchTab}"]`)?.click();
+    updateCalendarLocation();
+  }));
+  researchWorkspace.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.target instanceof Element && event.target.closest("input, select, textarea, .artprice-analysis, .artprice-form, .research-lot-list")) return;
+    if (event.key === "ArrowLeft") { event.preventDefault(); moveResearchLot(-1); }
+    if (event.key === "ArrowRight") { event.preventDefault(); moveResearchLot(1); }
+  });
   gallerySort.addEventListener("change", () => {
     galleryVisibleCount = 24;
     renderGalleryCards();
@@ -2783,6 +3221,11 @@
       galleryFilter = "all";
       galleryVisibleCount = 24;
       sidebarRenderedDay = "";
+      researchRenderedKey = "";
+      if (selectedDay) {
+        researchIndex = 0;
+        researchSearch.value = "";
+      }
       if (activeView === "catalog") list.replaceChildren();
     }
     selectedDay = isoDate;
@@ -2797,12 +3240,15 @@
 
     const lots = data[isoDate] || [];
     lotBrowserLaunch.hidden = !lots.length;
+    researchLaunch.hidden = !lots.length;
+    researchLaunch.textContent = lots.length === 1 ? "Research this lot" : `Research ${lots.length} lots in full view`;
     lotBrowserLaunch.textContent = lots.length === 1 ? "Browse this lot" : `Browse all ${lots.length} lots`;
     lotBrowserLaunch.setAttribute(
       "aria-label",
       lots.length === 1 ? `Browse the lot for ${dayLabel}` : `Browse all ${lots.length} lots for ${dayLabel}`
     );
     if (activeView === "catalog") renderGalleryCatalog();
+    else if (activeView === "research") renderResearchWorkspace();
     else renderSidebarLots(lots);
     updateCalendarLocation();
   };
@@ -2822,11 +3268,23 @@
   });
 
   const initialDay = "{{ initial_day|escapejs }}";
-  const requestedView = new URLSearchParams(window.location.search).get("view");
-  const requestedDay = new URLSearchParams(window.location.search).get("day");
+  const initialParams = new URLSearchParams(window.location.search);
+  const requestedView = initialParams.get("view");
+  const requestedDay = initialParams.get("day");
   const validRequestedDay = requestedDay && /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
     && (Object.hasOwn(data, requestedDay) || dayButtons.some((button) => button.dataset.calendarDay === requestedDay));
-  activeView = requestedView === "catalog" ? "catalog" : "calendar";
+  const requestedLook = initialParams.get("look");
+  researchLook = ["dossier", "workbench", "bidboard"].includes(requestedLook) ? requestedLook : "dossier";
+  researchTab = researchLook === "bidboard" ? "bids" : researchLook === "workbench" ? "sources" : "comps";
+  researchWorkspace.dataset.look = researchLook;
+  researchLookButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.researchLook === researchLook)));
+  const startingDay = validRequestedDay ? requestedDay : initialDay;
+  const requestedLot = Number(initialParams.get("lot"));
+  if (startingDay && Number.isSafeInteger(requestedLot)) {
+    const matchingIndex = (data[startingDay] || []).findIndex((lot) => lot.id === requestedLot);
+    if (matchingIndex >= 0) researchIndex = matchingIndex;
+  }
+  activeView = requestedView === "catalog" || requestedView === "research" ? requestedView : "calendar";
   if (validRequestedDay || initialDay) showDay(validRequestedDay ? requestedDay : initialDay);
   setCalendarView(requestedView);
 })();

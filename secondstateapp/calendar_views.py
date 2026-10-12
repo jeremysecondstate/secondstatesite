@@ -244,7 +244,11 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
 def auction_calendar(request):
     zone = _calendar_zone()
     now_local = timezone.localtime(timezone.now(), zone)
-    selected_month = _month_start(request.GET.get("month"), now_local.date())
+    # A shared research link can name its day without a separate month parameter.
+    selected_month = _month_start(
+        request.GET.get("month") or (request.GET.get("day") or "")[:7],
+        now_local.date(),
+    )
     following_month = _next_month(selected_month)
     month_weeks = month_calendar.Calendar(firstweekday=0).monthdatescalendar(selected_month.year, selected_month.month)
     range_start, range_end = _utc_bounds(month_weeks[0][0], month_weeks[-1][-1] + timedelta(days=1), zone)

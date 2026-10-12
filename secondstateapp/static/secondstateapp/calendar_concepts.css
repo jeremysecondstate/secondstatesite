@@ -1,0 +1,1389 @@
+/* Full-page research concepts. Every rule stays inside the research workspace. */
+.research-workspace {
+  --research-accent: #d9b878;
+  --research-accent-soft: rgba(217, 184, 120, .14);
+  --research-line: rgba(217, 184, 120, .22);
+  --research-surface: #111615;
+  --research-surface-raised: #191d1a;
+  --research-text: rgba(255, 255, 255, .93);
+  --research-muted: rgba(255, 255, 255, .64);
+  min-width: 0;
+  margin-top: 28px;
+  padding: clamp(18px, 2.5vw, 36px);
+  border: 1px solid var(--research-line);
+  border-radius: 7px;
+  color: var(--research-text);
+  background: #0a0e0d;
+  box-shadow: 0 28px 85px rgba(0, 0, 0, .34);
+}
+
+.research-workspace,
+.research-workspace * {
+  box-sizing: border-box;
+}
+
+.research-workspace [hidden] {
+  display: none !important;
+}
+
+.research-workspace :is(button, input, select, summary, a):focus-visible {
+  outline: 2px solid var(--research-accent);
+  outline-offset: 3px;
+}
+
+.research-workspace .research-workspace-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 22px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--research-line);
+}
+
+.research-workspace .research-workspace-header h2 {
+  margin: 5px 0 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(30px, 3.8vw, 54px);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -.035em;
+}
+
+.research-workspace .research-workspace-header p:not(.calendar-kicker) {
+  max-width: 67ch;
+  margin: 8px 0 0;
+  color: var(--research-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.research-workspace .research-back {
+  min-height: 34px;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  color: var(--research-accent);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.research-workspace .research-back:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.research-workspace .research-workspace-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.research-workspace .research-workspace-navigation > span {
+  margin-right: 8px;
+  color: var(--research-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.research-workspace .research-workspace-navigation :is(button, a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 9px 13px;
+  border: 1px solid var(--research-line);
+  border-radius: 3px;
+  color: var(--research-text);
+  background: rgba(255, 255, 255, .035);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.research-workspace .research-workspace-navigation :is(button, a):hover:not(:disabled) {
+  border-color: var(--research-accent);
+  background: var(--research-accent-soft);
+}
+
+.research-workspace .research-workspace-navigation button:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
+.research-workspace .research-workspace-navigation .research-tray-link {
+  border-color: var(--research-accent);
+  color: var(--research-accent);
+}
+
+.research-workspace .research-concept-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid var(--research-line);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.research-workspace .research-concept-switch {
+  margin-top: 24px;
+}
+
+.research-workspace .research-concept-switch > span {
+  padding: 0 12px;
+  color: var(--research-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.research-workspace .research-concept-switch button,
+.research-workspace .research-tabs button {
+  min-height: 42px;
+  padding: 9px 15px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--research-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.research-workspace .research-concept-switch button {
+  min-height: 63px;
+  text-align: left;
+}
+
+.research-workspace .research-concept-switch button strong,
+.research-workspace .research-concept-switch button small {
+  display: block;
+  white-space: nowrap;
+}
+
+.research-workspace .research-concept-switch button small {
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.research-workspace .research-concept-switch button:hover,
+.research-workspace .research-tabs button:hover {
+  border-color: var(--research-line);
+  color: var(--research-text);
+}
+
+.research-workspace .research-concept-switch button:is([aria-pressed="true"], [aria-selected="true"]),
+.research-workspace .research-tabs button:is([aria-pressed="true"], [aria-selected="true"]) {
+  border-color: var(--research-accent);
+  color: #111513;
+  background: var(--research-accent);
+}
+
+.research-workspace .research-workspace-body,
+.research-workspace .research-stage,
+.research-workspace .research-lot-card,
+.research-workspace .research-lot-rail,
+.research-workspace #research-lot-list {
+  min-width: 0;
+}
+
+.research-workspace .research-workspace-body {
+  display: grid;
+  gap: clamp(18px, 2vw, 30px);
+  margin-top: 26px;
+}
+
+.research-workspace .research-lot-rail {
+  align-self: start;
+  padding: 18px;
+  border: 1px solid var(--research-line);
+  border-radius: 5px;
+  background: var(--research-surface);
+}
+
+.research-workspace .research-lot-rail > :is(h3, p) {
+  margin: 0 0 12px;
+}
+
+.research-workspace .research-rail-heading > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.research-workspace .research-rail-heading .calendar-kicker {
+  margin: 0;
+}
+
+.research-workspace .research-rail-heading strong {
+  color: var(--research-accent);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.research-workspace .research-rail-heading label {
+  display: block;
+  margin: 0 0 7px;
+  color: var(--research-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.research-workspace .research-lot-rail h3 {
+  color: var(--research-accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.research-workspace .research-lot-rail > input,
+.research-workspace .research-lot-rail input[type="search"] {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 0 0 14px;
+  padding: 10px 13px;
+  border: 1px solid var(--research-line);
+  border-radius: 3px;
+  color: var(--research-text);
+  background: rgba(0, 0, 0, .25);
+  font: inherit;
+  font-size: 13px;
+}
+
+.research-workspace .research-lot-rail input::placeholder {
+  color: var(--research-muted);
+}
+
+.research-workspace #research-lot-list {
+  display: flex;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.research-workspace .research-lot-button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  min-height: 74px;
+  padding: 10px 13px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 3px;
+  color: var(--research-text);
+  background: rgba(255, 255, 255, .035);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.research-workspace .research-lot-button:hover {
+  border-color: var(--research-accent);
+  background: var(--research-accent-soft);
+  transform: translateY(-1px);
+}
+
+.research-workspace .research-lot-button:is(.is-active, .active, [aria-current="true"], [aria-selected="true"]) {
+  border-color: var(--research-accent);
+  color: var(--research-accent);
+  background: var(--research-accent-soft);
+}
+
+.research-workspace .research-lot-button-label :is(strong, small, span) {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.research-workspace .research-lot-thumb {
+  display: grid;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 54px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 2px;
+  color: var(--research-accent);
+  background: #090e0f;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 26px;
+}
+
+.research-workspace .research-lot-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.research-workspace .research-lot-button-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.research-workspace .research-lot-button-label small {
+  overflow: hidden;
+  color: var(--research-muted);
+  font-size: 9px;
+  letter-spacing: .05em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.research-workspace .research-lot-button strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.research-workspace .research-lot-button-label em {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--research-muted);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.research-workspace .research-rail-empty {
+  flex: 1 0 100%;
+  margin: 0;
+  padding: 20px 12px;
+  border: 1px dashed var(--research-line);
+  border-radius: 3px;
+  color: var(--research-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.research-workspace .research-lot-card > .research-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  min-height: 300px;
+  margin: 0;
+  padding: 30px;
+  place-items: center;
+  color: var(--research-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.research-workspace .research-stage {
+  align-self: start;
+}
+
+.research-workspace .research-lot-card {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--research-line);
+  border-radius: 5px;
+  background: var(--research-surface);
+}
+
+.research-workspace .research-lot-card > .research-bid-strip {
+  display: none;
+}
+
+.research-workspace .research-lot-card > .lot-browser-media {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: #090c0b;
+}
+
+.research-workspace .research-lot-card > .lot-browser-media .lot-browser-image-frame {
+  min-height: 0;
+}
+
+.research-workspace .research-lot-card > .lot-browser-media .lot-browser-image {
+  max-height: none;
+  padding: clamp(18px, 3vw, 42px);
+}
+
+.research-workspace .research-lot-overview {
+  min-width: 0;
+  padding: clamp(22px, 3vw, 48px);
+}
+
+.research-workspace .research-lot-overview .lot-artist {
+  margin-bottom: 11px;
+  color: var(--research-accent);
+  font-size: 11px;
+}
+
+.research-workspace .research-lot-overview .lot-title {
+  font-size: clamp(28px, 3.1vw, 45px);
+  line-height: 1.13;
+}
+
+.research-workspace .research-lot-overview :is(.lot-house, .lot-facts, .lot-location, .lot-bid) {
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.research-workspace .research-lot-overview .lot-house {
+  margin-top: 24px;
+}
+
+.research-workspace .research-lot-overview .lot-bid {
+  margin-top: 10px;
+  color: var(--research-accent);
+}
+
+.research-workspace .research-lot-overview .lot-browser-action-links {
+  margin-top: 24px;
+}
+
+.research-workspace .research-lot-overview .lot-browser-action-links a {
+  color: var(--research-accent);
+}
+
+.research-workspace .research-lot-card > .lot-browser-workflow {
+  min-width: 0;
+  margin: 0;
+  padding: clamp(22px, 3vw, 44px);
+  border-top: 1px solid var(--research-line);
+}
+
+.research-workspace .lot-browser-workflow-label {
+  margin-bottom: 20px;
+  color: var(--research-accent);
+  font-size: 11px;
+}
+
+.research-workspace .artprice-form {
+  max-width: 850px;
+}
+
+.research-workspace .artprice-label,
+.research-workspace .artprice-analysis-field label {
+  font-size: 11px;
+}
+
+.research-workspace .artprice-editor input,
+.research-workspace .artprice-editor button,
+.research-workspace .artprice-analysis-field input,
+.research-workspace .artprice-analysis-field select {
+  min-height: 42px;
+  font-size: 12px;
+}
+
+.research-workspace .artprice-analysis {
+  margin-top: 24px;
+  border-color: var(--research-line);
+  background: var(--research-surface-raised);
+}
+
+.research-workspace .artprice-analysis > summary {
+  min-height: 50px;
+  padding: 14px 18px;
+  font-size: 13px;
+}
+
+.research-workspace .artprice-analysis-panel {
+  padding: clamp(18px, 2vw, 30px);
+  border-color: var(--research-line);
+}
+
+.research-workspace .artprice-analysis-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.research-workspace .artprice-analysis-grid > .artprice-analysis-field.is-wide {
+  grid-column: 1 / -1;
+}
+
+.research-workspace .artprice-analysis-actions button {
+  min-height: 42px;
+  padding-inline: 14px;
+  font-size: 11px;
+}
+
+.research-workspace .artprice-analysis-intro,
+.research-workspace .artprice-analysis-explanation,
+.research-workspace .artprice-analysis-empty,
+.research-workspace .liveart-search-facts,
+.research-workspace .liveart-source-meta {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.research-workspace .artprice-analysis-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.research-workspace .artprice-analysis-summary-item {
+  padding: 13px;
+  border-color: var(--research-line);
+}
+
+.research-workspace .artprice-analysis-summary-item.is-wide {
+  grid-column: span 2;
+}
+
+.research-workspace .artprice-analysis-summary-item :is(dt, dd) {
+  font-size: 11px;
+}
+
+.research-workspace .artprice-analysis-table {
+  font-size: 12px;
+}
+
+.research-workspace .artprice-analysis-table th,
+.research-workspace .artprice-analysis-table td {
+  padding: 10px 12px;
+}
+
+.research-workspace .artprice-analysis-table th {
+  font-size: 10px;
+}
+
+.research-workspace .artprice-analysis-table-wrap {
+  overflow-x: auto;
+  border-color: var(--research-line);
+}
+
+.research-workspace .liveart-candidate {
+  padding: 17px;
+  border-color: var(--research-line);
+}
+
+.research-workspace .liveart-candidate h5 {
+  font-size: 15px;
+}
+
+.research-workspace .liveart-price-line {
+  color: var(--research-accent);
+  font-size: 13px;
+}
+
+.research-workspace .liveart-facts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.research-workspace .research-liveart-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 18px;
+  border: 1px solid var(--research-line);
+  border-radius: 4px;
+  background: var(--research-accent-soft);
+}
+
+.research-workspace .research-liveart-search .liveart-title-variant-field {
+  min-width: 0;
+  margin: 0;
+}
+
+.research-workspace .research-liveart-search > button {
+  min-height: 42px;
+  padding: 9px 16px;
+  border: 1px solid var(--research-accent);
+  border-radius: 3px;
+  color: #101715;
+  background: var(--research-accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.research-workspace .research-liveart-search > button:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.research-workspace .research-liveart-search > button:disabled {
+  cursor: wait;
+  opacity: .5;
+}
+
+.research-workspace .research-comps-panel .liveart-candidate-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.research-workspace .research-comps-panel .liveart-candidate-results > :not(.liveart-candidate) {
+  grid-column: 1 / -1;
+}
+
+.research-workspace .research-comps-panel .liveart-candidate {
+  height: 100%;
+  margin: 0;
+}
+
+.research-workspace .research-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 20px 0 0;
+  padding: 5px;
+  border: 1px solid var(--research-line);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, .19);
+}
+
+.research-workspace .research-source-panel,
+.research-workspace .research-comps-panel,
+.research-workspace .research-bids-panel {
+  min-width: 0;
+  margin-top: 18px;
+  padding: clamp(16px, 2vw, 28px);
+  border: 1px solid var(--research-line);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, .16);
+}
+
+.research-workspace .liveart-analysis {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.research-workspace .research-scenario {
+  min-width: 0;
+  margin: 20px 0;
+  padding: clamp(16px, 2vw, 25px);
+  border: 1px solid var(--research-line);
+  border-radius: 5px;
+  background: var(--research-surface-raised);
+}
+
+.research-workspace .research-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+  margin-top: 17px;
+}
+
+.research-workspace .research-scenario-grid .research-scenario {
+  height: 100%;
+  margin: 0;
+}
+
+.research-workspace .research-scenario h4 {
+  margin: 0 0 12px;
+  color: var(--research-accent);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(20px, 1.7vw, 27px);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.research-workspace .research-scenario .artprice-analysis-explanation {
+  font-size: 11px;
+}
+
+.research-workspace .research-scenario-table {
+  margin-top: 17px;
+}
+
+.research-workspace .research-scenario-table > summary,
+.research-workspace .research-source-results > summary {
+  padding: 10px 0;
+  color: var(--research-accent);
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.research-workspace .research-scenario-table[open] > summary,
+.research-workspace .research-source-results[open] > summary {
+  margin-bottom: 10px;
+}
+
+.research-workspace .research-scenario-highlight {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--research-line);
+  color: var(--research-accent);
+}
+
+.research-workspace .research-scenario-highlight span {
+  color: var(--research-muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.research-workspace .research-scenario-highlight small {
+  color: var(--research-muted);
+  font-size: 10px;
+}
+
+.research-workspace .research-scenario-highlight strong {
+  width: 100%;
+}
+
+.research-workspace .research-scenario-highlight :is(strong, output, b) {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(22px, 2.4vw, 34px);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.research-workspace .research-scenario table {
+  width: 100%;
+}
+
+/* Dossier: a horizontal lot strip leads into an editorial artwork spread. */
+.research-workspace[data-look="dossier"] {
+  --research-surface: #141513;
+  --research-surface-raised: #1c1d19;
+  background: radial-gradient(circle at 89% 0%, rgba(217, 184, 120, .1), transparent 29%), #0c0e0c;
+}
+
+.research-workspace[data-look="dossier"] .research-lot-rail {
+  padding: 20px;
+}
+
+.research-workspace[data-look="dossier"] #research-lot-list {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding-bottom: 10px;
+  scrollbar-color: var(--research-accent) rgba(255, 255, 255, .06);
+}
+
+.research-workspace[data-look="dossier"] .research-lot-button {
+  flex: 0 0 clamp(168px, 16vw, 230px);
+  border-top: 3px solid rgba(255, 255, 255, .12);
+}
+
+.research-workspace[data-look="dossier"] .research-lot-button:is(.is-active, .active, [aria-current="true"], [aria-selected="true"]) {
+  border-top-color: var(--research-accent);
+}
+
+.research-workspace[data-look="dossier"] .research-lot-card {
+  grid-template-columns: minmax(0, 1fr) minmax(0, .9fr);
+}
+
+.research-workspace[data-look="dossier"] .research-lot-card > .lot-browser-media {
+  min-height: 500px;
+  border-right: 1px solid var(--research-line);
+}
+
+.research-workspace[data-look="dossier"] .research-lot-card > .lot-browser-media .lot-browser-image {
+  max-height: 620px;
+}
+
+.research-workspace[data-look="dossier"] .research-lot-overview {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(217, 184, 120, .055), transparent 58%);
+}
+
+.research-workspace[data-look="dossier"] .research-lot-card > .lot-browser-workflow {
+  grid-column: 1 / -1;
+}
+
+.research-workspace[data-look="dossier"] .research-source-panel,
+.research-workspace[data-look="dossier"] .research-comps-panel,
+.research-workspace[data-look="dossier"] .research-bids-panel {
+  background: #111411;
+}
+
+/* Workbench: a searchable side rail and sticky artwork beside the workflow. */
+.research-workspace[data-look="workbench"] {
+  --research-accent: #ddc18e;
+  --research-accent-soft: rgba(221, 193, 142, .13);
+  --research-line: rgba(221, 193, 142, .2);
+  --research-surface: #111719;
+  --research-surface-raised: #182022;
+  background: #0b1113;
+}
+
+.research-workspace[data-look="workbench"] .research-workspace-body {
+  grid-template-columns: clamp(245px, 22vw, 310px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.research-workspace[data-look="workbench"] .research-lot-rail {
+  position: sticky;
+  top: 18px;
+}
+
+.research-workspace[data-look="workbench"] #research-lot-list {
+  flex-direction: column;
+  max-height: min(72vh, 840px);
+  overflow-y: auto;
+  padding-right: 5px;
+  scrollbar-color: var(--research-accent) rgba(255, 255, 255, .06);
+}
+
+.research-workspace[data-look="workbench"] .research-lot-button {
+  width: 100%;
+  border-left: 3px solid rgba(255, 255, 255, .12);
+}
+
+.research-workspace[data-look="workbench"] .research-lot-button:is(.is-active, .active, [aria-current="true"], [aria-selected="true"]) {
+  border-left-color: var(--research-accent);
+}
+
+.research-workspace[data-look="workbench"] .research-lot-card {
+  grid-template-columns: minmax(260px, 38%) minmax(0, 1fr);
+  align-items: start;
+}
+
+.research-workspace[data-look="workbench"] .research-lot-card > .lot-browser-media {
+  position: sticky;
+  top: 18px;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  min-height: min(65vh, 670px);
+  max-height: min(78vh, 760px);
+  border-right: 1px solid var(--research-line);
+}
+
+.research-workspace[data-look="workbench"] .research-lot-card > .lot-browser-media .lot-browser-image {
+  max-height: min(78vh, 760px);
+}
+
+.research-workspace[data-look="workbench"] .research-lot-overview {
+  grid-column: 2;
+  grid-row: 1;
+  padding-bottom: 24px;
+}
+
+.research-workspace[data-look="workbench"] .research-lot-card > .lot-browser-workflow {
+  grid-column: 2;
+  grid-row: 2;
+  padding-top: 24px;
+}
+
+.research-workspace[data-look="workbench"] .research-lot-overview .lot-title {
+  font-size: clamp(27px, 2.4vw, 38px);
+}
+
+.research-workspace[data-look="workbench"] .research-scenario {
+  border-left: 3px solid var(--research-accent);
+}
+
+.research-workspace[data-look="workbench"] .research-scenario-grid,
+.research-workspace[data-look="workbench"] .research-comps-panel .liveart-candidate-results,
+.research-workspace[data-look="workbench"] .artprice-analysis-grid,
+.research-workspace[data-look="workbench"] .artprice-analysis-summary-grid,
+.research-workspace[data-look="workbench"] .liveart-facts,
+.research-workspace[data-look="workbench"] .research-liveart-search {
+  grid-template-columns: 1fr;
+}
+
+.research-workspace[data-look="workbench"] .research-liveart-search > button {
+  justify-self: start;
+}
+
+/* Bidboard: a compact lot masthead gives bid analysis the widest surface. */
+.research-workspace[data-look="bidboard"] {
+  --research-accent: #81d4d1;
+  --research-accent-soft: rgba(129, 212, 209, .14);
+  --research-line: rgba(129, 212, 209, .24);
+  --research-surface: #101b20;
+  --research-surface-raised: #172a31;
+  background: radial-gradient(circle at 100% 0%, rgba(47, 122, 143, .27), transparent 33%), #081116;
+}
+
+.research-workspace[data-look="bidboard"] .research-concept-switch button:is([aria-pressed="true"], [aria-selected="true"]),
+.research-workspace[data-look="bidboard"] .research-tabs button:is([aria-pressed="true"], [aria-selected="true"]) {
+  color: #07181a;
+}
+
+.research-workspace[data-look="bidboard"] .research-liveart-search > button {
+  color: #07181a;
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-rail {
+  padding: 14px 18px;
+  background: rgba(16, 37, 45, .92);
+}
+
+.research-workspace[data-look="bidboard"] #research-lot-list {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding-bottom: 7px;
+  scrollbar-color: var(--research-accent) rgba(255, 255, 255, .06);
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-button {
+  flex: 0 0 clamp(170px, 18vw, 235px);
+  min-height: 62px;
+  padding: 7px 9px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-thumb {
+  flex-basis: 42px;
+  width: 42px;
+  height: 46px;
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-card {
+  grid-template-columns: clamp(170px, 21vw, 270px) minmax(0, 1fr);
+  border-color: var(--research-line);
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-card > .research-bid-strip {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  gap: 16px;
+  padding: clamp(20px, 2.4vw, 34px);
+  border-bottom: 1px solid rgba(129, 212, 209, .4);
+  background: linear-gradient(115deg, rgba(36, 101, 118, .5), rgba(9, 30, 39, .82) 62%, rgba(13, 38, 45, .95));
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-strip-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-strip-heading .calendar-kicker {
+  margin: 0;
+  color: var(--research-accent);
+  font-size: clamp(12px, 1.15vw, 15px);
+  font-weight: 800;
+  letter-spacing: .11em;
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-strip-heading :is(h3, h4) {
+  margin: 0;
+  color: #e9faf7;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(24px, 2.7vw, 36px);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-strip-heading p {
+  max-width: 60ch;
+  margin: 0;
+  color: rgba(235, 255, 252, .72);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-strip.is-empty {
+  gap: 14px;
+  background: linear-gradient(115deg, rgba(36, 101, 118, .32), rgba(9, 30, 39, .78));
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-strip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-pill {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 110px;
+  padding: 16px 18px;
+  border: 1px solid rgba(129, 212, 209, .33);
+  border-radius: 4px;
+  background: rgba(5, 20, 27, .66);
+  box-shadow: inset 0 3px 0 var(--research-accent);
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-pill :is(small, span, p) {
+  margin: 0;
+  color: rgba(235, 255, 252, .7);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .055em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-pill :is(strong, b, output) {
+  display: block;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+  color: #e7fffb;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(25px, 2.6vw, 38px);
+  font-weight: 500;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.research-workspace[data-look="bidboard"] .research-bid-strip-action {
+  justify-self: start;
+}
+
+.research-workspace[data-look="bidboard"] :is(button.research-bid-strip-action, .research-bid-strip-action button) {
+  min-height: 42px;
+  padding: 9px 16px;
+  border: 1px solid var(--research-accent);
+  border-radius: 3px;
+  color: #07181a;
+  background: var(--research-accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.research-workspace[data-look="bidboard"] :is(button.research-bid-strip-action, .research-bid-strip-action button):hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.research-workspace[data-look="bidboard"] :is(button.research-bid-strip-action, .research-bid-strip-action button):disabled {
+  cursor: default;
+  opacity: .48;
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-card > .lot-browser-media {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 215px;
+  max-height: 250px;
+  border-right: 1px solid var(--research-line);
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-card > .lot-browser-media .lot-browser-image {
+  max-height: 250px;
+  padding: 18px;
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-overview {
+  grid-column: 2;
+  grid-row: 2;
+  padding: 22px 30px;
+  background: linear-gradient(115deg, rgba(129, 212, 209, .08), transparent 70%);
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-overview .lot-title {
+  font-size: clamp(26px, 2.5vw, 37px);
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-overview .lot-house {
+  margin-top: 12px;
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-overview .lot-browser-action-links {
+  margin-top: 14px;
+  padding-top: 11px;
+}
+
+.research-workspace[data-look="bidboard"] .research-lot-card > .lot-browser-workflow {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  background: rgba(7, 18, 24, .46);
+}
+
+.research-workspace[data-look="bidboard"] .research-source-panel,
+.research-workspace[data-look="bidboard"] .research-comps-panel,
+.research-workspace[data-look="bidboard"] .research-bids-panel {
+  background: #0e2027;
+}
+
+.research-workspace[data-look="bidboard"] .research-scenario {
+  border-color: rgba(129, 212, 209, .45);
+  background: linear-gradient(130deg, rgba(42, 112, 128, .21), rgba(12, 31, 39, .85));
+  box-shadow: inset 0 3px 0 var(--research-accent);
+}
+
+.research-workspace[data-look="bidboard"] .research-scenario-highlight {
+  gap: 12px 24px;
+  padding-bottom: 18px;
+}
+
+.research-workspace[data-look="bidboard"] .research-scenario-highlight :is(strong, output, b) {
+  font-size: clamp(27px, 3vw, 42px);
+}
+
+.research-workspace[data-look="bidboard"] .artprice-analysis-table th {
+  color: var(--research-accent);
+  background: rgba(129, 212, 209, .09);
+}
+
+@media (max-width: 1200px) {
+  .research-workspace .research-scenario-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .research-workspace[data-look="workbench"] .research-workspace-body {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .research-workspace[data-look="workbench"] .research-lot-card {
+    grid-template-columns: 1fr;
+  }
+
+  .research-workspace[data-look="workbench"] .research-lot-card > .lot-browser-media {
+    position: static;
+    grid-column: 1;
+    grid-row: auto;
+    min-height: 370px;
+    max-height: 520px;
+    border-right: 0;
+    border-bottom: 1px solid var(--research-line);
+  }
+
+  .research-workspace[data-look="workbench"] .research-lot-card > .lot-browser-media .lot-browser-image {
+    max-height: 520px;
+  }
+
+  .research-workspace[data-look="workbench"] .research-lot-overview,
+  .research-workspace[data-look="workbench"] .research-lot-card > .lot-browser-workflow {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .research-workspace .research-comps-panel .liveart-candidate-results {
+    grid-template-columns: 1fr;
+  }
+
+  .research-workspace .research-scenario-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .research-workspace .artprice-analysis-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .research-workspace .artprice-analysis-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .research-workspace .liveart-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .research-workspace[data-look="dossier"] .research-lot-card {
+    grid-template-columns: 1fr;
+  }
+
+  .research-workspace[data-look="dossier"] .research-lot-card > .lot-browser-media {
+    min-height: 380px;
+    border-right: 0;
+    border-bottom: 1px solid var(--research-line);
+  }
+
+  .research-workspace[data-look="dossier"] .research-lot-card > .lot-browser-media .lot-browser-image {
+    max-height: 500px;
+  }
+
+  .research-workspace[data-look="workbench"] .research-workspace-body {
+    grid-template-columns: 1fr;
+  }
+
+  .research-workspace[data-look="workbench"] .research-lot-rail {
+    position: static;
+  }
+
+  .research-workspace[data-look="workbench"] #research-lot-list {
+    flex-direction: row;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 8px;
+  }
+
+  .research-workspace[data-look="workbench"] .research-lot-button {
+    flex: 0 0 200px;
+    border-left: 1px solid rgba(255, 255, 255, .12);
+    border-top: 3px solid rgba(255, 255, 255, .12);
+  }
+
+  .research-workspace[data-look="workbench"] .research-lot-button:is(.is-active, .active, [aria-current="true"], [aria-selected="true"]) {
+    border-top-color: var(--research-accent);
+  }
+}
+
+@media (max-width: 780px) {
+  .research-workspace[data-look="bidboard"] .research-bid-strip-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .research-workspace[data-look="bidboard"] .research-bid-pill {
+    min-height: 90px;
+  }
+}
+
+@media (max-width: 650px) {
+  .research-workspace {
+    margin-top: 18px;
+    padding: 16px;
+  }
+
+  .research-workspace .research-workspace-header {
+    align-items: flex-start;
+    padding-bottom: 18px;
+  }
+
+  .research-workspace .research-workspace-navigation {
+    justify-content: flex-start;
+  }
+
+  .research-workspace .research-workspace-navigation > span {
+    flex-basis: 100%;
+  }
+
+  .research-workspace .research-concept-switch {
+    width: 100%;
+  }
+
+  .research-workspace .research-concept-switch > span {
+    flex-basis: 100%;
+    padding: 5px 7px 0;
+  }
+
+  .research-workspace .research-concept-switch button {
+    flex: 1 1 auto;
+    padding-inline: 9px;
+  }
+
+  .research-workspace .research-workspace-body {
+    margin-top: 18px;
+  }
+
+  .research-workspace .research-lot-rail {
+    padding: 13px;
+  }
+
+  .research-workspace[data-look="bidboard"] .research-lot-card {
+    grid-template-columns: 1fr;
+  }
+
+  .research-workspace[data-look="bidboard"] .research-lot-card > .lot-browser-media {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 290px;
+    max-height: 360px;
+    border-right: 0;
+    border-bottom: 1px solid var(--research-line);
+  }
+
+  .research-workspace[data-look="bidboard"] .research-lot-card > .lot-browser-media .lot-browser-image {
+    max-height: 360px;
+  }
+
+  .research-workspace[data-look="bidboard"] .research-lot-overview {
+    grid-column: 1;
+    grid-row: 3;
+    padding: 23px;
+  }
+
+  .research-workspace[data-look="bidboard"] .research-lot-card > .lot-browser-workflow {
+    grid-row: 4;
+  }
+
+  .research-workspace .research-lot-card > .lot-browser-workflow {
+    padding: 20px 16px;
+  }
+
+  .research-workspace .artprice-analysis-panel {
+    padding: 16px 12px;
+  }
+
+  .research-workspace .artprice-analysis-grid,
+  .research-workspace .artprice-analysis-summary-grid,
+  .research-workspace .liveart-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .research-workspace .research-liveart-search {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .research-workspace .research-liveart-search > button {
+    width: 100%;
+  }
+
+  .research-workspace .artprice-analysis-summary-item.is-wide {
+    grid-column: 1;
+  }
+
+  .research-workspace .artprice-analysis-grid > .artprice-analysis-field.is-wide {
+    grid-column: 1 / -1;
+  }
+
+  .research-workspace .artprice-editor,
+  .research-workspace .artprice-editor:has(.artprice-remove:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .research-workspace .artprice-editor input {
+    grid-column: 1 / -1;
+  }
+
+  .research-workspace .artprice-editor button {
+    min-height: 42px;
+  }
+
+  .research-workspace .research-tabs button {
+    flex: 1 1 120px;
+  }
+
+  .research-workspace .research-source-panel,
+  .research-workspace .research-comps-panel,
+  .research-workspace .research-bids-panel {
+    padding: 14px;
+  }
+}

@@ -4,6 +4,16 @@
   padding: 46px clamp(18px, 3vw, 48px) 80px;
 }
 
+.calendar-page-shell.is-research-layout {
+  width: min(1920px, 100%);
+  padding-top: 24px;
+}
+
+.auction-calendar.is-research-view > .calendar-hero,
+.auction-calendar.is-research-view > .email-tray-card {
+  display: none;
+}
+
 .auction-calendar {
   --calendar-gold: #d9b878;
   --calendar-gold-soft: rgba(217, 184, 120, .15);
