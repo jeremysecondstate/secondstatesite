@@ -94,7 +94,7 @@ class LiveArtTermSearchViewTests(TestCase):
         self.api.list_artworks.assert_not_called()
         self.api.list_artists.assert_called_once_with(q="Alexander Calder", limit=3)
         self.assertEqual([call.kwargs for call in self.api.list_lots.call_args_list], [
-            {"artist_id": "calder", "status": "sold", "search": term, "sort": "SALE_DATE_DESC", "limit": 10}
+            {"artist_id": "calder", "status": "sold", "search": term, "category_id": 2, "sort": "SALE_DATE_DESC", "limit": 10}
             for term in ("Boomerangs", "Stabiles")
         ])
 
@@ -174,7 +174,7 @@ class LiveArtTermSearchViewTests(TestCase):
         response = self.research(search_terms='“Very Gay Nose and Ears” "very gay nose and ears"')
         self.assertEqual(response.status_code, 200)
         self.api.list_lots.assert_called_once_with(
-            artist_id="calder", status="sold", search="Very Gay Nose and Ears", sort="SALE_DATE_DESC", limit=20,
+            artist_id="calder", status="sold", search="Very Gay Nose and Ears", category_id=2, sort="SALE_DATE_DESC", limit=20,
         )
 
     def test_invalid_terms_and_unsupported_subject_do_not_call_provider(self):
@@ -209,10 +209,10 @@ class LiveArtTermSearchViewTests(TestCase):
 
     def test_empty_terms_and_legacy_title_keep_existing_full_title_path(self):
         self.assertEqual(self.research(search_terms="  ").status_code, 200)
-        self.api.list_artworks.assert_called_once_with(artist_id="calder", search="Boomerangs", limit=5)
+        self.api.list_artworks.assert_called_once_with(artist_id="calder", search="Boomerangs", category_id=2, limit=5)
         self.api.list_artworks.reset_mock()
         self.assertEqual(self.research(search_title="Very Gay Nose and Ears").status_code, 200)
-        self.api.list_artworks.assert_called_once_with(artist_id="calder", search="Very Gay Nose and Ears", limit=5)
+        self.api.list_artworks.assert_called_once_with(artist_id="calder", search="Very Gay Nose and Ears", category_id=2, limit=5)
 
     def test_unmatched_artist_does_not_query_other_artists_sales(self):
         self.api.list_artists.return_value = liveart_page([{"id": "miro", "name": "Joan Miró"}])

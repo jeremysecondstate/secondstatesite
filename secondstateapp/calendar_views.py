@@ -48,8 +48,8 @@ from .calendar_images import (
     store_saved_calendar_image,
 )
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
-from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, normalize_candidate
-from .liveart_search import merge_search_lots, parse_search_terms, search_query_limits
+from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, normalize_candidate
+from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -1155,7 +1155,9 @@ def auction_lot_artprice_analysis(request, lot_id: int):
 
 
 def _liveart_search_context(research: dict) -> dict:
-    return {key: research[key] for key in ("search_terms_used", "search_summary", "search_title_used") if key in research}
+    return {key: research[key] for key in (
+        "search_terms_used", "search_summary", "search_title_used", "search_category", "excluded_category_count",
+    ) if key in research}
 
 
 def _liveart_analysis_json(analysis: LiveArtResaleAnalysis) -> dict:
@@ -1224,12 +1226,17 @@ def _add_liveart_du(total: float | None, page) -> float | None:
 def _research_liveart_terms(lot, client, *, artist_id, terms: tuple[str, ...], units: float | None) -> dict:
     raw_comps = []
     summary = []
+    excluded_count = 0
     for term, limit in zip(terms, search_query_limits(len(terms))):
         page = client.list_lots(
             artist_id=artist_id, status="sold", search=term, sort="SALE_DATE_DESC", limit=limit,
+            category_id=PRINTS_AND_MULTIPLES_CATEGORY_ID,
         )
         units = _add_liveart_du(units, page)
-        rows = page.items[:limit]
+        returned_rows = page.items[:limit]
+        rows = [item for item in returned_rows if is_prints_and_multiples(item)]
+        excluded = len(returned_rows) - len(rows)
+        excluded_count += excluded
         raw_comps.extend({**item, "_retrieved_at": page.retrieved_at, "_search_terms": [term]} for item in rows)
         result = {
             "term": term, "returned_count": len(rows),
@@ -1237,6 +1244,8 @@ def _research_liveart_terms(lot, client, *, artist_id, terms: tuple[str, ...], u
         }
         if page.total_count is not None:
             result["total_count"] = page.total_count
+        if excluded:
+            result["excluded_count"] = excluded
         summary.append(result)
     candidates = []
     for raw in merge_search_lots(raw_comps):
@@ -1257,9 +1266,10 @@ def _research_liveart_terms(lot, client, *, artist_id, terms: tuple[str, ...], u
         "selected_ids": [], "retrieved_at": timezone.now().isoformat(),
         "data_units_spent": units, "requires_subject_choice": False,
         "search_terms_used": list(terms), "search_summary": summary,
+        "excluded_category_count": excluded_count,
         "message": (
-            f"Found {len(candidates)} distinct sold results across {len(terms)} search terms; review and select sales to use."
-            if candidates else "No sold results were returned for these search terms and this artist."
+            f"Found {len(candidates)} distinct Prints & Multiples sold results across {len(terms)} search terms; review and select sales to use."
+            if candidates else "No confirmed Prints & Multiples sold results were returned for these search terms and this artist."
         ),
     }
 
@@ -1302,10 +1312,14 @@ def _research_liveart_lot(
     artist_id = artist["id"]
     if search_terms:
         return _research_liveart_terms(lot, client, artist_id=artist_id, terms=search_terms, units=units)
-    artwork_page = client.list_artworks(artist_id=artist_id, search=title_query[:200], limit=5)
+    artwork_page = client.list_artworks(
+        artist_id=artist_id, search=title_query[:200], limit=5, category_id=PRINTS_AND_MULTIPLES_CATEGORY_ID,
+    )
     units = _add_liveart_du(units, artwork_page)
+    print_artworks = [item for item in artwork_page.items if is_prints_and_multiples(item)]
+    excluded_count = len(artwork_page.items) - len(print_artworks)
     matches = artwork_matches(
-        lot, artwork_page.items, artist_id=artist_id, artist_name=str(artist.get("name") or artist_name),
+        lot, print_artworks, artist_id=artist_id, artist_name=str(artist.get("name") or artist_name),
         title_aliases=(search_title,) if search_title else (),
     )
     verified = [item for item in matches if item.get("verified")]
@@ -1322,17 +1336,18 @@ def _research_liveart_lot(
 
     raw_comps: list[dict] = []
     if chosen is not None:
-        history_page = client.list_lots(artwork_id=chosen["artwork_id"], status="sold", limit=10)
+        history_page = client.list_lots(
+            artwork_id=chosen["artwork_id"], status="sold", limit=10, category_id=PRINTS_AND_MULTIPLES_CATEGORY_ID,
+        )
         units = _add_liveart_du(units, history_page)
         raw_comps.extend({**item, "_retrieved_at": history_page.retrieved_at} for item in history_page.items)
 
-    # This bounded category search supplies related works with different titles.
-    # A category can be broad (for example, prints), so every result remains a
-    # review candidate and must have a verified USD hammer to enter the math.
-    related_filters = {"artist_id": artist_id, "status": "sold", "sort": "SALE_DATE_DESC", "limit": 10}
-    category_id = chosen.get("category_id") if chosen else None
-    if category_id is not None:
-        related_filters["category_id"] = category_id
+    # All fallback and related-work searches stay within Prints & Multiples,
+    # including when no artwork reference was found.
+    related_filters = {
+        "artist_id": artist_id, "status": "sold", "sort": "SALE_DATE_DESC", "limit": 10,
+        "category_id": PRINTS_AND_MULTIPLES_CATEGORY_ID,
+    }
     related_page = client.list_lots(**related_filters)
     units = _add_liveart_du(units, related_page)
     raw_comps.extend({**item, "_retrieved_at": related_page.retrieved_at} for item in related_page.items)
@@ -1341,6 +1356,9 @@ def _research_liveart_lot(
     seen_ids = set()
     seen_sales = set()
     for raw in raw_comps:
+        if not is_prints_and_multiples(raw):
+            excluded_count += 1
+            continue
         candidate_id = str(raw.get("id") or "")
         if not candidate_id or candidate_id in seen_ids:
             continue
@@ -1368,9 +1386,9 @@ def _research_liveart_lot(
     elif requires_choice:
         message = "An artwork matched the supplied title variant, but its title differs from the Calendar title. Review and choose it to search its sale history."
     elif candidates:
-        message = f"Found {len(candidates)} sold results for this work and related works; review each before saving."
+        message = f"Found {len(candidates)} Prints & Multiples sold results for this work and related works; review each before saving."
     else:
-        message = "No suitable sold results were returned for this artist and artwork search."
+        message = "No suitable Prints & Multiples sold results were returned for this artist and artwork search."
     return {
         "subject_matches": matches,
         "subject_match": chosen,
@@ -1380,6 +1398,7 @@ def _research_liveart_lot(
         "data_units_spent": units,
         "requires_subject_choice": requires_choice,
         "search_title_used": title_query,
+        "excluded_category_count": excluded_count,
         "message": message,
     }
 
@@ -1423,6 +1442,8 @@ def auction_lot_liveart_research(request, lot_id: int):
     except ValueError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
+    research["search_category"] = {"id": PRINTS_AND_MULTIPLES_CATEGORY_ID, "label": PRINTS_AND_MULTIPLES_LABEL}
+    research.setdefault("excluded_category_count", 0)
     research["research_id"] = secrets.token_hex(16)
     request.session[f"liveart_research_{lot.pk}"] = research
     existing = LiveArtResaleAnalysis.objects.filter(lot=lot).first()

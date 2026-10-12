@@ -766,6 +766,14 @@
       const artpriceCount = candidates.filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html").length;
       const liveartCount = candidates.length - artpriceCount;
       const parts = [];
+      if (data?.search_category?.id === 2) {
+        parts.push("LiveArt search filter: Prints & Multiples only.");
+      } else if (liveartCount || data?.search_terms_used?.length || data?.data_units_spent != null) {
+        parts.push("Earlier LiveArt research was not restricted to Prints & Multiples. Search again to apply the filter.");
+      }
+      if (data?.excluded_category_count > 0) {
+        parts.push(`${data.excluded_category_count} returned record${data.excluded_category_count === 1 ? " was" : "s were"} excluded because the Prints & Multiples category could not be confirmed.`);
+      }
       const searchTerms = Array.isArray(data?.search_terms_used) ? data.search_terms_used
         : [...new Set(candidates.flatMap((candidate) => Array.isArray(candidate.search_terms) ? candidate.search_terms : []))];
       if (searchTerms.length) parts.push(`LiveArt searches: ${searchTerms.map((term) => `“${term}”`).join(" OR ")}.`);
@@ -1215,7 +1223,7 @@
     const applyAnalysis = (analysis) => {
       hasUnsavedChanges = false;
       currentAnalysis = analysis || null;
-      currentSearchInfo = {search_terms_used: analysis?.search_terms_used, search_summary: analysis?.search_summary, data_units_spent: analysis?.data_units_spent};
+      currentSearchInfo = {search_terms_used: analysis?.search_terms_used, search_summary: analysis?.search_summary, data_units_spent: analysis?.data_units_spent, search_category: analysis?.search_category, excluded_category_count: analysis?.excluded_category_count};
       currentResearchId = "";
       if (analysis) {
         currentCandidates = Array.isArray(analysis.candidates) ? analysis.candidates : [];
@@ -1323,7 +1331,7 @@
         currentResearchId = payload.research_id || "";
         researchRetrievedAt = payload.retrieved_at || "";
         hasResearch = true;
-        currentSearchInfo = {search_terms_used: payload.search_terms_used, search_summary: payload.search_summary, data_units_spent: payload.data_units_spent};
+        currentSearchInfo = {search_terms_used: payload.search_terms_used, search_summary: payload.search_summary, data_units_spent: payload.data_units_spent, search_category: payload.search_category, excluded_category_count: payload.excluded_category_count};
         subjectNeedsChoice = Boolean(payload.requires_subject_choice);
         findButton.hidden = false;
         const subjectMatches = Array.isArray(payload.subject_matches) ? payload.subject_matches : (payload.subject_match ? [payload.subject_match] : []);
@@ -1706,9 +1714,13 @@
     });
     const titleVariantHint = document.createElement("small");
     titleVariantHint.id = `${titleVariantInput.id}-hint`;
-    titleVariantInput.setAttribute("aria-describedby", titleVariantHint.id);
+    const searchScope = document.createElement("strong");
+    searchScope.className = "liveart-search-scope";
+    searchScope.id = `${titleVariantInput.id}-scope`;
+    searchScope.textContent = "Prints & Multiples only";
+    titleVariantInput.setAttribute("aria-describedby", `${searchScope.id} ${titleVariantHint.id}`);
     titleVariantHint.textContent = 'Each word is a separate search; results from any word are combined. Use double quotes for a phrase, such as "Very Gay Nose and Ears". Up to 5 terms or phrases. Leave blank to search the Calendar title.';
-    titleVariantField.append(titleVariantLabel, titleVariantInput, titleVariantHint);
+    titleVariantField.append(titleVariantLabel, titleVariantInput, searchScope, titleVariantHint);
     const recalculateButton = document.createElement("button");
     recalculateButton.type = "button";
     recalculateButton.textContent = "Recalculate";

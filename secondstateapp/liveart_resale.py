@@ -19,6 +19,7 @@ from catalogapp.artprice_artist_links import artist_identity_key
 
 from .artprice_max_bid import ArtpriceAnalysisError, calculate_bid_rows
 from .liveart_client import verify_sold_hammer_usd
+from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID
 
 
 MONEY = Decimal("0.01")
@@ -137,6 +138,27 @@ def _category_id(artwork: Mapping[str, Any]) -> Any:
     category = description.get("category") or artwork.get("category")
     nested_id = category.get("id") if isinstance(category, Mapping) else None
     return description.get("category_id") or artwork.get("category_id") or nested_id
+
+
+def is_prints_and_multiples(raw: Mapping[str, Any]) -> bool:
+    """Require an explicit canonical print category on an artwork or lot.
+
+    Do not infer category from titles, materials or edition numbers. Conflicting
+    category IDs also fail closed, even when the provider accepted our filter.
+    """
+    artwork = raw.get("artwork", raw)
+    if not isinstance(artwork, Mapping):
+        return False
+    identifiers = []
+    for source in (artwork, _description(artwork)):
+        if source.get("category_id") is not None:
+            identifiers.append(source["category_id"])
+        category = source.get("category")
+        if isinstance(category, Mapping) and category.get("id") is not None:
+            identifiers.append(category["id"])
+    return bool(identifiers) and all(
+        _text(identifier) == str(PRINTS_AND_MULTIPLES_CATEGORY_ID) for identifier in identifiers
+    )
 
 
 def _medium(artwork: Mapping[str, Any]) -> str | None:

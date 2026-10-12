@@ -10,6 +10,9 @@ from typing import Any
 MAX_SEARCH_CHARACTERS = 200
 MAX_SEARCH_TERMS = 5
 MAX_SEARCH_LOTS = 20
+# LiveArt /v1/categories, verified 2026-10-12: prints-and-multiples.
+PRINTS_AND_MULTIPLES_CATEGORY_ID = 2
+PRINTS_AND_MULTIPLES_LABEL = "Prints & Multiples"
 
 
 def _term_key(term: str) -> str:

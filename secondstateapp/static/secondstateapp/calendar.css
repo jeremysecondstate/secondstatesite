@@ -1414,6 +1414,12 @@ body:has(.lot-browser[open]) {
   line-height: 1.45;
 }
 
+.liveart-search-scope {
+  color: var(--calendar-gold);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .artprice-analysis-actions {
   display: flex;
   flex-wrap: wrap;

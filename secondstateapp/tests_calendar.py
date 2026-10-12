@@ -164,6 +164,7 @@ def liveart_lot(
     artist="Joan Miró",
     title="Jeune fille aux papillons",
     medium="Lithograph",
+    category_id=2,
     status="sold",
     hammer_usd=1205,
     original_hammer=1205,
@@ -179,6 +180,7 @@ def liveart_lot(
         "sale": {"id": sale_id, "start_datetime": sale_date},
         "artwork": {
             "id": f"artwork-{lot_id}",
+            **({"category_id": category_id} if category_id is not None else {}),
             "name": title,
             "artist_id": artist_id,
             "artist": {"id": artist_id, "name": artist},
@@ -202,6 +204,7 @@ def liveart_artwork(
     artist="Joan Miró",
     title="Jeune fille aux papillons",
     medium="Lithograph",
+    category_id=2,
 ):
     return {
         "id": artwork_id,
@@ -209,6 +212,7 @@ def liveart_artwork(
         "artist": {"id": artist_id, "name": artist},
         "description": {
             "name": title,
+            **({"category_id": category_id} if category_id is not None else {}),
             "artist_id": artist_id,
             "artist": {"id": artist_id, "name": artist},
             "materials": medium,
@@ -1626,6 +1630,7 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
         client.list_artworks.assert_called_once()
         self.assertEqual(client.list_artists.call_args.kwargs["q"], "Joan Miró")
         self.assertEqual(client.list_artworks.call_args.kwargs["search"], self.lot.title)
+        self.assertEqual(client.list_artworks.call_args.kwargs["category_id"], 2)
         self.assertLessEqual(client.list_lots.call_count, 2)
         self.assertLessEqual(
             client.list_artists.call_count + client.list_artworks.call_count + client.list_lots.call_count,
@@ -1634,6 +1639,7 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
         client.similar.assert_not_called()
         for call in client.list_lots.call_args_list:
             self.assertEqual(call.kwargs["status"], "sold")
+            self.assertEqual(call.kwargs["category_id"], 2)
             self.assertLessEqual(call.kwargs["limit"], 10)
             self.assertNotIn("auction_house_id", call.kwargs)
             self.assertNotIn("sale_datetime__gte", call.kwargs)
@@ -2098,7 +2104,7 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
         self.assertEqual(payload["candidates"][0]["hammer_usd"], "3600.00")
         client.list_artists.assert_called_once_with(q="Alexander Calder", limit=3)
         client.list_artworks.assert_called_once_with(
-            artist_id="artist-calder", search=self.lot.title, limit=5,
+            artist_id="artist-calder", search=self.lot.title, category_id=2, limit=5,
         )
 
     def test_research_does_not_accept_unrelated_artist_with_year_in_calendar_name(self):
@@ -2142,7 +2148,7 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["subject_match"]["id"], artwork["id"])
         client.list_artworks.assert_called_once_with(
-            artist_id="artist-calder", search="Very Gay Nose and Ears", limit=5,
+            artist_id="artist-calder", search="Very Gay Nose and Ears", category_id=2, limit=5,
         )
 
     def test_research_verifies_french_title_in_bilingual_liveart_artwork(self):

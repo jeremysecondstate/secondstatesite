@@ -56,6 +56,10 @@ The same normalized sold records feed **Sold comps for resale bids**. USD Artpri
 
 ## LiveArt word and phrase searches
 
+All new LiveArt searches are restricted to **Prints & Multiples**. The server sends `category_id=2` on every artwork and sold-lot lookup, including default-title searches, each alternative term, chosen artwork sale history, and related-work fallbacks. This category was verified against [LiveArt's canonical taxonomy](https://api.liveart.ai/v1/categories) on October 12, 2026; both endpoints support the filter in the [OpenAPI specification](https://api.liveart.ai/openapi.json). Returned records must also explicitly report that category; missing, conflicting, or other categories are excluded without inferring category from a title or medium. The result summary reports any excluded records.
+
+Fresh searches save the category filter with their search summary. Earlier saved LiveArt research remains identifiable as unfiltered and displays a notice to search again; it is not relabeled as Prints & Multiples research. This restriction applies to LiveArt lookups and does not change imported Artprice records.
+
 **LiveArt search terms (optional)** searches each word separately and combines the returned sold records for the Calendar artist. For example, `Boomerangs Stabiles` searches both words. Double quotes keep a title or translation together: `"Very Gay Nose and Ears"`. Commas and semicolons can also separate alternatives. Duplicate terms are searched once. Leave the field blank to use the existing Calendar title and artwork-reference workflow.
 
 Each term search accepts up to five distinct words or phrases, totaling at most 200 characters. It uses one artist lookup and one sold-lot lookup per term, sharing a maximum of 20 returned sale rows across those lookups. The response displays each term's returned count and flags additional available results; refine the terms when a result page is incomplete. Actual metered Data Units are displayed. There is no automatic pagination.
