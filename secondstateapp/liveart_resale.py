@@ -13,7 +13,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from statistics import median
 from typing import Any, Mapping
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from catalogapp.artprice_artist_links import artist_identity_key
 
@@ -50,15 +50,36 @@ def _text(value: Any) -> str:
 
 def _safe_url(value: Any) -> str | None:
     candidate = _text(value)
-    if not candidate or len(candidate) > 2000:
+    if not candidate or len(candidate) > 2000 or any(ord(char) < 32 for char in candidate) or "\\" in candidate:
         return None
     try:
         parsed = urlsplit(candidate)
-        if parsed.scheme.lower() in {"http", "https"} and parsed.hostname and not parsed.username and not parsed.password:
+        if parsed.scheme.lower() in {"http", "https"} and parsed.hostname and not parsed.username and not parsed.password and parsed.port in (None, 80, 443):
             return candidate
     except ValueError:
         pass
     return None
+
+
+def _record_url(value: Any) -> str | None:
+    """Only use a provider-supplied record link, never a house homepage."""
+    candidate = _safe_url(value)
+    if not candidate:
+        return None
+    parsed = urlsplit(candidate)
+    return candidate if parsed.path.strip("/") else None
+
+
+def _artwork_record_url(raw: Mapping[str, Any]) -> str | None:
+    """The documented exact artwork filter uses uid, not numeric id.
+
+    OpenAPI at https://api.liveart.ai/openapi.json, verified 2026-10-12.
+    This record URL contains no API credential and incurs no lookup here.
+    """
+    uid = raw.get("uid")
+    if not isinstance(uid, str) or not uid.strip() or len(uid) > 200:
+        return None
+    return "https://api.liveart.ai/v1/artworks?" + urlencode({"uid": uid.strip(), "limit": 1})
 
 
 def _key(value: Any) -> str:
@@ -215,7 +236,9 @@ def _subject_fields(raw: Mapping[str, Any]) -> dict[str, Any]:
         "lot": _text(raw.get("lot_num")),
         "artist": _artist(raw),
         "title": _text(_description(artwork).get("name") or artwork.get("name")),
-        "lot_url": _safe_url(raw.get("lot_url")),
+        "lot_url": _record_url(raw.get("lot_url")),
+        "sale_url": _record_url(sale.get("auction_url")),
+        "location": _text(sale.get("location")) or None,
         "medium": _medium(artwork),
         "edition": _artwork_edition(artwork, notes),
         "signature": _signature(evidence),
@@ -297,7 +320,7 @@ def artwork_matches(
             "can_choose": artist_matches and (title_matches or variant_matches),
             "missing_data": missing,
             "match_notes": notes,
-            "provider_url": f"https://api.liveart.ai/v1/artworks?id={artwork_id}&limit=1" if artwork_id.isdecimal() else None,
+            "provider_url": _artwork_record_url(raw),
         }
         options.append(option)
     return sorted(options, key=lambda item: (-int(item["verified"]), -item["score"], item["id"]))
@@ -553,7 +576,9 @@ def normalize_candidate(raw: Mapping[str, Any], subject: Mapping[str, Any] | Non
         # The documented exact-ID filter gives a stable provider record URL.
         # It exposes only the public response in a browser; never a key.
         "provider_url": f"https://api.liveart.ai/v1/lots?id={candidate_id}&limit=1" if candidate_id.isdecimal() else None,
-        "lot_url": _safe_url(raw.get("lot_url")),
+        "lot_url": _record_url(raw.get("lot_url")),
+        "sale_url": _record_url(_sale(raw).get("auction_url")),
+        "location": _text(_sale(raw).get("location")) or None,
         "sale_id": raw.get("sale_id") or _sale(raw).get("id"),
         "artwork_id": candidate_artwork_id,
         "artist_id": candidate_artist_id,

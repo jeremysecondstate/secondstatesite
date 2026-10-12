@@ -3,7 +3,8 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012">
+  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=archive-20261012">
 {% endblock %}
 
 {% block main_class %}calendar-page-shell{% endblock %}
@@ -84,7 +85,7 @@
     <span>View day as</span>
     <button id="calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="true">Calendar</button>
     <button id="catalog-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Gallery Catalog</button>
-    <button id="research-view-toggle" type="button" aria-controls="day-research-workspace" aria-pressed="false">Research Concepts</button>
+    <button id="research-view-toggle" type="button" aria-controls="day-research-workspace" aria-pressed="false">Archive Research</button>
   </div>
 
   <div id="calendar-layout" class="calendar-layout">
@@ -221,33 +222,35 @@
   <section id="day-research-workspace" class="research-workspace" data-look="dossier" aria-labelledby="research-workspace-title" hidden>
     <header class="research-workspace-header">
       <div class="research-workspace-heading">
-        <button id="research-back-to-gallery" class="research-back" type="button">← Back to calendar views</button>
-        <p class="calendar-kicker">Calendar / Private lot research</p>
+        <p class="calendar-kicker">SECONDSTATE / ARCHIVE RESEARCH</p>
         <h2 id="research-workspace-title" tabindex="-1">Research workspace</h2>
         <p id="research-workspace-subtitle">Choose a watched lot to begin.</p>
       </div>
       <div class="research-workspace-navigation" aria-label="Research lot navigation">
+        <button id="research-back-to-gallery" class="research-back" type="button">← Calendar views</button>
+        <label class="research-day-label" for="research-day-select">Watched day</label>
+        <select id="research-day-select" aria-label="Choose watched day"></select>
         <a class="research-tray-link" href="{% url 'auction_email_tray' %}">Email Tray · <span data-email-tray-count>{{ email_selected_count }}</span></a>
         <span id="research-workspace-count" aria-live="polite"></span>
         <button id="research-previous" type="button" aria-label="Previous research lot">← Previous</button>
         <button id="research-next" type="button" aria-label="Next research lot">Next →</button>
       </div>
     </header>
-    <div class="research-concept-switch" role="group" aria-label="Compare research workspace layouts">
-      <span>Compare three looks</span>
-      <button type="button" data-research-look="dossier" aria-pressed="true"><strong>01 · Gallery Dossier</strong><small>Artwork first, research below</small></button>
-      <button type="button" data-research-look="workbench" aria-pressed="false"><strong>02 · Day Workbench</strong><small>Fast lot-to-lot review</small></button>
-      <button type="button" data-research-look="bidboard" aria-pressed="false"><strong>03 · Bid Board</strong><small>Decision and scenarios first</small></button>
+    <div class="research-concept-switch" role="group" aria-label="Archive research stages">
+      <button type="button" data-research-look="dossier" aria-pressed="true"><strong>01 · Gallery Dossier</strong><small>Inspect the work &amp; collect sources</small></button>
+      <button type="button" data-research-look="workbench" aria-pressed="false"><strong>02 · Day Workbench</strong><small>Find sales &amp; select evidence</small></button>
+      <button type="button" data-research-look="bidboard" aria-pressed="false"><strong>03 · Bid Board</strong><small>Compare bids &amp; resale outcomes</small></button>
     </div>
     <div class="research-workspace-body">
-      <aside class="research-lot-rail" aria-label="Lots on the selected day">
+      <details class="research-lot-rail" aria-label="Lots on the selected day">
+        <summary>Browse the day's lots</summary>
         <div class="research-rail-heading">
           <div><span class="calendar-kicker">Day's lots</span><strong id="research-rail-total"></strong></div>
           <label for="research-lot-search">Find a lot</label>
           <input id="research-lot-search" type="search" placeholder="Artist, title, or house" autocomplete="off">
         </div>
         <div id="research-lot-list" class="research-lot-list"></div>
-      </aside>
+      </details>
       <div class="research-stage">
         <article id="research-lot-card" class="research-lot-card"></article>
       </div>
@@ -303,6 +306,7 @@
 
 {{ calendar_data|json_script:"auction-calendar-data" }}
 {{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
+<script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=archive-20261012"></script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
@@ -340,6 +344,7 @@
   const researchPrevious = document.getElementById("research-previous");
   const researchNext = document.getElementById("research-next");
   const researchBack = document.getElementById("research-back-to-gallery");
+  const researchDaySelect = document.getElementById("research-day-select");
   const researchSearch = document.getElementById("research-lot-search");
   const researchLotList = document.getElementById("research-lot-list");
   const researchRailTotal = document.getElementById("research-rail-total");
@@ -409,17 +414,31 @@
   const liveartAnalysisInstances = new Map();
   const liveartAnalysisCache = new Map();
   const liveartTitleVariants = new Map();
+  const researchLotCache = new Map();
+  const researchDaySelection = new Map();
+  const archiveDraftKey = (lotId, kind) => `archive:{{ request.user.pk|default:'staff' }}:${lotId}:${kind}`;
+  const readDraft = (lotId, kind) => {
+    try { return JSON.parse(sessionStorage.getItem(archiveDraftKey(lotId, kind)) || "null"); }
+    catch (_error) { return null; }
+  };
+  const writeDraft = (lotId, kind, value) => {
+    try {
+      if (value === null) sessionStorage.removeItem(archiveDraftKey(lotId, kind));
+      else sessionStorage.setItem(archiveDraftKey(lotId, kind), JSON.stringify(value));
+    } catch (_error) { /* In-memory controls still preserve work when storage is unavailable. */ }
+  };
+  const retainLotInstance = (instance) => instance.node.isConnected || instance.node.closest("[data-archive-cached-lot]");
 
   const registerLotInstance = (registry, lotId, node, applyState) => {
     const key = String(lotId);
-    const connected = (registry.get(key) || []).filter((instance) => instance.node.isConnected);
+    const connected = (registry.get(key) || []).filter(retainLotInstance);
     connected.push({node, applyState});
     registry.set(key, connected);
   };
 
   const syncLotInstances = (registry, lotId, value) => {
     const key = String(lotId);
-    const connected = (registry.get(key) || []).filter((instance) => instance.node.isConnected);
+    const connected = (registry.get(key) || []).filter(retainLotInstance);
     connected.forEach((instance) => instance.applyState(value));
     registry.set(key, connected);
   };
@@ -530,7 +549,7 @@
     input.inputMode = "url";
     input.autocomplete = "url";
     input.placeholder = "Paste artprice.com link";
-    input.value = lot.artprice_url || "";
+    input.value = options.idPrefix === "research" ? (readDraft(lot.id, "url") ?? lot.artprice_url ?? "") : (lot.artprice_url || "");
     input.setAttribute("aria-describedby", statusId);
 
     const saveButton = document.createElement("button");
@@ -630,6 +649,7 @@
     });
 
     input.addEventListener("input", () => {
+      if (options.idPrefix === "research") writeDraft(lot.id, "url", input.value);
       input.setCustomValidity("");
       status.textContent = "";
       status.classList.remove("is-error", "is-success");
@@ -674,6 +694,7 @@
         }
 
         lot.artprice_url = payload.artprice_url;
+        writeDraft(lot.id, "url", null);
         lot.email_tray_selected = Boolean(payload.email_tray_selected);
         syncLotInstances(artpriceEditorInstances, lot.id, lot);
         updateEmailTrayCount(Number(payload.selected_count) || 0);
@@ -709,7 +730,7 @@
     section.setAttribute("aria-label", "Combined resale comparables");
     const heading = document.createElement("h4");
     heading.className = "resale-source-heading";
-    heading.textContent = "Sold comps for resale bids";
+    heading.textContent = options.workspace ? "Sales & comparable works" : "Sold comps for resale bids";
     const intro = document.createElement("p");
     intro.className = "artprice-analysis-intro";
     intro.textContent = "USD sales with a matching named artist from saved Artprice HTML are preselected for resale bids, up to the 25 sale limit. Review the records below and uncheck any sale you want to exclude; then save to recalculate. LiveArt term searches combine up to 5 words or quoted phrases and retrieve up to 20 sold records in total. Review and select the relevant sales before saving.";
@@ -817,6 +838,21 @@
     let currentSearchInfo = {};
     let pendingSourceRefresh = false;
     let sourceRefreshVersion = 0;
+    let localRevision = 0;
+    const candidatePages = new Map();
+    let draftRestored = false;
+    let draftRestoreNotice = "";
+    const saveDraft = () => {
+      if (!options.workspace || !hasUnsavedChanges) return;
+      writeDraft(lot.id, "evidence", {
+        baseUpdatedAt: currentAnalysis?.updated_at || "",
+        candidates: currentCandidates, selectedIds: [...selectedIds],
+        researchId: currentResearchId, retrievedAt: researchRetrievedAt,
+        hasResearch, subjectNeedsChoice, subjectMatches: currentSubjectMatches,
+        searchInfo: currentSearchInfo,
+        costs: Object.fromEntries(costDefinitions.map(([name]) => [name, costFields[name].value])),
+      });
+    };
 
     const isArtpriceCandidate = (candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html";
     const candidateSelectionKey = (candidate) => isArtpriceCandidate(candidate)
@@ -855,7 +891,7 @@
       return parts.join(" ");
     };
     const setStatus = (message = "", tone = "") => {
-      status.textContent = message;
+      status.textContent = message || draftRestoreNotice;
       status.className = "artprice-analysis-status";
       if (tone) status.classList.add(`is-${tone}`);
     };
@@ -916,7 +952,7 @@
         if (candidate.match_type === "exact_work" || candidate.match_type === "related_work") {
           const relationship = document.createElement("span");
           relationship.className = `liveart-work-type is-${candidate.match_type}`;
-          relationship.textContent = candidate.match_type === "exact_work" ? "This work"
+          relationship.textContent = candidate.match_type === "exact_work" ? "Artwork reference"
             : candidate.search_terms?.length ? "Search result" : "Similar work";
           top.appendChild(relationship);
         }
@@ -950,7 +986,10 @@
       if (selectable || house || date || lotNumber) {
         const sale = document.createElement("p");
         sale.className = "liveart-sale-line";
-        sale.textContent = [house, date, lotNumber ? `Lot ${lotNumber}` : ""].filter(Boolean).join(" · ") || "Sale details not reported";
+        const houseLink = house ? providerLink(candidate.lot_url || candidate.sale_url, house) : null;
+        if (houseLink) sale.appendChild(houseLink);
+        else sale.append(document.createTextNode(house || "Auction house not reported"));
+        sale.append(document.createTextNode([date, lotNumber ? `Lot ${lotNumber}` : ""].filter(Boolean).map((value) => ` · ${value}`).join("")));
         card.appendChild(sale);
       }
       if (!selectable) {
@@ -1006,6 +1045,7 @@
       appendFact(facts, "Sale date", date);
       appendFact(facts, "Auction house", house);
       appendFact(facts, "Lot number", lotNumber);
+      appendFact(facts, "Location", candidate.location);
       appendFact(facts, "Edition", candidate.edition);
       appendFact(facts, "Medium", candidate.medium);
       appendFact(facts, "Signature", candidate.signature);
@@ -1064,6 +1104,17 @@
       missingNote.className = "liveart-missing-data";
       missingNote.textContent = `Missing data: ${missing.length ? missing.join(", ") : "None flagged"}`;
       card.appendChild(missingNote);
+      if (options.workspace) {
+        const detail = document.createElement("details");
+        detail.className = "archive-sale-detail";
+        const detailSummary = document.createElement("summary");
+        detailSummary.textContent = "Artwork, edition & source details";
+        detail.appendChild(detailSummary);
+        Array.from(card.children).forEach((child) => {
+          if (!child.matches(".liveart-candidate-top, h5, .liveart-sale-line, .liveart-price-line")) detail.appendChild(child);
+        });
+        card.appendChild(detail);
+      }
       return card;
     };
     const renderCandidates = (subjectMatches = []) => {
@@ -1100,7 +1151,7 @@
         candidateResults.appendChild(note);
       }
       const groups = [
-        ["exact_work", "Sales of this work", "An artwork ID can cover different print impressions. Check edition, signature, size, and condition for each sale."],
+        ["exact_work", "Exact artwork references", "An artwork reference does not establish an identical impression, edition, dimensions, signature, or condition. Check each sale before including it."],
         ["related_work", currentCandidates.some((candidate) => candidate.search_terms?.length) ? "LiveArt term search results" : "Similar sold works", "Compare the medium, edition, signature, size, and condition before selecting a sale."],
         ["artprice_html", "Saved Artprice HTML sales", "These sold records combine your saved HTML files. Overlapping sales count once. Review each date, price, source file, and missing detail."],
         ["other", "Other candidate sold results", "Review the artwork identity and sale details before selecting a sale."],
@@ -1114,7 +1165,7 @@
           const group = document.createElement("details");
           group.className = "research-candidate-group";
           group.dataset.group = type;
-          group.open = openGroupKeys.has(type);
+          group.open = openGroupKeys.has(type) || !candidateResults.dataset.initialized;
           const summary = document.createElement("summary");
           const selectedCount = items.filter((candidate) => selectedIds.has(String(candidate.id))).length;
           summary.textContent = `${label} (${items.length})${selectedCount ? ` · ${selectedCount} selected` : ""}`;
@@ -1124,7 +1175,29 @@
           note.className = "liveart-group-note";
           note.textContent = explanation;
           body.appendChild(note);
-          items.forEach((candidate) => body.appendChild(renderCandidateCard(candidate, true)));
+          const pageSize = 10;
+          const page = Math.min(candidatePages.get(type) || 0, Math.floor((items.length - 1) / pageSize));
+          items.slice(page * pageSize, (page + 1) * pageSize).forEach((candidate) => body.appendChild(renderCandidateCard(candidate, true)));
+          if (items.length > pageSize) {
+            const pagination = document.createElement("div");
+            pagination.className = "archive-sales-pagination";
+            appendText(pagination, "span", "", `${page * pageSize + 1}–${Math.min((page + 1) * pageSize, items.length)} of ${items.length} sales`);
+            [["Previous sales", -1], ["Next sales", 1]].forEach(([text, direction]) => {
+              const control = document.createElement("button");
+              control.type = "button";
+              control.textContent = text;
+              control.disabled = direction < 0 ? page === 0 : (page + 1) * pageSize >= items.length;
+              control.addEventListener("click", () => {
+                candidatePages.set(type, page + direction);
+                renderCandidates(currentSubjectMatches);
+                const refreshedGroup = candidateResults.querySelector(`[data-group="${type}"]`);
+                refreshedGroup?.querySelector("summary")?.focus();
+                refreshedGroup?.scrollIntoView({block: "start", behavior: "auto"});
+              });
+              pagination.appendChild(control);
+            });
+            body.appendChild(pagination);
+          }
           group.append(summary, body);
           candidateResults.appendChild(group);
           return;
@@ -1138,6 +1211,7 @@
         candidateResults.appendChild(note);
         items.forEach((candidate) => candidateResults.appendChild(renderCandidateCard(candidate, true)));
       });
+      candidateResults.dataset.initialized = "true";
     };
     const addResultItem = (parent, label, value) => {
       const item = document.createElement("div");
@@ -1180,6 +1254,7 @@
         addResultItem(summary, "Artprice analyzed", formatAnalysisTimestamp(sourceSummary.artprice_analysis_updated_at || currentAnalysis.retrieved_at));
       }
       savedResults.append(heading, ingestionNote, summary);
+      if (options.workspace) return;
       if (Array.isArray(sourceSummary.artprice_sources) && sourceSummary.artprice_sources.length > 1) {
         const fileBreakdown = document.createElement("ul");
         fileBreakdown.className = "liveart-source-breakdown";
@@ -1300,12 +1375,20 @@
     };
     const markAnalysisPending = (message = "Comp selections or costs changed. Save the resale bid analysis to recalculate the estimates.") => {
       hasUnsavedChanges = true;
+      localRevision += 1;
       options.onScenarioSummary?.(null);
       savedResults.replaceChildren();
       const pending = document.createElement("p");
       pending.className = "artprice-analysis-empty";
       pending.textContent = message;
       savedResults.appendChild(pending);
+      saveDraft();
+      candidateResults.querySelectorAll(".research-candidate-group").forEach((group) => {
+        const items = currentCandidates.filter((candidate) => candidate.match_type === group.dataset.group);
+        const count = items.filter((candidate) => selectedIds.has(String(candidate.id))).length;
+        const label = group.querySelector("summary");
+        label.textContent = label.textContent.replace(/ · \d+ selected$/, "") + (count ? ` · ${count} selected` : "");
+      });
     };
     costDefinitions.forEach(([name]) => {
       costFields[name].addEventListener("input", () => markAnalysisPending());
@@ -1319,7 +1402,7 @@
     const updateButtons = () => {
       saveButton.disabled = busy || Boolean(options.isParentBusy?.()) || pendingSourceRefresh || (!hasResearch && !currentAnalysis);
       deleteButton.hidden = !currentAnalysis || currentAnalysis.saved === false;
-      saveButton.textContent = currentAnalysis && currentAnalysis.saved !== false ? "Update resale bid analysis" : "Save resale bid analysis";
+      saveButton.textContent = options.workspace ? "Save selected evidence" : currentAnalysis && currentAnalysis.saved !== false ? "Update resale bid analysis" : "Save resale bid analysis";
     };
     const syncBusyControls = () => {
       const disabled = busy || Boolean(options.isParentBusy?.());
@@ -1347,6 +1430,7 @@
     };
     const applyAnalysis = (analysis) => {
       hasUnsavedChanges = false;
+      draftRestoreNotice = "";
       currentAnalysis = analysis || null;
       currentSearchInfo = {search_terms_used: analysis?.search_terms_used, search_summary: analysis?.search_summary, data_units_spent: analysis?.data_units_spent, search_category: analysis?.search_category, excluded_category_count: analysis?.excluded_category_count};
       currentResearchId = "";
@@ -1370,7 +1454,35 @@
         candidateResults.replaceChildren();
       }
       populateAssumptions(analysis);
+      if (options.workspace && !draftRestored) {
+        draftRestored = true;
+        const draft = readDraft(lot.id, "evidence");
+        if (draft && Array.isArray(draft.candidates)) {
+          const sameBaseline = draft.baseUpdatedAt === (analysis?.updated_at || "");
+          const draftIds = new Set((draft.selectedIds || []).map(String));
+          const selectedKeys = new Set(draft.candidates.filter((candidate) => draftIds.has(String(candidate.id))).map(candidateSelectionKey));
+          const previousArtprice = new Set(draft.candidates.filter(isArtpriceCandidate).map(candidateSelectionKey));
+          const currentArtprice = currentCandidates.filter(isArtpriceCandidate);
+          if (sameBaseline || draft.researchId) currentCandidates = [...draft.candidates.filter((candidate) => !isArtpriceCandidate(candidate)), ...currentArtprice];
+          selectedIds = new Set(currentCandidates.filter((candidate) => candidate.credible && candidate.hammer_usd != null && selectedKeys.has(candidateSelectionKey(candidate))).map((candidate) => String(candidate.id)));
+          currentArtprice.forEach((candidate) => {
+            if (selectedIds.size < 25 && candidate.selected && !previousArtprice.has(candidateSelectionKey(candidate))) selectedIds.add(String(candidate.id));
+          });
+          currentResearchId = draft.researchId || "";
+          researchRetrievedAt = draft.retrievedAt || "";
+          hasResearch = Boolean(draft.hasResearch);
+          subjectNeedsChoice = Boolean(draft.subjectNeedsChoice);
+          currentSearchInfo = draft.searchInfo || {};
+          currentSubjectMatches = draft.subjectMatches || [];
+          costDefinitions.forEach(([name]) => { if (draft.costs?.[name] !== undefined) costFields[name].value = draft.costs[name]; });
+          hasUnsavedChanges = true;
+          sourceMeta.textContent = describeSources({...currentSearchInfo, candidates: currentCandidates}, false);
+          renderCandidates(currentSubjectMatches);
+          if (!sameBaseline) draftRestoreNotice = "Saved evidence changed while this tab had a draft. Your pending choices are retained for available records; review them before saving.";
+        }
+      }
       renderAnalysis();
+      if (hasUnsavedChanges) markAnalysisPending("Unsaved evidence selections and costs restored from this browser tab. Save them to keep the analysis across sessions.");
       updateButtons();
       if (options.onSavedChange) options.onSavedChange(Boolean(analysis && analysis.saved !== false));
     };
@@ -1475,7 +1587,7 @@
     const find = async () => {
       await load();
       if (!loaded) return;
-      section.scrollIntoView({block: "nearest", behavior: "smooth"});
+      section.scrollIntoView({block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
       performResearch();
     };
     findButton.addEventListener("click", find);
@@ -1509,6 +1621,7 @@
         }, "The resale bid analysis could not be saved.");
         currentResearchId = "";
         hasUnsavedChanges = false;
+        writeDraft(lot.id, "evidence", null);
         if (pendingSourceRefresh) {
           liveartAnalysisCache.delete(String(lot.id));
           refreshQueued = true;
@@ -1536,6 +1649,7 @@
           body: JSON.stringify({action: "delete"}),
         }, "The resale bid analysis could not be removed.");
         liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
+        writeDraft(lot.id, "evidence", null);
         syncLotInstances(liveartAnalysisInstances, lot.id, payload.analysis || null);
         setStatus(payload.message || "Resale bid analysis removed.", "success");
         await refresh();
@@ -1621,6 +1735,29 @@
       find,
       refresh,
       syncBusyControls,
+      getEvidence: () => ({
+        selected_ids: [...selectedIds], research_id: currentResearchId,
+        candidates: currentCandidates, analysis: currentAnalysis,
+        assumptions: Object.fromEntries(costDefinitions.map(([name]) => [name, costFields[name].value])),
+        has_unsaved_changes: hasUnsavedChanges,
+        local_revision: localRevision,
+      }),
+      onBoardSaved: async (_board, evidence) => {
+        const payload = await requestAnalysisJson(lot.liveart_analysis_url, {
+          method: "GET", credentials: "same-origin", headers: {"X-Requested-With": "XMLHttpRequest"},
+        }, "Bid Board was saved, but the evidence list could not refresh. Reload to see the saved selection.");
+        liveartAnalysisCache.set(String(lot.id), payload.analysis || null);
+        if (evidence?.local_revision === localRevision) {
+          writeDraft(lot.id, "evidence", null);
+          syncLotInstances(liveartAnalysisInstances, lot.id, payload.analysis || null);
+        } else {
+          currentAnalysis = payload.analysis || null;
+          saveDraft();
+          (liveartAnalysisInstances.get(String(lot.id)) || []).filter((instance) => instance.node !== section && retainLotInstance(instance))
+            .forEach((instance) => instance.applyState(payload.analysis || null));
+        }
+        return {preservedDraft: evidence?.local_revision !== localRevision};
+      },
     };
   };
 
@@ -1821,12 +1958,13 @@
     titleVariantInput.type = "text";
     titleVariantInput.maxLength = 200;
     titleVariantInput.autocomplete = "off";
-    titleVariantInput.placeholder = 'Boomerangs Stabiles or "Very Gay Nose and Ears"';
-    titleVariantInput.value = liveartTitleVariants.get(String(lot.id)) || "";
+    titleVariantInput.placeholder = 'Words or "a grouped title"';
+    titleVariantInput.value = liveartTitleVariants.get(String(lot.id)) || readDraft(lot.id, "query") || "";
     titleVariantInput.dataset.liveartTitleVariantLot = String(lot.id);
     titleVariantInput.addEventListener("input", () => {
       titleVariantInput.setCustomValidity("");
       liveartTitleVariants.set(String(lot.id), titleVariantInput.value);
+      writeDraft(lot.id, "query", titleVariantInput.value);
       document.querySelectorAll("[data-liveart-title-variant-lot]").forEach((other) => {
         if (other !== titleVariantInput && other.dataset.liveartTitleVariantLot === String(lot.id)) {
           other.value = titleVariantInput.value;
@@ -1846,8 +1984,59 @@
     searchScope.id = `${titleVariantInput.id}-scope`;
     searchScope.textContent = "Prints & Multiples only";
     titleVariantInput.setAttribute("aria-describedby", `${searchScope.id} ${titleVariantHint.id}`);
-    titleVariantHint.textContent = 'Each word is a separate search; results from any word are combined. Use double quotes for a phrase, such as "Very Gay Nose and Ears". Up to 5 terms or phrases. Leave blank to search the Calendar title.';
+    titleVariantHint.textContent = 'Each word is a separate search; results from alternatives are combined. Double quotes group a phrase but do not guarantee exact matching. Up to 5 terms or phrases. Leave blank to use the Calendar title and artwork-reference search.';
     titleVariantField.append(titleVariantLabel, titleVariantInput, searchScope, titleVariantHint);
+    if (options.workspace) {
+      const tools = document.createElement("div");
+      tools.className = "archive-search-tools";
+      [["Calendar title", ""], ["Grouped title", `"${String(lot.title || "").replace(/[“”"]/g, "").slice(0, 198)}"`]].forEach(([label, query]) => {
+        const preset = document.createElement("button");
+        preset.type = "button";
+        preset.textContent = label;
+        preset.addEventListener("click", () => {
+          titleVariantInput.value = query;
+          titleVariantInput.dispatchEvent(new Event("input"));
+          titleVariantInput.focus();
+        });
+        tools.appendChild(preset);
+      });
+      const parsed = document.createElement("p");
+      parsed.className = "archive-query-preview";
+      parsed.setAttribute("aria-live", "polite");
+      const previewQuery = () => {
+        const value = titleVariantInput.value.replace(/[“”]/g, '"').trim();
+        if (!value) { parsed.textContent = "Will search the Calendar title and offer artwork references. Search runs only when you choose Find LiveArt sales."; return; }
+        const tokens = []; const seen = new Set(); let token = ""; let quoted = false; let closed = false; let invalid = "";
+        const append = () => {
+          const term = token.trim().replace(/\s+/g, " "); token = "";
+          if (!/[\p{L}\p{N}]/u.test(term)) { invalid = "Enter a word or phrase between separators."; return; }
+          const key = term.normalize("NFKD").toLocaleLowerCase().replace(/\p{M}/gu, "").replace(/’/g, "'");
+          if (!seen.has(key)) { tokens.push(term); seen.add(key); }
+        };
+        for (const char of value) {
+          if (char === '"') {
+            if (quoted) { append(); quoted = false; closed = true; }
+            else { if (token || closed) invalid = "Separate quoted phrases with a space, comma, or semicolon."; quoted = true; }
+          } else if (quoted) token += char;
+          else if (/[\s,;]/.test(char)) { if (token) append(); closed = false; }
+          else { if (closed) invalid = "Separate quoted phrases with a space, comma, or semicolon."; token += char; }
+        }
+        if (quoted) invalid = "Close each grouped phrase with a double quote.";
+        if (token) append();
+        if (tokens.length > 5) invalid = "Use at most 5 different words or grouped phrases.";
+        parsed.textContent = invalid || `Will combine ${tokens.length} alternative search${tokens.length === 1 ? "" : "es"}: ${tokens.map((term) => `“${term}”`).join(" · ")}`;
+      };
+      titleVariantInput.addEventListener("input", previewQuery);
+      previewQuery();
+      const help = document.createElement("details");
+      help.className = "archive-search-help";
+      const helpSummary = document.createElement("summary");
+      helpSummary.textContent = "Search help & usage";
+      const helpCopy = document.createElement("p");
+      helpCopy.textContent = 'Words, comma-separated alternatives, and quoted groups are supported. LiveArt may match catalogue text as well as titles; Google-style operators such as site:, exclusions, and exact-phrase guarantees are not supported. Each explicit search uses one artist lookup and one sold-lot lookup per term, with up to 20 returned records in total. Actual metered Data Units appear with the results. Presets and stage changes do not run searches.';
+      help.append(helpSummary, helpCopy);
+      titleVariantField.append(tools, parsed, help);
+    }
     const recalculateButton = document.createElement("button");
     recalculateButton.type = "button";
     recalculateButton.textContent = "Recalculate";
@@ -1904,12 +2093,16 @@
       sourcePanel.className = "research-source-panel";
       sourcePanel.id = `${idPrefix}research-sources-${lot.id}`;
       sourcePanel.setAttribute("role", "tabpanel");
-      const sourceResults = document.createElement("details");
+      const sourceResults = document.createElement("section");
       sourceResults.className = "research-source-results";
-      const sourceResultsSummary = document.createElement("summary");
-      sourceResultsSummary.textContent = "View saved Artprice analysis and full tables";
+      const sourceResultsSummary = document.createElement("h4");
+      sourceResultsSummary.textContent = "Source ledger";
       sourceResults.append(sourceResultsSummary, results);
-      sourcePanel.append(intro, artpriceHeading, form, status, sourceResults);
+      intro.textContent = "Save related Artprice HTML sources for this lot. Extracted records remain linked to their files; overlapping sales are counted once. Uploaded scripts are never run.";
+      sourcePanel.append(artpriceHeading, intro, form, status);
+      (options.sourceLedgerTarget || sourcePanel).appendChild(sourceResults);
+      advanced.hidden = true;
+      recalculateButton.hidden = true;
 
       const liveartSection = panel.querySelector(".liveart-analysis");
       const liveartChildren = Array.from(liveartSection.children);
@@ -1920,13 +2113,32 @@
       const liveartSearch = document.createElement("div");
       liveartSearch.className = "research-liveart-search";
       liveartSearch.append(titleVariantField, researchButton);
-      compsPanel.append(liveartSearch, ...liveartChildren.slice(0, 8));
+      const compsHeader = document.createElement("div");
+      compsHeader.className = "archive-panel-heading";
+      appendText(compsHeader, "span", "calendar-kicker", "02 / EVIDENCE");
+      appendText(compsHeader, "h3", "", "Sales & comparable works");
+      appendText(compsHeader, "p", "", "Select eligible sold USD hammer evidence. Up to 25 unique sales across Artprice and LiveArt.");
+      compsPanel.append(compsHeader, liveartSearch, ...liveartChildren.slice(3, 8), liveartChildren[9]);
+      liveartChildren[9].querySelector(".is-primary").textContent = "Save selected evidence";
+      const evidenceSummary = document.createElement("details");
+      evidenceSummary.className = "archive-evidence-summary";
+      const evidenceSummaryLabel = document.createElement("summary");
+      evidenceSummaryLabel.textContent = "Saved evidence & source counts";
+      evidenceSummary.append(evidenceSummaryLabel, liveartChildren[10]);
+      compsPanel.appendChild(evidenceSummary);
       const bidsPanel = document.createElement("div");
       bidsPanel.className = "research-bids-panel";
       bidsPanel.id = `${idPrefix}research-bids-${lot.id}`;
       bidsPanel.setAttribute("role", "tabpanel");
-      bidsPanel.append(...liveartChildren.slice(8));
-      liveartSection.append(compsPanel, bidsPanel);
+      let bidBoard = null;
+      if (window.ArchiveBidBoard) bidBoard = window.ArchiveBidBoard.mount(bidsPanel, {
+        lot, csrfToken,
+        draftKey: archiveDraftKey(lot.id, "board"),
+        getEvidence: async () => { await liveart.load(); return liveart.getEvidence(); },
+        onSaved: liveart.onBoardSaved,
+      });
+      else appendText(bidsPanel, "p", "artprice-analysis-empty", "Bid Board could not load. Refresh this page to try again.");
+      liveartSection.replaceChildren(compsPanel, bidsPanel);
 
       const tabs = document.createElement("div");
       tabs.className = "research-tabs";
@@ -1958,6 +2170,7 @@
           buttons[key].setAttribute("aria-selected", String(selected));
           buttons[key].tabIndex = selected ? 0 : -1;
         });
+        if (researchTab === "bids") bidBoard?.refresh?.();
       };
       tabs.addEventListener("keydown", (event) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -1971,6 +2184,7 @@
         buttons[researchTab].focus();
       });
       panel.replaceChildren(tabs, sourcePanel, liveartSection);
+      item.activateArchiveStage = activateTab;
       activateTab();
     }
     details.append(summary, panel);
@@ -2008,7 +2222,7 @@
     const updateActionState = () => {
       const hasAnalysis = Boolean(currentAnalysis);
       analyzeButton.textContent = "Add HTML files";
-      recalculateButton.hidden = !hasAnalysis;
+      recalculateButton.hidden = options.workspace || !hasAnalysis;
       deleteButton.hidden = !hasAnalysis;
       updateSummaryBadge();
       lot.has_artprice_analysis = hasAnalysis;
@@ -2045,6 +2259,73 @@
       return cell;
     };
 
+    const renderSourceLedger = (analysis) => {
+      const records = Array.isArray(analysis.comparables) ? analysis.comparables : [];
+      const sources = Array.isArray(analysis.source_ledger) ? analysis.source_ledger : Array.isArray(analysis.sources) ? analysis.sources : [];
+      appendText(results, "p", "archive-ledger-note", `${sources.length} saved file${sources.length === 1 ? "" : "s"} · ${records.length} unique sold record${records.length === 1 ? "" : "s"} · ${analysis.duplicate_records_count || 0} overlapping records counted once. A shared sale is visible under each contributing file.`);
+      sources.forEach((source, index) => {
+        const group = document.createElement("details");
+        group.className = "archive-source-file";
+        const summary = document.createElement("summary");
+        const copy = document.createElement("span");
+        appendText(copy, "strong", "", `${String(index + 1).padStart(2, "0")} · ${source.filename}`);
+        appendText(copy, "small", "", `${source.sold_records_count ?? "—"} sold records · Added ${formatAnalysisTimestamp(source.uploaded_at)}`);
+        summary.appendChild(copy);
+        group.appendChild(summary);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "archive-source-remove";
+        remove.textContent = "Remove this file";
+        remove.setAttribute("aria-label", `Remove ${source.filename}`);
+        remove.addEventListener("click", () => {
+          if (busy) return;
+          const formData = new FormData();
+          formData.append("action", "remove_source");
+          formData.append("source_id", source.id);
+          postAnalysis("remove_source", formData, `Removing ${source.filename}…`, "The Artprice file could not be removed.");
+        });
+        group.appendChild(remove);
+        const sourceRecords = Array.isArray(source.comparables) ? source.comparables : records.filter((record) => (record.source_ids || []).map(String).includes(String(source.id))
+          || (record.source_filenames || []).includes(source.filename) || sources.length === 1);
+        sourceRecords.forEach((record) => {
+          const sale = document.createElement("article");
+          sale.className = "archive-source-record";
+          const heading = document.createElement("div");
+          heading.className = "archive-record-heading";
+          const identity = document.createElement("div");
+          appendText(identity, "span", "calendar-kicker", record.artist || "Artist not reported");
+          appendText(identity, "h5", "", record.title || "Artwork not reported");
+          appendText(identity, "p", "", [record.auction_house || "Auction house not reported", record.sale_date || "Date not reported"].join(" · "));
+          const price = document.createElement("div");
+          appendText(price, "small", "", "Sold hammer");
+          appendText(price, "strong", "", formatAnalysisMoney(record.hammer_price, record.currency || analysis.currency));
+          appendText(price, "small", "", record.currency || analysis.currency || "Currency not reported");
+          heading.append(identity, price);
+          const facts = document.createElement("dl");
+          facts.className = "archive-record-facts";
+          [["Medium", record.medium], ["Dimensions", record.size], ["Edition", record.edition],
+            ["Auction house", record.auction_house], ["Sale date", record.sale_date], ["Lot", record.lot_number],
+            ["Location", record.location], ["Signature", record.signature], ["Condition", record.condition],
+            ["Source filename", source.filename], ["All contributing files", (record.source_filenames || [source.filename]).join(", ")],
+            ["Source record ID", record.provider_id || record.id]].forEach(([label, value]) => {
+            const fact = document.createElement("div");
+            appendText(fact, "dt", "", label);
+            appendText(fact, "dd", "", value === undefined || value === null || value === "" ? "Not reported" : String(value));
+            facts.appendChild(fact);
+          });
+          sale.append(heading, facts);
+          const sourceUrl = record.source_url || record.provider_url;
+          let safeUrl = null;
+          try { const url = new URL(sourceUrl); if (["https:", "http:"].includes(url.protocol) && !url.username && !url.password) safeUrl = url.href; } catch (_error) { /* Unavailable source link. */ }
+          if (safeUrl) sale.appendChild(externalLink(safeUrl, "archive-record-link", "Open source record ↗"));
+          else appendText(sale, "p", "archive-ledger-note", "Source record link not reported in this file.");
+          group.appendChild(sale);
+        });
+        if (!sourceRecords.length) appendText(group, "p", "archive-ledger-note", "No extracted sold records are available for this file.");
+        results.appendChild(group);
+      });
+    };
+
     const renderAnalysis = (analysis) => {
       results.replaceChildren();
       if (!analysis) {
@@ -2054,6 +2335,8 @@
         results.appendChild(empty);
         return;
       }
+
+      if (options.workspace) { renderSourceLedger(analysis); return; }
 
       const currency = analysis.currency || "USD";
       const heading = document.createElement("h4");
@@ -2844,13 +3127,127 @@
     strip.appendChild(action);
   };
 
+  const appendArchiveGallery = (lot) => {
+    const gallery = document.createElement("figure");
+    gallery.className = "archive-gallery";
+    const images = [...new Set((Array.isArray(lot.image_urls) ? lot.image_urls : [lot.image_url]).filter(Boolean))];
+    let activeImage = 0;
+    const expand = document.createElement("button");
+    expand.type = "button";
+    expand.className = "archive-image-expand";
+    expand.setAttribute("aria-label", `Expand image of ${lot.title || "artwork"}`);
+    const artwork = document.createElement("img");
+    artwork.referrerPolicy = "no-referrer";
+    const fallback = document.createElement("span");
+    fallback.className = "archive-image-fallback";
+    fallback.textContent = "Image unavailable";
+    const hint = document.createElement("span");
+    hint.className = "archive-expand-hint";
+    hint.textContent = "Expand image ↗";
+    expand.append(artwork, fallback, hint);
+    const caption = document.createElement("figcaption");
+    const captionCount = document.createElement("span");
+    caption.appendChild(captionCount);
+    if (lot.url) caption.appendChild(externalLink(lot.url, "archive-record-link", "View auction lot ↗"));
+    const controls = document.createElement("div");
+    controls.className = "archive-image-controls";
+    const thumbnails = document.createElement("div");
+    thumbnails.className = "archive-image-thumbnails";
+    const dialog = document.createElement("dialog");
+    dialog.className = "archive-image-dialog";
+    dialog.setAttribute("aria-label", `Expanded artwork image: ${lot.title || "Untitled"}`);
+    const dialogHead = document.createElement("div");
+    dialogHead.className = "archive-dialog-heading";
+    appendText(dialogHead, "h3", "", lot.title || "Artwork image");
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "Close ×";
+    close.addEventListener("click", () => dialog.close());
+    dialogHead.appendChild(close);
+    const expandedImage = document.createElement("img");
+    expandedImage.referrerPolicy = "no-referrer";
+    const dialogControls = document.createElement("div");
+    dialogControls.className = "archive-image-controls";
+    const dialogCount = document.createElement("span");
+    const showImage = (index) => {
+      activeImage = Math.max(0, Math.min(index, images.length - 1));
+      const available = images.length > 0;
+      artwork.hidden = !available;
+      expandedImage.hidden = !available;
+      fallback.hidden = available;
+      hint.hidden = !available;
+      expand.disabled = !available;
+      if (available) {
+        artwork.src = images[activeImage];
+        expandedImage.src = images[activeImage];
+        artwork.alt = `${lot.title || "Artwork"} · image ${activeImage + 1} of ${images.length}`;
+        expandedImage.alt = artwork.alt;
+      }
+      captionCount.textContent = available ? `Image ${activeImage + 1} of ${images.length} · supplied by the auction source` : "No image supplied by the auction source";
+      dialogCount.textContent = `Image ${activeImage + 1} of ${images.length}`;
+      thumbnails.querySelectorAll("button").forEach((button, i) => button.setAttribute("aria-pressed", String(i === activeImage)));
+      gallery.querySelectorAll("[data-image-direction]").forEach((button) => {
+        button.disabled = images.length < 2 || (button.dataset.imageDirection === "-1" ? activeImage === 0 : activeImage === images.length - 1);
+      });
+    };
+    const arrow = (direction) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.imageDirection = String(direction);
+      button.textContent = direction < 0 ? "←" : "→";
+      button.setAttribute("aria-label", direction < 0 ? "Previous artwork image" : "Next artwork image");
+      button.addEventListener("click", () => showImage(activeImage + direction));
+      return button;
+    };
+    images.forEach((url, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("aria-label", `Show artwork image ${index + 1}`);
+      const thumbnail = document.createElement("img");
+      thumbnail.src = url;
+      thumbnail.alt = "";
+      thumbnail.loading = "lazy";
+      thumbnail.referrerPolicy = "no-referrer";
+      thumbnail.addEventListener("error", () => { thumbnail.hidden = true; });
+      button.append(thumbnail, document.createTextNode(String(index + 1)));
+      button.addEventListener("click", () => showImage(index));
+      thumbnails.appendChild(button);
+    });
+    controls.append(arrow(-1), thumbnails, arrow(1));
+    controls.hidden = images.length < 2;
+    dialogControls.append(arrow(-1), dialogCount, arrow(1));
+    dialog.append(dialogHead, expandedImage, dialogControls);
+    gallery.append(expand, caption, controls, dialog);
+    artwork.addEventListener("error", () => {
+      artwork.hidden = true; fallback.hidden = false; hint.hidden = true; expand.disabled = true;
+    });
+    expandedImage.addEventListener("error", () => { expandedImage.alt = "This image could not be loaded. Try another supplied image."; });
+    expand.addEventListener("click", () => { if (images.length) dialog.showModal(); });
+    dialog.addEventListener("close", () => expand.focus({preventScroll: true}));
+    dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+    gallery.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault(); event.stopPropagation();
+      showImage(event.key === "Home" ? 0 : event.key === "End" ? images.length - 1 : activeImage + (event.key === "ArrowRight" ? 1 : -1));
+    });
+    showImage(0);
+    return gallery;
+  };
+
+  const activateArchiveStage = () => {
+    researchTab = researchLook === "bidboard" ? "bids" : researchLook === "workbench" ? "comps" : "sources";
+    researchWorkspace.dataset.look = researchLook;
+    researchLookButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.researchLook === researchLook)));
+    researchLotCard.querySelector(".lot-browser-workflow")?.activateArchiveStage?.();
+  };
+
   const renderResearchWorkspace = () => {
     const lots = data[selectedDay] || [];
     researchTitle.textContent = selectedDay
       ? formatCalendarDay(selectedDay, {weekday: "long", month: "long", day: "numeric", year: "numeric"})
       : "Research workspace";
     researchSubtitle.textContent = lots.length
-      ? `${lots.length} watched lot${lots.length === 1 ? "" : "s"} · One research workspace, three layout concepts`
+      ? `${lots.length} watched lot${lots.length === 1 ? "" : "s"} · Collect sources, compare sales, and set conditional bid ceilings`
       : "Choose a day with watched lots in the Calendar or Gallery Catalog.";
     researchPrevious.disabled = lots.length < 2 || researchIndex <= 0;
     researchNext.disabled = lots.length < 2 || researchIndex >= lots.length - 1;
@@ -2864,21 +3261,28 @@
     }
     researchIndex = Math.max(0, Math.min(researchIndex, lots.length - 1));
     const lot = lots[researchIndex];
+    researchDaySelection.set(selectedDay, lot.id);
+    researchDaySelect.value = selectedDay;
     researchCount.textContent = `Lot ${researchIndex + 1} of ${lots.length}`;
     researchPrevious.disabled = researchIndex === 0;
     researchNext.disabled = researchIndex === lots.length - 1;
     renderResearchRail();
     const key = `${selectedDay}:${lot.id}`;
-    if (researchRenderedKey === key) return;
+    if (researchRenderedKey === key) { activateArchiveStage(); return; }
     researchRenderedKey = key;
     researchLotCard.replaceChildren();
     researchLotCard.classList.toggle("is-ended", Boolean(lot.ended));
-    const bidStrip = document.createElement("section");
-    bidStrip.className = "research-bid-strip";
-    bidStrip.setAttribute("aria-label", "Current bid outlook");
-    renderResearchBidStrip(bidStrip, null);
-    researchLotCard.appendChild(bidStrip);
-    researchLotCard.appendChild(appendLotBrowserMedia(lot));
+    if (researchLotCache.has(String(lot.id))) {
+      researchLotCard.appendChild(researchLotCache.get(String(lot.id)));
+      activateArchiveStage();
+      return;
+    }
+    const content = document.createElement("div");
+    content.className = "archive-lot-content";
+    content.dataset.archiveCachedLot = String(lot.id);
+    researchLotCache.set(String(lot.id), content);
+    researchLotCard.appendChild(content);
+    content.appendChild(appendArchiveGallery(lot));
     const overview = document.createElement("section");
     overview.className = "research-lot-overview";
     if (lot.ended) appendText(overview, "p", "lot-browser-status", "Sale ended");
@@ -2897,16 +3301,16 @@
     if (lot.url) actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "Open auction lot ↗"));
     if (lot.artprice_url) actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
     overview.appendChild(actionLinks);
-    researchLotCard.appendChild(overview);
+    content.appendChild(overview);
     const workflow = document.createElement("section");
     workflow.className = "lot-browser-workflow";
-    appendText(workflow, "p", "lot-browser-workflow-label", "Private research workflow");
-    researchLotCard.appendChild(workflow);
+    content.appendChild(workflow);
     appendArtpriceEditor(workflow, lot, actionLinks, {idPrefix: "research"});
     appendArtpriceAnalysis(workflow, lot, {
       idPrefix: "research", quick: true, workspace: true,
-      onScenarioSummary: (analysis) => renderResearchBidStrip(bidStrip, analysis),
+      sourceLedgerTarget: content,
     });
+    activateArchiveStage();
   };
 
   const openResearchWorkspace = (index = 0) => {
@@ -3137,12 +3541,17 @@
   researchSearch.addEventListener("input", renderResearchRail);
   researchLookButtons.forEach((button) => button.addEventListener("click", () => {
     researchLook = button.dataset.researchLook;
-    researchWorkspace.dataset.look = researchLook;
-    researchLookButtons.forEach((choice) => choice.setAttribute("aria-pressed", String(choice === button)));
-    researchTab = researchLook === "bidboard" ? "bids" : researchLook === "workbench" ? "sources" : "comps";
-    researchLotCard.querySelector(`[data-research-tab="${researchTab}"]`)?.click();
+    activateArchiveStage();
     updateCalendarLocation();
   }));
+  researchWorkspace.querySelector(".research-concept-switch").addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation();
+    const index = researchLookButtons.indexOf(document.activeElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? 2 : (index + (event.key === "ArrowRight" ? 1 : 2)) % 3;
+    researchLookButtons[next].click();
+    researchLookButtons[next].focus();
+  });
   researchWorkspace.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.target instanceof Element && event.target.closest("input, select, textarea, .artprice-analysis, .artprice-form, .research-lot-list")) return;
@@ -3246,7 +3655,8 @@
       sidebarRenderedDay = "";
       researchRenderedKey = "";
       if (selectedDay) {
-        researchIndex = 0;
+        const remembered = researchDaySelection.get(isoDate);
+        researchIndex = Math.max(0, (data[isoDate] || []).findIndex((lot) => lot.id === remembered));
         researchSearch.value = "";
       }
       if (activeView === "catalog") list.replaceChildren();
@@ -3291,6 +3701,13 @@
   });
 
   const initialDay = "{{ initial_day|escapejs }}";
+  Object.keys(data).filter((day) => data[day]?.length).sort().forEach((day) => {
+    const option = document.createElement("option");
+    option.value = day;
+    option.textContent = formatCalendarDay(day, {month: "short", day: "numeric", year: "numeric"});
+    researchDaySelect.appendChild(option);
+  });
+  researchDaySelect.addEventListener("change", () => showDay(researchDaySelect.value));
   const initialParams = new URLSearchParams(window.location.search);
   const requestedView = initialParams.get("view");
   const requestedDay = initialParams.get("day");
@@ -3298,7 +3715,7 @@
     && (Object.hasOwn(data, requestedDay) || dayButtons.some((button) => button.dataset.calendarDay === requestedDay));
   const requestedLook = initialParams.get("look");
   researchLook = ["dossier", "workbench", "bidboard"].includes(requestedLook) ? requestedLook : "dossier";
-  researchTab = researchLook === "bidboard" ? "bids" : researchLook === "workbench" ? "sources" : "comps";
+  researchTab = researchLook === "bidboard" ? "bids" : researchLook === "workbench" ? "comps" : "sources";
   researchWorkspace.dataset.look = researchLook;
   researchLookButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.researchLook === researchLook)));
   const startingDay = validRequestedDay ? requestedDay : initialDay;

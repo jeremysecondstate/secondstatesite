@@ -57,6 +57,9 @@ class AuctionResult:
     medium: str | None = None
     edition: str | None = None
     size: str | None = None
+    signature: str | None = None
+    condition: str | None = None
+    location: str | None = None
     source_ids: tuple[str, ...] = ()
     source_filenames: tuple[str, ...] = ()
 
@@ -408,15 +411,17 @@ def _optional_lot_text(value: Any) -> str | None:
 
 
 def _artprice_lot_url(value: Any) -> str | None:
-    candidate = _optional_lot_text(value)
-    if not candidate or len(candidate) > 500:
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate or len(candidate) > 2000 or any(ord(char) < 32 for char in candidate) or "\\" in candidate:
         return None
     try:
         parsed = urlsplit(candidate)
         if parsed.scheme or parsed.netloc:
             if (
                 parsed.scheme != "https"
-                or parsed.hostname != "www.artprice.com"
+                or parsed.hostname not in {"artprice.com", "www.artprice.com"}
                 or parsed.username
                 or parsed.password
                 or parsed.port not in (None, 443)
@@ -429,6 +434,17 @@ def _artprice_lot_url(value: Any) -> str | None:
     except ValueError:
         return None
     return candidate if parsed.scheme else f"https://www.artprice.com{candidate}"
+
+
+def _lot_location(lot: Mapping[str, Any]) -> str | None:
+    """Keep the source's explicit location; never infer it from the house."""
+    direct = _optional_lot_text(lot.get("location"))
+    if direct:
+        return direct
+    return ", ".join(dict.fromkeys(
+        value for key in ("saleCity", "saleCountry")
+        if (value := _optional_lot_text(lot.get(key)))
+    )) or None
 
 
 def _require_two_decimal_places(value: Decimal, *, label: str) -> Decimal:
@@ -475,6 +491,9 @@ def _normalize_results(lots: Iterable[Mapping[str, Any]]) -> list[AuctionResult]
             medium=_optional_lot_text(lot.get("technique")),
             edition=_optional_lot_text(lot.get("numberAndEdition")),
             size=_optional_lot_text(lot.get("dimension")),
+            signature=_optional_lot_text(lot.get("signature")),
+            condition=_optional_lot_text(lot.get("condition")),
+            location=_lot_location(lot),
             source_ids=tuple(lot.get("_source_ids") or ()),
             source_filenames=tuple(lot.get("_source_filenames") or ()),
         )
@@ -711,6 +730,7 @@ def _result_to_json(result: AuctionResult) -> dict[str, Any]:
     normalized = {
         "sale_date": result.sale_date,
         "hammer_price": _two_decimal_string(result.hammer_price),
+        "currency": DEFAULT_CURRENCY,
         "auction_house": result.auction_house,
         "title": result.title,
         "lot_number": result.lot_number,
@@ -725,7 +745,7 @@ def _result_to_json(result: AuctionResult) -> dict[str, Any]:
             else None
         ),
     }
-    for key in ("provider_id", "provider_url", "artist", "category", "medium", "edition", "size"):
+    for key in ("provider_id", "provider_url", "artist", "category", "medium", "edition", "size", "signature", "condition", "location"):
         value = getattr(result, key)
         if value is not None:
             normalized[key] = value
@@ -765,6 +785,9 @@ def _results_from_comparables(
                 "technique": comparable.get("medium"),
                 "numberAndEdition": comparable.get("edition"),
                 "dimension": comparable.get("size"),
+                "signature": comparable.get("signature"),
+                "condition": comparable.get("condition"),
+                "location": comparable.get("location"),
                 "_source_ids": comparable.get("source_ids"),
                 "_source_filenames": comparable.get("source_filenames"),
             }

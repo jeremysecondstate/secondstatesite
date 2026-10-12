@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import (
+    bid_board_views,
     calendar_views,
     capital_dashboard_views,
     catalog_api_views,
@@ -42,6 +43,11 @@ urlpatterns = [
         "calendar/lots/<int:lot_id>/liveart-analysis/",
         calendar_views.auction_lot_liveart_analysis,
         name="auction_lot_liveart_analysis",
+    ),
+    path(
+        "calendar/lots/<int:lot_id>/bid-board/",
+        bid_board_views.auction_lot_bid_board,
+        name="auction_lot_bid_board",
     ),
     path(
         "calendar/lots/<int:lot_id>/email-tray/",

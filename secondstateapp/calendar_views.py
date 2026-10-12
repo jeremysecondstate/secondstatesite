@@ -32,7 +32,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
 
-from .artprice_max_bid import ArtpriceAnalysisError, analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity, merge_artprice_sources
+from .artprice_max_bid import ArtpriceAnalysisError, _artprice_lot_url, analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity, merge_artprice_sources
 from .auction_email import (
     AuctionEmailConfigurationError,
     compose_auction_email,
@@ -226,13 +226,20 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "bid": _bid_label(lot),
         "time": _time_label(lot, zone),
         "url": lot.lot_url or lot.sale_url,
+        "lot_url": lot.lot_url,
+        "sale_url": lot.sale_url,
         "images": [image_url] if image_url else [],
+        "image_urls": [image_url] if image_url else [],
+        "currency": lot.currency,
+        "current_bid": _decimal_json(lot.current_bid),
+        "bid_count": lot.bid_count,
         "artist_artprice_url": artist_artprice_url,
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
         "artprice_analysis_url": reverse("auction_lot_artprice_analysis", args=(lot.pk,)),
         "liveart_research_url": reverse("auction_lot_liveart_research", args=(lot.pk,)),
         "liveart_analysis_url": reverse("auction_lot_liveart_analysis", args=(lot.pk,)),
+        "bid_board_url": reverse("auction_lot_bid_board", args=(lot.pk,)),
         "email_tray_selected": lot.pk in selected_lot_ids,
         "email_tray_update_url": reverse("auction_email_lot_selection", args=(lot.pk,)),
         "ended": not lot.active,
@@ -761,6 +768,12 @@ def _analysis_json(analysis: AuctionMaxBidAnalysis) -> dict:
     return {
         "source_filename": analysis.source_filename,
         "sources": sources,
+        # The merged estimate fills missing descriptions from overlapping files.
+        # Keep the ledger faithful to what each individual file actually said.
+        "source_ledger": [
+            {**description, "comparables": source["comparables"]}
+            for description, source in zip(sources, _stored_artprice_sources(analysis))
+        ],
         "source_count": len(sources),
         "raw_sold_records_count": raw_count,
         "duplicate_records_count": max(0, raw_count - analysis.sold_records_count),
@@ -832,21 +845,21 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
             artist and calendar_artist and artist_identity_key(artist) != artist_identity_key(calendar_artist)
         )
         credible = bool(currency == "USD" and valid_hammer and not artist_conflict)
-        source_url = str(comparable.get("provider_url") or "").strip()
-        parsed_url = urlparse(source_url)
-        if parsed_url.scheme != "https" or parsed_url.hostname not in {"artprice.com", "www.artprice.com"}:
-            source_url = None
+        source_url = _artprice_lot_url(comparable.get("provider_url"))
 
         medium = str(comparable.get("medium") or "").strip() or None
         edition = str(comparable.get("edition") or "").strip() or None
         size = str(comparable.get("size") or "").strip() or None
+        signature = str(comparable.get("signature") or "").strip() or None
+        condition = str(comparable.get("condition") or "").strip() or None
+        location = str(comparable.get("location") or "").strip() or None
         differences = {}
         for field, subject, comp in (
             ("medium", lot.medium, medium),
             ("edition", None, edition),
-            ("signature", None, None),
+            ("signature", None, signature),
             ("size", None, size),
-            ("condition", None, None),
+            ("condition", None, condition),
         ):
             subject = str(subject or "").strip() or None
             differences[field] = {
@@ -865,7 +878,8 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
                 ("lot_number", comparable.get("lot_number")),
                 ("sale_date", comparable.get("sale_date")),
                 ("medium", medium), ("edition", edition),
-                ("signature", None), ("size", size), ("condition", None),
+                ("signature", signature), ("size", size), ("condition", condition),
+                ("location", location),
             ) if not value
         ]
         if not valid_hammer:
@@ -902,9 +916,10 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
             "original_currency": currency or None,
             "medium": medium,
             "edition": edition,
-            "signature": None,
+            "signature": signature,
             "size": size,
-            "condition": None,
+            "condition": condition,
+            "location": location,
             "differences": differences,
             "missing_data": missing,
             "credible": credible,
@@ -1836,9 +1851,14 @@ def _text(value, max_length: int) -> str:
 
 def _url(value) -> str:
     candidate = _text(value, 2000)
-    parsed = urlparse(candidate)
-    if parsed.scheme in {"http", "https"} and parsed.netloc and not parsed.username and not parsed.password:
-        return candidate
+    if any(ord(char) < 32 for char in candidate) or "\\" in candidate:
+        return ""
+    try:
+        parsed = urlparse(candidate)
+        if parsed.scheme in {"http", "https"} and parsed.hostname and not parsed.username and not parsed.password and parsed.port in (None, 80, 443):
+            return candidate
+    except ValueError:
+        pass
     return ""
 
 

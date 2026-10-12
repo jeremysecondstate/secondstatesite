@@ -24,17 +24,35 @@ Selecting a calendar date shows **Selected date → Auctions Happening This Day 
 
 **View day as → Gallery Catalog** replaces the month grid and sidebar with an image-led catalog for the same selected date. **Calendar** returns to the existing layout with that date still selected. The catalog uses the same validated lot images, artist Artprice links, auction links, estimates, bids, and ended status as the sidebar and modal. Its house and Email Tray filters, artist/house sorting, and 24-at-a-time **Show more lots** control make large days easier to scan. Previous/next day moves between loaded watched dates, including upcoming dates outside the current month grid. Selecting an artwork or **Research this lot** opens the full-width Research Concepts view at that work; **Research this day** starts at the first lot. The star on a card adds or removes a lot from the existing Email Tray when its lot-specific Artprice URL is saved. If it is missing, the star opens Research so the link can be saved first. The selected view and date appear in the page URL and survive a reload; month navigation retains the catalog view. Starting in catalog view defers the sidebar's Artprice controls until the user switches to Calendar.
 
-### Research workspace concepts
+### Archive research workflow
 
-**Research Concepts** is a third staff-only calendar view for comparing three page-sized layouts against the same live lot, Artprice, and LiveArt data. The selected day, lot ID, and look are linkable through `?view=research&day=YYYY-MM-DD&lot=<id>&look=<dossier|workbench|bidboard>`. A day link without an explicit `month` still loads that day's month. The Gallery Catalog opens this view at the selected artwork; Calendar's **Browse all lots** modal remains available for quick sequential viewing.
+**Archive Research** connects three stages for the same lot: Gallery Dossier, Day Workbench, and Bid Board. The selected day, lot ID, and stage are linkable through `?view=research&day=YYYY-MM-DD&lot=<id>&look=<dossier|workbench|bidboard>`. Existing `look` links remain compatible. A day link without an explicit `month` still loads that day's month. The Gallery Catalog opens the workflow at the selected artwork; Calendar's **Browse all lots** modal remains available for quick sequential viewing. The Calendar layout remains separate and unchanged.
 
-| Look | Layout | Primary use |
+| Stage | Layout | Primary use |
 | --- | --- | --- |
-| Gallery Dossier | Horizontal day-lot strip, large artwork and lot facts, full-width research below | Focused artwork review |
-| Day Workbench | Searchable vertical lot rail, sticky artwork, research beside it | Moving through a crowded sale day |
-| Bid Board | Three bid figures first, compact artwork masthead, wide research surface | Reviewing a bid decision |
+| Gallery Dossier | Validated image viewer, Artprice URL and uploads, collapsible source ledger grouped by file | Inspect the lot and retain provenance |
+| Day Workbench | Compact lot context and wide comparable rows, explicit LiveArt search and selection | Review exact artwork references separately from related works |
+| Bid Board | Conditional bid shortlist, eight-row bid × resale grid, expandable costs | Compare acquisition cost, resale proceeds, profit and return on cost |
 
-All three looks share the same save, search, selection, and calculation controls. The research tabs separate Artprice sources, LiveArt and comparable sales, and bid scenarios. Comparable sales are grouped in collapsed disclosures in the full-page view, with selected counts in each heading; opening a group preserves its state while analysis updates. Bid scenarios show one compact target-profit bid at 25% buyer premium when available, or the first premium in the saved range, with the actual percentage labeled. Each full premium table remains available in a disclosure. Changing a look keeps the current lot and loaded research state; changing lots loads that lot's saved state. No look triggers a LiveArt search automatically—search remains an explicit staff action.
+Stage changes preserve the lot and loaded controls. Per-lot browser drafts retain pending edits across navigation and reload, while saved sources, comparable selections and Bid Board assumptions use the database. Stage navigation never initiates a LiveArt search. Exact artwork identity does not establish that the impression, edition, size or condition matches; those fields remain independently reviewable. Links point to supplied auction lots or documented LiveArt record endpoints; missing links remain unavailable.
+
+The image viewer uses every validated image exposed by the current lot record. The present sync model stores one primary or saved image, so it does not invent reverse/detail images. A single image and a missing/failed image have explicit states. The expanded viewer uses a keyboard-accessible dialog.
+
+The source ledger displays normalized artwork, artist, USD hammer, medium, dimensions, edition, sale house/date, lot/location, signature, condition, file provenance and source URL when supplied. Unreported values remain visible as unavailable. Source HTML is parsed as data; its scripts and markup are never inserted into the page.
+
+### Bid Board calculations and persistence
+
+`GET/POST /calendar/lots/<id>/bid-board/` provides staff-only previews and saves with CSRF protection. It makes no external calls. The server obtains candidate prices from saved normalized records or the opaque LiveArt research ID in the current server session, never from browser-supplied prices. Saves persist `AuctionBidBoardAnalysis` and synchronize selected evidence with `LiveArtResaleAnalysis`.
+
+The three evidence-derived gross resale cases reuse the combined, deduplicated Artprice + LiveArt analysis: a configurable factor of the lowest selected hammer, the median selected hammer, and a configurable factor of the highest selected hammer. They expose their basis and source counts. Fewer than three unique sales receives a limited-evidence notice; no evidence produces unavailable cases unless a manual override is supplied. Overrides are labeled manual and can be cleared to resume evidence-derived values.
+
+All calculations use server-side `Decimal` values. Buyer premium, purchase tax and selling commission round individually to cents, half up. Purchase tax can apply to hammer only, hammer plus premium, or hammer plus premium plus other acquisition costs. Other acquisition and selling costs are explicit. Return on cost is net profit divided by all-in acquisition; profit divided by gross resale is a separate metric. Neither is a probability.
+
+An opening hammer is available as the first bid. A current hammer requires the next increment. A fixed ladder is anchored to that amount. Configurable tiers use increasing upper boundaries and one final open-ended tier; a step crossing a boundary lands on that boundary. Default tiers are explicitly an example schedule, not verified auction-house rules. Staff must confirm the sale's actual increments, premium and taxes. Source currency is not converted automatically.
+
+Ceilings search only available bids, snap down and verify that both minimum net profit and minimum return on cost are satisfied using exact cash values. An unavailable qualifying bid is shown explicitly. Shortlisted working/optimistic bids include their conservative downside. Eight levels appear per page and loss-making levels remain inspectable. Cell selection exposes all cash flows, $500/$1,000 profit checks, minimum cent break-even resale, further profit-target ceilings and the actual next bid's additional all-in cost/profit reduction.
+
+Migration `0028_auction_bid_board_analysis` adds per-lot saved assumptions, selections, result and evidence snapshots with staff attribution. Existing source and Email Tray records remain intact.
 
 A selected day with synced lots shows **Browse all N lots**. The button opens one modal rather than creating browser tabs: only the current lot card and primary image are rendered, while previous/next buttons or Left/Right move through the date's in-memory lot data. Navigation wraps at either end; Home and End jump to the first and last lot; Escape and the close button return focus to the launch button. Missing or failed images use a neutral fallback, and opening the external auction page remains a deliberate per-lot action.
 

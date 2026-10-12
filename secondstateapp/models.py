@@ -312,6 +312,22 @@ class LiveArtResaleAnalysis(models.Model):
         return f"{self.lot} (LiveArt resale)"
 
 
+class AuctionBidBoardAnalysis(models.Model):
+    """Saved Archive costs, evidence provenance, and conditional bid ceilings."""
+
+    lot = models.OneToOneField(AuctionWatchLot, on_delete=models.CASCADE, related_name="bid_board_analysis")
+    assumptions = models.JSONField(default=dict, blank=True)
+    selected_ids = models.JSONField(default=list, blank=True)
+    evidence_snapshot = models.JSONField(default=dict, blank=True)
+    analysis = models.JSONField(default=dict, blank=True)
+    updated_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+
+
 class AuctionReminderDelivery(models.Model):
     """Idempotency and delivery audit record for one daily reminder digest."""
 
