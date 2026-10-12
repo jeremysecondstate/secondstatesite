@@ -67,12 +67,37 @@ def _key(value: Any) -> str:
     return " ".join(re.sub(r"[^\w]+", " ", value).split())
 
 
+def artwork_search_title(title: Any, artist: Any) -> str:
+    """Drop a matching artist heading from a Calendar artwork title."""
+
+    title_text = _text(title)
+    for separator in (", ", ": ", " - ", " – ", " — "):
+        if separator not in title_text:
+            continue
+        heading, work = title_text.split(separator, 1)
+        if work.strip() and artist_identity_key(heading) == artist_identity_key(_text(artist)):
+            return work.strip()
+    return title_text
+
+
+def _title_forms(value: Any) -> set[str]:
+    """Keep complete titles and distinctive bilingual parenthetical forms."""
+
+    title = _text(value)
+    forms = {_key(title)}
+    if title.endswith(")") and "(" in title:
+        base, translation = title.rsplit("(", 1)
+        translation = translation[:-1]
+        for part in (base, translation):
+            key = _key(part)
+            if len(key.split()) >= 3:
+                forms.add(key)
+    return forms - {""}
+
+
 def _title_identity(expected: Any, candidate: Any) -> bool:
-    expected_key, candidate_key = _key(expected), _key(candidate)
-    return bool(
-        expected_key and candidate_key and expected_key == candidate_key
-        and expected_key not in {"untitled", "composition", "abstract", "study"}
-    )
+    common = _title_forms(expected) & _title_forms(candidate)
+    return any(key not in {"untitled", "composition", "abstract", "study"} for key in common)
 
 
 def _sale(raw: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -180,12 +205,13 @@ def _subject_fields(raw: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def artwork_matches(
-    lot: Any, raw_artworks: list[Mapping[str, Any]], *, artist_id: Any, artist_name: str
+    lot: Any, raw_artworks: list[Mapping[str, Any]], *, artist_id: Any, artist_name: str,
+    title_aliases: tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
     """Rank artwork identities by artist and title, independent of the auction."""
 
     expected_artist = _text(artist_name or _value(lot, "artist") or _value(lot, "artist_watchlist_name"))
-    expected_title = _text(_value(lot, "title"))
+    expected_title = artwork_search_title(_value(lot, "title"), expected_artist)
     options: list[dict[str, Any]] = []
     for raw in raw_artworks:
         if not isinstance(raw, Mapping):
@@ -207,6 +233,10 @@ def artwork_matches(
             and _text(artist_id) == _text(candidate_artist_id)
         ) if artist_id is not None else artist_name_matches
         title_matches = _title_identity(expected_title, candidate_title)
+        variant_matches = any(_title_identity(title, candidate_title) for title in title_aliases)
+        matched_title = expected_title if title_matches else next(
+            (title for title in title_aliases if _title_identity(title, candidate_title)), None
+        )
         matches = {
             "artist": artist_matches,
             "title": title_matches,
@@ -214,14 +244,16 @@ def artwork_matches(
         missing = [name for name, value in (("artist", candidate_artist), ("title", candidate_title), ("medium", _medium(raw)), ("edition", _artwork_edition(raw)), ("signature", _signature(markings)), ("size", _size(description))) if not value]
         if not candidate_artist_id:
             missing.append("artist_id")
-        score = sum(matches.values())
+        score = sum(matches.values()) + int(variant_matches and not title_matches)
         notes = []
         if artist_id is not None and candidate_artist_id is not None and not artist_matches:
             notes.append("Artist ID differs")
         elif not artist_name_matches:
             notes.append("Artist name differs or is missing")
         if not title_matches:
-            notes.append("Artwork title differs or is too generic to verify")
+            notes.append("Artwork title differs from the Calendar title; verify this work before using its history")
+        if variant_matches and not title_matches:
+            notes.append("The supplied title variant matched; choose this artwork only if it is the same work")
         option = {
             "id": artwork_id,
             "artwork_id": artwork_id,
@@ -229,6 +261,8 @@ def artwork_matches(
             "category_id": _category_id(raw),
             "artist": candidate_artist,
             "title": candidate_title,
+            "matched_title": matched_title,
+            "title_variant_matches": variant_matches,
             "medium": _medium(raw),
             "edition": _artwork_edition(raw),
             "signature": _signature(markings),
@@ -238,6 +272,7 @@ def artwork_matches(
             "matches": matches,
             "score": score,
             "verified": artist_matches and title_matches,
+            "can_choose": artist_matches and (title_matches or variant_matches),
             "missing_data": missing,
             "match_notes": notes,
             "provider_url": f"https://api.liveart.ai/v1/artworks?id={artwork_id}&limit=1" if artwork_id.isdecimal() else None,

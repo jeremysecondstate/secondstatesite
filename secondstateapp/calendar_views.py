@@ -48,7 +48,7 @@ from .calendar_images import (
     store_saved_calendar_image,
 )
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
-from .liveart_resale import artwork_matches, build_scenarios, normalize_candidate
+from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios, normalize_candidate
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -64,6 +64,9 @@ MAX_SYNC_BYTES = 2_000_000
 MAX_ARTPRICE_HTML_BYTES = 5 * 1024 * 1024
 ARTPRICE_PRELOADED_STATE_MARKER = "window.__PRELOADED_STATE__"
 ARTPRICE_REACT_STORE_MARKER = 'data-js-react-on-rails-store="artpriceStore"'
+LIVEART_ARTIST_YEAR_MARKER = re.compile(
+    r"\(\s*(?:c\.?\s*)?\d{4}(?:\s*[-\u2013\u2014]\s*\d{0,4})?\s*\)", re.IGNORECASE
+)
 # Heritage serves lot photographs separately from its bookmarked auction pages.
 CALENDAR_IMAGE_DOMAINS = (*DEFAULT_ALLOWED_DOMAINS, "heritagestatic.com")
 
@@ -994,13 +997,16 @@ def _add_liveart_du(total: float | None, page) -> float | None:
     return total + cost if total is not None and cost is not None else None
 
 
-def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "") -> dict:
+def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "", search_title: str = "") -> dict:
     artist_name = (lot.artist or lot.artist_watchlist_name or "").strip()
     if not artist_name or not lot.title.strip():
         raise ValueError("This Calendar lot needs an artist and title for LiveArt research.")
 
     client = LiveArtClient()
-    artist_page = client.list_artists(q=artist_name[:200], limit=3)
+    artist_query = " ".join(LIVEART_ARTIST_YEAR_MARKER.sub(" ", artist_name).split()) or artist_name
+    artwork_title = artwork_search_title(lot.title, artist_name)
+    title_query = search_title or artwork_title
+    artist_page = client.list_artists(q=artist_query[:200], limit=3)
     units = _liveart_du(artist_page)
     artist_key = artist_identity_key(artist_name)
     artist = next(
@@ -1024,17 +1030,21 @@ def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "") -> dict
         }
 
     artist_id = artist["id"]
-    artwork_page = client.list_artworks(artist_id=artist_id, search=lot.title[:200], limit=5)
+    artwork_page = client.list_artworks(artist_id=artist_id, search=title_query[:200], limit=5)
     units = _add_liveart_du(units, artwork_page)
     matches = artwork_matches(
-        lot, artwork_page.items, artist_id=artist_id, artist_name=str(artist.get("name") or artist_name)
+        lot, artwork_page.items, artist_id=artist_id, artist_name=str(artist.get("name") or artist_name),
+        title_aliases=(search_title,) if search_title else (),
     )
     verified = [item for item in matches if item.get("verified")]
+    selectable = [item for item in matches if item.get("can_choose")]
     chosen = None
     if subject_id:
-        chosen = next((item for item in verified if str(item.get("id")) == subject_id), None)
+        chosen = next((item for item in selectable if str(item.get("id")) == subject_id), None)
         if chosen is None:
-            raise ValueError("The selected LiveArt artwork does not match this artist and title.")
+            raise ValueError("The selected LiveArt artwork does not match this artist and searched title.")
+        if not chosen.get("verified"):
+            chosen = {**chosen, "chosen_manually": True}
     elif len(verified) == 1:
         chosen = verified[0]
 
@@ -1069,11 +1079,26 @@ def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "") -> dict
         if all(sale_key):
             seen_sales.add(sale_key)
         candidate = normalize_candidate(raw, chosen, lot)
+        if chosen is not None and chosen.get("chosen_manually"):
+            candidate["selected"] = False
+            candidate["match_notes"] = [
+                *(candidate.get("match_notes") or []),
+                "Artwork title differs from the Calendar title; review this sale before selecting it",
+            ]
         candidate["retrieved_at"] = raw.get("_retrieved_at") or timezone.now().isoformat()
         candidates.append(candidate)
     candidates.sort(key=lambda item: str(item.get("sale_date") or ""), reverse=True)
     candidates.sort(key=lambda item: item.get("match_type") != "exact_work")
     selected_ids = [str(item["id"]) for item in candidates if item.get("selected") and item.get("credible")]
+    requires_choice = chosen is None and (len(verified) > 1 or bool(selectable and not verified))
+    if requires_choice and verified:
+        message = "Multiple LiveArt artwork references match. Choose one to search its sale history."
+    elif requires_choice:
+        message = "An artwork matched the supplied title variant, but its title differs from the Calendar title. Review and choose it to search its sale history."
+    elif candidates:
+        message = f"Found {len(candidates)} sold results for this work and related works; review each before saving."
+    else:
+        message = "No suitable sold results were returned for this artist and artwork search."
     return {
         "subject_matches": matches,
         "subject_match": chosen,
@@ -1081,11 +1106,9 @@ def _research_liveart_lot(lot: AuctionWatchLot, *, subject_id: str = "") -> dict
         "selected_ids": selected_ids,
         "retrieved_at": timezone.now().isoformat(),
         "data_units_spent": units,
-        "requires_subject_choice": len(verified) > 1,
-        "message": (
-            f"Found {len(candidates)} sold results for this work and related works; review each before saving."
-            if candidates else "No suitable sold results were returned for this artist and artwork search."
-        ),
+        "requires_subject_choice": requires_choice,
+        "search_title_used": title_query,
+        "message": message,
     }
 
 
@@ -1105,7 +1128,11 @@ def auction_lot_liveart_research(request, lot_id: int):
         subject_id = str(payload.get("subject_id") or "").strip()
         if len(subject_id) > 80:
             raise ValueError("Invalid LiveArt artwork ID.")
-        research = _research_liveart_lot(lot, subject_id=subject_id)
+        raw_search_title = payload.get("search_title") or ""
+        if not isinstance(raw_search_title, str) or len(raw_search_title.strip()) > 200:
+            raise ValueError("Invalid LiveArt title variant.")
+        search_title = raw_search_title.strip()
+        research = _research_liveart_lot(lot, subject_id=subject_id, search_title=search_title)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"ok": False, "error": "Research request must be valid JSON."}, status=400)
     except LiveArtConfigurationError as exc:

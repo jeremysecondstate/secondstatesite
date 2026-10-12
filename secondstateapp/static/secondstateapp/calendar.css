@@ -1404,6 +1404,16 @@ body:has(.lot-browser[open]) {
   cursor: pointer;
 }
 
+.liveart-title-variant-field {
+  margin-top: 10px;
+}
+
+.liveart-title-variant-field small {
+  color: var(--calendar-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
 .artprice-analysis-actions {
   display: flex;
   flex-wrap: wrap;

@@ -346,6 +346,7 @@
   const artpriceAnalysisCache = new Map();
   const liveartAnalysisInstances = new Map();
   const liveartAnalysisCache = new Map();
+  const liveartTitleVariants = new Map();
 
   const registerLotInstance = (registry, lotId, node, applyState) => {
     const key = String(lotId);
@@ -834,9 +835,10 @@
         const choose = document.createElement("button");
         choose.type = "button";
         choose.className = "liveart-subject-choice";
-        choose.disabled = !candidate.verified;
-        choose.dataset.verified = String(Boolean(candidate.verified));
-        choose.textContent = candidate.verified ? "Research this artwork" : "Artwork match unverified";
+        choose.disabled = !candidate.can_choose;
+        choose.dataset.canChoose = String(Boolean(candidate.can_choose));
+        choose.textContent = candidate.verified ? "Research this artwork"
+          : candidate.can_choose ? "Review and research this artwork" : "Artwork match unverified";
         choose.addEventListener("click", () => performResearch(candidate.id));
         top.appendChild(choose);
       }
@@ -1117,13 +1119,14 @@
       busy = value;
       section.querySelectorAll("button, input").forEach((control) => { control.disabled = value; });
       if (options.researchButton) options.researchButton.disabled = value;
+      if (options.titleVariantInput) options.titleVariantInput.disabled = value;
       if (!value) {
         candidateResults.querySelectorAll('input[type="checkbox"]').forEach((control) => {
           const candidate = currentCandidates.find((item) => String(item.id) === control.value);
           control.disabled = !candidate?.credible || candidate.hammer_usd === null || candidate.hammer_usd === undefined;
         });
         subjectResults.querySelectorAll(".liveart-subject-choice").forEach((button) => {
-          button.disabled = button.dataset.verified !== "true";
+          button.disabled = button.dataset.canChoose !== "true";
         });
       }
       updateButtons();
@@ -1200,6 +1203,13 @@
     };
     const performResearch = async (subjectId = null) => {
       if (busy || !lot.liveart_research_url) return;
+      const searchTitle = options.titleVariantInput?.value.trim() || "";
+      if (searchTitle.length > 200) {
+        options.titleVariantInput.setCustomValidity("Title variant must be 200 characters or fewer.");
+        options.titleVariantInput.reportValidity();
+        return;
+      }
+      if (options.titleVariantInput) options.titleVariantInput.setCustomValidity("");
       setBusy(true);
       setStatus("Searching LiveArt artwork and sold records…", "loading");
       try {
@@ -1207,7 +1217,7 @@
           method: "POST",
           credentials: "same-origin",
           headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
-          body: JSON.stringify(subjectId === null ? {} : {subject_id: subjectId}),
+          body: JSON.stringify({...(subjectId === null ? {} : {subject_id: subjectId}), search_title: searchTitle}),
         }, "LiveArt research could not be completed.");
         const selectedArtpriceIds = new Set(currentCandidates
           .filter((candidate) => candidate.provider === "Artprice" && selectedIds.has(String(candidate.id)))
@@ -1501,6 +1511,37 @@
     researchButton.className = "is-primary";
     researchButton.type = "button";
     researchButton.textContent = "Find LiveArt sales";
+    const titleVariantField = document.createElement("div");
+    titleVariantField.className = "artprice-analysis-field liveart-title-variant-field";
+    const titleVariantLabel = document.createElement("label");
+    titleVariantLabel.htmlFor = `${idPrefix}liveart-title-variant-${lot.id}`;
+    titleVariantLabel.textContent = "LiveArt title variant (optional)";
+    const titleVariantInput = document.createElement("input");
+    titleVariantInput.id = titleVariantLabel.htmlFor;
+    titleVariantInput.type = "text";
+    titleVariantInput.maxLength = 200;
+    titleVariantInput.autocomplete = "off";
+    titleVariantInput.placeholder = "English translation or alternate title";
+    titleVariantInput.value = liveartTitleVariants.get(String(lot.id)) || "";
+    titleVariantInput.dataset.liveartTitleVariantLot = String(lot.id);
+    titleVariantInput.addEventListener("input", () => {
+      titleVariantInput.setCustomValidity("");
+      liveartTitleVariants.set(String(lot.id), titleVariantInput.value);
+      document.querySelectorAll("[data-liveart-title-variant-lot]").forEach((other) => {
+        if (other !== titleVariantInput && other.dataset.liveartTitleVariantLot === String(lot.id)) {
+          other.value = titleVariantInput.value;
+        }
+      });
+    });
+    titleVariantInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        researchButton.click();
+      }
+    });
+    const titleVariantHint = document.createElement("small");
+    titleVariantHint.textContent = "An English translation or alternate spelling replaces the Calendar title for the next LiveArt search. Review returned artworks before selecting.";
+    titleVariantField.append(titleVariantLabel, titleVariantInput, titleVariantHint);
     const recalculateButton = document.createElement("button");
     recalculateButton.type = "button";
     recalculateButton.textContent = "Recalculate";
@@ -1523,6 +1564,7 @@
 
     form.append(grid);
     if (quick) form.append(advanced);
+    form.append(titleVariantField);
     form.append(actions);
     panel.append(intro, artpriceHeading, form, status, results);
     let currentAnalysis = null;
@@ -1539,6 +1581,7 @@
       idPrefix,
       quick,
       researchButton,
+      titleVariantInput,
       onSavedChange: (saved) => {
         hasResaleAnalysis = saved;
         lot.has_liveart_analysis = saved;

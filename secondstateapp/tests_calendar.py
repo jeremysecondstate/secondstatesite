@@ -1915,6 +1915,201 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
             self.assertNotIn("lot_num", call.kwargs)
             self.assertNotIn("sale_datetime__gte", call.kwargs)
 
+    def test_research_matches_artist_when_calendar_name_contains_birth_year(self):
+        self.lot.artist = "Alexander (1898) Calder"
+        self.lot.artist_watchlist_name = "Alexander Calder"
+        self.lot.title = "Nez et oreilles tres gais"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title"))
+        artwork = liveart_artwork(
+            "calder-artwork", artist_id="artist-calder", artist="Alexander Calder",
+            title=self.lot.title,
+        )
+        sale = liveart_lot(
+            "calder-sale", artist_id="artist-calder", artist="Alexander Calder",
+            title=self.lot.title, hammer_usd=3600,
+        )
+        sale["artwork_id"] = artwork["id"]
+        sale["artwork"]["id"] = artwork["id"]
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class, lots=[sale])
+            client.list_artists.return_value = liveart_page([
+                {"id": "artist-unrelated", "name": "Alexander Smith"},
+                {"id": "artist-calder", "name": "Alexander Calder"},
+            ])
+            client.list_artworks.return_value = liveart_page([artwork])
+            response = self.research()
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["subject_match"]["id"], artwork["id"])
+        self.assertEqual(payload["candidates"][0]["id"], sale["id"])
+        self.assertTrue(payload["candidates"][0]["credible"])
+        self.assertEqual(payload["candidates"][0]["hammer_usd"], "3600.00")
+        client.list_artists.assert_called_once_with(q="Alexander Calder", limit=3)
+        client.list_artworks.assert_called_once_with(
+            artist_id="artist-calder", search=self.lot.title, limit=5,
+        )
+
+    def test_research_does_not_accept_unrelated_artist_with_year_in_calendar_name(self):
+        self.lot.artist = "Alexander (1898) Calder"
+        self.lot.artist_watchlist_name = "Alexander Calder"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name"))
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class)
+            client.list_artists.return_value = liveart_page([
+                {"id": "artist-unrelated", "name": "Alexander Smith"},
+            ])
+            response = self.research()
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIsNone(payload["subject_match"])
+        self.assertEqual(payload["candidates"], [])
+        self.assertIn("No LiveArt artist matched", payload["message"])
+        client.list_artworks.assert_not_called()
+        client.list_lots.assert_not_called()
+
+    def test_research_can_search_translated_title_and_verify_original_title(self):
+        self.lot.artist = "Alexander (1898) Calder"
+        self.lot.artist_watchlist_name = "Alexander Calder"
+        self.lot.title = "Nez et oreilles tres gais"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title"))
+        artwork = liveart_artwork(
+            "calder-artwork", artist_id="artist-calder", artist="Alexander Calder",
+            title="Nez et oreilles tres gais",
+        )
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class, lots=[])
+            client.list_artists.return_value = liveart_page([
+                {"id": "artist-calder", "name": "Alexander Calder"},
+            ])
+            client.list_artworks.return_value = liveart_page([artwork])
+            response = self.research(search_title="Very Gay Nose and Ears")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["subject_match"]["id"], artwork["id"])
+        client.list_artworks.assert_called_once_with(
+            artist_id="artist-calder", search="Very Gay Nose and Ears", limit=5,
+        )
+
+    def test_research_verifies_french_title_in_bilingual_liveart_artwork(self):
+        self.lot.artist = "Alexander (1898) Calder"
+        self.lot.title = "Nez et oreilles tres gais"
+        self.lot.save(update_fields=("artist", "title"))
+        artwork = liveart_artwork(
+            "calder-bilingual", artist_id="artist-calder", artist="Alexander Calder",
+            title="Nez et oreilles très gais (Very Gay Nose and Ears)",
+        )
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class, lots=[])
+            client.list_artists.return_value = liveart_page([
+                {"id": "artist-calder", "name": "Alexander Calder"},
+            ])
+            client.list_artworks.return_value = liveart_page([artwork])
+            response = self.research(search_title="Very Gay Nose and Ears")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["subject_match"]["id"], artwork["id"])
+        self.assertEqual(response.json()["subject_match"]["matched_title"], self.lot.title)
+
+    def test_damaged_french_title_needs_manual_choice_before_history_is_used(self):
+        self.lot.artist = "Alexander (1898) Calder"
+        self.lot.title = "Nez et oreilles tres gais"
+        self.lot.save(update_fields=("artist", "title"))
+        damaged_title = "Nez et oreilles tr\ufffds gais (Very Gay Nose and Ears)"
+        artwork = liveart_artwork(
+            "calder-damaged", artist_id="artist-calder", artist="Alexander Calder",
+            title=damaged_title,
+        )
+        sale = liveart_lot(
+            "calder-damaged-sale", artist_id="artist-calder", artist="Alexander Calder",
+            title=damaged_title, hammer_usd=3600,
+        )
+        sale["artwork_id"] = artwork["id"]
+        sale["artwork"]["id"] = artwork["id"]
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class, lots=[sale])
+            client.list_artists.return_value = liveart_page([
+                {"id": "artist-calder", "name": "Alexander Calder"},
+            ])
+            client.list_artworks.return_value = liveart_page([artwork])
+            first = self.research(search_title="Very Gay Nose and Ears")
+            self.assertEqual(first.status_code, 200)
+            first_payload = first.json()
+            self.assertIsNone(first_payload["subject_match"])
+            self.assertTrue(first_payload["requires_subject_choice"])
+            self.assertFalse(first_payload["subject_matches"][0]["verified"])
+            self.assertTrue(first_payload["subject_matches"][0]["can_choose"])
+            self.assertFalse(any(
+                call.kwargs.get("artwork_id") == artwork["id"]
+                for call in client.list_lots.call_args_list
+            ))
+
+            chosen = self.research(
+                search_title="Very Gay Nose and Ears", subject_id=artwork["id"],
+            )
+
+        self.assertEqual(chosen.status_code, 200)
+        payload = chosen.json()
+        self.assertTrue(payload["subject_match"]["chosen_manually"])
+        self.assertFalse(payload["subject_match"]["verified"])
+        self.assertEqual(payload["candidates"][0]["id"], sale["id"])
+        self.assertEqual(payload["candidates"][0]["hammer_usd"], "3600.00")
+        self.assertFalse(payload["candidates"][0]["selected"])
+        self.assertEqual(payload["selected_ids"], [])
+        self.assertTrue(any(
+            call.kwargs.get("artwork_id") == artwork["id"]
+            for call in client.list_lots.call_args_list
+        ))
+
+    def test_search_title_does_not_verify_an_unrelated_artwork(self):
+        self.lot.artist = "Alexander (1898) Calder"
+        self.lot.title = "Nez et oreilles tres gais"
+        self.lot.save(update_fields=("artist", "title"))
+        sale = liveart_lot(
+            "blue-dots-sale", artist_id="artist-calder", artist="Alexander Calder",
+            title="Blue Dots", hammer_usd=2400,
+        )
+        sale["artwork_id"] = "unrelated-work"
+        sale["artwork"]["id"] = "unrelated-work"
+        self.client.force_login(self.staff)
+        with patch("secondstateapp.calendar_views.LiveArtClient") as client_class:
+            client = self.mock_client(client_class, lots=[sale])
+            client.list_artists.return_value = liveart_page([
+                {"id": "artist-calder", "name": "Alexander Calder"},
+            ])
+            client.list_artworks.return_value = liveart_page([
+                liveart_artwork(
+                    "unrelated-work", artist_id="artist-calder", artist="Alexander Calder",
+                    title="Blue Dots",
+                ),
+            ])
+            response = self.research(search_title="Blue Dots")
+            chosen = self.research(search_title="Blue Dots", subject_id="unrelated-work")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["subject_match"])
+        self.assertFalse(response.json()["subject_matches"][0]["verified"])
+        self.assertTrue(response.json()["subject_matches"][0]["can_choose"])
+        self.assertTrue(response.json()["requires_subject_choice"])
+        self.assertEqual(response.json()["selected_ids"], [])
+        self.assertEqual(chosen.status_code, 200)
+        chosen_payload = chosen.json()
+        self.assertTrue(chosen_payload["subject_match"]["chosen_manually"])
+        self.assertFalse(chosen_payload["subject_match"]["verified"])
+        self.assertEqual(chosen_payload["candidates"][0]["match_type"], "exact_work")
+        self.assertFalse(chosen_payload["candidates"][0]["selected"])
+        self.assertEqual(chosen_payload["selected_ids"], [])
+        self.assertTrue(any(
+            call.kwargs.get("artwork_id") == "unrelated-work"
+            for call in client.list_lots.call_args_list
+        ))
+
     def test_multiple_matching_artworks_can_be_chosen_for_exact_history(self):
         alternative = liveart_artwork("another-impression")
         self.client.force_login(self.staff)
