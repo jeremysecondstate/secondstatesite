@@ -13,7 +13,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from statistics import median
 from typing import Any, Mapping
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from catalogapp.artprice_artist_links import artist_identity_key
 
@@ -80,6 +80,27 @@ def _artwork_record_url(raw: Mapping[str, Any]) -> str | None:
     if not isinstance(uid, str) or not uid.strip() or len(uid) > 200:
         return None
     return "https://api.liveart.ai/v1/artworks?" + urlencode({"uid": uid.strip(), "limit": 1})
+
+
+def safe_artwork_reference(reference: Any) -> dict[str, Any] | None:
+    """Hide obsolete saved artwork links without inventing missing identities.
+
+    Older analyses generated /v1/artworks?id=... links, but that endpoint only
+    supports uid. A numeric artwork id cannot be substituted for its uid.
+    Keep this read-time correction independent of database or paid API writes.
+    """
+    if not isinstance(reference, Mapping):
+        return None
+    result = dict(reference)
+    url = _safe_url(reference.get("provider_url"))
+    if url:
+        parsed = urlsplit(url)
+        if parsed.hostname == "api.liveart.ai" and parsed.path.rstrip("/") == "/v1/artworks":
+            query = parse_qs(parsed.query)
+            if "id" in query or len(query.get("uid", [])) != 1 or not query["uid"][0].strip():
+                url = None
+    result["provider_url"] = url
+    return result
 
 
 def _key(value: Any) -> str:
@@ -302,6 +323,7 @@ def artwork_matches(
         option = {
             "id": artwork_id,
             "artwork_id": artwork_id,
+            "artwork_uid": _text(raw.get("uid")) or None,
             "artist_id": candidate_artist_id,
             "category_id": _category_id(raw),
             "artist": candidate_artist,

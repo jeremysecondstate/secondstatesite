@@ -8,11 +8,12 @@ from zoneinfo import ZoneInfo
 from django.test import SimpleTestCase, TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 
 from .artprice_max_bid import analyze_artprice_comparables, analyze_artprice_html, merge_artprice_sources
 from .calendar_views import _calendar_image_url, _lot_json
 from .liveart_resale import normalize_candidate, subject_matches
-from .models import AuctionMaxBidAnalysis
+from .models import AuctionMaxBidAnalysis, LiveArtResaleAnalysis
 from .tests_artprice_react_store import react_store_html
 from .tests_calendar import artprice_upload, watch_lot
 from .tests_liveart_resale import artwork, lot
@@ -130,3 +131,24 @@ class ArchiveSourcePersistenceTests(TestCase):
         self.assertEqual(ledger[1]["comparables"][0]["signature"], "Signed in pencil")
         self.assertTrue(all("comparables" not in source for source in analysis["sources"]))
         self.assertEqual(self.client.get(url).json()["analysis"]["source_ledger"], ledger)
+
+    def test_saved_legacy_artwork_id_links_are_omitted_without_guessing_uid(self):
+        legacy = {"id": "16050", "artwork_id": "16050", "title": "Print", "provider_url": "https://api.liveart.ai/v1/artworks?id=16050&limit=1"}
+        valid = {"id": "16051", "artwork_id": "16051", "title": "Another print", "provider_url": "https://api.liveart.ai/v1/artworks?uid=real-provider-uid&limit=1"}
+        saved = LiveArtResaleAnalysis.objects.create(
+            lot=self.lot, subject_match=legacy, subject_matches=[legacy, valid],
+            candidates=[], selected_ids=[], assumptions={}, scenarios=[],
+            retrieved_at=timezone.now(),
+        )
+        with patch("secondstateapp.calendar_views._research_liveart_lot") as paid_search:
+            response = self.client.get(reverse("auction_lot_liveart_analysis", args=(self.lot.pk,)))
+        self.assertEqual(response.status_code, 200)
+        analysis = response.json()["analysis"]
+        self.assertIsNone(analysis["subject_match"]["provider_url"])
+        self.assertEqual(analysis["subject_match"]["artwork_id"], "16050")
+        self.assertIsNone(analysis["subject_matches"][0]["provider_url"])
+        self.assertEqual(analysis["subject_matches"][1]["provider_url"], valid["provider_url"])
+        self.assertNotIn("artworks?id=", response.content.decode())
+        paid_search.assert_not_called()
+        saved.refresh_from_db()
+        self.assertEqual(saved.subject_match, legacy)

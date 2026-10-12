@@ -3,7 +3,7 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012b">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=archive-20261012">
 {% endblock %}
 
@@ -900,6 +900,9 @@
       try {
         const parsed = new URL(url);
         if (!["https:", "http:"].includes(parsed.protocol) || parsed.username || parsed.password) return null;
+        if (parsed.hostname === "api.liveart.ai" && parsed.pathname.replace(/\/$/, "") === "/v1/artworks"
+          && (parsed.searchParams.has("id") || parsed.searchParams.getAll("uid").length !== 1
+            || !parsed.searchParams.get("uid")?.trim())) return null;
         return externalLink(parsed.href, "liveart-provider-link", label);
       } catch (_error) {
         return null;

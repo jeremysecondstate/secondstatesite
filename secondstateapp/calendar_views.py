@@ -48,7 +48,7 @@ from .calendar_images import (
     store_saved_calendar_image,
 )
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
-from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, normalize_candidate
+from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, normalize_candidate, safe_artwork_reference
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
 from .models import (
     AuctionEmailBatch,
@@ -1184,8 +1184,8 @@ def _liveart_analysis_json(analysis: LiveArtResaleAnalysis) -> dict:
     return {
         "provider": "Resale",
         "saved": True,
-        "subject_match": analysis.subject_match or None,
-        "subject_matches": analysis.subject_matches,
+        "subject_match": safe_artwork_reference(analysis.subject_match) if analysis.subject_match else None,
+        "subject_matches": [safe_artwork_reference(item) for item in analysis.subject_matches if isinstance(item, dict)],
         "candidates": analysis.candidates,
         "selected_ids": analysis.selected_ids,
         "assumptions": analysis.assumptions,
