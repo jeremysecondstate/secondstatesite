@@ -857,6 +857,24 @@
     const isArtpriceCandidate = (candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html";
     const candidateSelectionKey = (candidate) => isArtpriceCandidate(candidate)
       ? `artprice:${candidate.sale_identity || candidate.id}` : String(candidate.id);
+    // A draft saved before manual review was enabled has no manual_selectable field.
+    // Only the old, explicit work-detail warning can unlock that draft locally;
+    // the server independently rechecks the trusted research before saving.
+    const legacyManualReview = (candidate) => {
+      const reasons = Array.isArray(candidate.exclusion_reasons) ? candidate.exclusion_reasons : [];
+      return candidate.provider === "LiveArt" && candidate.status === "sold"
+        && String(candidate.category_id) === "2" && Boolean(candidate.artist)
+        && reasons.includes("Related work has no matching category or specific medium")
+        && !reasons.some((reason) => ["Artist does not match", "No verified sold USD hammer price", "Sale date is invalid or in the future"].includes(reason));
+    };
+    const needsManualReview = (candidate) => candidate.manual_selectable === true
+      || (candidate.manual_selectable == null && legacyManualReview(candidate));
+    const canSelectCandidate = (candidate) => {
+      const hammer = Number(candidate?.hammer_usd);
+      return candidate?.status === "sold" && Number.isFinite(hammer) && hammer > 0
+        && hammer <= 1e12 && (isArtpriceCandidate(candidate) || String(candidate.category_id) === "2")
+        && (candidate.credible === true || needsManualReview(candidate));
+    };
 
     const textValue = (value) => value === null || value === undefined || value === "" ? "Not reported" : String(value);
     const describeSources = (data, saved) => {
@@ -931,7 +949,7 @@
         checkbox.type = "checkbox";
         checkbox.value = String(candidate.id);
         checkbox.checked = selectedIds.has(String(candidate.id));
-        checkbox.disabled = !candidate.credible || candidate.hammer_usd === null || candidate.hammer_usd === undefined;
+        checkbox.disabled = !canSelectCandidate(candidate);
         checkbox.setAttribute("aria-label", `Use ${candidate.title || "untitled"} as a comparable`);
         checkbox.addEventListener("change", () => {
           if (checkbox.checked && selectedIds.size >= 25) {
@@ -945,8 +963,17 @@
           markAnalysisPending();
         });
         const copy = document.createElement("span");
-        copy.textContent = checkbox.disabled ? "Excluded — unsuitable or unverified" : "Use in resale bid";
-        label.append(checkbox, copy);
+        copy.textContent = checkbox.disabled ? "Excluded — sale evidence is ineligible" : "Use in resale bid";
+        const copyAndWarning = document.createElement("span");
+        copyAndWarning.appendChild(copy);
+        if (!checkbox.disabled && needsManualReview(candidate)) {
+          const warning = document.createElement("small");
+          warning.className = "liveart-review-warning";
+          const reasons = Array.isArray(candidate.exclusion_reasons) ? candidate.exclusion_reasons : [];
+          warning.textContent = `Review catalogue before including: ${reasons.slice(0, 2).join("; ") || "artwork match is uncertain"}.`;
+          copyAndWarning.appendChild(warning);
+        }
+        label.append(checkbox, copyAndWarning);
         top.appendChild(label);
         const sourceBadge = document.createElement("span");
         sourceBadge.className = `liveart-work-type ${isArtprice ? "is-artprice" : "is-liveart"}`;
@@ -1147,7 +1174,7 @@
         note.className = "artprice-analysis-empty";
         note.textContent = "No sold results were found in this limited search. No maximum bid can be estimated from LiveArt yet.";
         candidateResults.appendChild(note);
-      } else if (!currentCandidates.some((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined)) {
+      } else if (!currentCandidates.some(canSelectCandidate)) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
         note.textContent = "None of these sold results has an eligible USD hammer comp. You can save the research without a bid estimate.";
@@ -1415,7 +1442,7 @@
       if (!disabled) {
         candidateResults.querySelectorAll('input[type="checkbox"]').forEach((control) => {
           const candidate = currentCandidates.find((item) => String(item.id) === control.value);
-          control.disabled = !candidate?.credible || candidate.hammer_usd === null || candidate.hammer_usd === undefined;
+          control.disabled = !canSelectCandidate(candidate);
         });
         subjectResults.querySelectorAll(".liveart-subject-choice").forEach((button) => {
           button.disabled = button.dataset.canChoose !== "true";
@@ -1467,7 +1494,7 @@
           const previousArtprice = new Set(draft.candidates.filter(isArtpriceCandidate).map(candidateSelectionKey));
           const currentArtprice = currentCandidates.filter(isArtpriceCandidate);
           if (sameBaseline || draft.researchId) currentCandidates = [...draft.candidates.filter((candidate) => !isArtpriceCandidate(candidate)), ...currentArtprice];
-          selectedIds = new Set(currentCandidates.filter((candidate) => candidate.credible && candidate.hammer_usd != null && selectedKeys.has(candidateSelectionKey(candidate))).map((candidate) => String(candidate.id)));
+          selectedIds = new Set(currentCandidates.filter((candidate) => canSelectCandidate(candidate) && selectedKeys.has(candidateSelectionKey(candidate))).map((candidate) => String(candidate.id)));
           currentArtprice.forEach((candidate) => {
             if (selectedIds.size < 25 && candidate.selected && !previousArtprice.has(candidateSelectionKey(candidate))) selectedIds.add(String(candidate.id));
           });
@@ -1563,7 +1590,7 @@
         currentCandidates = Array.isArray(payload.candidates) ? payload.candidates : [];
         const responseSelectedIds = new Set((Array.isArray(payload.selected_ids) ? payload.selected_ids : []).map(String));
         selectedIds = new Set(currentCandidates
-          .filter((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined
+          .filter((candidate) => canSelectCandidate(candidate)
             && (isArtpriceCandidate(candidate) && previousArtpriceIds.has(candidateSelectionKey(candidate))
               ? selectedArtpriceIds.has(candidateSelectionKey(candidate))
               : responseSelectedIds.has(String(candidate.id)) || candidate.selected))
@@ -1706,7 +1733,7 @@
         const artpriceCandidates = currentCandidates.filter(isArtpriceCandidate);
         currentCandidates = [...pending.candidates.filter((candidate) => !isArtpriceCandidate(candidate)), ...artpriceCandidates];
         selectedIds = new Set(currentCandidates
-          .filter((candidate) => candidate.credible && candidate.hammer_usd !== null && candidate.hammer_usd !== undefined
+          .filter((candidate) => canSelectCandidate(candidate)
             && previousSelection.has(candidateSelectionKey(candidate)))
           .map((candidate) => String(candidate.id)));
         artpriceCandidates.forEach((candidate) => {

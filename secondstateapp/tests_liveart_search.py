@@ -169,6 +169,55 @@ class LiveArtTermSearchViewTests(TestCase):
         self.assertTrue(payload["candidates"][0]["credible"])
         self.api.list_artists.assert_called_once_with(q="Friedrich Hundertwasser", limit=3)
 
+    def test_old_hundertwasser_print_can_be_selected_after_manual_review(self):
+        self.lot.artist = "Friedensreich HUNDERTWASSER"
+        self.lot.artist_watchlist_name = "Friedensreich Hundertwasser"
+        self.lot.title = "Burning Winter (Winter Lichterloh)"
+        self.lot.medium = "screenprint on paper"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title", "medium"))
+        self.api.list_artists.return_value = liveart_page([
+            {"id": "hundertwasser", "name": "Friedrich Hundertwasser"},
+        ])
+        old_sale = liveart_lot(
+            "252", artist_id="hundertwasser", artist="Friedrich Hundertwasser",
+            title="Burning winter", medium="", sale_date="2000-12-06T12:00:00Z",
+            hammer_usd=4026,
+        )
+        old_sale["auction_house_name"] = "Sotheby's"
+        self.api.list_lots.return_value = liveart_page([old_sale])
+
+        response = self.research(search_terms="Burning")
+        self.assertEqual(response.status_code, 200)
+        research = response.json()
+        candidate = research["candidates"][0]
+        self.assertFalse(candidate["credible"])
+        self.assertTrue(candidate["manual_selectable"])
+        self.assertFalse(candidate["selected"])
+        self.assertEqual(research["selected_ids"], [])
+        self.assertEqual(candidate["hammer_usd"], "4026.00")
+
+        # A session created before this field existed is rechecked without a new API call.
+        session = self.client.session
+        session[f"liveart_research_{self.lot.pk}"]["candidates"][0].pop("manual_selectable")
+        session.save()
+        list_lots_calls = self.api.list_lots.call_count
+        saved = self.save(research, ["252"])
+        self.assertEqual(saved.status_code, 200, saved.content)
+        analysis = saved.json()["analysis"]
+        self.assertEqual(analysis["selected_ids"], ["252"])
+        self.assertTrue(analysis["candidates"][0]["manual_selectable"])
+        self.assertEqual(analysis["scenarios"][1]["resale_hammer"], "4026.00")
+        self.assertEqual(self.api.list_lots.call_count, list_lots_calls)
+
+        stored = LiveArtResaleAnalysis.objects.get(lot=self.lot)
+        stored.candidates[0].pop("manual_selectable")
+        stored.save(update_fields=["candidates"])
+        reloaded = self.client.get(self.analysis_url).json()["analysis"]
+        self.assertEqual(reloaded["selected_ids"], ["252"])
+        self.assertTrue(reloaded["candidates"][0]["manual_selectable"])
+        self.assertEqual(reloaded["scenarios"][1]["resale_hammer"], "4026.00")
+        self.assertEqual(self.api.list_lots.call_count, list_lots_calls)
+
     def test_empty_first_term_still_fetches_second_and_reports_limited_page(self):
         second = liveart_page([self.sale(2, title="Stabiles")])
         second.has_more = True
@@ -264,6 +313,18 @@ class LiveArtTermSearchViewTests(TestCase):
         self.assertTrue(all(not row["credible"] for row in payload["candidates"]))
         self.assertEqual(self.save(payload, ["31"]).status_code, 400)
         self.assertEqual(self.save(payload, ["32"]).status_code, 400)
+        self.assertFalse(LiveArtResaleAnalysis.objects.filter(lot=self.lot).exists())
+
+    def test_legacy_research_with_unverified_print_category_cannot_be_selected(self):
+        self.api.list_lots.return_value = liveart_page([self.sale(33)])
+        for category_id in ("1", None):
+            with self.subTest(category_id=category_id):
+                research = self.research(search_terms="Boomerangs").json()
+                self.assertTrue(research["candidates"][0]["credible"])
+                session = self.client.session
+                session[f"liveart_research_{self.lot.pk}"]["candidates"][0]["category_id"] = category_id
+                session.save()
+                self.assertEqual(self.save(research, ["33"]).status_code, 400)
         self.assertFalse(LiveArtResaleAnalysis.objects.filter(lot=self.lot).exists())
 
     def test_unknown_usage_remains_unknown(self):

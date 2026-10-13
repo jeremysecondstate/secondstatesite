@@ -1790,6 +1790,7 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
                 "status": "sold",
                 "credible": True,
                 "selected": True,
+                "category_id": 2,
                 "hammer_usd": "1205.00",
             }],
             selected_ids=["sold-comp"],
@@ -1876,7 +1877,8 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
 
     def test_default_artprice_selection_respects_existing_25_comp_limit(self):
         liveart = [
-            {"id": f"live-{index}", "provider": "LiveArt", "status": "sold", "credible": True}
+            {"id": f"live-{index}", "provider": "LiveArt", "status": "sold", "credible": True,
+             "category_id": 2, "hammer_usd": "1205.00"}
             for index in range(25)
         ]
         artprice = {

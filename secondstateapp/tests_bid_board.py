@@ -201,12 +201,26 @@ class BidBoardAPITests(TestCase):
         self.assertEqual(result["cases"][1]["resale_hammer"], "6000.00")
 
     def test_category_eligibility_deduplication_and_selection_limit(self):
-        self.save_research([self.candidate(), self.candidate(), self.candidate("502", category_id="1"), self.candidate("503", credible=False)])
+        self.save_research([self.candidate(), self.candidate(), self.candidate("502", category_id="1"), self.candidate("503", credible=False, artist="Other Artist")])
         duplicate = self.post(research_id="session-proof", selected_ids=["501", "501"])
         self.assertEqual(duplicate.json()["analysis"]["source_summary"]["combined_comp_count"], 1)
         self.assertEqual(self.post(research_id="session-proof", selected_ids=["502"]).status_code, 400)
         self.assertEqual(self.post(research_id="session-proof", selected_ids=["503"]).status_code, 400)
         self.assertEqual(self.post(research_id="session-proof", selected_ids=[str(i) for i in range(26)]).status_code, 400)
+
+    def test_manual_review_sale_from_older_research_can_enter_bid_board(self):
+        self.save_research([self.candidate(
+            "503", credible=False, manual_selectable=False, title="Older print title",
+            exclusion_reasons=["Related work has no matching category or specific medium"],
+        )])
+        response = self.post(action="save", research_id="session-proof", selected_ids=["503"])
+        self.assertEqual(response.status_code, 200, response.content)
+        board = response.json()["analysis"]
+        self.assertEqual(board["selected_ids"], ["503"])
+        self.assertEqual(board["cases"][1]["resale_hammer"], "4000.00")
+        stored = LiveArtResaleAnalysis.objects.get(lot=self.lot)
+        self.assertEqual(stored.selected_ids, ["503"])
+        self.assertTrue(stored.candidates[0]["manual_selectable"])
 
     def test_unknown_start_and_non_usd_hammer_remain_empty(self):
         self.lot.currency = "GBP"

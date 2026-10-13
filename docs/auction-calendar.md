@@ -96,7 +96,7 @@ Artist matching uses normalized full names and explicitly verified LiveArt alias
 
 Each term search accepts up to five distinct words or phrases, totaling at most 200 characters. It uses one artist lookup and one sold-lot lookup per term, sharing a maximum of 20 returned sale rows across those lookups. The response displays each term's returned count and flags additional available results; refine the terms when a result page is incomplete. Actual metered Data Units are displayed. There is no automatic pagination.
 
-Term matches are review candidates because LiveArt searches both titles and catalogue text. They are not automatically selected for bids. Only eligible sold USD hammer prices can be selected. Duplicate sale records are counted once, retaining all terms that found them. The search summary, including terms with no results, and each candidate's search terms persist in the saved analysis. Saved Artprice sources continue to participate in the combined bids.
+Term matches are review candidates because LiveArt searches both titles and catalogue text. They are not automatically selected for bids. Staff may explicitly include a same-artist Prints & Multiples sale with a verified sold USD hammer even when title or medium details do not confirm the artwork match; the row shows a catalogue-review warning. Unsold results, invalid or missing USD hammers, artist conflicts, unconfirmed print categories, and future sale dates remain ineligible. Duplicate sale records are counted once, retaining all terms that found them. The search summary, including terms with no results, and each candidate's search terms persist in the saved analysis. Saved Artprice sources continue to participate in the combined bids.
 
 ## Website and desktop sync configuration
 

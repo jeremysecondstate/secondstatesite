@@ -1,5 +1,6 @@
 """Unit tests for matching and scenario math without LiveArt network access."""
 
+from copy import deepcopy
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -39,6 +40,7 @@ def lot(
         "sale": {"id": 88, "start_datetime": sale_date},
         "artwork": {
             "id": artwork_id,
+            "category_id": 2,
             "name": title,
             "artist_id": 7,
             "artist": {"id": 7, "name": artist},
@@ -222,6 +224,52 @@ class LiveArtResaleTests(SimpleTestCase):
         _, scenarios = build_scenarios([candidate], [candidate["id"]], {})
         self.assertEqual(scenarios, [])
 
+    def test_older_sale_with_incomplete_work_details_needs_explicit_selection(self):
+        target = SimpleNamespace(
+            **{**self.calendar_lot.__dict__, "artist": "Friedensreich HUNDERTWASSER",
+               "title": "Burning Winter (Winter Lichterloh)", "medium": "screenprint on paper"}
+        )
+        raw = lot(
+            45, artist="Friedrich Hundertwasser", title="Burning winter",
+            materials="", sale_date="2000-12-06T10:00:00Z", hammer=4026,
+        )
+        raw["artwork"]["category_id"] = 2
+        candidate = normalize_candidate(raw, None, target)
+
+        self.assertFalse(candidate["credible"])
+        self.assertTrue(candidate["manual_selectable"])
+        self.assertFalse(candidate["selected"])
+        self.assertIn("Related work has no matching category or specific medium", candidate["exclusion_reasons"])
+        self.assertEqual(build_scenarios([candidate], [], {})[1], [])
+        _, scenarios = build_scenarios([candidate], [candidate["id"]], {})
+        self.assertEqual(scenarios[1]["resale_hammer"], "4026.00")
+
+    def test_manual_review_does_not_override_invalid_sale_evidence(self):
+        target = SimpleNamespace(
+            **{**self.calendar_lot.__dict__, "artist": "Friedensreich HUNDERTWASSER",
+               "title": "Burning Winter (Winter Lichterloh)", "medium": "screenprint on paper"}
+        )
+        base = lot(
+            46, artist="Friedrich Hundertwasser", title="Burning winter",
+            materials="", sale_date="2000-12-06T10:00:00Z", hammer=4026,
+        )
+        base["artwork"]["category_id"] = 2
+        cases = {
+            "wrong artist": lambda row: row["artwork"]["artist"].update(name="Other Artist"),
+            "unsold": lambda row: row.update(status="unsold"),
+            "missing hammer": lambda row: row["price"].update(hammer_usd=None),
+            "non-print category": lambda row: row["artwork"].update(category_id=1),
+            "unknown category": lambda row: row["artwork"].pop("category_id"),
+            "future date": lambda row: row["sale"].update(start_datetime="2099-01-01T10:00:00Z"),
+        }
+        for label, modify in cases.items():
+            with self.subTest(label=label):
+                raw = deepcopy(base)
+                modify(raw)
+                candidate = normalize_candidate(raw, None, target)
+                self.assertFalse(candidate["manual_selectable"])
+                self.assertEqual(build_scenarios([candidate], [candidate["id"]], {})[1], [])
+
     def test_scenarios_use_selected_hammers_and_all_buying_costs(self):
         low = normalize_candidate(lot(25, hammer=1000), self.subject, self.calendar_lot)
         high = normalize_candidate(lot(26, hammer=2000), self.subject, self.calendar_lot)
@@ -252,7 +300,7 @@ class LiveArtResaleTests(SimpleTestCase):
     def test_cross_source_overlap_requires_same_house_and_compatible_lot(self):
         liveart = {
             "id": "live-42", "provider": "LiveArt", "status": "sold", "credible": True,
-            "hammer_usd": "1000.00", "sale_date": "2025-05-02T10:00:00Z",
+            "category_id": "2", "hammer_usd": "1000.00", "sale_date": "2025-05-02",
             "auction_house": "Rago", "lot_number": "42", "title": "Test Print",
         }
         duplicate = {

@@ -13,6 +13,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from .bid_board import BidBoardError, BidLadder, build_board, normalize_assumptions
+from .liveart_resale import resale_candidate_selectable
 from .models import AuctionBidBoardAnalysis, AuctionWatchLot, LiveArtResaleAnalysis
 
 
@@ -50,7 +51,7 @@ def _evidence(request, lot, payload, saved):
         if candidate.get("provider") != "Artprice" and str(candidate.get("category_id")) != "2":
             continue
         candidates.append(candidate)
-    allowed = {str(item.get("id")) for item in candidates if item.get("credible") is True and item.get("status") == "sold" and item.get("hammer_usd") is not None}
+    allowed = {str(item.get("id")) for item in candidates if resale_candidate_selectable(item) and item.get("status") == "sold" and item.get("hammer_usd") is not None}
     if "selected_ids" in payload:
         selections = payload["selected_ids"]
         if not isinstance(selections, list) or len(selections) > MAX_SELECTED_RESALE_COMPS or any(isinstance(item, bool) or not isinstance(item, (str, int)) for item in selections):

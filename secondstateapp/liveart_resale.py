@@ -204,6 +204,53 @@ def is_prints_and_multiples(raw: Mapping[str, Any]) -> bool:
     )
 
 
+def _sold_print_evidence(candidate: Mapping[str, Any]) -> bool:
+    """Check the hard LiveArt sale requirements independently of artwork matching."""
+
+    if (candidate.get("provider") != "LiveArt" or candidate.get("status") != "sold"
+            or not is_prints_and_multiples(candidate)):
+        return False
+    raw_hammer = candidate.get("hammer_usd")
+    if raw_hammer is None or isinstance(raw_hammer, bool):
+        return False
+    try:
+        hammer = Decimal(str(raw_hammer))
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+    if not hammer.is_finite() or not 0 < hammer <= MAX_MONEY:
+        return False
+    sale_date = _text(candidate.get("sale_date"))
+    if sale_date:
+        try:
+            if date.fromisoformat(sale_date) > datetime.now(timezone.utc).date():
+                return False
+        except ValueError:
+            return False
+    return True
+
+
+def manual_review_eligible(candidate: Mapping[str, Any], calendar_lot: Any) -> bool:
+    """Allow staff to choose a sold print despite uncertain artwork details.
+
+    This also rechecks older normalized research without another metered API call.
+    Artist, sold USD hammer, category, and date remain hard requirements.
+    """
+
+    if candidate.get("credible") is True or not _sold_print_evidence(candidate):
+        return False
+    artist = _text(candidate.get("artist"))
+    expected_artist = _text(_value(calendar_lot, "artist") or _value(calendar_lot, "artist_watchlist_name"))
+    return liveart_artist_names_match(artist, expected_artist)
+
+
+def resale_candidate_selectable(candidate: Mapping[str, Any]) -> bool:
+    if candidate.get("provider") == "LiveArt":
+        return _sold_print_evidence(candidate) and (
+            candidate.get("credible") is True or candidate.get("manual_selectable") is True
+        )
+    return candidate.get("credible") is True
+
+
 def _medium(artwork: Mapping[str, Any]) -> str | None:
     description = _description(artwork)
     return _text(description.get("materials") or artwork.get("materials")) or None
@@ -592,7 +639,7 @@ def normalize_candidate(raw: Mapping[str, Any], subject: Mapping[str, Any] | Non
     candidate_id = _text(raw.get("id"))
     if not candidate_id.isdecimal():
         missing.extend(("provider_id", "provider_url"))
-    return {
+    candidate = {
         "id": candidate_id,
         "provider": "LiveArt",
         "provider_id": candidate_id,
@@ -633,6 +680,10 @@ def normalize_candidate(raw: Mapping[str, Any], subject: Mapping[str, Any] | Non
         "match_notes": reasons,
         "retrieved_at": raw.get("_retrieved_at"),
     }
+    candidate["manual_selectable"] = bool(
+        is_prints_and_multiples(raw) and manual_review_eligible(candidate, calendar_lot)
+    )
+    return candidate
 
 
 def _money(value: Any, name: str) -> Decimal:
@@ -759,10 +810,10 @@ def build_scenarios_with_sources(
     artprice_analysis_updated_at: str | None = None,
     allow_unestimable: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
-    """Calculate scenario maximum hammer bids from selected verified sales.
+    """Calculate scenario maximum hammer bids from selected sold evidence.
 
-    A selected candidate may have a visible medium/edition mismatch, but it
-    still must be a sold result with a positive USD hammer and the same artist.
+    A selected LiveArt print may need manual catalogue review, but still needs
+    a positive sold USD hammer and the same artist.
     """
 
     supplied = dict(assumptions or {})
@@ -796,7 +847,7 @@ def build_scenarios_with_sources(
     for candidate in candidates:
         if str(candidate.get("id")) not in selected or candidate.get("status") != "sold":
             continue
-        if candidate.get("credible") is not True:
+        if not resale_candidate_selectable(candidate):
             continue
         try:
             hammer = Decimal(str(candidate.get("hammer_usd")))

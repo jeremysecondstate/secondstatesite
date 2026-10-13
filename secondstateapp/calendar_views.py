@@ -49,7 +49,7 @@ from .calendar_images import (
 )
 from .liveart_artist import liveart_artist_names_match, liveart_artist_search_name
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
-from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, normalize_candidate, safe_artwork_reference
+from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, manual_review_eligible, normalize_candidate, resale_candidate_selectable, safe_artwork_reference
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
 from .models import (
     AuctionEmailBatch,
@@ -933,7 +933,10 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
 
 
 def _merged_resale_candidates(lot: AuctionWatchLot, candidates: object) -> list[dict]:
-    liveart = [item for item in candidates if isinstance(item, dict) and item.get("provider") != "Artprice"] if isinstance(candidates, list) else []
+    liveart = [
+        {**item, "manual_selectable": manual_review_eligible(item, lot)}
+        for item in candidates if isinstance(item, dict) and item.get("provider") != "Artprice"
+    ] if isinstance(candidates, list) else []
     return liveart + _artprice_candidates(lot)
 
 
@@ -946,7 +949,7 @@ def _selected_resale_ids(
 ) -> list[str]:
     """Include eligible new Artprice sales while retaining explicit later choices."""
 
-    allowed = {str(item.get("id")) for item in candidates if item.get("credible") and item.get("status") == "sold"}
+    allowed = {str(item.get("id")) for item in candidates if resale_candidate_selectable(item) and item.get("status") == "sold"}
     requested = {str(item) for item in selected_ids}
     previous_artprice_by_sale = {
         artprice_sale_identity({**item, "hammer_price": item.get("hammer_usd")}): str(item.get("id"))
@@ -1549,7 +1552,7 @@ def auction_lot_liveart_analysis(request, lot_id: int):
     if len(selected_ids) > MAX_SELECTED_RESALE_COMPS or any(not isinstance(item, (str, int)) for item in selected_ids):
         return JsonResponse({"ok": False, "error": "Invalid resale comp selection."}, status=400)
     selected_ids = list(dict.fromkeys(str(item) for item in selected_ids))
-    allowed = {str(item.get("id")) for item in candidates if isinstance(item, dict) and item.get("credible")}
+    allowed = {str(item.get("id")) for item in candidates if isinstance(item, dict) and resale_candidate_selectable(item) and item.get("status") == "sold"}
     if any(item not in allowed for item in selected_ids):
         return JsonResponse({"ok": False, "error": "Select only eligible sold USD hammer comps."}, status=400)
     candidates = _candidates_with_selection(candidates, selected_ids)

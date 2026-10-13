@@ -157,6 +157,7 @@
 .research-workspace .liveart-candidate-top { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 7px 15px; margin: 0 0 4px; }
 .research-workspace .liveart-select-label { font-size: 11px; font-weight: 400; color: var(--research-text); }
 .research-workspace .liveart-select-label input { width: 15px; height: 15px; }
+.research-workspace .liveart-review-warning { color: var(--research-accent); }
 .research-workspace .liveart-candidate h5 { font-size: 15px; font-weight: 500; line-height: 1.4; margin: 0; font-family: Arial, sans-serif; }
 .research-workspace .liveart-sale-line { font-size: 12px; margin: 0; color: var(--research-text); }
 .research-workspace .liveart-price-line { font-size: 13px; margin: 0; color: var(--research-text); font-weight: 500; text-align: right; }
