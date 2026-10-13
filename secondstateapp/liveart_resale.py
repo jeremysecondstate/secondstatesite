@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from catalogapp.artprice_artist_links import artist_identity_key
 
 from .artprice_max_bid import ArtpriceAnalysisError, calculate_bid_rows
+from .liveart_artist import liveart_artist_names_match
 from .liveart_client import verify_sold_hammer_usd
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID
 
@@ -292,7 +293,7 @@ def artwork_matches(
         candidate_title = _text(description.get("name") or raw.get("name"))
         artist_name_matches = bool(
             expected_artist and candidate_artist
-            and artist_identity_key(expected_artist) == artist_identity_key(candidate_artist)
+            and liveart_artist_names_match(expected_artist, candidate_artist)
         )
         artist_matches = bool(
             artist_id is not None and candidate_artist_id is not None
@@ -512,7 +513,7 @@ def normalize_candidate(raw: Mapping[str, Any], subject: Mapping[str, Any] | Non
     candidate_artist_id = _artist_id(artwork)
     expected_artist = _text(reference.get("artist") or _value(calendar_lot, "artist") or _value(calendar_lot, "artist_watchlist_name"))
     if candidate_artist and expected_artist:
-        artist_matches = artist_identity_key(candidate_artist) == artist_identity_key(expected_artist)
+        artist_matches = liveart_artist_names_match(candidate_artist, expected_artist)
     else:
         artist_matches = bool(
             reference.get("artist_id") and candidate_artist_id

@@ -47,6 +47,7 @@ from .calendar_images import (
     prepare_saved_calendar_image,
     store_saved_calendar_image,
 )
+from .liveart_artist import liveart_artist_names_match, liveart_artist_search_name
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
 from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, normalize_candidate, safe_artwork_reference
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
@@ -1304,13 +1305,13 @@ def _research_liveart_lot(
     artist_query = " ".join(LIVEART_ARTIST_YEAR_MARKER.sub(" ", artist_name).split()) or artist_name
     artwork_title = artwork_search_title(lot.title, artist_name)
     title_query = search_title or artwork_title
-    artist_page = client.list_artists(q=artist_query[:200], limit=3)
+    artist_page = client.list_artists(q=liveart_artist_search_name(artist_query)[:200], limit=3)
     units = _liveart_du(artist_page)
-    artist_key = artist_identity_key(artist_name)
     artist = next(
         (
             item for item in artist_page.items
-            if artist_identity_key(str(item.get("name") or "")) == artist_key and item.get("id") is not None
+            if liveart_artist_names_match(artist_name, str(item.get("name") or ""))
+            and item.get("id") is not None
         ),
         None,
     )

@@ -6,12 +6,21 @@ from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
+from .liveart_artist import liveart_artist_names_match, liveart_artist_search_name
 from .liveart_search import merge_search_lots, parse_search_terms, search_query_limits
 from .models import LiveArtResaleAnalysis
-from .tests_calendar import liveart_lot, liveart_page, stored_analysis, watch_lot
+from .tests_calendar import liveart_artwork, liveart_lot, liveart_page, stored_analysis, watch_lot
 
 
 class LiveArtSearchParsingTests(SimpleTestCase):
+    def test_documented_hundertwasser_alias_keeps_other_artists_out(self):
+        self.assertEqual(
+            liveart_artist_search_name("Friedensreich HUNDERTWASSER"), "Friedrich Hundertwasser",
+        )
+        self.assertTrue(liveart_artist_names_match("Hundertwasser, Friedensreich", "Friedrich Hundertwasser"))
+        self.assertFalse(liveart_artist_names_match("Friedensreich Hundertwasser Jr", "Friedrich Hundertwasser"))
+        self.assertFalse(liveart_artist_names_match("Friedensreich Hundertwasser", "Friedrich Müller"))
+
     def test_words_phrases_separators_and_apostrophes(self):
         self.assertEqual(
             parse_search_terms('Boomerangs Stabiles,boomerangs;“Very Gay Nose and Ears”\nL\'oiseau'),
@@ -97,6 +106,68 @@ class LiveArtTermSearchViewTests(TestCase):
             {"artist_id": "calder", "status": "sold", "search": term, "category_id": 2, "sort": "SALE_DATE_DESC", "limit": 10}
             for term in ("Boomerangs", "Stabiles")
         ])
+
+    def test_hundertwasser_alias_finds_and_accepts_burning_winter_sales(self):
+        self.lot.artist = "Friedensreich HUNDERTWASSER"
+        self.lot.artist_watchlist_name = "Friedensreich Hundertwasser"
+        self.lot.title = "Burning Winter (Winter lichterloh)"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title"))
+        self.api.list_artists.return_value = liveart_page([
+            {"id": "other", "name": "Friedrich Müller"},
+            {"id": "hundertwasser", "name": "Friedrich Hundertwasser"},
+        ])
+        self.api.list_lots.side_effect = [
+            liveart_page([liveart_lot(
+                "41", artist_id="hundertwasser", artist="Friedrich Hundertwasser",
+                title="Burning Winter (Winter Lichterloh)", lot_num="41", hammer_usd=3200,
+            )]),
+            liveart_page([liveart_lot(
+                "42", artist_id="hundertwasser", artist="Friedrich Hundertwasser",
+                title="BURNING WINTER (KOSCHATZKY 67)", lot_num="42", hammer_usd=3125,
+            )]),
+        ]
+
+        research = self.research(search_terms="Burning Winter")
+
+        self.assertEqual(research.status_code, 200)
+        payload = research.json()
+        self.api.list_artists.assert_called_once_with(q="Friedrich Hundertwasser", limit=3)
+        self.assertEqual(
+            [call.kwargs["artist_id"] for call in self.api.list_lots.call_args_list],
+            ["hundertwasser", "hundertwasser"],
+        )
+        self.assertEqual({row["id"] for row in payload["candidates"]}, {"41", "42"})
+        self.assertTrue(all(row["credible"] for row in payload["candidates"]))
+        self.assertEqual(payload["selected_ids"], [])
+        self.assertEqual(self.save(payload, ["41", "42"]).status_code, 200)
+
+    def test_hundertwasser_alias_also_works_for_default_artwork_search(self):
+        self.lot.artist = "Friedensreich HUNDERTWASSER"
+        self.lot.title = "Burning Winter"
+        self.lot.save(update_fields=("artist", "title"))
+        self.api.list_artists.return_value = liveart_page([
+            {"id": "hundertwasser", "name": "Friedrich Hundertwasser"},
+        ])
+        artwork = liveart_artwork(
+            "burning-winter", artist_id="hundertwasser", artist="Friedrich Hundertwasser",
+            title="Burning Winter",
+        )
+        sale = liveart_lot(
+            "43", artist_id="hundertwasser", artist="Friedrich Hundertwasser",
+            title="Burning Winter", hammer_usd=3628,
+        )
+        sale["artwork_id"] = artwork["id"]
+        sale["artwork"]["id"] = artwork["id"]
+        self.api.list_artworks.return_value = liveart_page([artwork])
+        self.api.list_lots.return_value = liveart_page([sale])
+
+        response = self.research(search_terms="")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["subject_match"]["id"], "burning-winter")
+        self.assertTrue(payload["candidates"][0]["credible"])
+        self.api.list_artists.assert_called_once_with(q="Friedrich Hundertwasser", limit=3)
 
     def test_empty_first_term_still_fetches_second_and_reports_limited_page(self):
         second = liveart_page([self.sale(2, title="Stabiles")])
