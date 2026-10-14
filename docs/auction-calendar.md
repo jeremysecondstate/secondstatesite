@@ -2,6 +2,8 @@
 
 The desktop Artist Watchlist synchronizes normalized auction results to the staff-only calendar at `/calendar/`. The calendar and every Email Tray route use Django staff-login protection; ordinary and logged-out users are redirected to the staff login.
 
+Posted Invaluable sale results sync as separate `sold_price` and `sold_currency` fields. The calendar keeps the estimate and replaces the current-bid line with **Sold: $11,000 USD** (or the source's currency) when a positive explicit result is available. Sold lots are inactive for reminders and remain visible in historical dates. Resyncs without a posted result preserve an existing sold price and the lot's saved research and Email Tray identity. Deploy migration `0029_auctionwatchlot_sold_price_sold_currency` with the website update, and restart the desktop app to use live result rechecks and **Import Saved Sold Results…**; see [Artist Watchlist](artist-watchlist.md#posted-sold-prices) for the signed-in saved-page fallback.
+
 ## Data flow
 
 ```text

@@ -1069,6 +1069,34 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual(details[unsafe_lot.pk]["images"], [])
         self.assertNotContains(response, "private-calendar-image.jpg")
 
+    def test_posted_sold_result_replaces_stale_bid_and_keeps_estimate(self):
+        sold = watch_lot(
+            source_lot_id="posted-sold", sold_price=11000, sold_currency="USD",
+            current_bid=3800, bid_count=0, active=False,
+        )
+        foreign = watch_lot(
+            source_lot_id="foreign-sold", sold_price=1250.50, sold_currency="GBP",
+            current_bid=3800, active=False,
+        )
+        ended = watch_lot(
+            source_lot_id="ended-no-result", current_bid=1700, bid_count=4, active=False,
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+        details = {item["id"]: item for item in response.context["calendar_data"]["2026-07-25"]}
+        self.assertEqual(details[sold.pk]["sold"], "Sold: $11,000 USD")
+        self.assertEqual(details[sold.pk]["bid"], "Sold: $11,000 USD")
+        self.assertEqual(details[sold.pk]["sold_price"], "11000.00")
+        self.assertEqual(details[sold.pk]["sold_currency"], "USD")
+        self.assertEqual(details[sold.pk]["estimate"], "$2,000–3,000 estimate")
+        self.assertEqual(details[foreign.pk]["bid"], "Sold: £1,250.50 GBP")
+        self.assertEqual(details[foreign.pk]["estimate"], "$2,000–3,000 estimate")
+        self.assertEqual(details[ended.pk]["sold"], "")
+        self.assertEqual(details[ended.pk]["bid"], "Current bid: $1,700 · 4 bids")
+        self.assertContains(response, "Sold: $11,000 USD")
+
     def test_invalid_month_falls_back_without_error(self):
         self.client.force_login(self.staff)
         response = self.client.get(reverse("auction_calendar"), {"month": "not-a-month"})
@@ -2716,6 +2744,123 @@ class CalendarSyncApiTests(TestCase):
         }
         lot.update(overrides)
         return {"lots": [lot]}
+
+    def _sync(self, payload):
+        return self.client.post(
+            self.endpoint,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_API_KEY="sync-test-key",
+        )
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_posted_sold_price_updates_in_place_and_preserves_saved_research(self):
+        self.assertEqual(self._sync(self._payload()).status_code, 200)
+        lot = AuctionWatchLot.objects.get()
+        lot_pk = lot.pk
+        artprice = stored_analysis(lot)
+        liveart = LiveArtResaleAnalysis.objects.create(
+            lot=lot, selected_ids=["verified-comp"],
+            retrieved_at=datetime(2026, 7, 20, tzinfo=ZoneInfo("UTC")),
+        )
+        tray_item = AuctionEmailBatchItem.objects.create(batch=AuctionEmailBatch.objects.create(), lot=lot)
+
+        response = self._sync(self._payload(
+            sold_price=11000, sold_currency="USD", current_bid=3800, bid_count=0,
+            status="changed", active=True,
+        ))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["updated"], 1)
+        self.assertEqual(response.json()["ended"], 1)
+        lot.refresh_from_db()
+        self.assertEqual(lot.pk, lot_pk)
+        self.assertEqual(lot.sold_price, Decimal("11000.00"))
+        self.assertEqual(lot.sold_currency, "USD")
+        self.assertFalse(lot.active)
+        self.assertEqual(lot.estimate_low, Decimal("10000.00"))
+        self.assertEqual(lot.estimate_high, Decimal("15000.00"))
+        self.assertEqual(AuctionWatchLot.objects.count(), 1)
+        artprice.refresh_from_db()
+        liveart.refresh_from_db()
+        tray_item.refresh_from_db()
+        self.assertEqual(artprice.lot_id, lot_pk)
+        self.assertEqual(artprice.expected_resale_hammer, Decimal("1205.00"))
+        self.assertEqual(liveart.selected_ids, ["verified-comp"])
+        self.assertEqual(tray_item.lot_id, lot_pk)
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_legacy_or_empty_result_resync_cannot_erase_or_reactivate_known_sale(self):
+        self.assertEqual(self._sync(self._payload(sold_price=11000, sold_currency="GBP")).status_code, 200)
+        original_pk = AuctionWatchLot.objects.get().pk
+        updates = ({}, {"sold_price": None}, {"sold_price": ""}, {"sold_price": 0})
+        for update in updates:
+            with self.subTest(update=update):
+                response = self._sync(self._payload(
+                    title="Refreshed title", status="new", active=True, sold_currency="", **update,
+                ))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["updated"], 1)
+                self.assertEqual(response.json()["ended"], 1)
+                lot = AuctionWatchLot.objects.get()
+                self.assertEqual(lot.pk, original_pk)
+                self.assertEqual(lot.title, "Refreshed title")
+                self.assertEqual(lot.sold_price, Decimal("11000.00"))
+                self.assertEqual(lot.sold_currency, "GBP")
+                self.assertFalse(lot.active)
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_later_posted_result_can_correct_amount_and_uses_explicit_sale_currency(self):
+        self._sync(self._payload(sold_price=11000))
+        original_pk = AuctionWatchLot.objects.get().pk
+        self.assertEqual(AuctionWatchLot.objects.get().sold_currency, "USD")
+
+        response = self._sync(self._payload(sold_price="12050.75", sold_currency="eur"))
+
+        self.assertEqual(response.status_code, 200)
+        lot = AuctionWatchLot.objects.get()
+        self.assertEqual(lot.pk, original_pk)
+        self.assertEqual(lot.sold_price, Decimal("12050.75"))
+        self.assertEqual(lot.sold_currency, "EUR")
+        self.assertEqual(lot.currency, "USD")
+        self.assertFalse(lot.active)
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_invalid_sold_price_rejects_whole_payload_before_saving(self):
+        for invalid in (
+            -1, "NaN", "Infinity", "not-money", True, "10000000000000",
+            "1e1000000", "-1e1000000", "9.999999999999995e12",
+        ):
+            with self.subTest(sold_price=invalid):
+                payload = self._payload()
+                payload["lots"].append(dict(payload["lots"][0], source_lot_id="bad-result", sold_price=invalid))
+                response = self._sync(payload)
+                self.assertEqual(response.status_code, 400)
+                self.assertFalse(AuctionWatchLot.objects.exists())
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_ended_lot_with_bid_is_not_a_posted_sale(self):
+        response = self._sync(self._payload(status="ended", current_bid=11000))
+        self.assertEqual(response.status_code, 200)
+        lot = AuctionWatchLot.objects.get()
+        self.assertIsNone(lot.sold_price)
+        self.assertEqual(lot.sold_currency, "")
+        self.assertFalse(lot.active)
+
+    @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
+    def test_sync_acknowledges_only_explicit_positive_sold_results(self):
+        payload = self._payload(sold_price=11000, sold_currency="USD")
+        payload["lots"].append(dict(payload["lots"][0], source_lot_id="no-result", sold_price=None))
+
+        response = self._sync(payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["received"], 2)
+        self.assertEqual(response.json()["sold_prices_received"], 1)
+        retry = self._sync(self._payload(sold_price=0))
+        self.assertEqual(retry.status_code, 200)
+        self.assertEqual(retry.json()["sold_prices_received"], 0)
+        self.assertEqual(AuctionWatchLot.objects.get(source_lot_id="205299494").sold_price, Decimal("11000.00"))
 
     @patch.dict(os.environ, {"CATALOG_API_KEY": "sync-test-key"}, clear=False)
     def test_sync_requires_the_catalog_api_key(self):

@@ -132,6 +132,37 @@ class CalendarSyncConfigurationTests(TestCase):
         self.assertIn("Server rejected the upload", self.warning.call_args.args[1])
         self.assertIn("sync incomplete", self.panel.status_callback.call_args.args[0])
 
+    def test_saved_sold_result_import_merges_agenda_and_automatically_syncs(self):
+        self.panel.calendar_api_key = "offline-test-key"
+        entry = BookmarkEntry(
+            folder_path=("ARTISTS INVALUABLE",), title="Alexander Calder", source="Invaluable",
+            artist="Alexander Calder", url="https://www.invaluable.com/search?artistName=Alexander+Calder",
+        )
+        self.panel.active_entries = [entry]
+        self.panel.selected_artists = {entry.watch_label}
+        self.panel._cache_path = self.root / "unused.sqlite3"
+        self.panel.import_sold_button = Mock()
+        sold = NormalizedLot(
+            source="Invaluable", source_lot_id="116", artist="Alexander Calder",
+            artist_watchlist_name="Alexander Calder", title="Nid d'araignee", sold_price=11000,
+            sold_currency="USD", status="changed",
+        )
+        result = WatchlistResult([sold], WatchlistMetrics(changed_lots=1))
+        with (
+            patch("catalogapp.watchlist_ui.filedialog.askopenfilenames", return_value=["sold.html"]),
+            patch("catalogapp.watchlist_ui.WatchlistCache") as cache,
+            patch("catalogapp.watchlist_ui.local_watchlist_directory", return_value=self.root),
+            patch("catalogapp.watchlist_ui.import_saved_sold_pages", return_value=result) as importer,
+            patch("catalogapp.watchlist_ui.threading.Thread", side_effect=self.immediate_thread),
+        ):
+            self.panel.import_saved_sold_results()
+        importer.assert_called_once_with(["sold.html"], entries=[entry], cache=cache.return_value.__enter__.return_value)
+        self.assertEqual({lot.cache_key for lot in self.panel.current_lots}, {self.lot.cache_key, sold.cache_key})
+        self.panel.calendar_syncer.assert_called_once()
+        self.assertIn(sold, self.panel.calendar_syncer.call_args.args[0])
+        self.panel.import_sold_button.configure.assert_called_with(state=tk.NORMAL)
+        self.warning.assert_not_called()
+
     def test_unconfirmed_images_keep_deployment_guidance_visible_after_partial_sync(self):
         self.panel.calendar_api_key = "offline-test-key"
         self.result.errors = ["Heritage live refresh failed; retained cached lots."]

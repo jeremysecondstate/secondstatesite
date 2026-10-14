@@ -111,6 +111,14 @@ Invaluable's `currentBid` and `bidCount` values are normalized separately so the
 
 ## Calendar behavior
 
+### Posted sold prices
+
+After an auction, **Refresh Watchlist** rechecks previously watched Invaluable lot detail pages for up to 30 days after their source date/time, including lots that have disappeared from upcoming searches or were already marked ended. A posted result such as **Sold: $11,000 USD** is stored separately from the estimate and current bid, appears in the desktop **Current Bid / Sold** column and Markdown/CSV exports, and is uploaded by automatic calendar sync. The website displays the result in the catalog, day list, lot browser, and research view. A missing lot or its last bid alone never counts as a sold price. Confirmed sold lots remain in calendar history and are excluded from upcoming ICS events and reminders. Later syncs that omit the result preserve the saved price.
+
+Some Invaluable pages show **Sold: Log in to view** to the desktop's public requests. If the price is visible in your signed-in browser, save that individual lot page as HTML and use **Import Saved Sold Results…** with its Invaluable artist selected. The importer matches the saved page to an existing watched lot and automatically syncs its posted result; it also works for older tracked lots outside the 30-day live recheck period. Only normalized result fields are imported. Page HTML, login cookies, and local filenames are not uploaded. Pages without an explicit visible sold amount or without a matching selected watch are reported and leave existing data intact.
+
+**Sync Website Calendar** retries the current local results; use **Refresh Watchlist** or the saved-result import first to retrieve a newly posted price. The bookmark file supplies artist searches, while each lot's detail page supplies its final result.
+
 ICS output defaults to one event per auction sale. Matched artists and lots are grouped in the description. A timezone-aware source time is converted to UTC. A source date without a time becomes an all-day event and the description marks the time as unverified. Event-per-lot and reminders are supported by the export function but are intentionally not the noisy UI default.
 
 The private web calendar at `/calendar/` is populated automatically after a successful refresh and can be retried with **Sync Website Calendar**. A selected date with lots exposes **Browse all N lots**, which opens a single modal viewer with the current lot's primary image, details, counter, progress, wraparound previous/next controls, and keyboard navigation. Website staff can explicitly select lots with saved Artprice links for the shared Email Tray; sync never selects, deselects, or sends them. See [`auction-calendar.md`](auction-calendar.md) for authentication, deployment, and Gmail setup.

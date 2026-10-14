@@ -124,6 +124,21 @@ class WatchlistCache:
             ).fetchall()
         return [NormalizedLot.from_dict(json.loads(row["payload_json"])) for row in rows]
 
+    def lots_for_watch_url(self, watch_url: str) -> list[NormalizedLot]:
+        """Include ended memberships so posted results can arrive after disappearance."""
+
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT lots.payload_json FROM watch_memberships
+                JOIN lots ON lots.cache_key = watch_memberships.cache_key
+                WHERE watch_memberships.watch_url = ?
+                ORDER BY lots.cache_key
+                """,
+                (watch_url,),
+            ).fetchall()
+        return [NormalizedLot.from_dict(json.loads(row["payload_json"])) for row in rows]
+
     def upsert(
         self,
         lot: NormalizedLot,
@@ -131,26 +146,35 @@ class WatchlistCache:
         watch_url: str,
         search_hash: str,
         observed_at: datetime | None = None,
+        active: bool = True,
     ) -> str:
         now = _iso(observed_at)
         with self._lock, self.connection:
             existing = self.connection.execute(
-                "SELECT content_hash, first_seen_at FROM lots WHERE cache_key = ?", (lot.cache_key,)
+                "SELECT content_hash, first_seen_at, payload_json FROM lots WHERE cache_key = ?", (lot.cache_key,)
             ).fetchone()
             if existing is None:
                 transition = "new"
                 lot.first_seen_at = now
             else:
+                previous = NormalizedLot.from_dict(json.loads(existing["payload_json"]))
+                if lot.sold_price is None and previous.sold_price is not None:
+                    lot.sold_price = previous.sold_price
+                    lot.sold_currency = previous.sold_currency or previous.currency
+                    lot.content_hash = lot.calculate_content_hash()
                 transition = "unchanged" if existing["content_hash"] == lot.content_hash else "changed"
                 lot.first_seen_at = existing["first_seen_at"]
             lot.last_seen_at = now
             lot.status = transition
+            active = active and lot.sold_price is None
+            if not active and lot.sold_price is None:
+                lot.status = "ended"
             self.connection.execute(
                 """
                 INSERT INTO lots (
                     cache_key, source, source_lot_id, canonical_url, payload_json, content_hash,
                     search_hash, first_seen_at, last_seen_at, status, active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(cache_key) DO UPDATE SET
                     source=excluded.source,
                     source_lot_id=excluded.source_lot_id,
@@ -161,7 +185,7 @@ class WatchlistCache:
                     first_seen_at=excluded.first_seen_at,
                     last_seen_at=excluded.last_seen_at,
                     status=excluded.status,
-                    active=1
+                    active=excluded.active
                 """,
                 (
                     lot.cache_key,
@@ -173,18 +197,19 @@ class WatchlistCache:
                     search_hash,
                     lot.first_seen_at,
                     lot.last_seen_at,
-                    transition,
+                    lot.status,
+                    int(active),
                 ),
             )
             self.connection.execute(
                 """
                 INSERT INTO watch_memberships (watch_url, cache_key, last_seen_at, active)
-                VALUES (?, ?, ?, 1)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT(watch_url, cache_key) DO UPDATE SET
                     last_seen_at=excluded.last_seen_at,
-                    active=1
+                    active=excluded.active
                 """,
-                (watch_url, lot.cache_key, now),
+                (watch_url, lot.cache_key, now, int(active)),
             )
         return transition
 
@@ -220,6 +245,10 @@ class WatchlistCache:
                 if not row:
                     continue
                 lot = NormalizedLot.from_dict(json.loads(row["payload_json"]))
+                if lot.sold_price is not None:
+                    # A second bookmark disappearing cannot overwrite the
+                    # explicit result transition recorded through the first.
+                    continue
                 lot.status = "ended"
                 lot.last_seen_at = now
                 self.connection.execute(

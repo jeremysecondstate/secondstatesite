@@ -197,6 +197,8 @@ class AuctionWatchLot(models.Model):
     currency = models.CharField(max_length=8, blank=True)
     current_bid = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
     bid_count = models.PositiveIntegerField(blank=True, null=True)
+    sold_price = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    sold_currency = models.CharField(max_length=8, blank=True)
     lot_url = models.URLField(max_length=2000, blank=True)
     sale_url = models.URLField(max_length=2000, blank=True)
     image_url = models.URLField(max_length=2000, blank=True)

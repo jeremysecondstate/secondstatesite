@@ -2879,7 +2879,7 @@
     appendText(caption, "p", "day-gallery-meta", [lot.medium, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.time].filter(Boolean).join(" · "));
     appendText(caption, "p", "day-gallery-estimate", lot.estimate);
     appendText(caption, "p", "day-gallery-bid", lot.bid);
-    if (lot.ended) appendText(caption, "p", "day-gallery-ended", "Sale ended");
+    if (lot.ended && !lot.sold) appendText(caption, "p", "day-gallery-ended", "Sale ended");
     const actions = document.createElement("div");
     actions.className = "day-gallery-actions";
     const quickLook = document.createElement("button");
@@ -3315,7 +3315,7 @@
     content.appendChild(appendArchiveGallery(lot));
     const overview = document.createElement("section");
     overview.className = "research-lot-overview";
-    if (lot.ended) appendText(overview, "p", "lot-browser-status", "Sale ended");
+    if (lot.ended && !lot.sold) appendText(overview, "p", "lot-browser-status", "Sale ended");
     appendArtistLabel(overview, lot);
     const heading = document.createElement("h3");
     heading.className = "lot-title";
@@ -3388,7 +3388,7 @@
 
     const copy = document.createElement("div");
     copy.className = "lot-browser-copy has-workflow";
-    if (lot.ended) appendText(copy, "p", "lot-browser-status", "Sale ended");
+    if (lot.ended && !lot.sold) appendText(copy, "p", "lot-browser-status", "Sale ended");
     appendArtistLabel(copy, lot);
     appendText(copy, "h3", "lot-title", lot.title);
     appendText(copy, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));

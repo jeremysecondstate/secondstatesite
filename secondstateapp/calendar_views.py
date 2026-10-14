@@ -142,7 +142,22 @@ def _estimate_label(lot: AuctionWatchLot) -> str:
     return f"{prefix}{value} estimate"
 
 
+def _sold_label(lot: AuctionWatchLot) -> str:
+    if lot.sold_price is None or lot.sold_price <= 0:
+        return ""
+    currency = (lot.sold_currency or lot.currency or "").upper()
+    prefix = {
+        "USD": "$", "GBP": "£", "EUR": "€", "CAD": "C$", "AUD": "A$",
+        "HKD": "HK$", "JPY": "¥", "CNY": "¥",
+    }.get(currency, "")
+    suffix = f" {currency}" if currency else ""
+    return f"Sold: {prefix}{_money(lot.sold_price)}{suffix}"
+
+
 def _bid_label(lot: AuctionWatchLot) -> str:
+    sold_label = _sold_label(lot)
+    if sold_label:
+        return sold_label
     if lot.bid_count == 0:
         return "Current bid: No bids"
     if lot.current_bid is None:
@@ -225,6 +240,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "location": lot.location,
         "estimate": _estimate_label(lot),
         "bid": _bid_label(lot),
+        "sold": _sold_label(lot),
         "time": _time_label(lot, zone),
         "url": lot.lot_url or lot.sale_url,
         "lot_url": lot.lot_url,
@@ -234,6 +250,8 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "currency": lot.currency,
         "current_bid": _decimal_json(lot.current_bid),
         "bid_count": lot.bid_count,
+        "sold_price": _decimal_json(lot.sold_price),
+        "sold_currency": lot.sold_currency or (lot.currency if lot.sold_price else ""),
         "artist_artprice_url": artist_artprice_url,
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
@@ -1888,12 +1906,16 @@ def _decimal(value) -> Decimal | None:
         result = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError) as exc:
         raise ValueError("must be a number") from exc
-    if not result.is_finite() or abs(result) >= Decimal("10000000000000"):
+    limit = Decimal("10000000000000")
+    if not result.is_finite() or result.copy_abs() >= limit:
         raise ValueError("is outside the supported range")
     try:
-        return result.quantize(Decimal("0.01"))
+        rounded = result.quantize(Decimal("0.01"))
     except InvalidOperation as exc:
         raise ValueError("must be a number with at most two decimal places") from exc
+    if rounded.copy_abs() >= limit:
+        raise ValueError("is outside the supported range")
+    return rounded
 
 
 def _nonnegative_integer(value) -> int | None:
@@ -1908,6 +1930,13 @@ def _nonnegative_integer(value) -> int | None:
     if str(result) != str(value).strip() or result < 0 or result > 2_147_483_647:
         raise ValueError("must be a non-negative integer")
     return result
+
+
+def _sold_price(value) -> Decimal | None:
+    result = _decimal(value)
+    if result is not None and result < 0:
+        raise ValueError("sold_price must be a positive number")
+    return result if result else None
 
 
 def _source_datetime(value, zone: ZoneInfo) -> tuple[datetime | None, bool]:
@@ -2006,7 +2035,8 @@ def sync_auction_calendar(request):
             first_seen_at, _ = _source_datetime(record.get("first_seen_at"), zone)
             last_seen_at, _ = _source_datetime(record.get("last_seen_at"), zone)
             source_status = _text(record.get("status") or "unchanged", 24).lower()
-            active = source_status != "ended" and record.get("active", True) is not False
+            sold_price = _sold_price(record.get("sold_price"))
+            active = sold_price is None and source_status != "ended" and record.get("active", True) is not False
             defaults = {
                 "artist": _text(record.get("artist"), 255),
                 "artist_watchlist_name": _text(record.get("artist_watchlist_name"), 255),
@@ -2031,6 +2061,10 @@ def sync_auction_calendar(request):
                 "source_first_seen_at": first_seen_at,
                 "source_last_seen_at": last_seen_at,
             }
+            # Missing results on a legacy or partial refresh are not a retraction.
+            if sold_price is not None:
+                defaults["sold_price"] = sold_price
+                defaults["sold_currency"] = _text(record.get("sold_currency"), 8).upper() or defaults["currency"]
             artist_name = defaults["artist_watchlist_name"] or defaults["artist"]
             normalized_artist_name = artist_identity_key(artist_name)[:255]
             saved_image = None
@@ -2073,12 +2107,18 @@ def sync_auction_calendar(request):
                     )
                     artists_by_key[normalized_artist_name] = artist
                 defaults["watchlist_artist"] = artist
-            if saved_image is None:
-                existing_image = AuctionWatchLot.objects.select_for_update().filter(
-                    source=source, source_lot_id=source_lot_id,
-                ).values_list("image_url", flat=True).first()
-                if is_saved_calendar_image_url(existing_image):
+            existing_lot = AuctionWatchLot.objects.select_for_update().filter(
+                source=source, source_lot_id=source_lot_id,
+            ).first()
+            if existing_lot is not None:
+                if saved_image is None and is_saved_calendar_image_url(existing_lot.image_url):
                     defaults.pop("image_url", None)
+                if existing_lot.sold_price is not None and existing_lot.sold_price > 0:
+                    defaults["active"] = False
+                    if "sold_price" not in defaults:
+                        defaults["sold_currency"] = existing_lot.sold_currency or existing_lot.currency
+                if "sold_price" in defaults and not defaults["sold_currency"]:
+                    defaults["sold_currency"] = existing_lot.sold_currency or existing_lot.currency
             _lot, created = AuctionWatchLot.objects.update_or_create(
                 source=source,
                 source_lot_id=source_lot_id,
@@ -2097,5 +2137,6 @@ def sync_auction_calendar(request):
             "ended": ended_count,
             "artist_links": len(prepared_artist_links),
             "images_received": sum(image is not None for image in prepared_images),
+            "sold_prices_received": sum("sold_price" in prepared_lot[2] for prepared_lot in prepared),
         }
     )

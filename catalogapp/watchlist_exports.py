@@ -57,6 +57,8 @@ def render_csv(lots: Iterable[NormalizedLot]) -> str:
         "status",
         "lot_url",
         "sale_url",
+        "sold_price",
+        "sold_currency",
     ]
     writer = csv.DictWriter(output, fieldnames=fields, lineterminator="\n")
     writer.writeheader()
@@ -79,6 +81,8 @@ def render_csv(lots: Iterable[NormalizedLot]) -> str:
                 "status": lot.status,
                 "lot_url": lot.lot_url,
                 "sale_url": lot.sale_url,
+                "sold_price": "" if lot.sold_price is None else lot.sold_price,
+                "sold_currency": lot.sold_currency,
             }
         )
     return output.getvalue()
@@ -91,7 +95,8 @@ def render_ics(
     include_reminders: bool = False,
     generated_at: datetime | None = None,
 ) -> str:
-    dated = [lot for lot in lots if parse_lot_datetime(lot.relevant_at)[0] is not None and lot.status != "ended"]
+    dated = [lot for lot in lots if parse_lot_datetime(lot.relevant_at)[0] is not None
+             and lot.status != "ended" and lot.sold_price is None]
     groups: dict[tuple[str, ...], list[NormalizedLot]] = {}
     for lot in dated:
         key = (lot.cache_key,) if event_per_lot else _sale_key(lot)
@@ -147,7 +152,7 @@ def render_ics(
 
 
 def render_calendar_preview(lots: Iterable[NormalizedLot]) -> str:
-    dated = [lot for lot in sorted(lots, key=_sort_key) if lot.status != "ended"]
+    dated = [lot for lot in sorted(lots, key=_sort_key) if lot.status != "ended" and lot.sold_price is None]
     if not dated:
         return "No calendar events in the selected horizon."
     groups: dict[tuple[str, ...], list[NormalizedLot]] = {}
@@ -193,10 +198,13 @@ def _sale_key(lot: NormalizedLot) -> tuple[str, ...]:
 
 def _money_label(lot: NormalizedLot) -> str:
     code = f" {lot.currency}" if lot.currency else ""
+    sold = f" — {lot.sold_label}" if lot.sold_price is not None else ""
     if lot.estimate_low is not None or lot.estimate_high is not None:
         low = "?" if lot.estimate_low is None else f"{lot.estimate_low:,.0f}"
         high = "?" if lot.estimate_high is None else f"{lot.estimate_high:,.0f}"
-        return f" — estimate {low}–{high}{code}"
+        return f" — estimate {low}–{high}{code}{sold}"
+    if sold:
+        return sold
     if lot.current_bid is not None:
         return f" — bid {lot.current_bid:,.0f}{code}"
     return ""

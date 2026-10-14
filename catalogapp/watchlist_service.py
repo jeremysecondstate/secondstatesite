@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import threading
 from typing import Callable, Iterable
 
@@ -101,6 +101,7 @@ class WatchlistService:
         refreshed_lots: list[NormalizedLot] = []
         fallback_lot_keys: set[str] = set()
         observed_lot_keys: set[str] = set()
+        result_checks: dict[str, NormalizedLot | None] = {}
         stopped = False
         started_pages = int(getattr(fetcher, "pages_fetched", 0))
         observed_at = self.now()
@@ -176,6 +177,8 @@ class WatchlistService:
                     observed_at,
                     preloaded_search=batched_pages.get(entry.url),
                     observed_lot_keys=observed_lot_keys,
+                    result_checks=result_checks,
+                    errors=errors,
                 )
                 refreshed_lots.extend(lots)
                 if complete:
@@ -207,18 +210,27 @@ class WatchlistService:
         metrics.input_tokens = enrichment.input_tokens
         metrics.output_tokens = enrichment.output_tokens
         metrics.total_tokens = enrichment.total_tokens
-        for lot in freshly_observed_lots:
-            self.cache.update_payload(lot)
-
         deduplicated: dict[str, NormalizedLot] = {}
+        priority = {"new": 3, "changed": 2, "ended": 1, "unchanged": 0}
         for lot in mark_cross_source_duplicates(refreshed_lots):
-            deduplicated[lot.cache_key] = lot
+            previous = deduplicated.get(lot.cache_key)
+            if previous is None or not (previous.sold_price is not None and lot.sold_price is None):
+                if previous is not None and priority.get(previous.status, 0) > priority.get(lot.status, 0):
+                    lot.status = previous.status
+                deduplicated[lot.cache_key] = lot
         lots = list(deduplicated.values())
-        lots = [lot for lot in lots if lot.status == "ended" or lot_within_horizon(lot, observed_at, horizon_days)]
+        for lot in lots:
+            if lot.cache_key not in fallback_lot_keys:
+                self.cache.update_payload(lot)
+        lots = [lot for lot in lots if lot.status == "ended" or lot.sold_price is not None
+                or lot_within_horizon(lot, observed_at, horizon_days)]
         if new_changed_only:
             lots = [
                 lot for lot in lots
-                if lot.cache_key not in fallback_lot_keys and lot.status in {"new", "changed", "ended"}
+                if lot.cache_key not in fallback_lot_keys and (
+                    lot.status in {"new", "changed"}
+                    or (lot.status == "ended" and lot.cache_key in observed_lot_keys)
+                )
             ]
         lots.sort(key=_agenda_sort_key)
         if progress:
@@ -238,6 +250,8 @@ class WatchlistService:
         observed_at: datetime,
         preloaded_search: BatchedSearchPage | None = None,
         observed_lot_keys: set[str] | None = None,
+        result_checks: dict[str, NormalizedLot | None] | None = None,
+        errors: list[str] | None = None,
     ) -> tuple[list[NormalizedLot], list[NormalizedLot], bool]:
         page_url = entry.url
         visited_pages: set[str] = set()
@@ -258,6 +272,8 @@ class WatchlistService:
                 use_preloaded_search = False
             else:
                 page = adapter.fetch_search_page(page_url, fetcher)
+            if stop.is_set():
+                raise WatchlistStopped("Watchlist refresh stopped by the user.")
             cards = adapter.parse_search_page(page, page_url, entry.artist)
             if len(visited_pages) > 1 and cards and all(card.cache_key in observed_keys for card in cards):
                 raise SourceAccessError(
@@ -279,6 +295,8 @@ class WatchlistService:
                         detail_page = adapter.fetch_lot_detail(lot.lot_url, fetcher)
                         metrics.detail_pages_fetched += 1
                         detail = adapter.parse_lot_detail(detail_page, lot.lot_url, entry.artist)
+                        if result_checks is not None:
+                            result_checks[lot.cache_key] = detail
                         if detail:
                             lot = adapter.merge_detail(lot, detail)
                 transition = self.cache.upsert(
@@ -300,10 +318,88 @@ class WatchlistService:
             if next_url in visited_pages:
                 next_url = ""
             page_url = next_url
+        if complete and adapter.source == "Invaluable":
+            lots = self._refresh_posted_results(
+                entry, adapter, fetcher, stop, metrics, observed_at, lots,
+                result_checks if result_checks is not None else {},
+                errors if errors is not None else [], observed_lot_keys,
+            )
         ended = self.cache.mark_missing_ended(entry.url, observed_keys, observed_at) if complete else []
         if observed_lot_keys is not None:
             observed_lot_keys.update(lot.cache_key for lot in ended)
         return lots, ended, complete
+
+    def _refresh_posted_results(
+        self,
+        entry: BookmarkEntry,
+        adapter: BookmarkSourceAdapter,
+        fetcher,
+        stop: threading.Event,
+        metrics: WatchlistMetrics,
+        observed_at: datetime,
+        lots: list[NormalizedLot],
+        result_checks: dict[str, NormalizedLot | None],
+        errors: list[str],
+        observed_lot_keys: set[str] | None,
+    ) -> list[NormalizedLot]:
+        """Revisit watched details for 30 days, even after upcoming searches drop them."""
+
+        current = {lot.cache_key: lot for lot in lots}
+        now = observed_at if observed_at.tzinfo else observed_at.replace(tzinfo=timezone.utc)
+        for cached in self.cache.lots_for_watch_url(entry.url):
+            if stop.is_set():
+                raise WatchlistStopped("Watchlist refresh stopped by the user.")
+            if cached.sold_price is not None:
+                # A confirmed result is still included for reliable sync retries.
+                if cached.cache_key not in current:
+                    cached.status = "unchanged"
+                    current[cached.cache_key] = cached
+                    metrics.cache_hits += 1
+                continue
+            when, _all_day = parse_lot_datetime(cached.relevant_at)
+            if when is None or not now - timedelta(days=30) <= when <= now:
+                continue
+            if not cached.lot_url:
+                continue
+            if cached.cache_key not in result_checks:
+                try:
+                    page = adapter.fetch_lot_detail(cached.lot_url, fetcher)
+                    if stop.is_set():
+                        raise WatchlistStopped("Watchlist refresh stopped by the user.")
+                    metrics.detail_pages_fetched += 1
+                    detail = adapter.parse_lot_detail(page, cached.lot_url, entry.artist)
+                    if detail is None:
+                        raise SourceAccessError("The lot page did not contain recognizable auction details.")
+                    result_checks[cached.cache_key] = detail
+                except WatchlistStopped:
+                    raise
+                except Exception as exc:
+                    result_checks[cached.cache_key] = None
+                    message = " ".join(str(exc).split())[:300]
+                    errors.append(
+                        f"{entry.watch_label} (Invaluable), lot {cached.lot_number or cached.source_lot_id}: "
+                        f"sold result could not be checked: {message}. The last known data was retained."
+                    )
+            detail = result_checks[cached.cache_key]
+            if detail is not None and detail.sold_price is not None:
+                lot = adapter.merge_detail(cached, detail)
+                lookup = self.cache.lookup(cached)
+                transition = self.cache.upsert(
+                    lot, watch_url=entry.url,
+                    search_hash=lookup.search_hash if lookup else "",
+                    observed_at=observed_at, active=False,
+                )
+                prior = current.get(lot.cache_key)
+                if prior is not None and prior.status in {"new", "changed"}:
+                    lot.status = prior.status
+                elif transition == "changed":
+                    metrics.changed_lots += 1
+                if observed_lot_keys is not None:
+                    observed_lot_keys.add(lot.cache_key)
+                current[lot.cache_key] = lot
+            elif cached.status == "ended" and cached.cache_key not in current:
+                current[cached.cache_key] = cached
+        return list(current.values())
 
     def _cached_lots_for_entry(self, entry: BookmarkEntry) -> list[NormalizedLot]:
         lots = self.cache.active_lots_for_watch_url(entry.url)

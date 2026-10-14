@@ -31,6 +31,8 @@ class NormalizedLot:
     currency: str = ""
     current_bid: float | None = None
     bid_count: int | None = None
+    sold_price: float | None = None
+    sold_currency: str = ""
     lot_url: str = ""
     sale_url: str = ""
     image_url: str = ""
@@ -63,6 +65,8 @@ class NormalizedLot:
     def bid_label(self) -> str:
         """Human-readable bid state for the desktop agenda."""
 
+        if self.sold_price is not None:
+            return self.sold_label
         if self.bid_count == 0:
             return "No bids"
         if self.current_bid is None:
@@ -74,6 +78,14 @@ class NormalizedLot:
             noun = "bid" if self.bid_count == 1 else "bids"
             return f"{value} ({self.bid_count} {noun})"
         return value
+
+    @property
+    def sold_label(self) -> str:
+        if self.sold_price is None:
+            return ""
+        amount = f"{self.sold_price:,.2f}".rstrip("0").rstrip(".")
+        currency = (self.sold_currency or self.currency).upper()
+        return f"Sold: {amount} {currency}".strip()
 
     def visible_content(self) -> dict[str, Any]:
         ignored = {
@@ -89,6 +101,10 @@ class NormalizedLot:
         # Keep pre-image cache hashes stable until artwork pixels are imported.
         if not self.saved_image_base64:
             content.pop("saved_image_base64", None)
+        # Legacy cached records keep their hash until a result is posted.
+        if self.sold_price is None:
+            content.pop("sold_price", None)
+            content.pop("sold_currency", None)
         return content
 
     def calculate_content_hash(self) -> str:

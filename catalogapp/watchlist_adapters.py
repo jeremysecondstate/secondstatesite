@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from copy import copy
 import json
+import math
 import re
 from typing import Any, Iterable, Protocol
 import unicodedata
@@ -113,6 +114,8 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         "lotTitle",
         "objectID",
         "photoPath",
+        "soldPrice",
+        "soldCurrencyCode",
         "stateName",
         "subcategoryName",
         "supercategoryName",
@@ -354,7 +357,33 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         if not raw_lots:
             raw_lots.append(self._raw_from_detail(soup, lot_url))
         normalized = self._normalize_and_deduplicate(raw_lots, lot_url, watchlist_artist)
-        return normalized[0] if normalized else None
+        if not normalized:
+            return None
+        canonical = canonicalize_bookmark_url(lot_url)
+        canonical_node = soup.find("link", rel="canonical")
+        page_canonical = canonicalize_bookmark_url(canonical_node.get("href", "")) if canonical_node else ""
+        detail = next((lot for lot in normalized if lot.lot_url in {canonical, page_canonical}), None)
+        if detail is None:
+            # Related-lot metadata alone must not become this page's lot.
+            detail = self._normalize(self._raw_from_detail(soup, lot_url), lot_url, watchlist_artist)
+        if detail is None:
+            return None
+        # The public metadata can omit the result while the visible detail
+        # contains "Sold: $11,000 USD". Read that label independently of JSON.
+        sold = self._sold_from_html(soup)
+        if sold.low is not None:
+            detail.sold_price = sold.low
+            detail.sold_currency = sold.currency or detail.currency
+            detail.content_hash = detail.calculate_content_hash()
+        return detail
+
+    def merge_detail(self, card: NormalizedLot, detail: NormalizedLot) -> NormalizedLot:
+        merged = super().merge_detail(card, detail)
+        # Catalog objectID and URL-derived detail IDs need not be identical.
+        merged.source_lot_id = card.source_lot_id
+        merged.lot_url = card.lot_url or detail.lot_url
+        merged.content_hash = merged.calculate_content_hash()
+        return merged
 
     def extract_next_page_url(self, page: str, page_url: str) -> str:
         catalog_result = self._catalog_result(page)
@@ -494,6 +523,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             location = ", ".join(
                 value for value in (self._text_value(hit, "stateName"), self._text_value(hit, "countryName")) if value
             )
+        sold = self._sold_money(hit)
         return {
             "lotId": self._text_value(hit, "objectID", "lotRef"),
             "lotUrl": self._catalog_lot_url(hit, page_url),
@@ -505,6 +535,8 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             "estimateLow": self._value(hit, "estimateLow"),
             "estimateHigh": self._value(hit, "estimateHigh"),
             "currentBid": self._value(hit, "currentBid"),
+            "soldPrice": sold.low,
+            "soldCurrency": sold.currency,
             "bidCount": self._value(hit, "bidCount"),
             "currency": self._text_value(hit, "currencyCode"),
             "endAt": self._catalog_datetime(hit),
@@ -570,12 +602,20 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         watchlist_artist: str,
     ) -> list[NormalizedLot]:
         lots: list[NormalizedLot] = []
-        seen: set[str] = set()
+        seen: dict[str, NormalizedLot] = {}
         for raw in raw_lots:
             lot = self._normalize(raw, page_url, watchlist_artist)
-            if not lot or lot.cache_key in seen:
+            if not lot:
                 continue
-            seen.add(lot.cache_key)
+            if lot.cache_key in seen:
+                existing = seen[lot.cache_key]
+                if lot.sold_price is not None:
+                    # Public JSON can omit a result present on its DOM card.
+                    existing.sold_price = lot.sold_price
+                    existing.sold_currency = lot.sold_currency
+                    existing.content_hash = existing.calculate_content_hash()
+                continue
+            seen[lot.cache_key] = lot
             lots.append(lot)
         return lots
 
@@ -599,6 +639,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         )
         current_bid_value = self._value(raw, "currentBid", "bid", "price")
         current = self._money(current_bid_value, None, None, estimate.currency)
+        sold = self._sold_money(raw)
         bid_count = self._bid_count(self._value(raw, "bidCount", "numberOfBids"))
         if bid_count is None:
             bid_count = self._bid_count(current_bid_value, require_label=True)
@@ -629,6 +670,8 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             estimate_high=estimate.high,
             currency=estimate.currency or current.currency,
             current_bid=current.low,
+            sold_price=sold.low,
+            sold_currency=sold.currency if sold.low is not None else "",
             bid_count=bid_count,
             lot_url=lot_url,
             sale_url=(
@@ -646,6 +689,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
 
     def _raw_from_card(self, node: Any, page_url: str) -> dict[str, Any]:
         anchor = node.find("a", href=self._lot_href) if hasattr(node, "find") else None
+        sold = self._sold_from_html(node)
         return {
             "lotId": node.get("data-lot-id", "") if hasattr(node, "get") else "",
             "url": anchor.get("href", "") if anchor else "",
@@ -657,6 +701,8 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             "lotNumber": self._node_text(node, (".lot-number", "[data-lot-number]")),
             "estimate": self._node_text(node, (".estimate", "[data-estimate]")),
             "currentBid": self._node_text(node, (".current-bid", ".bid")),
+            "soldPrice": sold.low,
+            "soldCurrency": sold.currency,
             "bidCount": self._node_text(node, (".bid-count", "[data-bid-count]", "[data-testid='bid-count']")),
             "endAt": self._node_attr(node, ("time[datetime]", "[data-end-at]"), ("datetime", "data-end-at")),
             "startAt": self._node_attr(node, ("[data-start-at]",), ("data-start-at",)),
@@ -667,6 +713,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
 
     def _raw_from_detail(self, soup: BeautifulSoup, lot_url: str) -> dict[str, Any]:
         canonical = soup.find("link", rel="canonical")
+        sold = self._sold_from_html(soup)
         return {
             "url": canonical.get("href", lot_url) if canonical else lot_url,
             "title": self._node_text(soup, ("h1", "[data-testid='lot-title']", ".lot-title")),
@@ -677,9 +724,99 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             "lotNumber": self._node_text(soup, (".lot-number", "[data-testid='lot-number']")),
             "estimate": self._node_text(soup, (".estimate", "[data-testid='estimate']")),
             "currentBid": self._node_text(soup, (".current-bid", "[data-testid='current-bid']")),
+            "soldPrice": sold.low,
+            "soldCurrency": sold.currency,
             "bidCount": self._node_text(soup, (".bid-count", "[data-bid-count]", "[data-testid='bid-count']")),
             "endAt": self._node_attr(soup, ("time[datetime]", "[data-end-at]"), ("datetime", "data-end-at")),
         }
+
+    @staticmethod
+    def _posted_sold_money(value: Any, currency: Any = "") -> _Money:
+        """Accept a single explicit result amount, never bids or an estimate.
+
+        Text must start with the amount (after an optional Sold: label), so a
+        login prompt or an unavailable result cannot consume a later number.
+        Currency printed alongside the result takes precedence over estimates.
+        """
+
+        if value is None or isinstance(value, bool):
+            return _Money()
+        text = " ".join(str(value).split())
+        text = re.sub(r"^Sold(?:\s+(?:for|price))?\s*:\s*", "", text, flags=re.I)
+        match = re.fullmatch(
+            r"(?:(?P<prefix>[A-Z]{3})\s*)?"
+            r"(?P<symbol>US\$|C\$|A\$|HK\$|NZ\$|[$€£])?\s*"
+            r"(?P<amount>\d[\d,]*(?:\.\d{1,2})?)\s*"
+            r"(?P<suffix>[A-Z]{3})?",
+            text,
+            flags=re.I,
+        )
+        if not match:
+            return _Money()
+        amount = float(match["amount"].replace(",", ""))
+        if amount <= 0 or not math.isfinite(amount):
+            return _Money()
+        symbol_codes = {"US$": "USD", "C$": "CAD", "A$": "AUD", "HK$": "HKD", "NZ$": "NZD", "$": "USD", "€": "EUR", "£": "GBP"}
+        explicit_code = match["suffix"] or match["prefix"]
+        # A supplied source currency disambiguates the generic dollar symbol.
+        code = explicit_code or (symbol_codes.get((match["symbol"] or "").upper()) if match["symbol"] != "$" else "")
+        code = code or str(currency or "").upper().strip() or symbol_codes.get(match["symbol"] or "", "")
+        return _Money(amount, currency=code.upper())
+
+    @classmethod
+    def _sold_money(cls, raw: dict[str, Any]) -> _Money:
+        folded = {str(key).casefold(): value for key, value in raw.items()}
+        source_currency = cls._value(raw, "soldCurrency", "soldCurrencyCode", "currencyCode", "currency", "priceCurrency")
+        for key in ("soldPrice", "soldFor", "priceRealized", "realizedPrice", "hammerPrice"):
+            value = folded.get(key.casefold())
+            currency = source_currency
+            if isinstance(value, dict):
+                currency = cls._value(value, "currency", "currencyCode", "priceCurrency") or currency
+                value = cls._value(value, "amount", "value", "price")
+            sold = cls._posted_sold_money(value, currency)
+            if sold.low is not None:
+                return sold
+        return _Money()
+
+    @classmethod
+    def _sold_from_html(cls, node: Any) -> _Money:
+        if not hasattr(node, "select"):
+            return _Money()
+        # DOM selectors are explicitly about the result; generic price and bid
+        # elements carry no evidence that the lot was sold.
+        def unrelated_or_hidden(candidate: Any) -> bool:
+            for ancestor in (candidate, *candidate.parents):
+                if ancestor.has_attr("hidden") or ancestor.get("aria-hidden") == "true":
+                    return True
+                if node.name == "[document]" and (
+                    re.search(r"\b(?:lot-card|lot-item|related-lots|recommended-lots|recommendations)\b", " ".join(ancestor.get("class", [])))
+                    or "related" in str(ancestor.get("data-testid", "")).casefold()
+                ):
+                    return True
+            return False
+
+        for candidate in node.select("[data-sold-price], .sold-price, .lot-sold-price, [data-testid='sold-price']"):
+            if unrelated_or_hidden(candidate):
+                continue
+            value = candidate.get("data-sold-price") or candidate.get_text(" ", strip=True)
+            currency = candidate.get("data-sold-currency") or candidate.get("data-currency") or ""
+            sold = cls._posted_sold_money(value, currency)
+            if sold.low is not None:
+                return sold
+        for label in node.find_all(string=re.compile(r"^\s*Sold(?:\s+(?:for|price))?\s*:", re.I)):
+            parent = label.parent
+            if parent.name in {"script", "style", "template"}:
+                continue
+            if unrelated_or_hidden(parent):
+                # A related-lot card cannot supply the current detail's result.
+                continue
+            for candidate in (parent, parent.parent):
+                if candidate is None:
+                    continue
+                sold = cls._posted_sold_money(candidate.get_text(" ", strip=True))
+                if sold.low is not None:
+                    return sold
+        return _Money()
 
     def _embedded_lot_dicts(self, soup: BeautifulSoup) -> Iterable[dict[str, Any]]:
         for script in soup.find_all("script"):

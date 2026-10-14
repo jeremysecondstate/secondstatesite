@@ -24,6 +24,7 @@ class CalendarSyncResult:
     updated: int
     ended: int
     images_received: int = 0
+    sold_prices_received: int = 0
 
     def summary(self) -> str:
         message = (
@@ -32,6 +33,9 @@ class CalendarSyncResult:
         )
         if self.images_received:
             message += f" {self.images_received} saved artwork images synced."
+        if self.sold_prices_received:
+            noun = "price" if self.sold_prices_received == 1 else "prices"
+            message += f" {self.sold_prices_received} sold {noun} synced."
         return message
 
 
@@ -56,6 +60,8 @@ def _calendar_payload(lot: NormalizedLot) -> dict:
         "currency": lot.currency,
         "current_bid": lot.current_bid,
         "bid_count": lot.bid_count,
+        "sold_price": lot.sold_price,
+        "sold_currency": lot.sold_currency,
         "lot_url": lot.lot_url,
         "sale_url": lot.sale_url,
         "image_url": lot.image_url,
@@ -129,7 +135,7 @@ def sync_watchlist_lots(
         {"name": name, "artprice_url": url}
         for name, url in sorted(artist_links.values(), key=lambda item: item[0].casefold())
     ])
-    totals = dict(received=0, created=0, updated=0, ended=0, images_received=0)
+    totals = dict(received=0, created=0, updated=0, ended=0, images_received=0, sold_prices_received=0)
     for batch in batches:
         try:
             response = session.post(
@@ -154,6 +160,7 @@ def sync_watchlist_lots(
         if not isinstance(response_payload, dict) or not response_payload.get("ok"):
             raise CalendarSyncError("Website calendar returned an unexpected response.")
         expected_images = sum(bool(record.get("saved_image_base64")) for record in batch["lots"])
+        expected_sold_prices = sum(record.get("sold_price") is not None for record in batch["lots"])
         try:
             counts = {key: int(response_payload.get(key, 0)) for key in totals}
         except (TypeError, ValueError) as exc:
@@ -164,6 +171,11 @@ def sync_watchlist_lots(
             raise CalendarSyncError(
                 "Lot details reached the website, but saved artwork images were not confirmed. "
                 "Deploy the website's saved-image update, then click Sync Website Calendar again."
+            )
+        if counts["sold_prices_received"] != expected_sold_prices:
+            raise CalendarSyncError(
+                "Lot details reached the website, but sold prices were not confirmed. "
+                "Deploy the website's sold-price update and migration, then click Sync Website Calendar again."
             )
         for key in totals:
             totals[key] += counts[key]

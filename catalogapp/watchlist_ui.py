@@ -22,6 +22,7 @@ from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_exports import render_calendar_preview, render_csv, render_ics, render_markdown
 from catalogapp.watchlist_models import NormalizedLot, parse_lot_datetime
 from catalogapp.watchlist_saved_pages import import_saved_heritage_pages
+from catalogapp.watchlist_sold_pages import import_saved_sold_pages
 from catalogapp.watchlist_service import WatchlistResult, WatchlistService
 from catalogapp.watchlist_sync import CalendarSyncResult, sync_watchlist_lots
 from secondstate import environment
@@ -205,9 +206,13 @@ class ArtistWatchlistPanel(ttk.Frame):
             command=self.import_saved_heritage_pages,
         )
         self.import_saved_button.pack(side=tk.LEFT)
+        self.import_sold_button = ttk.Button(
+            saved_controls, text="Import Saved Sold Results…", command=self.import_saved_sold_results,
+        )
+        self.import_sold_button.pack(side=tk.LEFT, padx=(8, 0))
         ttk.Label(
             saved_controls,
-            text="Select a Heritage sale, then import its results pages saved as HTML from your browser.",
+            text="Import saved Heritage sale catalogs or Invaluable sold lot pages for selected watches.",
             style="Subtle.TLabel",
             wraplength=680,
         ).pack(side=tk.LEFT, padx=(8, 0))
@@ -226,7 +231,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.agenda_tree.column("#0", width=200, stretch=True)
         widths = {"time": 60, "sale": 180, "lot": 55, "title": 220, "estimate": 105, "bid": 130, "status": 70}
         for column in columns:
-            heading = "Current Bid" if column == "bid" else column.replace("_", " ").title()
+            heading = "Current Bid / Sold" if column == "bid" else column.replace("_", " ").title()
             self.agenda_tree.heading(column, text=heading)
             self.agenda_tree.column(column, width=widths[column], stretch=column in {"artist", "sale", "title"})
         self.agenda_tree.grid(row=0, column=0, sticky="nsew")
@@ -394,7 +399,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             return
         self.stop_event = threading.Event()
         self.refresh_button.configure(state=tk.DISABLED)
-        self.import_saved_button.configure(state=tk.DISABLED)
+        self._set_import_buttons_state(tk.DISABLED)
         self.stop_button.configure(state=tk.NORMAL)
         self._set_status("Starting deterministic watchlist refresh…")
         entries = list(self.active_entries)
@@ -453,7 +458,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         horizon_days = int(self.horizon_var.get())
         new_changed_only = bool(self.new_changed_var.get())
         self.refresh_button.configure(state=tk.DISABLED)
-        self.import_saved_button.configure(state=tk.DISABLED)
+        self._set_import_buttons_state(tk.DISABLED)
         self._set_status(f"Importing saved Heritage results for {entry.watch_label}…")
 
         def run() -> None:
@@ -482,6 +487,59 @@ class ArtistWatchlistPanel(ttk.Frame):
                 self.after(0, lambda message=message: self._finish_refresh_error(message))
 
         self.worker = threading.Thread(target=run, name="heritage-saved-page-import", daemon=True)
+        self.worker.start()
+
+    def _set_import_buttons_state(self, state) -> None:
+        self.import_saved_button.configure(state=state)
+        sold_button = self.__dict__.get("import_sold_button")
+        if sold_button is not None:
+            sold_button.configure(state=state)
+
+    def import_saved_sold_results(self) -> None:
+        if self.worker and self.worker.is_alive():
+            return
+        chosen = [entry for entry in self.active_entries
+                  if entry.source == "Invaluable" and entry.watch_label in self.selected_artists]
+        if not chosen:
+            messagebox.showwarning(
+                "Select Invaluable Artists",
+                "Select the Invaluable artists whose watched lots you want to update. "
+                "Save each sold lot page as HTML from your signed-in browser, then import it here.",
+                parent=self,
+            )
+            return
+        paths = filedialog.askopenfilenames(
+            title="Import saved Invaluable sold lot pages",
+            filetypes=[("Saved HTML pages", "*.html *.htm"), ("All Files", "*.*")], parent=self,
+        )
+        if not paths:
+            return
+        previous_lots = list(self.current_lots)
+        previous_fallback_keys = set(self.fallback_lot_keys)
+        self.refresh_button.configure(state=tk.DISABLED)
+        self._set_import_buttons_state(tk.DISABLED)
+        self._set_status("Importing posted Invaluable sold results…")
+
+        def run() -> None:
+            try:
+                local_watchlist_directory().mkdir(parents=True, exist_ok=True)
+                with WatchlistCache(self._cache_path) as cache:
+                    result = import_saved_sold_pages(paths, entries=chosen, cache=cache)
+                merged = {lot.cache_key: lot for lot in previous_lots}
+                result.fallback_lot_keys.update(
+                    previous_fallback_keys.difference(lot.cache_key for lot in result.lots)
+                )
+                merged.update({lot.cache_key: lot for lot in result.lots})
+                result.lots = sorted(
+                    merged.values(),
+                    key=lambda lot: (lot.relevant_at or "9999", lot.artist_watchlist_name.casefold(), lot.lot_number),
+                )
+                self._sync_and_finish_result(result)
+            except Exception as exc:
+                message = " ".join(str(exc).split())[:500]
+                self.after(0, lambda message=message: self._finish_refresh_error(message))
+
+        self.worker = threading.Thread(target=run, name="invaluable-sold-page-import", daemon=True)
         self.worker.start()
 
     def _sync_and_finish_result(self, result: WatchlistResult) -> None:
@@ -559,7 +617,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         sync_setup_message: str = "",
     ) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
-        self.import_saved_button.configure(state=tk.NORMAL)
+        self._set_import_buttons_state(tk.NORMAL)
         self.stop_button.configure(state=tk.DISABLED)
         self.current_lots = result.lots
         self.fallback_lot_keys = set(result.fallback_lot_keys)
@@ -619,7 +677,7 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def _finish_refresh_error(self, message: str) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
-        self.import_saved_button.configure(state=tk.NORMAL)
+        self._set_import_buttons_state(tk.NORMAL)
         self.stop_button.configure(state=tk.DISABLED)
         self._set_status("Watchlist refresh failed.")
         messagebox.showerror("Watchlist Refresh Failed", message, parent=self)
@@ -640,7 +698,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             return
 
         self.refresh_button.configure(state=tk.DISABLED)
-        self.import_saved_button.configure(state=tk.DISABLED)
+        self._set_import_buttons_state(tk.DISABLED)
         self.calendar_sync_button.configure(state=tk.DISABLED)
         self._set_status("Syncing current watchlist results to the website calendar...")
         lots = list(self.current_lots)
@@ -663,13 +721,13 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def _finish_calendar_sync(self, result: CalendarSyncResult) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
-        self.import_saved_button.configure(state=tk.NORMAL)
+        self._set_import_buttons_state(tk.NORMAL)
         self._set_calendar_sync_button_state()
         self._set_status(result.summary())
 
     def _finish_calendar_sync_error(self, message: str) -> None:
         self.refresh_button.configure(state=tk.NORMAL)
-        self.import_saved_button.configure(state=tk.NORMAL)
+        self._set_import_buttons_state(tk.NORMAL)
         self._set_calendar_sync_button_state()
         self._set_status("Website calendar sync incomplete; some updates may already be saved. See the sync message for the next step.")
         messagebox.showerror(
