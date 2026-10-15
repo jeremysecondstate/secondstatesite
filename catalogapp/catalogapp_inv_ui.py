@@ -11,6 +11,8 @@ from tkinter import scrolledtext
 
 from catalogapp.catalog_paths import resolve_catalog_path
 from catalogapp.watchlist_ui import ArtistWatchlistPanel
+from secondstate.artwork_dimensions import format_catalog_dimensions, normalize_dimensions
+from secondstate.artwork_notes import clean_public_notes
 from secondstate.environment import load_project_environment
 
 load_project_environment()
@@ -189,11 +191,15 @@ class ArtCatalogApp:
         return self.current_results.loc[int(sel[0])]
 
     def _dimensions_from_row(self, row):
-        raw_height = str(row.get("Height", "")).strip()
-        raw_width = str(row.get("Width", "")).strip()
-        if raw_height.startswith("S"):
-            return "", f'{raw_height.replace("S", "").strip()}" x {raw_width.replace("S", "").strip()}"'
-        return f'{raw_height}" x {raw_width}"', ""
+        return format_catalog_dimensions(row.get("Height"), row.get("Width"))
+
+    @staticmethod
+    def _normalize_listing_dimensions(data):
+        data = dict(data)
+        for field in ("dimensions_text", "sheet_size"):
+            if field in data:
+                data[field] = normalize_dimensions(data[field])
+        return data
 
     def _row_to_payload(self, row, price="", catalog_description=""):
         dimensions_text, sheet_size = self._dimensions_from_row(row)
@@ -202,7 +208,7 @@ class ArtCatalogApp:
             "title": self.safe(row.get("Title", "")) or "Untitled",
             "year": self.safe(row.get("Year", "")),
             "medium": self.safe(row.get("Medium", "")),
-            "description": self.safe(row.get("Description/Notes", "")),
+            "description": clean_public_notes(self.safe(row.get("Description/Notes", ""))),
             "dimensions_text": dimensions_text,
             "sheet_size": sheet_size,
             "catalog_number": self.safe(row.get("Catalog Number", "")),
@@ -315,6 +321,100 @@ class ArtCatalogApp:
             raise ValueError("Website returned an empty generated description.")
         return description
 
+    def _generate_notes(self, payload, artwork_id=None):
+        path = f"artworks/{artwork_id}/generate_notes/" if artwork_id is not None else "artworks/generate_notes/"
+        response = requests.post(
+            f"{BASE_URL}/{path}", json=self._normalize_listing_dimensions(payload),
+            headers=api_headers({"Content-Type": "application/json"}), timeout=70,
+        )
+        raise_for_api_error(response, "Generate notes")
+        notes = response.json().get("notes", "").strip()
+        if not notes:
+            raise ValueError("Website returned empty generated notes.")
+        return notes
+
+    def _upload_dialog(self, payload):
+        """Review the public notes, dimensions, and description before upload."""
+        dialog = tk.Toplevel(self.master)
+        dialog.title(f"Review upload: {payload['title']}")
+        dialog.geometry("860x760")
+        dialog.minsize(760, 620)
+        dialog.transient(self.master)
+        dialog.grab_set()
+        form = ttk.Frame(dialog, padding=16)
+        form.pack(fill=tk.BOTH, expand=True)
+        form.columnconfigure(1, weight=1)
+        ttk.Label(form, text=payload["title"], style="Header.TLabel").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        size_fields = {}
+        for row_num, (key, label) in enumerate((("dimensions_text", "Image size"), ("sheet_size", "Sheet size")), start=1):
+            ttk.Label(form, text=label).grid(row=row_num, column=0, sticky="w", padx=(0, 12), pady=3)
+            entry = ttk.Entry(form)
+            entry.grid(row=row_num, column=1, sticky="ew", pady=3)
+            entry.insert(0, payload.get(key, ""))
+            size_fields[key] = entry
+        ttk.Label(form, text='Inches, for example 11.5" x 14.75".', style="Subtle.TLabel").grid(row=3, column=1, sticky="w")
+        ttk.Label(form, text="Notes / signature text").grid(row=4, column=0, columnspan=2, sticky="w", pady=(12, 4))
+        notes_text = scrolledtext.ScrolledText(form, wrap=tk.WORD, height=5, font=("Segoe UI", 10))
+        notes_text.grid(row=5, column=0, columnspan=2, sticky="nsew")
+        notes_text.insert(tk.END, payload.get("description", ""))
+        form.rowconfigure(5, weight=1)
+        ttk.Label(form, text="Description").grid(row=7, column=0, columnspan=2, sticky="w", pady=(12, 4))
+        desc_text = scrolledtext.ScrolledText(form, wrap=tk.WORD, height=10, font=("Segoe UI", 10))
+        desc_text.grid(row=8, column=0, columnspan=2, sticky="nsew")
+        desc_text.insert(tk.END, payload.get("catalog_description", ""))
+        form.rowconfigure(8, weight=2)
+        use_web = tk.BooleanVar(value=True)
+        status = ttk.Label(form, text="Review the public notes and description before continuing.", style="Subtle.TLabel")
+        status.grid(row=10, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        result = {"value": None}
+
+        def current_payload():
+            data = dict(payload)
+            data.update({key: widget.get().strip() for key, widget in size_fields.items()})
+            data["description"] = notes_text.get("1.0", tk.END).strip()
+            data["catalog_description"] = desc_text.get("1.0", tk.END).strip()
+            return self._normalize_listing_dimensions(data)
+
+        def generate(kind):
+            for button in generation_buttons:
+                button.config(state=tk.DISABLED)
+            try:
+                status.config(text=f"Generating {kind}...")
+                dialog.update_idletasks()
+                data = current_payload()
+                if kind == "notes":
+                    generated, target = self._generate_notes(data), notes_text
+                else:
+                    data["use_web"] = use_web.get()
+                    generated, target = self._generate_description(data), desc_text
+                target.delete("1.0", tk.END)
+                target.insert(tk.END, generated)
+                status.config(text=f"Draft {kind} inserted. Review/edit before continuing.")
+            except Exception as exc:
+                messagebox.showerror(f"Generate {kind.title()} Failed", str(exc), parent=dialog)
+            finally:
+                for button in generation_buttons:
+                    button.config(state=tk.NORMAL)
+
+        def accept():
+            result["value"] = current_payload()
+            dialog.destroy()
+
+        notes_btn = ttk.Button(form, text="Generate Notes", command=lambda: generate("notes"), style="Accent.TButton")
+        notes_btn.grid(row=6, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        description_actions = ttk.Frame(form)
+        description_actions.grid(row=9, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        desc_btn = ttk.Button(description_actions, text="Generate Description", command=lambda: generate("description"), style="Accent.TButton")
+        desc_btn.pack(side=tk.LEFT)
+        ttk.Checkbutton(description_actions, text="allow web search", variable=use_web).pack(side=tk.LEFT, padx=(10, 0))
+        generation_buttons = (notes_btn, desc_btn)
+        actions = ttk.Frame(form)
+        actions.grid(row=11, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        ttk.Button(actions, text="Continue to Images", command=accept, style="Success.TButton").pack(side=tk.RIGHT)
+        ttk.Button(actions, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=(0, 8))
+        dialog.wait_window()
+        return result["value"]
+
     def _description_dialog(self, title, payload, initial_text=""):
         dialog = tk.Toplevel(self.master)
         dialog.title(title)
@@ -418,7 +518,11 @@ class ArtCatalogApp:
             entry.grid(row=row_num, column=1, sticky="ew", pady=3)
             fields[key] = entry
             row_num += 1
-        ttk.Label(form, text="Notes / signature text").grid(row=row_num, column=0, sticky="nw", padx=(0, 8), pady=3)
+        notes_heading = ttk.Frame(form)
+        notes_heading.grid(row=row_num, column=0, sticky="nw", padx=(0, 8), pady=3)
+        ttk.Label(notes_heading, text="Notes / signature text").pack(anchor="w")
+        notes_btn = ttk.Button(notes_heading, text="Generate Notes", command=lambda: generate_notes(), style="Accent.TButton")
+        notes_btn.pack(anchor="w", pady=(4, 0))
         notes_text = scrolledtext.ScrolledText(form, wrap=tk.WORD, height=4, font=("Segoe UI", 10))
         notes_text.grid(row=row_num, column=1, sticky="ew", pady=3)
         row_num += 1
@@ -444,10 +548,11 @@ class ArtCatalogApp:
             data["description"] = notes_text.get("1.0", tk.END).strip()
             data["catalog_description"] = desc_text.get("1.0", tk.END).strip()
             data["is_available"] = is_available.get()
-            return data
+            return self._normalize_listing_dimensions(data)
 
         def populate(art):
             selected["art"] = art
+            art = self._normalize_listing_dimensions(art)
             for key, widget in fields.items():
                 widget.delete(0, tk.END)
                 widget.insert(0, art.get(key, "") or "")
@@ -493,6 +598,23 @@ class ArtCatalogApp:
                 status.config(text="Draft inserted. Review/edit, then Save Changes.")
             except Exception as exc:
                 messagebox.showerror("Generate Failed", str(exc), parent=win)
+
+        def generate_notes():
+            art = selected["art"]
+            if not art:
+                return
+            notes_btn.config(state=tk.DISABLED)
+            try:
+                status.config(text="Generating notes...")
+                win.update_idletasks()
+                notes = self._generate_notes(payload(), artwork_id=art.get("id"))
+                notes_text.delete("1.0", tk.END)
+                notes_text.insert(tk.END, notes)
+                status.config(text="Draft notes inserted. Review/edit, then Save Changes.")
+            except Exception as exc:
+                messagebox.showerror("Generate Notes Failed", str(exc), parent=win)
+            finally:
+                notes_btn.config(state=tk.NORMAL)
 
         def save():
             art = selected["art"]
@@ -584,10 +706,9 @@ class ArtCatalogApp:
             if not price:
                 continue
             data = self._row_to_payload(row, price=price)
-            description = self._description_dialog(f"Description for upload: {data['title']}", data)
-            if description is None:
+            data = self._upload_dialog(data)
+            if data is None:
                 continue
-            data["catalog_description"] = description
             images = list(filedialog.askopenfilenames(title=f"Select image(s) for '{title}'", filetypes=[("Image Files", "*.jpg *.jpeg *.png")]))
             if not images:
                 continue

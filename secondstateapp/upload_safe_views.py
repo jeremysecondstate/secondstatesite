@@ -5,6 +5,9 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
+from secondstate.artwork_dimensions import normalize_dimensions
+from secondstate.artwork_notes import clean_public_notes
+
 from .models import Artwork, ArtworkImage
 
 
@@ -40,10 +43,10 @@ def upload_artwork(request):
                 edition_size=data.get("edition_size", ""),
                 printer=data.get("printer", ""),
                 publisher=data.get("publisher", ""),
-                dimensions_text=data.get("dimensions_text", ""),
-                sheet_size=data.get("sheet_size", ""),
+                dimensions_text=normalize_dimensions(data.get("dimensions_text", "")),
+                sheet_size=normalize_dimensions(data.get("sheet_size", "")),
                 catalog_number=data.get("catalog_number", ""),
-                description=data.get("description", ""),
+                description=clean_public_notes(data.get("description", "")),
                 catalog_description=data.get("catalog_description", ""),
                 price=_parse_price(data.get("price", 0)),
                 is_available=True,

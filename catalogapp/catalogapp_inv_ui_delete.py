@@ -145,7 +145,11 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
             entry.grid(row=row_num, column=1, sticky="ew", pady=3)
             fields[key] = entry
             row_num += 1
-        ttk.Label(form, text="Notes / signature text").grid(row=row_num, column=0, sticky="nw", padx=(0, 8), pady=3)
+        notes_heading = ttk.Frame(form)
+        notes_heading.grid(row=row_num, column=0, sticky="nw", padx=(0, 8), pady=3)
+        ttk.Label(notes_heading, text="Notes / signature text").pack(anchor="w")
+        notes_btn = ttk.Button(notes_heading, text="Generate Notes", command=lambda: generate_notes(), style="Accent.TButton")
+        notes_btn.pack(anchor="w", pady=(4, 0))
         notes_text = scrolledtext.ScrolledText(form, wrap=tk.WORD, height=4, font=("Segoe UI", 10))
         notes_text.grid(row=row_num, column=1, sticky="ew", pady=3)
         row_num += 1
@@ -181,10 +185,11 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
             data["description"] = notes_text.get("1.0", tk.END).strip()
             data["catalog_description"] = desc_text.get("1.0", tk.END).strip()
             data["is_available"] = is_available.get()
-            return data
+            return self._normalize_listing_dimensions(data)
 
         def populate(art):
             selected["art"] = art
+            art = self._normalize_listing_dimensions(art)
             for key, widget in fields.items():
                 widget.delete(0, tk.END)
                 widget.insert(0, art.get(key, "") or "")
@@ -264,6 +269,23 @@ class ArtCatalogAppWithDelete(ArtCatalogApp):
                 status.config(text="Draft inserted. Review/edit, then Save Changes.")
             except Exception as exc:
                 messagebox.showerror("Generate Failed", str(exc), parent=win)
+
+        def generate_notes():
+            art = selected["art"]
+            if not art:
+                return
+            notes_btn.config(state=tk.DISABLED)
+            try:
+                status.config(text="Generating notes...")
+                win.update_idletasks()
+                notes = self._generate_notes(payload(), artwork_id=art.get("id"))
+                notes_text.delete("1.0", tk.END)
+                notes_text.insert(tk.END, notes)
+                status.config(text="Draft notes inserted. Review/edit, then Save Changes.")
+            except Exception as exc:
+                messagebox.showerror("Generate Notes Failed", str(exc), parent=win)
+            finally:
+                notes_btn.config(state=tk.NORMAL)
 
         def save():
             art = selected["art"]
