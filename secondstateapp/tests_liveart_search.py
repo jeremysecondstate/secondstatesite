@@ -13,6 +13,26 @@ from .tests_calendar import liveart_artwork, liveart_lot, liveart_page, stored_a
 
 
 class LiveArtSearchParsingTests(SimpleTestCase):
+    def test_verified_bearden_full_name_matches_only_romare_bearden(self):
+        for source_name in (
+            "Romare Howard Bearden", "ROMARE HOWARD BEARDEN", "Bearden, Romare Howard",
+            "Romare (1911) Howard Bearden", "BEARDEN, ROMARE HOWARD (1911–1988)",
+        ):
+            with self.subTest(source_name=source_name):
+                self.assertEqual(liveart_artist_search_name(source_name), "Romare Bearden")
+                self.assertTrue(liveart_artist_names_match(source_name, "Romare Bearden"))
+                self.assertTrue(liveart_artist_names_match("Romare Bearden", source_name))
+        for other_name in (
+            "Romare Bearden Jr", "Romare Howard Bearden Jr", "Howard Bearden",
+            "Romare Henry Bearden", "ATTRIBUTED TO ROMARE HOWARD BEARDEN",
+            "After Romare Bearden",
+        ):
+            with self.subTest(other_name=other_name):
+                self.assertEqual(liveart_artist_search_name(other_name), other_name)
+                self.assertFalse(liveart_artist_names_match(other_name, "Romare Bearden"))
+                self.assertFalse(liveart_artist_names_match("Romare Howard Bearden", other_name))
+        self.assertFalse(liveart_artist_names_match("John Howard Smith", "John Smith"))
+
     def test_verified_neimann_spelling_matches_only_leroy_neiman(self):
         for source_name in (
             "Leroy Neimann", "LeRoy NEIMANN", "Neimann, LeRoy",
@@ -120,6 +140,92 @@ class LiveArtTermSearchViewTests(TestCase):
             {"artist_id": "calder", "status": "sold", "search": term, "category_id": 2, "sort": "SALE_DATE_DESC", "limit": 10}
             for term in ("Boomerangs", "Stabiles")
         ])
+
+    def test_bearden_full_name_finds_carolina_prints_and_rejects_attributed_artist(self):
+        self.lot.artist = "Romare Howard Bearden"
+        self.lot.artist_watchlist_name = "Romare Howard Bearden"
+        self.lot.title = (
+            "Romare Bearden (American, 1911-1988) Serigraph in Colors on Wove Paper 1995, "
+            "'Early Carolina Morning', H 20.5\" W 29.5\""
+        )
+        self.lot.medium = "Serigraph"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title", "medium"))
+        self.api.list_artists.return_value = liveart_page([
+            {"id": 1500540, "name": "ATTRIBUTED TO ROMARE HOWARD BEARDEN"},
+            {"id": 11328, "uid": "8Bwp9T", "name": "Romare Bearden"},
+        ])
+        sale = liveart_lot(
+            "carolina-print", artist_id=11328, artist="Romare Bearden",
+            title="Early Carolina Morning", medium="Serigraph and silkscreen on Coventry rag paper",
+            hammer_usd=1600,
+        )
+        attributed_sale = liveart_lot(
+            "carolina-attributed", artist_id=1500540, artist="ATTRIBUTED TO ROMARE HOWARD BEARDEN",
+            title="Early Carolina Morning", medium="Serigraph", lot_num="26", hammer_usd=900,
+        )
+        self.api.list_lots.return_value = liveart_page([sale, attributed_sale])
+
+        response = self.research(search_terms='"Early Carolina Morning"')
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.api.list_artists.assert_called_once_with(q="Romare Bearden", limit=3)
+        self.api.list_artworks.assert_not_called()
+        self.api.list_lots.assert_called_once_with(
+            artist_id=11328, status="sold", search="Early Carolina Morning", category_id=2,
+            sort="SALE_DATE_DESC", limit=20,
+        )
+        candidates = {row["id"]: row for row in payload["candidates"]}
+        self.assertEqual(set(candidates), {"carolina-print", "carolina-attributed"})
+        self.assertTrue(candidates["carolina-print"]["credible"])
+        self.assertEqual(candidates["carolina-print"]["search_terms"], ["Early Carolina Morning"])
+        self.assertFalse(candidates["carolina-attributed"]["credible"])
+        self.assertFalse(candidates["carolina-attributed"]["manual_selectable"])
+        self.assertEqual(payload["selected_ids"], [])
+        self.assertEqual(self.save(payload, ["carolina-attributed"]).status_code, 400)
+        self.assertFalse(LiveArtResaleAnalysis.objects.filter(lot=self.lot).exists())
+        saved = self.save(payload, ["carolina-print"])
+        self.assertEqual(saved.status_code, 200, saved.content)
+        self.assertEqual(saved.json()["analysis"]["selected_ids"], ["carolina-print"])
+        self.assertEqual(LiveArtResaleAnalysis.objects.get(lot=self.lot).selected_ids, ["carolina-print"])
+
+    def test_bearden_full_name_also_finds_default_artwork_and_sale_history(self):
+        self.lot.artist = "Romare Howard Bearden"
+        self.lot.artist_watchlist_name = "Romare Howard Bearden"
+        self.lot.title = "Early Carolina Morning"
+        self.lot.medium = "Serigraph"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title", "medium"))
+        self.api.list_artists.return_value = liveart_page([
+            {"id": 11328, "uid": "8Bwp9T", "name": "Romare Bearden"},
+        ])
+        artwork = liveart_artwork(
+            "carolina-artwork", artist_id=11328, artist="Romare Bearden",
+            title="Early Carolina Morning", medium="Serigraph",
+        )
+        sale = liveart_lot(
+            "carolina-sale", artist_id=11328, artist="Romare Bearden",
+            title="Early Carolina Morning", medium="Serigraph",
+        )
+        sale["artwork_id"] = artwork["id"]
+        sale["artwork"]["id"] = artwork["id"]
+        self.api.list_artworks.return_value = liveart_page([artwork])
+        self.api.list_lots.return_value = liveart_page([sale])
+
+        response = self.research(search_terms="")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["subject_match"]["id"], "carolina-artwork")
+        self.assertEqual(payload["subject_match"]["artist_id"], 11328)
+        self.assertEqual([row["id"] for row in payload["candidates"]], ["carolina-sale"])
+        self.assertTrue(payload["candidates"][0]["credible"])
+        self.api.list_artists.assert_called_once_with(q="Romare Bearden", limit=3)
+        self.api.list_artworks.assert_called_once_with(
+            artist_id=11328, search="Early Carolina Morning", category_id=2, limit=5,
+        )
+        self.api.list_lots.assert_any_call(
+            artwork_id="carolina-artwork", status="sold", category_id=2, limit=10,
+        )
 
     def test_neimann_spelling_finds_sinatra_sales_and_rejects_other_artists(self):
         self.lot.artist = "Leroy Neimann"

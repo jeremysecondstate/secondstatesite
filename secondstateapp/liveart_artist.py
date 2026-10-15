@@ -10,6 +10,9 @@ _LIVEART_NAMES = {
     # Calendar imports use Neimann. Verified against LiveArt artist 25667
     # (c9GBTz/leroy-neiman, 1921-2012) and the imported lot title, 2026-10-15.
     artist_identity_key("Leroy Neimann"): "Leroy Neiman",
+    # Calendar/Artprice use his middle name. Verified against LiveArt artist
+    # 11328 (8Bwp9T/romare-bearden, 1911-1988) and lot 2086, 2026-10-15.
+    artist_identity_key("Romare Howard Bearden"): "Romare Bearden",
 }
 
 

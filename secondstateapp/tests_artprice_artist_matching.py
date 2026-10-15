@@ -1,4 +1,4 @@
-"""Regression coverage for the saved Neiman Artprice results in Calendar."""
+"""Regression coverage for verified artist aliases in saved Artprice results."""
 
 import json
 from unittest.mock import patch
@@ -93,6 +93,34 @@ class ArtpriceArtistMatchingTests(TestCase):
         self.assertEqual(saved["source_summary"]["artprice_included_count"], 4)
         self.assertTrue(saved["scenarios"])
         self.assertTrue(all(item["selected_comp_count"] == 4 for item in saved["scenarios"]))
+
+    def test_bearden_full_and_short_names_share_saved_sale_validation(self):
+        self.lot.artist = "Romare Howard Bearden"
+        self.lot.artist_watchlist_name = "Romare Howard Bearden"
+        self.lot.title = "Early Carolina Morning"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title"))
+        response = self.client.post(self.artprice_url, {
+            "action": "add_sources",
+            "artprice_html": artprice_upload("bearden-test.html", lots=[{
+                "id": "bearden-print", "title": self.lot.title,
+                "artistOrAssociation": "Romare Bearden", "price": "1600.00",
+                "saleDtStart": "19 Nov 2022", "auctioneerName": "Test auction house",
+                "number": "1", "lotstatus": 1,
+            }]),
+        })
+        self.assertEqual(response.status_code, 200, response.content)
+        source = AuctionMaxBidAnalysis.objects.get(lot=self.lot)
+        for artist in ("Romare Bearden", "Romare Howard BEARDEN"):
+            with self.subTest(artist=artist):
+                source.comparables[0]["artist"] = artist
+                source.save(update_fields=("comparables",))
+                preview = self.preview()
+                candidate = preview["candidates"][0]
+                self.assertTrue(candidate["credible"])
+                self.assertEqual(candidate["hammer_usd"], "1600.00")
+                response = self.save([candidate["id"]])
+                self.assertEqual(response.status_code, 200, response.content)
+                self.assertEqual(response.json()["analysis"]["source_summary"]["artprice_included_count"], 1)
 
     def test_legacy_excluded_candidates_refresh_without_reupload_or_liveart(self):
         source = self.upload()
