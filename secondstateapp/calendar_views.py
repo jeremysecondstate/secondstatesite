@@ -866,12 +866,14 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
         except (InvalidOperation, TypeError, ValueError):
             hammer = None
         valid_hammer = bool(hammer is not None and hammer.is_finite() and 0 < hammer <= Decimal("1000000000000"))
+        has_usd_hammer = bool(currency == "USD" and valid_hammer)
         artist = str(comparable.get("artist") or "").strip() or None
         calendar_artist = (lot.artist or lot.artist_watchlist_name or "").strip()
+        # Apply the same verified name aliases to both evidence providers.
         artist_conflict = bool(
-            artist and calendar_artist and artist_identity_key(artist) != artist_identity_key(calendar_artist)
+            artist and calendar_artist and not liveart_artist_names_match(artist, calendar_artist)
         )
-        credible = bool(currency == "USD" and valid_hammer and not artist_conflict)
+        credible = bool(has_usd_hammer and not artist_conflict)
         source_url = _artprice_lot_url(comparable.get("provider_url"))
 
         medium = str(comparable.get("medium") or "").strip() or None
@@ -938,7 +940,7 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
             "lot_number": str(comparable.get("lot_number") or ""),
             "artist": artist,
             "title": str(comparable.get("title") or ""),
-            "hammer_usd": f"{hammer:.2f}" if credible else None,
+            "hammer_usd": f"{hammer:.2f}" if has_usd_hammer else None,
             "original_hammer": f"{hammer:.2f}" if valid_hammer else None,
             "original_currency": currency or None,
             "medium": medium,

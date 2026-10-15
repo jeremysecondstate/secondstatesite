@@ -981,7 +981,8 @@
           markAnalysisPending();
         });
         const copy = document.createElement("span");
-        copy.textContent = checkbox.disabled ? "Excluded — sale evidence is ineligible" : "Use in resale bid";
+        const exclusionReason = Array.isArray(candidate.exclusion_reasons) ? candidate.exclusion_reasons[0] : "";
+        copy.textContent = checkbox.disabled ? `Excluded — ${exclusionReason || "sale evidence is ineligible"}` : "Use in resale bid";
         const copyAndWarning = document.createElement("span");
         copyAndWarning.appendChild(copy);
         if (!checkbox.disabled && needsManualReview(candidate)) {
@@ -1072,7 +1073,7 @@
       price.className = "liveart-price-line";
       price.textContent = candidate.hammer_usd === null || candidate.hammer_usd === undefined
         ? "USD hammer unavailable — excluded from valuation"
-        : `${isArtprice ? "Artprice HTML USD hammer" : "Verified LiveArt USD hammer"}: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}`;
+        : `${isArtprice ? "Artprice HTML USD hammer" : "Verified LiveArt USD hammer"}: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}${canSelectCandidate(candidate) ? "" : " — excluded from valuation"}`;
       card.appendChild(price);
       const facts = document.createElement("div");
       facts.className = "liveart-facts";
