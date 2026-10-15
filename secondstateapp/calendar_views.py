@@ -295,7 +295,7 @@ def auction_calendar(request):
     } if active_email_batch else set()
 
     month_lots = list(
-        AuctionWatchLot.objects.filter(event_at__gte=range_start, event_at__lt=range_end)
+        AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=range_start, event_at__lt=range_end)
         .select_related("watchlist_artist", "bid_board_analysis")
         .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
         .order_by("event_at", "auction_house", "artist", "id")
@@ -336,7 +336,7 @@ def auction_calendar(request):
 
     today_start, upcoming_end = _utc_bounds(now_local.date(), now_local.date() + timedelta(days=181), zone)
     upcoming_lots = list(
-        AuctionWatchLot.objects.filter(active=True, event_at__gte=today_start, event_at__lt=upcoming_end)
+        AuctionWatchLot.objects.filter(superseded_by__isnull=True, active=True, event_at__gte=today_start, event_at__lt=upcoming_end)
         .select_related("watchlist_artist")
         .order_by("event_at", "auction_house", "artist", "id")[:1000]
     )
@@ -362,7 +362,7 @@ def auction_calendar(request):
         local_day = date.fromisoformat(day_iso)
         day_start, day_end = _utc_bounds(local_day, local_day + timedelta(days=1), zone)
         day_lots = list(
-            AuctionWatchLot.objects.filter(event_at__gte=day_start, event_at__lt=day_end)
+            AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=day_start, event_at__lt=day_end)
             .select_related("watchlist_artist", "bid_board_analysis")
             .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
             .order_by("event_at", "auction_house", "artist", "id")
@@ -399,7 +399,7 @@ def auction_calendar(request):
         "initial_day": initial_day,
         "upcoming_groups": visible_upcoming_groups,
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
-        "synced_lot_count": AuctionWatchLot.objects.count(),
+        "synced_lot_count": AuctionWatchLot.objects.filter(superseded_by__isnull=True).count(),
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),
         "email_recipient_names": ", ".join(choice["name"] for choice in email_recipients),
@@ -539,6 +539,11 @@ def update_auction_email_selection(request, lot_id: int):
 
     with transaction.atomic():
         lot = get_object_or_404(AuctionWatchLot.objects.select_for_update(), pk=lot_id)
+        if selected and lot.superseded_by_id is not None:
+            return JsonResponse(
+                {"ok": False, "error": "This listing was replaced. Reload the Calendar to select the current lot."},
+                status=409,
+            )
         batch = _active_email_batch_for_update(create=selected)
         if batch and batch.status == AuctionEmailBatch.Status.SENDING:
             return JsonResponse(
@@ -2121,6 +2126,8 @@ def sync_auction_calendar(request):
                 source=source, source_lot_id=source_lot_id,
             ).first()
             if existing_lot is not None:
+                if existing_lot.superseded_by_id is not None:
+                    defaults["active"] = False
                 if saved_image is None and is_saved_calendar_image_url(existing_lot.image_url):
                     defaults.pop("image_url", None)
                 if existing_lot.sold_price is not None and existing_lot.sold_price > 0:

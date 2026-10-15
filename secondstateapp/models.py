@@ -175,6 +175,12 @@ class AuctionWatchLot(models.Model):
 
     source = models.CharField(max_length=80)
     source_lot_id = models.CharField(max_length=255)
+    # Retain withdrawn catalog entries and their history without displaying
+    # them alongside the explicitly verified replacement listing.
+    superseded_by = models.ForeignKey(
+        "self", blank=True, null=True, on_delete=models.PROTECT,
+        related_name="superseded_lots",
+    )
     artist = models.CharField(max_length=255, blank=True)
     artist_watchlist_name = models.CharField(max_length=255, blank=True)
     watchlist_artist = models.ForeignKey(
