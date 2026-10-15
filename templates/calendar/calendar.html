@@ -4,7 +4,7 @@
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012b">
-  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=archive-20261012">
+  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=saved-board-20261015">
 {% endblock %}
 
 {% block main_class %}calendar-page-shell{% endblock %}
@@ -318,11 +318,17 @@
 
 {{ calendar_data|json_script:"auction-calendar-data" }}
 {{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
-<script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=archive-20261012"></script>
+<script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=saved-board-20261015"></script>
+<script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=saved-board-20261015"></script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
   const salesData = JSON.parse(document.getElementById("auction-calendar-sales-data").textContent);
+  window.addEventListener("archive-bid-board-saved", (event) => {
+    Object.values(data).flat().forEach((lot) => {
+      if (String(lot.id) === String(event.detail.lotId)) lot.saved_bid_board = event.detail.savedBoard;
+    });
+  });
   const auctionCalendar = document.querySelector(".auction-calendar");
   const calendarPageShell = document.querySelector(".calendar-page-shell");
   const title = document.getElementById("selected-day-title");
@@ -2891,6 +2897,11 @@
     appendText(caption, "p", "day-gallery-meta", [lot.medium, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.time].filter(Boolean).join(" · "));
     appendText(caption, "p", "day-gallery-estimate", lot.estimate);
     appendText(caption, "p", "day-gallery-bid", lot.bid);
+    if (window.SavedBidBoard) {
+      const savedBoard = document.createElement("div");
+      window.SavedBidBoard.mountSummary(savedBoard, {lot, csrfToken});
+      caption.appendChild(savedBoard);
+    }
     const actions = document.createElement("div");
     actions.className = "day-gallery-actions";
     const quickLook = document.createElement("button");
@@ -3768,6 +3779,11 @@
   activeView = requestedView === "catalog" || requestedView === "research" ? requestedView : "calendar";
   if (validRequestedDay || initialDay) showDay(validRequestedDay ? requestedDay : initialDay);
   setCalendarView(requestedView);
+  const requestedSavedBoard = initialParams.get("saved_bid_board");
+  if (requestedSavedBoard && window.SavedBidBoard) {
+    const savedLot = (data[selectedDay] || []).find((lot) => String(lot.id) === requestedSavedBoard);
+    if (savedLot?.saved_bid_board) window.SavedBidBoard.open(savedLot, {csrfToken});
+  }
 })();
 </script>
 {% endblock %}

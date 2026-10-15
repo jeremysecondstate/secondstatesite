@@ -322,6 +322,7 @@ class AuctionBidBoardAnalysis(models.Model):
     selected_ids = models.JSONField(default=list, blank=True)
     evidence_snapshot = models.JSONField(default=dict, blank=True)
     analysis = models.JSONField(default=dict, blank=True)
+    include_in_email = models.BooleanField(default=False)
     updated_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

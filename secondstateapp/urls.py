@@ -50,6 +50,16 @@ urlpatterns = [
         name="auction_lot_bid_board",
     ),
     path(
+        "calendar/lots/<int:lot_id>/bid-board/saved/",
+        bid_board_views.auction_lot_saved_bid_board,
+        name="auction_lot_saved_bid_board",
+    ),
+    path(
+        "calendar/lots/<int:lot_id>/bid-board/email/",
+        bid_board_views.auction_lot_bid_board_email,
+        name="auction_lot_bid_board_email",
+    ),
+    path(
         "calendar/lots/<int:lot_id>/email-tray/",
         calendar_views.update_auction_email_selection,
         name="auction_email_lot_selection",

@@ -219,6 +219,10 @@
       let payload;
       try {payload = await response.json();} catch (_) {throw new Error("The server did not return a Bid Board response. Your session may have expired; reload and sign in.");}
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Bid Board could not be calculated.");
+      if (body?.action === "save" && payload.saved_board) {
+        options.lot.saved_bid_board = payload.saved_board;
+        window.dispatchEvent(new CustomEvent("archive-bid-board-saved", {detail: {lotId: options.lot.id, savedBoard: payload.saved_board}}));
+      }
       return payload.analysis;
     }
     async function update(action = "preview", _markDirty = false) {

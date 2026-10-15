@@ -42,6 +42,7 @@ from .auction_email import (
     send_auction_email,
     validate_sending_configuration,
 )
+from .bid_board_snapshot import saved_board_summary
 from .calendar_images import (
     is_saved_calendar_image_url,
     prepare_saved_calendar_image,
@@ -261,6 +262,9 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "liveart_research_url": reverse("auction_lot_liveart_research", args=(lot.pk,)),
         "liveart_analysis_url": reverse("auction_lot_liveart_analysis", args=(lot.pk,)),
         "bid_board_url": reverse("auction_lot_bid_board", args=(lot.pk,)),
+        "saved_bid_board": saved_board_summary(getattr(lot, "bid_board_analysis", None)),
+        "saved_bid_board_url": reverse("auction_lot_saved_bid_board", args=(lot.pk,)),
+        "bid_board_email_url": reverse("auction_lot_bid_board_email", args=(lot.pk,)),
         "email_tray_selected": lot.pk in selected_lot_ids,
         "email_tray_update_url": reverse("auction_email_lot_selection", args=(lot.pk,)),
         "ended": not lot.active,
@@ -292,7 +296,8 @@ def auction_calendar(request):
 
     month_lots = list(
         AuctionWatchLot.objects.filter(event_at__gte=range_start, event_at__lt=range_end)
-        .select_related("watchlist_artist")
+        .select_related("watchlist_artist", "bid_board_analysis")
+        .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
         .order_by("event_at", "auction_house", "artist", "id")
     )
     lots_by_day: dict[date, list[AuctionWatchLot]] = defaultdict(list)
@@ -358,7 +363,8 @@ def auction_calendar(request):
         day_start, day_end = _utc_bounds(local_day, local_day + timedelta(days=1), zone)
         day_lots = list(
             AuctionWatchLot.objects.filter(event_at__gte=day_start, event_at__lt=day_end)
-            .select_related("watchlist_artist")
+            .select_related("watchlist_artist", "bid_board_analysis")
+            .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
             .order_by("event_at", "auction_house", "artist", "id")
         )
         calendar_data[day_iso] = [_lot_json(lot, zone, selected_lot_ids) for lot in day_lots]
@@ -1626,7 +1632,7 @@ def review_auction_email_tray(request):
     batch = (
         AuctionEmailBatch.objects.filter(is_active=True)
         .select_related("requested_by")
-        .prefetch_related("items__lot", "items__selected_by")
+        .prefetch_related("items__lot__bid_board_analysis", "items__selected_by")
         .first()
     )
     items = sorted(list(batch.items.all()), key=_email_item_sort_key) if batch else []
@@ -1736,7 +1742,7 @@ def _prepare_auction_email_dispatch(request, *, retry: bool):
             return None
 
         items = sorted(
-            list(batch.items.select_related("lot", "selected_by")),
+            list(batch.items.select_related("lot__bid_board_analysis", "selected_by")),
             key=_email_item_sort_key,
         )
         invalid_lots = []

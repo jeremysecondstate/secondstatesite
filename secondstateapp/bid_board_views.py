@@ -4,17 +4,20 @@ import json
 from datetime import timezone as datetime_timezone
 from decimal import Decimal
 
+from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import transaction
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 from .bid_board import BidBoardError, BidLadder, build_board, normalize_assumptions
+from .bid_board_snapshot import saved_board_snapshot, saved_board_summary
 from .liveart_resale import resale_candidate_selectable
-from .models import AuctionBidBoardAnalysis, AuctionWatchLot, LiveArtResaleAnalysis
+from .models import AuctionBidBoardAnalysis, AuctionEmailBatch, AuctionWatchLot, LiveArtResaleAnalysis
 
 
 def _evidence(request, lot, payload, saved):
@@ -163,10 +166,62 @@ def auction_lot_bid_board(request, lot_id):
                     "updated_by": request.user,
                 })
             board.update({"saved": True, "updated_at": record.updated_at.isoformat(), "evidence_changed_since_save": False})
-        return JsonResponse({"ok": True, "analysis": board})
+        return JsonResponse({"ok": True, "analysis": board, "saved_board": saved_board_summary(record if request.method == "POST" and action == "save" else previous)})
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"ok": False, "error": "Bid Board request must be valid JSON."}, status=400)
     except _StaleResearch as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=409)
     except ValueError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+
+@never_cache
+@staff_member_required
+@require_http_methods(["GET"])
+def auction_lot_saved_bid_board(request, lot_id):
+    record = AuctionBidBoardAnalysis.objects.filter(lot_id=lot_id).first()
+    if record is None:
+        return JsonResponse({"ok": False, "error": "No saved Bid Board is available for this lot."}, status=404)
+    return JsonResponse({"ok": True, "board": saved_board_snapshot(record)})
+
+
+@never_cache
+@staff_member_required
+@require_http_methods(["POST"])
+def auction_lot_bid_board_email(request, lot_id):
+    """Persist an explicit opt-in without changing the saved analysis timestamp."""
+    def respond(payload, status=200):
+        if request.content_type == "application/json" or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(payload, status=status)
+        if status >= 400:
+            messages.error(request, payload["error"])
+        return redirect("auction_email_tray")
+
+    if len(request.body) > 1000:
+        return respond({"ok": False, "error": "Bid Board email preference request is too large."}, 413)
+    try:
+        if request.content_type == "application/json":
+            payload = json.loads(request.body or b"{}")
+            if not isinstance(payload, dict) or not isinstance(payload.get("include_in_email"), bool):
+                raise ValueError("Choose whether to include the Bid Board in the lot's email.")
+            include = payload["include_in_email"]
+        else:
+            value = request.POST.get("include_in_email", "false")
+            if value not in {"true", "false", "on", "off", "1", "0"}:
+                raise ValueError("Choose whether to include the Bid Board in the lot's email.")
+            include = value in {"true", "on", "1"}
+    except (ValueError, UnicodeDecodeError) as exc:
+        return respond({"ok": False, "error": str(exc) if not isinstance(exc, (json.JSONDecodeError, UnicodeDecodeError)) else "Email preference request must be valid JSON."}, 400)
+
+    with transaction.atomic():
+        # Match the dispatch lock, so the preference cannot change while its
+        # batch's immutable send-time snapshot is being composed or delivered.
+        batch = AuctionEmailBatch.objects.select_for_update().filter(is_active=True).first()
+        if batch and batch.status == AuctionEmailBatch.Status.SENDING and batch.items.filter(lot_id=lot_id).exists():
+            return respond({"ok": False, "error": "This lot's email options cannot change while its batch is sending."}, 409)
+        record = AuctionBidBoardAnalysis.objects.select_for_update().filter(lot_id=lot_id).first()
+        if record is None:
+            return respond({"ok": False, "error": "Save a Bid Board before including it in the lot's email."}, 404)
+        record.include_in_email = include
+        record.save(update_fields=["include_in_email"])
+    return respond({"ok": True, "saved_board": saved_board_summary(record)})

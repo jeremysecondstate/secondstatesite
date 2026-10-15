@@ -99,6 +99,16 @@
                     <a href="{% firstof item.lot.lot_url item.lot.sale_url %}" target="_blank" rel="noopener noreferrer">Auction lot ↗</a>
                   {% endif %}
                 </div>
+                {% if item.lot.bid_board_analysis %}
+                  <form method="post" action="{% url 'auction_lot_bid_board_email' item.lot_id %}" style="margin-top:12px;">
+                    {% csrf_token %}
+                    <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;">
+                      <input type="checkbox" name="include_in_email" value="true" {% if item.lot.bid_board_analysis.include_in_email %}checked{% endif %} {% if batch.status == "sending" %}disabled{% endif %} onchange="this.form.requestSubmit()">
+                      <span>Include saved Bid Board and qualifying bid in this lot’s email</span>
+                    </label>
+                    <noscript><button type="submit" class="email-review-text-button" {% if batch.status == "sending" %}disabled{% endif %}>Update email option</button></noscript>
+                  </form>
+                {% endif %}
               </div>
               <form method="post" action="{% url 'auction_email_lot_remove' item.lot_id %}">
                 {% csrf_token %}
@@ -169,6 +179,7 @@
                   </div>
                   <a href="{{ lot.artprice_url }}" target="_blank" rel="noopener noreferrer">Artprice</a>
                   {% if lot.lot_url %}<a href="{{ lot.lot_url }}" target="_blank" rel="noopener noreferrer">Auction lot</a>{% endif %}
+                  {% if lot.bid_board %}{% include "calendar/email_bid_board.html" with board=lot.bid_board.email only %}{% endif %}
                 </article>
               {% endfor %}
             </div>

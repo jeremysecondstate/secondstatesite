@@ -17,3 +17,42 @@
 @media(max-width:1000px){.archive-board .ab-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.ab-assumption-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.archive-board .ab-heading,.archive-board .ab-section-title{align-items:flex-start;flex-direction:column;gap:6px}.archive-board .ab-heading>p{text-align:left}.archive-board h2{font-size:28px}.ab-shortlist{gap:12px;grid-template-columns:1fr}.archive-board .ab-pick{padding:10px 0}.ab-pick>strong{font-size:25px}.ab-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.ab-metrics dd{font-size:17px}.ab-resale-fields{grid-template-columns:1fr}.archive-board input,.archive-board select,.archive-board textarea{font-size:16px}.ab-pagination{flex-wrap:wrap}.ab-pagination>span{width:100%}.archive-board button{min-height:40px}.ab-grid{min-width:620px}}
 @media(max-width:380px){.archive-board .ab-controls,.ab-assumption-fields{grid-template-columns:1fr}}
+
+/* The gallery keeps the saved decision visible; drafts stay in Research. */
+.sb-catalog-summary{margin:0 0 14px;padding:13px 14px;border:1px solid rgba(217,184,120,.3);background:rgba(217,184,120,.065);color:#f2efe7;overflow-wrap:anywhere}
+.sb-catalog-summary[hidden]{display:none!important}
+.sb-qualifying-bid{display:block;color:var(--calendar-gold,#d9b878);font-size:16px;line-height:1.4;font-weight:600;font-variant-numeric:tabular-nums}
+.sb-catalog-actions{margin-top:8px}
+.sb-view-button{display:inline-flex;align-items:center;min-height:36px;padding:6px 0;background:none;border:0;color:var(--calendar-gold,#d9b878);font:inherit;font-size:12px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.sb-view-button:hover{color:#f0d58f}
+.sb-email-control{margin-top:9px;padding-top:11px;border-top:1px solid rgba(217,184,120,.2)}
+.sb-email-label,.archive-board .sb-email-label{display:flex;align-items:flex-start;gap:9px;font-size:11px;line-height:1.5;color:inherit;cursor:pointer}
+.sb-email-label input,.archive-board .sb-email-label input{flex:0 0 auto;display:block;width:16px;height:16px;margin:1px 0 0;padding:0;accent-color:#927049}
+.sb-email-label:has(input:disabled){opacity:.65;cursor:wait}
+.sb-email-status{font-size:11px;line-height:1.4;margin:7px 0 0}
+.sb-email-status:empty{display:none}
+.sb-catalog-summary .sb-email-status.is-error{color:#ffb4a2}
+.sb-view-button:focus-visible,.sb-email-label input:focus-visible{outline:2px solid #d9b878;outline-offset:4px}
+body:has(.sb-dialog[open]){overflow:hidden}
+.sb-dialog{width:min(1180px,calc(100vw - 48px));max-width:none;max-height:calc(100dvh - 48px);padding:0;border:1px solid #c9c2b3;background:#f2efe7;color:#252a26;box-shadow:0 28px 100px rgba(0,0,0,.45);overscroll-behavior:contain}
+.sb-dialog::backdrop{background:rgba(3,6,7,.8)}
+.sb-dialog-inner{padding:26px clamp(18px,3vw,38px) 32px}
+.sb-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:25px;border-bottom:1px solid var(--ab-line);padding-bottom:14px}
+.sb-dialog-header>div{min-width:0}
+.sb-dialog-header h2{overflow-wrap:anywhere}
+.sb-dialog-header p{margin-bottom:0}
+.archive-board .sb-dialog-close{flex:0 0 auto;min-height:40px}
+.sb-dialog-content{padding-top:6px}
+.sb-saved-selection{margin:12px 0 26px;padding:20px;border:1px solid var(--ab-line);background:#eae5d9}
+.sb-saved-selection h3{margin-top:6px}
+.sb-saved-selected{font-size:14px}
+.sb-saved-selection .sb-email-control{border-color:var(--ab-line);padding-top:15px}
+.sb-saved-selection .sb-email-label{font-size:13px}
+.sb-saved-shortlist .ab-pick{border-top:1px solid var(--ab-line);padding:12px 0;display:flex;flex-direction:column;gap:6px}
+.sb-dialog .sb-selected-cell{outline:1px solid var(--ab-bronze);outline-offset:-5px;background:#e8e2d5}
+.sb-dialog .ab-metrics dd{overflow-wrap:anywhere}
+.sb-dialog .sb-email-status.is-error{color:#984d3d}
+.sb-evidence-list{margin:0 0 16px;padding-left:20px;font-size:13px}
+.sb-evidence-list li{padding:10px 0;border-bottom:1px solid var(--ab-line)}
+.sb-evidence-list p{margin:4px 0 0}
+@media(max-width:620px){.sb-dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}.sb-dialog-inner{padding:18px 16px 24px}.sb-dialog-header{gap:12px}.sb-dialog-header h2{font-size:24px}.sb-saved-selection{padding:15px}.sb-saved-selection h3{font-size:24px}.sb-dialog .ab-metrics{gap:18px 12px}.sb-email-label{font-size:12px}.sb-view-button{min-height:40px}}

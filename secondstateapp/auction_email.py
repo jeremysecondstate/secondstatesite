@@ -5,19 +5,23 @@ import re
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from email.message import EmailMessage
 from email.policy import SMTP
 from email.utils import formatdate
 from html import escape
 from typing import Iterable, Sequence
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 
+from .bid_board_snapshot import saved_board_snapshot
 from .models import AuctionWatchLot
 
 
@@ -220,7 +224,7 @@ def _sale_time_labels(lot: AuctionWatchLot, zone: ZoneInfo) -> tuple[date | None
 
 def _snapshot_lot(lot: AuctionWatchLot, zone: ZoneInfo) -> dict:
     sale_date, sale_date_label, sale_time_label = _sale_time_labels(lot, zone)
-    return {
+    snapshot = {
         "lot_id": lot.pk,
         "source": lot.source,
         "source_lot_id": lot.source_lot_id,
@@ -237,6 +241,137 @@ def _snapshot_lot(lot: AuctionWatchLot, zone: ZoneInfo) -> dict:
         "lot_url": lot.lot_url or lot.sale_url,
         "sale_url": lot.sale_url,
     }
+    saved_board = getattr(lot, "bid_board_analysis", None)
+    if saved_board and saved_board.include_in_email:
+        snapshot["bid_board"] = _snapshot_email_bid_board(saved_board, sale_date, zone)
+    return snapshot
+
+
+def _board_amount(value, *, percent=False) -> str:
+    if value in (None, ""):
+        return "Unavailable"
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return "Unavailable"
+    if not amount.is_finite():
+        return "Unavailable"
+    return f"{amount:,.2f}%" if percent else f"{'-' if amount < 0 else ''}${abs(amount):,.2f}"
+
+
+def _snapshot_email_bid_board(record, sale_date, zone) -> dict:
+    """Format the persisted board without rebuilding it from newer research."""
+    snapshot = saved_board_snapshot(record)
+    analysis, summary = snapshot["analysis"], snapshot["summary"]
+    detail = summary.get("detail") or {}
+    assumptions = snapshot["assumptions"]
+    selected_case = summary.get("selected_case")
+    qualification = (
+        "Meets both minimums" if summary.get("qualifies") is True
+        else "Does not meet both minimums" if summary.get("qualifies") is False
+        else "Qualification unavailable"
+    )
+    latest_url = ""
+    if sale_date:
+        query = urlencode({"month": sale_date.strftime("%Y-%m"), "day": sale_date.isoformat(),
+                           "view": "catalog", "saved_bid_board": record.lot_id})
+        latest_url = f"{str(settings.SECONDSTATE_PUBLIC_URL).rstrip('/')}{reverse('auction_calendar')}?{query}"
+    metrics = [
+        {"label": label, "value": _board_amount(detail.get(key), percent=percent)}
+        for label, key, percent in (
+            ("All-in acquisition", "all_in_acquisition", False),
+            ("Gross resale hammer", "gross_resale_hammer", False),
+            ("Net resale proceeds", "net_resale_proceeds", False),
+            ("Net profit / loss", "net_profit", False),
+            ("Return on cost", "return_on_cost_pct", True),
+        )
+    ]
+    cases = []
+    shortlist = {item.get("case_key"): item for item in analysis.get("shortlist", [])}
+    for case in analysis.get("cases", []):
+        ceiling = shortlist.get(case.get("key"), {})
+        cases.append({
+            "label": case.get("label", case.get("key", "Case")),
+            "resale": _board_amount(case.get("resale_hammer")),
+            "ceiling": (
+                _board_amount(ceiling.get("bid")) if ceiling.get("bid") is not None
+                else "Qualification unavailable" if not ceiling or case.get("resale_hammer") is None
+                else "No qualifying bid"
+            ),
+            "basis": case.get("basis", ""),
+        })
+    rows = []
+    for row in analysis.get("rows", []):
+        cells = []
+        for cell in row.get("cells", []):
+            available = cell.get("net_profit") is not None
+            cells.append({
+                "profit": _board_amount(cell.get("net_profit")),
+                "return": _board_amount(cell.get("return_on_cost_pct"), percent=True),
+                "qualification": ("Meets minimums" if cell.get("qualifies") else "Below minimums") if available else "Unavailable",
+                "selected": row.get("bid") == summary.get("selected_bid") and cell.get("case_key") == selected_case,
+            })
+        rows.append({"bid": _board_amount(row.get("bid")), "acquisition": _board_amount(row.get("all_in_acquisition")), "cells": cells})
+    costs = [
+        {"label": label, "value": _board_amount(assumptions.get(key), percent=percent)}
+        for label, key, percent in (
+            ("Minimum profit", "minimum_profit", False),
+            ("Minimum return on cost", "minimum_return_pct", True),
+            ("Buyer premium", "buyer_premium_pct", True),
+            ("Purchase tax", "purchase_tax_pct", True),
+            ("Other acquisition costs", "acquisition_costs", False),
+            ("Selling commission", "selling_commission_pct", True),
+            ("Other selling costs", "selling_costs", False),
+        )
+    ]
+    tax_bases = {"hammer": "Hammer", "hammer_premium": "Hammer + buyer premium", "acquisition": "Hammer + buyer premium + acquisition costs"}
+    costs.append({"label": "Purchase tax basis", "value": tax_bases.get(assumptions.get("purchase_tax_basis"), "Unavailable")})
+    if assumptions.get("increment_mode") == "fixed":
+        costs.append({"label": "Bid increment", "value": _board_amount(assumptions.get("fixed_increment"))})
+    pagination = analysis.get("pagination") or {}
+    snapshot["email"] = {
+        "saved_label": timezone.localtime(record.updated_at, zone).strftime("%b %d, %Y at %I:%M %p %Z"),
+        "selected_bid": _board_amount(summary.get("selected_bid")),
+        "selected_case": summary.get("selected_case_label", "Working"),
+        "qualification": qualification,
+        "qualifying_bid": (
+            _board_amount(summary.get("qualifying_bid")) if summary.get("qualifying_bid") is not None
+            else "Qualification unavailable" if summary.get("qualifies") is None
+            else "No qualifying bid"
+        ),
+        "metrics": metrics, "cases": cases, "rows": rows, "costs": costs,
+        "page_label": f"Saved grid page {pagination.get('page', 0) + 1} of {max(1, pagination.get('page_count', 1))}",
+        "notices": analysis.get("notices", []),
+        "calculation_basis": analysis.get("calculation_basis", ""),
+        "increment_notice": analysis.get("increment_notice", ""),
+        "latest_url": latest_url,
+    }
+    return snapshot
+
+
+def _bid_board_text(snapshot: dict) -> list[str]:
+    board = snapshot["email"]
+    lines = [
+        "Saved Bid Board (USD)", f"Saved: {board['saved_label']}",
+        f"Selected bid: {board['selected_bid']} hammer · {board['selected_case']} case",
+        board["qualification"],
+        f"Qualifying bid ceiling ({board['selected_case']}): {board['qualifying_bid']}",
+        *[f"{metric['label']}: {metric['value']}" for metric in board["metrics"]],
+        "Resale cases and qualifying bid ceilings:",
+    ]
+    for case in board["cases"]:
+        lines.append(f"{case['label']}: {case['resale']} resale hammer · {case['ceiling']} qualifying bid ceiling. {case['basis']}")
+    if board["rows"]:
+        labels = [case["label"] for case in board["cases"]]
+        lines.extend([board["page_label"], "Hammer | All-in acquisition | " + " | ".join(f"{label} profit / return" for label in labels)])
+        for row in board["rows"]:
+            cells = [f"{cell['profit']} / {cell['return']} ({cell['qualification']}){' [selected]' if cell['selected'] else ''}" for cell in row["cells"]]
+            lines.append(" | ".join([row["bid"], row["acquisition"], *cells]))
+    lines.extend(f"{cost['label']}: {cost['value']}" for cost in board["costs"])
+    lines.extend([*board["notices"], board["increment_notice"], board["calculation_basis"]])
+    if board["latest_url"]:
+        lines.append(f"See latest saved Bid Board (staff sign-in required): {board['latest_url']}")
+    return lines
 
 
 def compose_auction_email(lots: Iterable[AuctionWatchLot]) -> ComposedAuctionEmail:
@@ -336,6 +471,8 @@ def compose_auction_email(lots: Iterable[AuctionWatchLot]) -> ComposedAuctionEma
                         "",
                     ]
                 )
+                if item.get("bid_board"):
+                    text_lines.extend([*_bid_board_text(item["bid_board"]), ""])
                 html_parts.extend(
                     [
                         '<div style="margin:0 0 14px;padding:16px 18px;border:1px solid #e2ddd4;background:#faf9f6;">',
@@ -368,7 +505,10 @@ def compose_auction_email(lots: Iterable[AuctionWatchLot]) -> ComposedAuctionEma
                         + escape(item["lot_url"], quote=True)
                         + '">Auction lot</a>'
                     )
-                html_parts.append("</div></div>")
+                html_parts.append("</div>")
+                if item.get("bid_board"):
+                    html_parts.append(render_to_string("calendar/email_bid_board.html", {"board": item["bid_board"]["email"]}))
+                html_parts.append("</div>")
 
     compact_text_lines = []
     for line in text_lines:

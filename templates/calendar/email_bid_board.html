@@ -1,0 +1,30 @@
+<div style="margin-top:16px;padding:14px;border:1px solid #d7c8ab;background:#f2efe8;color:#242720;font:12px/1.6 Arial,sans-serif;">
+  <div style="font:700 13px Arial,sans-serif;color:#70582c;">Saved Bid Board · USD</div>
+  <div style="margin:3px 0 10px;color:#666;font-size:11px;">Saved {{ board.saved_label }}. These figures reflect this saved version.</div>
+  <div style="font:500 20px Georgia,serif;">{{ board.selected_bid }} selected hammer · {{ board.selected_case }} case</div>
+  <div style="margin-top:4px;">{{ board.qualification }}</div>
+  <div><strong>Qualifying bid ceiling ({{ board.selected_case }}): {{ board.qualifying_bid }}</strong></div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:10px 0;border-collapse:collapse;font:12px Arial,sans-serif;color:#242720;">
+    {% for metric in board.metrics %}
+      <tr><td style="padding:4px 0;">{{ metric.label }}</td><td align="right" style="padding:4px 0;">{{ metric.value }}</td></tr>
+    {% endfor %}
+  </table>
+  <table width="100%" cellspacing="0" cellpadding="0" style="margin:12px 0;border-collapse:collapse;font:11px/1.5 Arial,sans-serif;color:#242720;">
+    <caption style="text-align:left;font-weight:bold;padding:4px 0;">Resale cases and qualifying bid ceilings</caption>
+    <thead><tr><th scope="col" align="left" style="padding:6px 4px;border-bottom:1px solid #cfc4b0;">Case</th><th scope="col" align="right" style="padding:6px 4px;border-bottom:1px solid #cfc4b0;">Resale hammer</th><th scope="col" align="right" style="padding:6px 4px;border-bottom:1px solid #cfc4b0;">Bid ceiling</th></tr></thead>
+    <tbody>{% for case in board.cases %}<tr><td style="padding:6px 4px;border-bottom:1px solid #ded6c8;">{{ case.label }}<br><span style="color:#666;font-size:10px;">{{ case.basis }}</span></td><td align="right" style="padding:6px 4px;border-bottom:1px solid #ded6c8;">{{ case.resale }}</td><td align="right" style="padding:6px 4px;border-bottom:1px solid #ded6c8;">{{ case.ceiling }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% if board.rows %}
+    <div style="overflow-x:auto;">
+      <table width="100%" cellspacing="0" cellpadding="0" style="margin:12px 0;border-collapse:collapse;font:10px/1.5 Arial,sans-serif;color:#242720;">
+        <caption style="text-align:left;font-weight:bold;padding:4px 0;">{{ board.page_label }} · Net profit / return on cost</caption>
+        <thead><tr><th scope="col" align="left" style="padding:5px 3px;border-bottom:1px solid #cfc4b0;">Hammer</th><th scope="col" align="right" style="padding:5px 3px;border-bottom:1px solid #cfc4b0;">All-in</th>{% for case in board.cases %}<th scope="col" align="right" style="padding:5px 3px;border-bottom:1px solid #cfc4b0;">{{ case.label }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for row in board.rows %}<tr><th scope="row" align="left" style="padding:6px 3px;border-bottom:1px solid #ded6c8;font-weight:normal;">{{ row.bid }}</th><td align="right" style="padding:6px 3px;border-bottom:1px solid #ded6c8;">{{ row.acquisition }}</td>{% for cell in row.cells %}<td align="right" style="padding:6px 3px;border-bottom:1px solid #ded6c8;{% if cell.selected %}background:#e6dbc4;font-weight:bold;{% endif %}">{{ cell.profit }}<br>{{ cell.return }}<br><span style="font-size:9px;">{{ cell.qualification }}{% if cell.selected %} · Selected{% endif %}</span></td>{% endfor %}</tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  {% endif %}
+  <div style="margin-top:10px;font-size:11px;">{% for cost in board.costs %}{{ cost.label }}: {{ cost.value }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>
+  {% for notice in board.notices %}<div style="margin-top:6px;font-size:11px;">{{ notice }}</div>{% endfor %}
+  <div style="margin-top:6px;color:#666;font-size:10px;">{{ board.increment_notice }} {{ board.calculation_basis }}</div>
+  {% if board.latest_url %}<div style="margin-top:10px;"><a href="{{ board.latest_url }}" style="color:#70582c;text-decoration:underline;">See latest saved Bid Board</a> <span style="font-size:10px;color:#666;">(staff sign-in required)</span></div>{% endif %}
+</div>
