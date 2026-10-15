@@ -11,7 +11,7 @@ from catalogapp.bookmark_watchlist import BookmarkEntry
 from catalogapp.watchlist_adapters import BatchedSearchPage, BookmarkSourceAdapter, adapter_for_url
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_enrichment import OpenAIEnricher
-from catalogapp.watchlist_fetch import SourceAccessError, WatchlistStopped, page_fetcher_from_environment
+from catalogapp.watchlist_fetch import SourceAccessBlocked, SourceAccessError, WatchlistStopped, page_fetcher_from_environment
 from catalogapp.watchlist_models import (
     NormalizedLot,
     lot_within_horizon,
@@ -57,18 +57,33 @@ class WatchlistResult:
     fallback_lot_keys: set[str] = field(default_factory=set)
 
 
+@dataclass(slots=True)
+class _PostedResultChecks:
+    details: dict[str, NormalizedLot | None] = field(default_factory=dict)
+    access_blocked: bool = False
+
+
+_SOLD_LOGIN_NOTICE = (
+    "Invaluable requires sign-in to view sold prices. Choose Connect Invaluable, "
+    "sign in in the browser window, then refresh again. You can also use Import Saved Sold Results. "
+    "Existing estimates and results have been retained."
+)
+
+
 class WatchlistService:
     def __init__(
         self,
         cache: WatchlistCache,
         *,
         fetcher=None,
+        invaluable_fetcher=None,
         enricher: OpenAIEnricher | None = None,
         now: Callable[[], datetime] | None = None,
         max_pages_per_bookmark: int = 10,
     ) -> None:
         self.cache = cache
         self.fetcher = fetcher
+        self.invaluable_fetcher = invaluable_fetcher
         self.enricher = enricher or OpenAIEnricher.from_environment(cache)
         self.now = now or (lambda: datetime.now(timezone.utc))
         self.max_pages_per_bookmark = max(1, min(int(max_pages_per_bookmark), 25))
@@ -86,6 +101,16 @@ class WatchlistService:
     ) -> WatchlistResult:
         stop = stop_event or threading.Event()
         fetcher = self.fetcher or page_fetcher_from_environment(stop)
+        invaluable_fetcher = self.invaluable_fetcher if self.invaluable_fetcher is not None else fetcher
+        fetchers = {id(item): item for item in (fetcher, invaluable_fetcher)}
+        started_pages = {key: int(getattr(item, "pages_fetched", 0)) for key, item in fetchers.items()}
+
+        def source_fetcher(adapter: BookmarkSourceAdapter):
+            return invaluable_fetcher if adapter.source == "Invaluable" else fetcher
+
+        def fetched_pages() -> int:
+            return sum(max(0, int(getattr(item, "pages_fetched", 0)) - started_pages[key]) for key, item in fetchers.items())
+
         selected = {artist.casefold() for artist in selected_artists}
         chosen = [entry for entry in entries if entry.watch_label.casefold() in selected]
         metrics = WatchlistMetrics(
@@ -93,6 +118,7 @@ class WatchlistService:
             artists=len({entry.watch_label.casefold() for entry in chosen}),
         )
         errors: list[str] = []
+        notices: list[str] = []
         if not zero_ai and not self.enricher.enabled:
             errors.append(
                 "AI enrichment was requested but is not enabled. Set OPENAI_WATCHLIST_ENRICHMENT_ENABLED=1 "
@@ -101,9 +127,8 @@ class WatchlistService:
         refreshed_lots: list[NormalizedLot] = []
         fallback_lot_keys: set[str] = set()
         observed_lot_keys: set[str] = set()
-        result_checks: dict[str, NormalizedLot | None] = {}
+        result_checks = _PostedResultChecks()
         stopped = False
-        started_pages = int(getattr(fetcher, "pages_fetched", 0))
         observed_at = self.now()
         profile_directory = getattr(fetcher, "profile_directory", None)
         if profile_directory and progress:
@@ -128,7 +153,7 @@ class WatchlistService:
                 batched_pages.update(
                     batcher(
                         [(entry.url, entry.artist) for entry in adapter_entries],
-                        fetcher,
+                        source_fetcher(adapter),
                         max_pages=self.max_pages_per_bookmark,
                     )
                 )
@@ -136,6 +161,8 @@ class WatchlistService:
                 stopped = True
                 break
             except Exception as exc:
+                if adapter.source == "Invaluable" and isinstance(exc, SourceAccessBlocked):
+                    result_checks.access_blocked = True
                 message = " ".join(str(exc).split())[:500]
                 cached_count = 0
                 for entry in adapter_entries:
@@ -152,18 +179,27 @@ class WatchlistService:
                 )
 
         if stopped:
-            metrics.pages_fetched = max(0, int(getattr(fetcher, "pages_fetched", 0)) - started_pages)
-            return WatchlistResult(lots=[], metrics=metrics, errors=errors, stopped=True)
+            metrics.pages_fetched = fetched_pages()
+            return WatchlistResult(lots=[], metrics=metrics, errors=errors, stopped=True, notices=notices)
 
         for entry in chosen:
             if stop.is_set():
                 stopped = True
                 break
-            if entry.url in batch_failed_urls:
-                continue
             adapter = adapter_for_url(entry.url)
             if adapter is None:
                 errors.append(f"{entry.source or 'Unsupported source'} adapter is not available yet: {entry.watch_label}")
+                continue
+            if entry.url in batch_failed_urls:
+                if adapter.source == "Invaluable":
+                    try:
+                        refreshed_lots.extend(self._refresh_posted_results(
+                            entry, adapter, source_fetcher(adapter), stop, metrics, observed_at, [],
+                            result_checks, errors, observed_lot_keys, notices, ended_only=True,
+                        ))
+                    except WatchlistStopped:
+                        stopped = True
+                        break
                 continue
             if progress:
                 progress(f"Fetching {entry.watch_label} from {entry.source}…")
@@ -171,7 +207,7 @@ class WatchlistService:
                 lots, ended, complete = self._refresh_entry(
                     entry,
                     adapter,
-                    fetcher,
+                    source_fetcher(adapter),
                     stop,
                     metrics,
                     observed_at,
@@ -179,6 +215,7 @@ class WatchlistService:
                     observed_lot_keys=observed_lot_keys,
                     result_checks=result_checks,
                     errors=errors,
+                    notices=notices,
                 )
                 refreshed_lots.extend(lots)
                 if complete:
@@ -189,6 +226,8 @@ class WatchlistService:
                 stopped = True
                 break
             except Exception as exc:
+                if adapter.source == "Invaluable" and isinstance(exc, SourceAccessBlocked):
+                    result_checks.access_blocked = True
                 message = " ".join(str(exc).split())[:500]
                 cached = self._cached_lots_for_entry(entry)
                 refreshed_lots.extend(cached)
@@ -199,8 +238,17 @@ class WatchlistService:
                 )
                 errors.append(f"{entry.watch_label} ({entry.source}): {message}{suffix}")
                 self.cache.record_source_error(entry.url, message, observed_at)
+                if adapter.source == "Invaluable":
+                    try:
+                        refreshed_lots.extend(self._refresh_posted_results(
+                            entry, adapter, source_fetcher(adapter), stop, metrics, observed_at, [],
+                            result_checks, errors, observed_lot_keys, notices, ended_only=True,
+                        ))
+                    except WatchlistStopped:
+                        stopped = True
+                        break
 
-        metrics.pages_fetched = max(0, int(getattr(fetcher, "pages_fetched", 0)) - started_pages)
+        metrics.pages_fetched = fetched_pages()
         fallback_lot_keys.difference_update(observed_lot_keys)
         freshly_observed_lots = [lot for lot in refreshed_lots if lot.cache_key not in fallback_lot_keys]
         enrichment = self.enricher.enrich(freshly_observed_lots, zero_ai=zero_ai)
@@ -237,6 +285,7 @@ class WatchlistService:
             progress(metrics.summary())
         return WatchlistResult(
             lots=lots, metrics=metrics, errors=errors, stopped=stopped,
+            notices=notices,
             fallback_lot_keys=fallback_lot_keys.intersection(lot.cache_key for lot in lots),
         )
 
@@ -250,8 +299,9 @@ class WatchlistService:
         observed_at: datetime,
         preloaded_search: BatchedSearchPage | None = None,
         observed_lot_keys: set[str] | None = None,
-        result_checks: dict[str, NormalizedLot | None] | None = None,
+        result_checks: _PostedResultChecks | None = None,
         errors: list[str] | None = None,
+        notices: list[str] | None = None,
     ) -> tuple[list[NormalizedLot], list[NormalizedLot], bool]:
         page_url = entry.url
         visited_pages: set[str] = set()
@@ -291,12 +341,26 @@ class WatchlistService:
                     metrics.cache_hits += 1
                 else:
                     lot = card
-                    if adapter.needs_detail(lot) and lot.lot_url:
-                        detail_page = adapter.fetch_lot_detail(lot.lot_url, fetcher)
+                    if adapter.needs_detail(lot) and lot.lot_url and not (
+                        adapter.source == "Invaluable" and result_checks is not None and result_checks.access_blocked
+                    ):
+                        try:
+                            detail_page = adapter.fetch_lot_detail(lot.lot_url, fetcher)
+                        except SourceAccessError as exc:
+                            if adapter.source == "Invaluable" and result_checks is not None:
+                                result_checks.details[lot.cache_key] = None
+                                if isinstance(exc, SourceAccessBlocked):
+                                    result_checks.access_blocked = True
+                            raise
                         metrics.detail_pages_fetched += 1
                         detail = adapter.parse_lot_detail(detail_page, lot.lot_url, entry.artist)
+                        if detail is None:
+                            if adapter.source == "Invaluable" and result_checks is not None:
+                                result_checks.details[lot.cache_key] = None
+                            raise SourceAccessError("The lot page did not contain recognizable auction details.")
                         if result_checks is not None:
-                            result_checks[lot.cache_key] = detail
+                            result_checks.details[lot.cache_key] = detail
+                            self._note_sold_access(detail, result_checks, notices if notices is not None else [])
                         if detail:
                             lot = adapter.merge_detail(lot, detail)
                 transition = self.cache.upsert(
@@ -321,8 +385,9 @@ class WatchlistService:
         if complete and adapter.source == "Invaluable":
             lots = self._refresh_posted_results(
                 entry, adapter, fetcher, stop, metrics, observed_at, lots,
-                result_checks if result_checks is not None else {},
+                result_checks if result_checks is not None else _PostedResultChecks(),
                 errors if errors is not None else [], observed_lot_keys,
+                notices if notices is not None else [],
             )
         ended = self.cache.mark_missing_ended(entry.url, observed_keys, observed_at) if complete else []
         if observed_lot_keys is not None:
@@ -338,9 +403,12 @@ class WatchlistService:
         metrics: WatchlistMetrics,
         observed_at: datetime,
         lots: list[NormalizedLot],
-        result_checks: dict[str, NormalizedLot | None],
+        result_checks: _PostedResultChecks,
         errors: list[str],
         observed_lot_keys: set[str] | None,
+        notices: list[str],
+        *,
+        ended_only: bool = False,
     ) -> list[NormalizedLot]:
         """Revisit watched details for 30 days, even after upcoming searches drop them."""
 
@@ -352,16 +420,25 @@ class WatchlistService:
             if cached.sold_price is not None:
                 # A confirmed result is still included for reliable sync retries.
                 if cached.cache_key not in current:
-                    cached.status = "unchanged"
+                    if not ended_only:
+                        cached.status = "unchanged"
                     current[cached.cache_key] = cached
                     metrics.cache_hits += 1
+                continue
+            # Already ended records remain visible even if a catalog cannot be
+            # read, or their result is older than the automatic recheck window.
+            if cached.status == "ended" and cached.cache_key not in current:
+                current[cached.cache_key] = cached
+            if ended_only and cached.status != "ended":
                 continue
             when, _all_day = parse_lot_datetime(cached.relevant_at)
             if when is None or not now - timedelta(days=30) <= when <= now:
                 continue
             if not cached.lot_url:
                 continue
-            if cached.cache_key not in result_checks:
+            if cached.cache_key not in result_checks.details:
+                if result_checks.access_blocked:
+                    continue
                 try:
                     page = adapter.fetch_lot_detail(cached.lot_url, fetcher)
                     if stop.is_set():
@@ -370,17 +447,20 @@ class WatchlistService:
                     detail = adapter.parse_lot_detail(page, cached.lot_url, entry.artist)
                     if detail is None:
                         raise SourceAccessError("The lot page did not contain recognizable auction details.")
-                    result_checks[cached.cache_key] = detail
+                    result_checks.details[cached.cache_key] = detail
+                    self._note_sold_access(detail, result_checks, notices)
                 except WatchlistStopped:
                     raise
                 except Exception as exc:
-                    result_checks[cached.cache_key] = None
+                    result_checks.details[cached.cache_key] = None
+                    if isinstance(exc, SourceAccessBlocked):
+                        result_checks.access_blocked = True
                     message = " ".join(str(exc).split())[:300]
                     errors.append(
                         f"{entry.watch_label} (Invaluable), lot {cached.lot_number or cached.source_lot_id}: "
                         f"sold result could not be checked: {message}. The last known data was retained."
                     )
-            detail = result_checks[cached.cache_key]
+            detail = result_checks.details[cached.cache_key]
             if detail is not None and detail.sold_price is not None:
                 lot = adapter.merge_detail(cached, detail)
                 lookup = self.cache.lookup(cached)
@@ -401,8 +481,20 @@ class WatchlistService:
                 current[cached.cache_key] = cached
         return list(current.values())
 
+    @staticmethod
+    def _note_sold_access(detail: NormalizedLot | None, checks: _PostedResultChecks, notices: list[str]) -> None:
+        if detail is not None and "sold_price_login" in detail.ambiguities and detail.sold_price is None:
+            checks.access_blocked = True
+            if _SOLD_LOGIN_NOTICE not in notices:
+                notices.append(_SOLD_LOGIN_NOTICE)
+
     def _cached_lots_for_entry(self, entry: BookmarkEntry) -> list[NormalizedLot]:
         lots = self.cache.active_lots_for_watch_url(entry.url)
+        known_keys = {lot.cache_key for lot in lots}
+        lots.extend(
+            lot for lot in self.cache.lots_for_watch_url(entry.url)
+            if lot.cache_key not in known_keys and (lot.status == "ended" or lot.sold_price is not None)
+        )
         for lot in lots:
             lot.artist_watchlist_name = entry.artist or lot.artist
         return lots

@@ -67,6 +67,8 @@ class NormalizedLot:
 
         if self.sold_price is not None:
             return self.sold_label
+        if self.status == "ended":
+            return "Sale ended · Sold price unavailable"
         if self.bid_count == 0:
             return "No bids"
         if self.current_bid is None:

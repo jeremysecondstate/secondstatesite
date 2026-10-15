@@ -9,11 +9,11 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 from catalogapp.bookmark_watchlist import BookmarkEntry
-from catalogapp.watchlist_adapters import BookmarkSourceAdapter
+from catalogapp.watchlist_adapters import BatchedSearchPage, BookmarkSourceAdapter
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_enrichment import EnrichmentMetrics
 from catalogapp.watchlist_exports import render_csv, render_ics, render_markdown
-from catalogapp.watchlist_fetch import SourceAccessError
+from catalogapp.watchlist_fetch import SourceAccessBlocked, SourceAccessError
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_service import WatchlistService
 from catalogapp.watchlist_sync import CalendarSyncError, sync_watchlist_lots
@@ -67,6 +67,29 @@ class OfflineInvaluableAdapter:
         return replace(page) if page is not None else None
 
 
+class CountingOfflineFetcher:
+    def __init__(self, pages, *, initial_pages=0):
+        self.pages = pages
+        self.pages_fetched = initial_pages
+        self.calls = []
+
+    def fetch(self, url):
+        self.calls.append(url)
+        page = self.pages[url]
+        if isinstance(page, Exception):
+            raise page
+        self.pages_fetched += 1
+        return page
+
+
+class FetcherUsingAdapter(OfflineInvaluableAdapter):
+    def fetch_search_page(self, url, fetcher):
+        return fetcher.fetch(url)
+
+    def fetch_lot_detail(self, url, fetcher):
+        return fetcher.fetch(url)
+
+
 class WatchlistSoldRefreshTests(TestCase):
     def setUp(self):
         self.cache = WatchlistCache(":memory:")
@@ -92,15 +115,18 @@ class WatchlistSoldRefreshTests(TestCase):
         return replace(lot or self.lot, sold_price=11000, sold_currency="USD", content_hash="")
 
     def refresh(self, adapter, **kwargs):
-        fetcher = Mock(pages_fetched=0)
-        fetcher.fetch.side_effect = AssertionError("This test must remain offline")
-        fetcher.post_json.side_effect = AssertionError("This test must remain offline")
+        fetcher = kwargs.pop("fetcher", None)
+        if fetcher is None:
+            fetcher = Mock(pages_fetched=0)
+            fetcher.fetch.side_effect = AssertionError("This test must remain offline")
+            fetcher.post_json.side_effect = AssertionError("This test must remain offline")
         enricher = Mock(enabled=True)
         enricher.enrich.return_value = EnrichmentMetrics()
         max_pages = kwargs.pop("max_pages_per_bookmark", 10)
         entries = kwargs.pop("entries", [ENTRY])
         service = WatchlistService(
             self.cache, fetcher=fetcher, enricher=enricher, now=lambda: NOW,
+            invaluable_fetcher=kwargs.pop("invaluable_fetcher", None),
             max_pages_per_bookmark=max_pages,
         )
         with patch("catalogapp.watchlist_service.adapter_for_url", return_value=adapter):
@@ -307,6 +333,172 @@ class WatchlistSoldRefreshTests(TestCase):
         self.assertEqual(adapter.detail_calls, [])
         self.assertTrue(any("HTTP 403" in error for error in result.errors))
         self.assertIsNone(self.cache.get(self.lot.cache_key).sold_price)
+
+    def test_failed_search_rechecks_known_ended_lot_independently(self):
+        self.cache.mark_missing_ended(ENTRY.url, [], PREVIOUS)
+        adapter = OfflineInvaluableAdapter(
+            {ENTRY.url: SourceAccessError("Catalog unavailable")},
+            {self.lot.lot_url: self.sold_detail()},
+        )
+
+        result = self.refresh(adapter, new_changed_only=True)
+
+        self.assertEqual(adapter.detail_calls, [self.lot.lot_url])
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].sold_price, 11000)
+        self.assertEqual(result.fallback_lot_keys, set())
+        self.assertEqual(result.metrics.changed_lots, 1)
+        self.assertEqual(self.cache.active_lots_for_watch_url(ENTRY.url), [])
+        self.assertTrue(any("Catalog unavailable" in error for error in result.errors))
+
+    def test_catalog_failure_keeps_old_ended_and_confirmed_sold_history(self):
+        old = replace(self.lot, start_at=(NOW - timedelta(days=45)).isoformat(), content_hash="")
+        self.seed(old)
+        self.cache.mark_missing_ended(ENTRY.url, [], PREVIOUS)
+        sold = replace(self.sold_detail(), source_lot_id="calder-117", lot_number="117", content_hash="")
+        self.seed(sold)
+        before = {lot.cache_key: lot.to_dict() for lot in self.cache.lots_for_watch_url(ENTRY.url)}
+        adapter = OfflineInvaluableAdapter({ENTRY.url: SourceAccessError("Catalog unavailable")})
+
+        result = self.refresh(adapter)
+
+        self.assertEqual(adapter.detail_calls, [])
+        self.assertEqual({lot.cache_key for lot in result.lots}, set(before))
+        self.assertEqual(result.fallback_lot_keys, set(before))
+        self.assertEqual({lot.cache_key: lot.to_dict() for lot in self.cache.lots_for_watch_url(ENTRY.url)}, before)
+
+    def test_batch_failure_rechecks_shared_ended_lot_once(self):
+        second = replace(ENTRY, url=ENTRY.url + "&subcategory=prints")
+        self.cache.upsert(replace(self.lot), watch_url=second.url, search_hash=self.lot.content_hash, observed_at=PREVIOUS)
+        self.cache.mark_missing_ended(ENTRY.url, [], PREVIOUS)
+        self.cache.mark_missing_ended(second.url, [], PREVIOUS)
+        adapter = OfflineInvaluableAdapter({}, {self.lot.lot_url: self.sold_detail()})
+        adapter.fetch_search_batch = Mock(side_effect=SourceAccessError("Catalog unavailable"))
+
+        result = self.refresh(adapter, entries=[ENTRY, second])
+
+        adapter.fetch_search_batch.assert_called_once()
+        self.assertEqual(adapter.search_calls, [])
+        self.assertEqual(adapter.detail_calls, [self.lot.lot_url])
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].sold_price, 11000)
+        self.assertEqual(result.fallback_lot_keys, set())
+
+    def test_login_gate_is_one_actionable_notice_and_stops_other_artist_probes(self):
+        second_entry = replace(ENTRY, artist="Joan Miro", title="Joan Miro", url=ENTRY.url + "&other=miro")
+        second = replace(self.lot, source_lot_id="miro-117", lot_url=self.lot.lot_url + "-other", content_hash="")
+        self.cache.upsert(second, watch_url=second_entry.url, search_hash=second.content_hash, observed_at=PREVIOUS)
+        gated = replace(self.lot, ambiguities=["sold_price_login"], content_hash="")
+        adapter = OfflineInvaluableAdapter(
+            {ENTRY.url: {"lots": []}, second_entry.url: {"lots": []}},
+            {self.lot.lot_url: gated, second.lot_url: self.sold_detail(second)},
+        )
+
+        result = self.refresh(adapter, entries=[ENTRY, second_entry])
+
+        self.assertEqual(adapter.detail_calls, [self.lot.lot_url])
+        self.assertEqual(result.errors, [])
+        self.assertEqual(len(result.notices), 1)
+        self.assertIn("Connect Invaluable", result.notices[0])
+        self.assertEqual(len(result.lots), 2)
+        self.assertTrue(all(lot.sold_price is None for lot in result.lots))
+
+    def test_result_access_failure_stops_other_lots_but_retains_every_ended_lot(self):
+        second = replace(self.lot, source_lot_id="calder-117", lot_url=self.lot.lot_url + "-other", content_hash="")
+        self.seed(second)
+        self.cache.mark_missing_ended(ENTRY.url, [], PREVIOUS)
+        adapter = OfflineInvaluableAdapter(
+            {ENTRY.url: {"lots": []}},
+            {self.lot.lot_url: SourceAccessBlocked("HTTP 403"), second.lot_url: self.sold_detail(second)},
+        )
+
+        result = self.refresh(adapter)
+
+        self.assertEqual(adapter.detail_calls, [self.lot.lot_url])
+        self.assertEqual(len(result.errors), 1)
+        self.assertEqual({lot.cache_key for lot in result.lots}, {self.lot.cache_key, second.cache_key})
+        self.assertTrue(all(lot.sold_price is None for lot in result.lots))
+
+    def test_broken_lot_and_unrecognized_page_do_not_block_other_sold_results(self):
+        malformed = replace(self.lot, source_lot_id="calder-117", lot_url=self.lot.lot_url + "-malformed", content_hash="")
+        available = replace(self.lot, source_lot_id="calder-118", lot_url=self.lot.lot_url + "-available", content_hash="")
+        self.seed(malformed)
+        self.seed(available)
+        self.cache.mark_missing_ended(ENTRY.url, [], PREVIOUS)
+        adapter = OfflineInvaluableAdapter(
+            {ENTRY.url: {"lots": []}},
+            {self.lot.lot_url: SourceAccessError("HTTP 404"), malformed.lot_url: None, available.lot_url: self.sold_detail(available)},
+        )
+
+        result = self.refresh(adapter)
+
+        self.assertEqual(adapter.detail_calls, [self.lot.lot_url, malformed.lot_url, available.lot_url])
+        self.assertEqual(len(result.errors), 2)
+        self.assertEqual(self.cache.get(available.cache_key).sold_price, 11000)
+        self.assertIsNone(self.cache.get(self.lot.cache_key).sold_price)
+        self.assertIsNone(self.cache.get(malformed.cache_key).sold_price)
+        self.assertEqual(len(result.lots), 3)
+
+    def test_catalog_authentication_block_prevents_detail_probes_and_retains_history(self):
+        self.cache.mark_missing_ended(ENTRY.url, [], PREVIOUS)
+        adapter = OfflineInvaluableAdapter(
+            {ENTRY.url: SourceAccessBlocked("HTTP 403")},
+            {self.lot.lot_url: self.sold_detail()},
+        )
+
+        result = self.refresh(adapter)
+
+        self.assertEqual(adapter.detail_calls, [])
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.fallback_lot_keys, {self.lot.cache_key})
+        self.assertIsNone(result.lots[0].sold_price)
+
+    def test_initial_detail_login_gate_is_reported_without_repeat_result_probe(self):
+        gated = replace(self.lot, ambiguities=["sold_price_login"], content_hash="")
+        adapter = OfflineInvaluableAdapter({ENTRY.url: {"lots": [self.lot]}}, {self.lot.lot_url: gated})
+        adapter.needs_detail = Mock(return_value=True)
+
+        result = self.refresh(adapter)
+
+        self.assertEqual(adapter.detail_calls, [self.lot.lot_url])
+        self.assertEqual(len(result.notices), 1)
+        self.assertIn("Connect Invaluable", result.notices[0])
+
+    def test_invaluable_fetcher_is_isolated_and_page_metrics_sum_both_sources(self):
+        other_entry = replace(ENTRY, source="Heritage", artist="Miro", title="Miro", url="https://fineart.ha.com/catalog")
+        other_lot = replace(self.lot, source="Heritage", source_lot_id="heritage-117", start_at=(NOW + timedelta(days=1)).isoformat(), content_hash="")
+        public = CountingOfflineFetcher({other_entry.url: {"lots": [other_lot]}}, initial_pages=5)
+        signed_in = CountingOfflineFetcher({ENTRY.url: {"lots": [self.lot]}, self.lot.lot_url: self.sold_detail()}, initial_pages=12)
+        invaluable = FetcherUsingAdapter({})
+        heritage = FetcherUsingAdapter({})
+        heritage.source = "Heritage"
+        service = WatchlistService(self.cache, fetcher=public, invaluable_fetcher=signed_in, now=lambda: NOW)
+
+        with patch("catalogapp.watchlist_service.adapter_for_url", side_effect=lambda url: invaluable if url == ENTRY.url else heritage):
+            result = service.refresh([ENTRY, other_entry], selected_artists=[ENTRY.watch_label, other_entry.watch_label])
+
+        self.assertEqual(public.calls, [other_entry.url])
+        self.assertEqual(signed_in.calls, [ENTRY.url, self.lot.lot_url])
+        self.assertEqual(result.metrics.pages_fetched, 3)
+        self.assertEqual(result.metrics.detail_pages_fetched, 1)
+        self.assertEqual(len(result.lots), 2)
+
+    def test_batched_catalog_uses_invaluable_fetcher_and_shared_counter_is_not_doubled(self):
+        second = replace(ENTRY, url=ENTRY.url + "&subcategory=prints")
+        fetcher = CountingOfflineFetcher({"batch": {}, self.lot.lot_url: self.sold_detail()}, initial_pages=7)
+        adapter = FetcherUsingAdapter({})
+
+        def batch(searches, chosen_fetcher, **_kwargs):
+            self.assertIs(chosen_fetcher, fetcher)
+            chosen_fetcher.fetch("batch")
+            return {url: BatchedSearchPage({"lots": []}) for url, _artist in searches}
+
+        adapter.fetch_search_batch = Mock(side_effect=batch)
+        result = self.refresh(adapter, entries=[ENTRY, second], fetcher=fetcher, invaluable_fetcher=fetcher)
+
+        self.assertEqual(fetcher.calls, ["batch", self.lot.lot_url])
+        self.assertEqual(result.metrics.pages_fetched, 2)
+        self.assertEqual(result.lots[0].sold_price, 11000)
 
     def test_two_watch_urls_check_missing_lot_once_and_preserve_sold_transition(self):
         second = replace(ENTRY, url=ENTRY.url + "&subcategory=prints")

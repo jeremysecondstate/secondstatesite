@@ -1,0 +1,2 @@
+# Optional desktop-only support. Uses an installed Chrome or Edge browser.
+playwright>=1.51,<2

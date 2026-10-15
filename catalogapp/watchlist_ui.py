@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,8 @@ from catalogapp.bookmark_watchlist import (
     load_bookmarks_file,
 )
 from catalogapp.watchlist_cache import WatchlistCache
+from catalogapp.watchlist_browser import InvaluableBrowserFetcher, connect_invaluable
+from catalogapp.watchlist_fetch import WatchlistStopped
 from catalogapp.watchlist_exports import render_calendar_preview, render_csv, render_ics, render_markdown
 from catalogapp.watchlist_models import NormalizedLot, parse_lot_datetime
 from catalogapp.watchlist_saved_pages import import_saved_heritage_pages
@@ -66,6 +69,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self._lot_urls: dict[str, str] = {}
         self._settings_path = local_watchlist_directory() / "settings.json"
         self._cache_path = local_watchlist_directory() / "watchlist.sqlite3"
+        self._invaluable_profile_directory = local_watchlist_directory() / "invaluable-browser"
         self._build()
         self._load_initial_bookmarks()
 
@@ -174,7 +178,7 @@ class ArtistWatchlistPanel(ttk.Frame):
 
         results = ttk.LabelFrame(workspace, text="2. Refresh and agenda", padding=8)
         results.columnconfigure(0, weight=1)
-        results.rowconfigure(2, weight=1)
+        results.rowconfigure(3, weight=1)
         workspace.add(selection, minsize=100, stretch="always")
         workspace.add(results, minsize=140, stretch="always")
         controls = ttk.Frame(results)
@@ -198,8 +202,28 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.stop_button = ttk.Button(controls, text="Stop", command=self.stop_refresh, state=tk.DISABLED)
         self.stop_button.pack(side=tk.RIGHT, padx=(0, 8))
 
+        connection_controls = ttk.Frame(results)
+        connection_controls.grid(row=1, column=0, sticky="ew", pady=(0, 7))
+        self.invaluable_session_var = tk.BooleanVar(
+            value=self._read_settings().get("invaluable_session_enabled") is True
+        )
+        self.connect_invaluable_button = ttk.Button(
+            connection_controls, text="Connect Invaluable…", command=self.connect_invaluable,
+        )
+        self.connect_invaluable_button.pack(side=tk.LEFT)
+        self.invaluable_session_check = ttk.Checkbutton(
+            connection_controls, text="Use saved login", variable=self.invaluable_session_var,
+            command=self._save_settings_hint,
+        )
+        self.invaluable_session_check.pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Label(
+            connection_controls,
+            text="Sign in once in Chrome to include posted sold prices when you refresh.",
+            style="Subtle.TLabel", wraplength=680,
+        ).pack(side=tk.LEFT, padx=(8, 0))
+
         saved_controls = ttk.Frame(results)
-        saved_controls.grid(row=1, column=0, sticky="ew", pady=(0, 7))
+        saved_controls.grid(row=2, column=0, sticky="ew", pady=(0, 7))
         self.import_saved_button = ttk.Button(
             saved_controls,
             text="Import Saved Heritage Pages…",
@@ -218,7 +242,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         ).pack(side=tk.LEFT, padx=(8, 0))
 
         views = ttk.Notebook(results)
-        views.grid(row=2, column=0, sticky="nsew")
+        views.grid(row=3, column=0, sticky="nsew")
         agenda_tab = ttk.Frame(views, padding=4)
         calendar_tab = ttk.Frame(views, padding=4)
         views.add(agenda_tab, text="Agenda")
@@ -388,6 +412,50 @@ class ArtistWatchlistPanel(ttk.Frame):
                 values[0] = "Yes" if item in self.selected_artists else ""
                 self.artist_tree.item(item, values=values)
 
+    def connect_invaluable(self) -> None:
+        if self.worker and self.worker.is_alive():
+            return
+        self.stop_event = threading.Event()
+        self.refresh_button.configure(state=tk.DISABLED)
+        self._set_import_buttons_state(tk.DISABLED)
+        self.stop_button.configure(state=tk.NORMAL)
+        self._set_status("Opening Invaluable in Chrome. Sign in there to connect sold-price refreshes…")
+
+        def run() -> None:
+            try:
+                connected = connect_invaluable(
+                    self._invaluable_profile_directory,
+                    stop_event=self.stop_event,
+                    progress=lambda text: self.after(0, lambda value=text: self._set_status(value)),
+                )
+                self.after(0, lambda: self._finish_invaluable_connection(connected))
+            except WatchlistStopped:
+                self.after(0, lambda: self._finish_invaluable_connection(False))
+            except Exception as exc:
+                message = " ".join(str(exc).split())[:500]
+                self.after(0, lambda message=message: self._finish_invaluable_connection(False, message))
+
+        self.worker = threading.Thread(target=run, name="invaluable-sign-in", daemon=True)
+        self.worker.start()
+
+    def _finish_invaluable_connection(self, connected: bool, error: str = "") -> None:
+        self.refresh_button.configure(state=tk.NORMAL)
+        self._set_import_buttons_state(tk.NORMAL)
+        self.stop_button.configure(state=tk.DISABLED)
+        self.worker = None
+        if connected:
+            self.invaluable_session_var.set(True)
+            self._save_settings_hint()
+            self._set_status("Invaluable connected. Refreshing watched lots with your saved login…")
+            if self.active_entries and self.selected_artists:
+                self.refresh_watchlist()
+            else:
+                self._set_status("Invaluable connected. Select artists, then click Refresh Watchlist.")
+        else:
+            self._set_status("Invaluable connection not completed. Click Connect Invaluable to try again.")
+            if error:
+                messagebox.showwarning("Invaluable Connection", error, parent=self)
+
     def refresh_watchlist(self) -> None:
         if self.worker and self.worker.is_alive():
             return
@@ -407,12 +475,25 @@ class ArtistWatchlistPanel(ttk.Frame):
         horizon_days = int(self.horizon_var.get())
         zero_ai = bool(self.zero_ai_var.get())
         new_changed_only = bool(self.new_changed_var.get())
+        use_invaluable_session = bool(self.invaluable_session_var.get()) and any(
+            entry.source == "Invaluable" and entry.watch_label in selected_artists for entry in entries
+        )
 
         def run() -> None:
             try:
                 local_watchlist_directory().mkdir(parents=True, exist_ok=True)
-                with WatchlistCache(self._cache_path) as cache:
-                    service = self.service_factory(cache) if self.service_factory else WatchlistService(cache)
+                with ExitStack() as resources:
+                    cache = resources.enter_context(WatchlistCache(self._cache_path))
+                    if self.service_factory:
+                        service = self.service_factory(cache)
+                    else:
+                        browser = None
+                        if use_invaluable_session:
+                            browser = InvaluableBrowserFetcher(
+                                self._invaluable_profile_directory, stop_event=self.stop_event,
+                            )
+                            resources.callback(browser.close)
+                        service = WatchlistService(cache, invaluable_fetcher=browser)
                     result = service.refresh(
                         entries,
                         selected_artists=selected_artists,
@@ -425,7 +506,7 @@ class ArtistWatchlistPanel(ttk.Frame):
                 self._sync_and_finish_result(result)
             except Exception as exc:
                 message = " ".join(str(exc).split())[:500]
-                self.after(0, lambda: self._finish_refresh_error(message))
+                self.after(0, lambda message=message: self._finish_refresh_error(message))
 
         self.worker = threading.Thread(target=run, name="artist-watchlist-refresh", daemon=True)
         self.worker.start()
@@ -491,9 +572,10 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def _set_import_buttons_state(self, state) -> None:
         self.import_saved_button.configure(state=state)
-        sold_button = self.__dict__.get("import_sold_button")
-        if sold_button is not None:
-            sold_button.configure(state=state)
+        for name in ("import_sold_button", "connect_invaluable_button", "invaluable_session_check"):
+            button = self.__dict__.get(name)
+            if button is not None:
+                button.configure(state=state)
 
     def import_saved_sold_results(self) -> None:
         if self.worker and self.worker.is_alive():
@@ -823,12 +905,15 @@ class ArtistWatchlistPanel(ttk.Frame):
     def _set_status(self, text: str) -> None:
         self.status_callback(text)
 
-    def _remembered_bookmark_path(self) -> Path | None:
+    def _read_settings(self) -> dict:
         try:
             payload = json.loads(self._settings_path.read_text(encoding="utf-8"))
-            path = payload.get("last_bookmark_path", "")
         except (OSError, ValueError, TypeError):
-            return None
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def _remembered_bookmark_path(self) -> Path | None:
+        path = self._read_settings().get("last_bookmark_path", "")
         return Path(path) if path else None
 
     def _load_initial_bookmarks(self) -> None:
@@ -847,8 +932,13 @@ class ArtistWatchlistPanel(ttk.Frame):
         )
 
     def _save_settings_hint(self) -> None:
+        payload = self._read_settings()
+        payload["last_bookmark_path"] = self.bookmark_path_var.get()
+        session_var = self.__dict__.get("invaluable_session_var")
+        if session_var is not None:
+            payload["invaluable_session_enabled"] = bool(session_var.get())
         self._settings_path.parent.mkdir(parents=True, exist_ok=True)
         self._settings_path.write_text(
-            json.dumps({"last_bookmark_path": self.bookmark_path_var.get()}, indent=2),
+            json.dumps(payload, indent=2),
             encoding="utf-8",
         )

@@ -14,7 +14,7 @@ import unicodedata
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment, NavigableString
 
 from catalogapp.bookmark_watchlist import canonicalize_bookmark_url
 from catalogapp.watchlist_models import NormalizedLot
@@ -368,13 +368,29 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             detail = self._normalize(self._raw_from_detail(soup, lot_url), lot_url, watchlist_artist)
         if detail is None:
             return None
+        if not detail.title:
+            # Current Invaluable metadata can carry only a URL and bid. Its
+            # visible heading supplies the title; an empty application shell
+            # must not count as a successfully refreshed lot detail.
+            detail.title = self._node_text(soup, ("h1", "[data-testid='lot-title']", ".lot-title"))
+        if not detail.title or re.fullmatch(
+            r"(?:JavaScript is disabled|Access denied|Verify you are human|Just a moment(?:\.{3})?)",
+            detail.title,
+            re.I,
+        ):
+            return None
         # The public metadata can omit the result while the visible detail
         # contains "Sold: $11,000 USD". Read that label independently of JSON.
         sold = self._sold_from_html(soup)
         if sold.low is not None:
             detail.sold_price = sold.low
             detail.sold_currency = sold.currency or detail.currency
-            detail.content_hash = detail.calculate_content_hash()
+        elif any(
+            re.fullmatch(r"Sold(?:\s+(?:for|price))?\s*:\s*(?:Log\s*in|Sign\s*in)\s+to\s+view\b.*", text, re.I)
+            for text in self._sold_label_texts(soup)
+        ):
+            detail.ambiguities.append("sold_price_login")
+        detail.content_hash = detail.calculate_content_hash()
         return detail
 
     def merge_detail(self, card: NormalizedLot, detail: NormalizedLot) -> NormalizedLot:
@@ -779,43 +795,78 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         return _Money()
 
     @classmethod
+    def _sold_node_excluded(cls, candidate: Any, root: Any) -> bool:
+        for ancestor in (candidate, *candidate.parents):
+            if ancestor.has_attr("hidden") or ancestor.get("aria-hidden") == "true":
+                return True
+            if root.name == "[document]" and (
+                re.search(r"\b(?:lot-card|lot-item|related-lots|recommended-lots|recommendations)\b", " ".join(ancestor.get("class", [])))
+                or "related" in str(ancestor.get("data-testid", "")).casefold()
+            ):
+                return True
+        return False
+
+    @classmethod
+    def _sold_label_texts(cls, node: Any) -> Iterable[str]:
+        """Read only the Sold label and its immediately adjacent inline value.
+
+        Invaluable's closed-bid-lot-detail places the strong label beside the
+        amount, with title, estimate, house and date in the same parent. Parsing
+        that entire parent either misses the result or risks borrowing another
+        number. Stop at the next block, field label, or hidden element.
+        """
+
+        label_pattern = r"Sold(?:\s+(?:for|price))?\s*:"
+        for label in node.find_all(string=re.compile(r"^\s*" + label_pattern, re.I)):
+            parent = label.parent
+            if isinstance(label, Comment) or parent.name in {"script", "style", "template"}:
+                continue
+            if cls._sold_node_excluded(parent, node):
+                continue
+            for candidate in (parent, parent.parent):
+                if candidate is not None:
+                    yield candidate.get_text(" ", strip=True)
+            for origin in (label, parent):
+                origin_text = str(origin).strip() if isinstance(origin, NavigableString) else origin.get_text(" ", strip=True)
+                if not re.fullmatch(label_pattern, origin_text, re.I):
+                    continue
+                parts = [origin_text]
+                for sibling in origin.next_siblings:
+                    if isinstance(sibling, Comment):
+                        continue
+                    if isinstance(sibling, NavigableString):
+                        value = str(sibling).strip()
+                    else:
+                        if sibling.name not in {"span", "b", "i", "em", "small", "button", "a"}:
+                            break
+                        if cls._sold_node_excluded(sibling, node):
+                            break
+                        value = sibling.get_text(" ", strip=True)
+                    if value:
+                        parts.append(value)
+                    if len(parts) > 8:
+                        break
+                yield " ".join(parts)
+
+    @classmethod
     def _sold_from_html(cls, node: Any) -> _Money:
         if not hasattr(node, "select"):
             return _Money()
         # DOM selectors are explicitly about the result; generic price and bid
         # elements carry no evidence that the lot was sold.
-        def unrelated_or_hidden(candidate: Any) -> bool:
-            for ancestor in (candidate, *candidate.parents):
-                if ancestor.has_attr("hidden") or ancestor.get("aria-hidden") == "true":
-                    return True
-                if node.name == "[document]" and (
-                    re.search(r"\b(?:lot-card|lot-item|related-lots|recommended-lots|recommendations)\b", " ".join(ancestor.get("class", [])))
-                    or "related" in str(ancestor.get("data-testid", "")).casefold()
-                ):
-                    return True
-            return False
 
         for candidate in node.select("[data-sold-price], .sold-price, .lot-sold-price, [data-testid='sold-price']"):
-            if unrelated_or_hidden(candidate):
+            if cls._sold_node_excluded(candidate, node):
                 continue
             value = candidate.get("data-sold-price") or candidate.get_text(" ", strip=True)
             currency = candidate.get("data-sold-currency") or candidate.get("data-currency") or ""
             sold = cls._posted_sold_money(value, currency)
             if sold.low is not None:
                 return sold
-        for label in node.find_all(string=re.compile(r"^\s*Sold(?:\s+(?:for|price))?\s*:", re.I)):
-            parent = label.parent
-            if parent.name in {"script", "style", "template"}:
-                continue
-            if unrelated_or_hidden(parent):
-                # A related-lot card cannot supply the current detail's result.
-                continue
-            for candidate in (parent, parent.parent):
-                if candidate is None:
-                    continue
-                sold = cls._posted_sold_money(candidate.get_text(" ", strip=True))
-                if sold.low is not None:
-                    return sold
+        for text in cls._sold_label_texts(node):
+            sold = cls._posted_sold_money(text)
+            if sold.low is not None:
+                return sold
         return _Money()
 
     def _embedded_lot_dicts(self, soup: BeautifulSoup) -> Iterable[dict[str, Any]]:

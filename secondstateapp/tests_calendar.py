@@ -1094,7 +1094,7 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual(details[foreign.pk]["bid"], "Sold: £1,250.50 GBP")
         self.assertEqual(details[foreign.pk]["estimate"], "$2,000–3,000 estimate")
         self.assertEqual(details[ended.pk]["sold"], "")
-        self.assertEqual(details[ended.pk]["bid"], "Current bid: $1,700 · 4 bids")
+        self.assertEqual(details[ended.pk]["bid"], "Sale ended · Sold price unavailable")
         self.assertContains(response, "Sold: $11,000 USD")
 
     def test_invalid_month_falls_back_without_error(self):

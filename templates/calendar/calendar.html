@@ -108,26 +108,38 @@
         <div class="calendar-grid" role="grid" aria-label="{{ month_title }} auction calendar">
           {% for week in weeks %}
             {% for day in week %}
-              <button
+              <div
                 class="calendar-day{% if not day.in_month %} is-outside{% endif %}{% if day.is_today %} is-today{% endif %}{% if day.lot_count %} has-events{% endif %}"
-                type="button"
-                data-calendar-day="{{ day.iso }}"
-                aria-controls="selected-day-sales selected-day-lots"
-                aria-label="{{ day.date|date:'l, F j, Y' }}{% if day.lot_count %}, {{ day.lot_count }} watched lot{{ day.lot_count|pluralize }} in {{ day.sale_count }} auction{{ day.sale_count|pluralize }}{% endif %}. Select to view the complete auction list below."
                 role="gridcell"
               >
-                <span class="day-number">{{ day.day_number }}</span>
-                <span class="day-events">
-                  {% for event in day.event_groups %}
-                    <span class="event-chip{% if event.ended %} is-ended{% endif %}" title="{% if event.sale_title %}{{ event.sale_title }} · {% endif %}{{ event.auction_house }} · {{ event.lot_count }} watched lot{{ event.lot_count|pluralize }}">
-                      <span class="event-title">{% firstof event.sale_title event.auction_house %}</span>
-                      {% if event.sale_title %}<span class="event-house">{{ event.auction_house }}</span>{% endif %}
-                      <span class="event-count" aria-label="{{ event.lot_count }} watched lot{{ event.lot_count|pluralize }}">{{ event.lot_count }}</span>
-                    </span>
-                  {% endfor %}
-                  {% if day.more_count %}<span class="more-events">+{{ day.more_count }} more auction{{ day.more_count|pluralize }}</span>{% endif %}
-                </span>
-              </button>
+                <button
+                  class="calendar-day-select"
+                  type="button"
+                  data-calendar-day="{{ day.iso }}"
+                  aria-controls="selected-day-sales selected-day-lots"
+                  aria-label="{{ day.date|date:'l, F j, Y' }}{% if day.lot_count %}, {{ day.lot_count }} watched lot{{ day.lot_count|pluralize }} in {{ day.sale_count }} auction{{ day.sale_count|pluralize }}{% endif %}. Select to view the complete auction list below."
+                  aria-pressed="false"
+                >
+                  <span class="day-number">{{ day.day_number }}</span>
+                  <span class="day-events">
+                    {% for event in day.event_groups %}
+                      <span class="event-chip{% if event.ended %} is-ended{% endif %}" title="{% if event.sale_title %}{{ event.sale_title }} · {% endif %}{{ event.auction_house }} · {{ event.lot_count }} watched lot{{ event.lot_count|pluralize }}">
+                        <span class="event-title">{% firstof event.sale_title event.auction_house %}</span>
+                        {% if event.sale_title %}<span class="event-house">{{ event.auction_house }}</span>{% endif %}
+                        <span class="event-count" aria-label="{{ event.lot_count }} watched lot{{ event.lot_count|pluralize }}">{{ event.lot_count }}</span>
+                      </span>
+                    {% endfor %}
+                    {% if day.more_count %}<span class="more-events">+{{ day.more_count }} more auction{{ day.more_count|pluralize }}</span>{% endif %}
+                  </span>
+                </button>
+                {% if day.lot_count %}
+                  <a
+                    class="day-catalog-link"
+                    href="?month={{ month_value }}&amp;day={{ day.iso }}&amp;view=catalog"
+                    aria-label="Gallery Catalog for {{ day.date|date:'l, F j, Y' }}"
+                  >Gallery Catalog <span aria-hidden="true">→</span></a>
+                {% endif %}
+              </div>
             {% endfor %}
           {% endfor %}
         </div>
@@ -320,7 +332,7 @@
   const salesCount = document.getElementById("selected-day-sales-count");
   const salesList = document.getElementById("selected-day-sales-list");
   const list = document.getElementById("selected-day-lots");
-  const dayButtons = Array.from(document.querySelectorAll(".calendar-day"));
+  const dayButtons = Array.from(document.querySelectorAll(".calendar-day-select"));
   const csrfToken = document.getElementById("calendar-csrf-token").dataset.token;
   const lotBrowserLaunch = document.getElementById("day-lot-browser-launch");
   const researchLaunch = document.getElementById("day-research-launch");
@@ -2879,7 +2891,6 @@
     appendText(caption, "p", "day-gallery-meta", [lot.medium, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.time].filter(Boolean).join(" · "));
     appendText(caption, "p", "day-gallery-estimate", lot.estimate);
     appendText(caption, "p", "day-gallery-bid", lot.bid);
-    if (lot.ended && !lot.sold) appendText(caption, "p", "day-gallery-ended", "Sale ended");
     const actions = document.createElement("div");
     actions.className = "day-gallery-actions";
     const quickLook = document.createElement("button");
@@ -3315,7 +3326,6 @@
     content.appendChild(appendArchiveGallery(lot));
     const overview = document.createElement("section");
     overview.className = "research-lot-overview";
-    if (lot.ended && !lot.sold) appendText(overview, "p", "lot-browser-status", "Sale ended");
     appendArtistLabel(overview, lot);
     const heading = document.createElement("h3");
     heading.className = "lot-title";
@@ -3388,7 +3398,6 @@
 
     const copy = document.createElement("div");
     copy.className = "lot-browser-copy has-workflow";
-    if (lot.ended && !lot.sold) appendText(copy, "p", "lot-browser-status", "Sale ended");
     appendArtistLabel(copy, lot);
     appendText(copy, "h3", "lot-title", lot.title);
     appendText(copy, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
@@ -3697,8 +3706,10 @@
     renderDaySales(isoDate);
     dayButtons.forEach((button) => {
       const selected = button.dataset.calendarDay === isoDate;
-      button.classList.toggle("is-selected", selected);
-      button.setAttribute("aria-selected", selected ? "true" : "false");
+      const cell = button.closest(".calendar-day");
+      cell.classList.toggle("is-selected", selected);
+      cell.setAttribute("aria-selected", String(selected));
+      button.setAttribute("aria-pressed", String(selected));
     });
 
     const lots = data[isoDate] || [];

@@ -10,6 +10,7 @@ from typing import Callable
 from urllib.parse import urlsplit
 
 import requests
+from bs4 import BeautifulSoup
 
 from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
 
@@ -20,6 +21,21 @@ class WatchlistStopped(RuntimeError):
 
 class SourceAccessError(RuntimeError):
     pass
+
+
+class SourceAccessBlocked(SourceAccessError):
+    """Source-wide authentication, challenge, or rate-limit failure."""
+
+
+def _has_access_challenge(response) -> bool:
+    content_type = (response.headers.get("Content-Type") or "").casefold()
+    if "html" not in content_type and not response.text.lstrip().startswith("<"):
+        return False
+    soup = BeautifulSoup(response.text, "html.parser")
+    headings = " ".join(node.get_text(" ", strip=True) for node in soup.select("title, h1")).casefold()
+    return any(term in headings for term in (
+        "javascript is disabled", "access denied", "verify you are human", "just a moment",
+    ))
 
 
 def _allowed_url(url: str) -> bool:
@@ -65,6 +81,16 @@ class HttpPageFetcher:
         content_type = (response.headers.get("Content-Type") or "").casefold()
         if content_type and not any(item in content_type for item in ("html", "json", "text")):
             raise SourceAccessError(f"{urlsplit(url).hostname or 'The source'} returned an unsupported content type.")
+        if response.status_code == 202:
+            raise SourceAccessBlocked(
+                f"{urlsplit(url).hostname or 'The source'} returned an access page (HTTP 202). "
+                "The lot was not refreshed. Use Connect Invaluable if sign-in is required."
+            )
+        if _has_access_challenge(response):
+            raise SourceAccessBlocked(
+                f"{urlsplit(url).hostname or 'The source'} returned an access challenge. "
+                "The lot was not refreshed."
+            )
         return response.text
 
     def post_json(self, url: str, payload: object, *, referer: str = "") -> object:
@@ -82,9 +108,13 @@ class HttpPageFetcher:
             headers["Referer"] = referer
         response = self._request("post", url, headers=headers, json=payload)
         content_type = (response.headers.get("Content-Type") or "").casefold()
-        if content_type and "json" not in content_type:
-            received = "a web page instead of auction data" if "html" in content_type else "a non-JSON response"
-            raise SourceAccessError(
+        blocked = response.status_code == 202 or _has_access_challenge(response)
+        if blocked or (content_type and "json" not in content_type):
+            received = "a web page instead of auction data" if "html" in content_type else (
+                "an access response" if blocked else "a non-JSON response"
+            )
+            error_class = SourceAccessBlocked if blocked else SourceAccessError
+            raise error_class(
                 f"{urlsplit(url).hostname or 'The source'} returned {received} "
                 f"(HTTP {response.status_code}). Live auction data was not refreshed."
             )
@@ -125,7 +155,7 @@ class HttpPageFetcher:
                     "Import Saved Heritage Pages in the watchlist."
                     if host == "ha.com" or host.endswith(".ha.com") else ""
                 )
-                raise SourceAccessError(
+                raise SourceAccessBlocked(
                     f"{host} requires authentication or blocked automation (HTTP {response.status_code}). "
                     f"The watchlist will not bypass that control.{guidance}"
                 )
@@ -133,6 +163,8 @@ class HttpPageFetcher:
                 if attempt < self.max_retries:
                     self._backoff(attempt, response.headers.get("Retry-After"))
                     continue
+            if response.status_code == 429:
+                raise SourceAccessBlocked(f"{host} rate-limited the watchlist (HTTP 429).")
             try:
                 response.raise_for_status()
             except requests.RequestException as exc:
@@ -196,8 +228,8 @@ class ControlledPlaywrightFetcher:
             try:
                 page = context.pages[0] if context.pages else context.new_page()
                 response = page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-                if response and response.status in {401, 403, 429}:
-                    raise SourceAccessError(
+                if response and response.status in {202, 401, 403, 429}:
+                    raise SourceAccessBlocked(
                         f"The source returned HTTP {response.status}. The watchlist will not bypass that control."
                     )
                 host = (urlsplit(url).hostname or "").casefold()
@@ -218,7 +250,7 @@ class ControlledPlaywrightFetcher:
                 html = page.content()
                 challenge_text = f"{page.title()} {html[:4000]}".casefold()
                 if any(term in challenge_text for term in ("captcha", "verify you are human", "access denied")):
-                    raise SourceAccessError("The source presented an access challenge; refresh stopped without bypassing it.")
+                    raise SourceAccessBlocked("The source presented an access challenge; refresh stopped without bypassing it.")
                 self.pages_fetched += 1
                 return html
             finally:

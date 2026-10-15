@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from bs4 import BeautifulSoup
 from django.test import SimpleTestCase
 
 from catalogapp.watchlist_adapters import InvaluableAdapter
@@ -34,6 +35,57 @@ class InvaluableSoldAdapterTests(SimpleTestCase):
         lot = self.adapter.parse_lot_detail('<h1>Calder lithograph</h1><p><b>Sold:</b> <span>$11,000 USD</span></p>', LOT_URL, "Alexander Calder")
         self.assertEqual(lot.sold_price, 11000)
         self.assertEqual(lot.sold_currency, "USD")
+
+    def test_actual_public_closed_detail_reports_login_required(self):
+        page = (FIXTURES / "invaluable_closed_bid_detail.html").read_text(encoding="utf-8")
+        lot = self.adapter.parse_lot_detail(page, LOT_URL, "Alexander Calder")
+        self.assertIsNone(lot.sold_price)
+        self.assertIn("sold_price_login", lot.ambiguities)
+
+    def test_adjacent_result_in_actual_closed_detail_structure(self):
+        page = (FIXTURES / "invaluable_closed_bid_detail.html").read_text(encoding="utf-8")
+        for amount in ("$11,000 USD", "<span>$11,000 USD</span>", "$<!-- -->11,000<!-- --> USD"):
+            with self.subTest(amount=amount):
+                soup = BeautifulSoup(page, "html.parser")
+                button = soup.select_one(".closed-bid-lot-detail > button")
+                button.replace_with(BeautifulSoup(amount, "html.parser"))
+                lot = self.adapter.parse_lot_detail(str(soup), LOT_URL, "Alexander Calder")
+                self.assertEqual(lot.sold_price, 11000)
+                self.assertEqual(lot.sold_currency, "USD")
+                self.assertNotIn("sold_price_login", lot.ambiguities)
+
+    def test_adjacent_result_does_not_borrow_other_field_or_range(self):
+        for value in (
+            "Log in to view<span>11,000 USD</span>",
+            "$3,000<span> - $5,000</span>",
+            "<div>11,000 USD</div>",
+            "<span hidden>$11,000 USD</span>",
+            "<strong>Current bid:</strong><span>$11,000 USD</span>",
+        ):
+            with self.subTest(value=value):
+                lot = self.detail(f'<div><h1>Calder lithograph</h1><strong>Sold: </strong>{value}<div>October 14, 2026</div></div>')
+                self.assertIsNone(lot.sold_price)
+
+    def test_login_prompt_in_related_lot_does_not_mark_main_result(self):
+        lot = self.detail('<article class="lot-card"><strong>Sold: </strong><button>Log in to view</button></article>')
+        self.assertNotIn("sold_price_login", lot.ambiguities)
+
+    def test_shell_or_unrecognized_document_is_not_a_refreshed_lot(self):
+        for page in (
+            "", "<html><div id='root'></div></html>",
+            '<script type="application/json">{"url": "' + LOT_URL + '"}</script>',
+            "<h1>JavaScript is disabled</h1><p>Enable JavaScript to continue</p>",
+            "<h1>Verify you are human</h1>",
+        ):
+            with self.subTest(page=page):
+                self.assertIsNone(self.adapter.parse_lot_detail(page, LOT_URL, "Alexander Calder"))
+
+    def test_partial_embedded_metadata_uses_visible_title(self):
+        page = '<script type="application/json">{"url": "' + LOT_URL + '", "currentBid": 2000}</script><h1>Calder lithograph</h1><strong>Sold: </strong><button>Log in to view</button>'
+        lot = self.adapter.parse_lot_detail(page, LOT_URL, "Alexander Calder")
+        self.assertEqual(lot.title, "Calder lithograph")
+        self.assertIn("sold_price_login", lot.ambiguities)
+        self.assertEqual(lot.content_hash, lot.calculate_content_hash())
 
     def test_explicit_result_keys_and_currency(self):
         for key in ("soldPrice", "soldFor", "priceRealized", "realizedPrice", "hammerPrice"):

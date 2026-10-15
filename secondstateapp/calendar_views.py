@@ -158,6 +158,8 @@ def _bid_label(lot: AuctionWatchLot) -> str:
     sold_label = _sold_label(lot)
     if sold_label:
         return sold_label
+    if not lot.active:
+        return "Sale ended · Sold price unavailable"
     if lot.bid_count == 0:
         return "Current bid: No bids"
     if lot.current_bid is None:
