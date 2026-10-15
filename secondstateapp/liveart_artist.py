@@ -3,10 +3,13 @@
 from catalogapp.artprice_artist_links import artist_identity_key
 
 
-# LiveArt labels this artist Friedrich, while auction records commonly use his
-# Friedensreich name. Keep aliases explicit so unrelated artists cannot match.
+# Keep verified aliases explicit so unrelated artists cannot match.
 _LIVEART_NAMES = {
+    # LiveArt labels this artist Friedrich; auction records use Friedensreich.
     artist_identity_key("Friedensreich Hundertwasser"): "Friedrich Hundertwasser",
+    # Calendar imports use Neimann. Verified against LiveArt artist 25667
+    # (c9GBTz/leroy-neiman, 1921-2012) and the imported lot title, 2026-10-15.
+    artist_identity_key("Leroy Neimann"): "Leroy Neiman",
 }
 
 

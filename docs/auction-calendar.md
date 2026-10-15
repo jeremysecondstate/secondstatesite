@@ -102,7 +102,7 @@ Fresh searches save the category filter with their search summary. Earlier saved
 
 **LiveArt search terms (optional)** searches each word separately and combines the returned sold records for the Calendar artist. For example, `Boomerangs Stabiles` searches both words. Double quotes keep a title or translation together: `"Very Gay Nose and Ears"`. Commas and semicolons can also separate alternatives. Duplicate terms are searched once. Leave the field blank to use the existing Calendar title and artwork-reference workflow.
 
-Artist matching uses normalized full names and explicitly verified LiveArt aliases. For example, Calendar's Friedensreich Hundertwasser searches LiveArt's Friedrich Hundertwasser entry; returned sales still need a matching artist identity and an eligible sold USD hammer price.
+Artist matching uses normalized full names and explicitly verified LiveArt aliases. For example, Calendar's Friedensreich Hundertwasser searches LiveArt's Friedrich Hundertwasser entry. The imported spelling Leroy Neimann resolves to Leroy Neiman (LiveArt artist `25667`, public record `c9GBTz/leroy-neiman`, verified October 15, 2026). These aliases apply to both artist lookup and returned-sale validation; returned sales still need a matching artist identity and an eligible sold USD hammer price.
 
 Each term search accepts up to five distinct words or phrases, totaling at most 200 characters. It uses one artist lookup and one sold-lot lookup per term, sharing a maximum of 20 returned sale rows across those lookups. The response displays each term's returned count and flags additional available results; refine the terms when a result page is incomplete. Actual metered Data Units are displayed. There is no automatic pagination.
 

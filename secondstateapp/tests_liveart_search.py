@@ -13,6 +13,20 @@ from .tests_calendar import liveart_artwork, liveart_lot, liveart_page, stored_a
 
 
 class LiveArtSearchParsingTests(SimpleTestCase):
+    def test_verified_neimann_spelling_matches_only_leroy_neiman(self):
+        for source_name in (
+            "Leroy Neimann", "LeRoy NEIMANN", "Neimann, LeRoy",
+            "Leroy (1921) Neimann", "NEIMANN, LEROY (1921–2012)",
+        ):
+            with self.subTest(source_name=source_name):
+                self.assertEqual(liveart_artist_search_name(source_name), "Leroy Neiman")
+                self.assertTrue(liveart_artist_names_match(source_name, "Leroy Neiman"))
+                self.assertTrue(liveart_artist_names_match("Leroy Neiman", source_name))
+        for other_name in ("Leroy Neimann Jr", "Leroy Neiman Jr", "Paul Neimann", "Leroy Nieman"):
+            with self.subTest(other_name=other_name):
+                self.assertFalse(liveart_artist_names_match(other_name, "Leroy Neiman"))
+                self.assertFalse(liveart_artist_names_match("Leroy Neimann", other_name))
+
     def test_documented_hundertwasser_alias_keeps_other_artists_out(self):
         self.assertEqual(
             liveart_artist_search_name("Friedensreich HUNDERTWASSER"), "Friedrich Hundertwasser",
@@ -106,6 +120,93 @@ class LiveArtTermSearchViewTests(TestCase):
             {"artist_id": "calder", "status": "sold", "search": term, "category_id": 2, "sort": "SALE_DATE_DESC", "limit": 10}
             for term in ("Boomerangs", "Stabiles")
         ])
+
+    def test_neimann_spelling_finds_sinatra_sales_and_rejects_other_artists(self):
+        self.lot.artist = "Leroy Neimann"
+        self.lot.artist_watchlist_name = "Leroy Neimann"
+        self.lot.title = (
+            "Leroy Neiman (American, 1921-2012) Serigraph on Paper, Ca. 1994, "
+            "'Frank Sinatra, Duets', H 28.75\" W 28.75\""
+        )
+        self.lot.medium = "Serigraph"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title", "medium"))
+        self.api.list_artists.return_value = liveart_page([
+            {"id": 999, "name": "Paul Neiman"},
+            {"id": 25667, "uid": "c9GBTz", "name": "Leroy Neiman"},
+        ])
+        sale = liveart_lot(
+            "sinatra-print", artist_id=25667, artist="Leroy Neiman",
+            title="FRANK SINATRA, DUETS", medium="Screenprint in colors, on wove paper",
+            hammer_usd=2400,
+        )
+        wrong_artist_sale = liveart_lot(
+            "other-sinatra", artist_id=999, artist="Leroy Neimann Jr",
+            title="FRANK SINATRA, DUETS", medium="Screenprint in colors, on wove paper",
+            lot_num="26", hammer_usd=1800,
+        )
+        self.api.list_lots.side_effect = [
+            liveart_page([sale]), liveart_page([sale, wrong_artist_sale]),
+        ]
+
+        response = self.research(search_terms='"Frank Sinatra, Duets" "Frank Sinatra"')
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.api.list_artists.assert_called_once_with(q="Leroy Neiman", limit=3)
+        self.api.list_artworks.assert_not_called()
+        self.assertEqual([call.kwargs for call in self.api.list_lots.call_args_list], [
+            {"artist_id": 25667, "status": "sold", "search": term, "category_id": 2,
+             "sort": "SALE_DATE_DESC", "limit": 10}
+            for term in ("Frank Sinatra, Duets", "Frank Sinatra")
+        ])
+        candidates = {row["id"]: row for row in payload["candidates"]}
+        self.assertEqual(set(candidates), {"sinatra-print", "other-sinatra"})
+        self.assertTrue(candidates["sinatra-print"]["credible"])
+        self.assertEqual(candidates["sinatra-print"]["search_terms"], ["Frank Sinatra, Duets", "Frank Sinatra"])
+        self.assertFalse(candidates["other-sinatra"]["credible"])
+        self.assertFalse(candidates["other-sinatra"]["manual_selectable"])
+        self.assertEqual(payload["selected_ids"], [])
+        self.assertEqual(self.save(payload, ["other-sinatra"]).status_code, 400)
+        self.assertFalse(LiveArtResaleAnalysis.objects.filter(lot=self.lot).exists())
+        saved = self.save(payload, ["sinatra-print"])
+        self.assertEqual(saved.status_code, 200, saved.content)
+        self.assertEqual(saved.json()["analysis"]["selected_ids"], ["sinatra-print"])
+        self.assertEqual(LiveArtResaleAnalysis.objects.get(lot=self.lot).selected_ids, ["sinatra-print"])
+
+    def test_neimann_spelling_also_finds_default_artwork_and_sale_history(self):
+        self.lot.artist = "Leroy Neimann"
+        self.lot.artist_watchlist_name = "Leroy Neimann"
+        self.lot.title = "Frank Sinatra, Duets"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title"))
+        self.api.list_artists.return_value = liveart_page([
+            {"id": 25667, "uid": "c9GBTz", "name": "Leroy Neiman"},
+        ])
+        artwork = liveart_artwork(
+            "sinatra-artwork", artist_id=25667, artist="Leroy Neiman", title="Frank Sinatra, Duets",
+        )
+        sale = liveart_lot(
+            "sinatra-sale", artist_id=25667, artist="Leroy Neiman", title="Frank Sinatra, Duets",
+        )
+        sale["artwork_id"] = artwork["id"]
+        sale["artwork"]["id"] = artwork["id"]
+        self.api.list_artworks.return_value = liveart_page([artwork])
+        self.api.list_lots.return_value = liveart_page([sale])
+
+        response = self.research(search_terms="")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["subject_match"]["id"], "sinatra-artwork")
+        self.assertEqual(payload["subject_match"]["artist_id"], 25667)
+        self.assertEqual([row["id"] for row in payload["candidates"]], ["sinatra-sale"])
+        self.assertTrue(payload["candidates"][0]["credible"])
+        self.api.list_artists.assert_called_once_with(q="Leroy Neiman", limit=3)
+        self.api.list_artworks.assert_called_once_with(
+            artist_id=25667, search="Frank Sinatra, Duets", category_id=2, limit=5,
+        )
+        self.api.list_lots.assert_any_call(
+            artwork_id="sinatra-artwork", status="sold", category_id=2, limit=10,
+        )
 
     def test_hundertwasser_alias_finds_and_accepts_burning_winter_sales(self):
         self.lot.artist = "Friedensreich HUNDERTWASSER"
