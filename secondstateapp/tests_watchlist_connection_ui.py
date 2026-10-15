@@ -28,6 +28,7 @@ class InvaluableConnectionUiTests(TestCase):
         self.panel._sync_and_finish_result = Mock()
         self.panel.bookmark_path_var = Mock(get=Mock(return_value="bookmarks.html"))
         self.panel.invaluable_session_var = Mock(get=Mock(return_value=True))
+        self.panel.invaluable_connection_status_var = Mock()
         self.panel.horizon_var = Mock(get=Mock(return_value=7))
         self.panel.zero_ai_var = Mock(get=Mock(return_value=True))
         self.panel.new_changed_var = Mock(get=Mock(return_value=False))
@@ -78,6 +79,12 @@ class InvaluableConnectionUiTests(TestCase):
         self.panel.invaluable_session_var.set.assert_not_called()
         self.panel.refresh_watchlist.assert_not_called()
         self.assertFalse(self.panel._settings_path.exists())
+
+    def test_connection_progress_is_visible_next_to_connect_button(self):
+        message = "Chrome is open. Complete Invaluable sign-in in that window."
+        self.panel._set_invaluable_connection_status(message)
+        self.panel.invaluable_connection_status_var.set.assert_called_once_with(message)
+        self.panel._set_status.assert_called_once_with(message)
 
     def test_refresh_reuses_one_browser_and_closes_it_before_sync(self):
         result = WatchlistResult([], WatchlistMetrics())

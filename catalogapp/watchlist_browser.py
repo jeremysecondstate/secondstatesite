@@ -197,6 +197,7 @@ class InvaluableBrowserFetcher:
                         user_data_dir=str(self.profile_directory),
                         channel=channel,
                         headless=self.headless,
+                        chromium_sandbox=True,
                         accept_downloads=False,
                     )
                     break
@@ -371,45 +372,80 @@ def connect_invaluable(
     """Let the user sign in normally, and save only a proven, working session.
 
     Returns False if the user closes the window or the allotted time expires.
-    Cancellation raises WatchlistStopped; blocked access raises SourceAccessError.
+    Cancellation raises WatchlistStopped. Access challenges stay visible for the
+    user; this connection flow never retries navigation or resolves them itself.
     No password, account details, or cookies are read by application code.
     """
     progress = progress or (lambda _message: None)
     with InvaluableBrowserFetcher(profile_directory, stop_event=stop_event, headless=False) as fetcher:
-        fetcher._navigate(INVALUABLE_SIGN_IN_LOT)
-        fetcher._page.bring_to_front()
-        progress("Sign in to Invaluable in the opened browser. Return to the sold lot; the connection saves when its sold price appears.")
+        # Interactive connection is not an automatic refresh. Bring the window
+        # forward before loading the site, and let the user see any sign-in or
+        # access screen instead of closing Chrome on the first HTTP 202/403.
+        try:
+            fetcher._page.bring_to_front()
+        except Exception as exc:
+            raise SourceAccessError(
+                "Could not show the Invaluable browser window. Close any existing connection window and try again."
+            ) from exc
+        instructions = "Sign in to Invaluable in the opened browser. Return to the sold lot; the connection saves when its sold price appears."
+        progress(instructions)
+        last_progress = instructions
+
+        def report(message):
+            nonlocal last_progress
+            if message != last_progress:
+                progress(message)
+                last_progress = message
+
+        try:
+            response = fetcher._page.goto(INVALUABLE_SIGN_IN_LOT, wait_until="domcontentloaded", timeout=45_000)
+            if response is None or response.status >= 300 or response.status == 202:
+                report(
+                    "Invaluable has not opened the lot yet. Its browser window will stay open so you can "
+                    "check the page and sign in normally. Return to the sold lot when it is available."
+                )
+        except Exception:
+            report(
+                "The Invaluable page did not finish loading. Its browser window will stay open; "
+                "open the sold lot there when the website is available."
+            )
         deadline = time.monotonic() + max(0, timeout_seconds)
-        saw_login_navigation = False
-        returned_to_lot = False
         while time.monotonic() < deadline:
             fetcher._check_stopped()
-            if not fetcher._context.pages:
+            try:
+                pages = [page for page in fetcher._context.pages if not page.is_closed()]
+            except Exception:
+                pages = []
+            if not pages:
                 progress("Invaluable connection cancelled because its browser window was closed.")
                 return False
-            for page in fetcher._context.pages:
-                if page.is_closed() or not _allowed_url(page.url):
+            for page in pages:
+                if not _allowed_url(page.url):
                     continue
                 path = urlsplit(page.url).path.rstrip("/")
-                if page == fetcher._page and re.search(r"(?:login|signin|sign-in)", path, re.I):
-                    saw_login_navigation = True
-                if page == fetcher._page and not path and saw_login_navigation and not returned_to_lot:
-                    # A conventional sign-in page can return to the homepage.
-                    # Revisit the result once; its numeric value remains the proof.
-                    returned_to_lot = True
-                    fetcher._navigate(INVALUABLE_SIGN_IN_LOT)
-                    progress("Checking that the signed-in Invaluable session can display the posted sold price.")
-                    continue
                 # Do not confirm login from an unrelated recommended or public lot.
                 if path != urlsplit(INVALUABLE_SIGN_IN_LOT).path:
                     continue
                 try:
-                    html, text = fetcher._read_page(page)
+                    text = page.locator("body").inner_text(timeout=5_000)
+                    if _CHALLENGE.search(f"{page.title()}\n{text[:3000]}"):
+                        report(
+                            "Invaluable is showing an access screen. The browser will stay open for you to "
+                            "check it. The app will wait without retrying; return to the sold lot when normal access is available."
+                        )
+                        continue
+                    html = page.content()
+                    # A login redirect can replace the document between reads.
+                    if not _allowed_url(page.url) or urlsplit(page.url).path.rstrip("/") != path:
+                        continue
                     lot = _dom_lot(html, page.url)
                     if lot and lot.sold_price is not None and _VISIBLE_SOLD.search(text):
+                        fetcher._check_stopped()
                         progress("Invaluable connected. This local browser session will refresh posted sold prices automatically.")
                         return True
-                except SourceAccessError:
+                    if lot and "sold_price_login" in lot.ambiguities:
+                        report(instructions)
+                except WatchlistStopped:
                     raise
                 except Exception:
                     # Normal login navigation may temporarily replace the DOM.
@@ -417,7 +453,7 @@ def connect_invaluable(
             try:
                 # The original tab may have been replaced by the site's login flow.
                 if fetcher._page.is_closed():
-                    fetcher._page = fetcher._context.pages[-1]
+                    fetcher._page = pages[-1]
                 fetcher._pause()
             except (SourceAccessError, WatchlistStopped):
                 raise

@@ -204,23 +204,32 @@ class ArtistWatchlistPanel(ttk.Frame):
 
         connection_controls = ttk.Frame(results)
         connection_controls.grid(row=1, column=0, sticky="ew", pady=(0, 7))
+        connection_controls.columnconfigure(2, weight=1)
         self.invaluable_session_var = tk.BooleanVar(
             value=self._read_settings().get("invaluable_session_enabled") is True
         )
         self.connect_invaluable_button = ttk.Button(
             connection_controls, text="Connect Invaluable…", command=self.connect_invaluable,
         )
-        self.connect_invaluable_button.pack(side=tk.LEFT)
+        self.connect_invaluable_button.grid(row=0, column=0, sticky="w")
         self.invaluable_session_check = ttk.Checkbutton(
             connection_controls, text="Use saved login", variable=self.invaluable_session_var,
             command=self._save_settings_hint,
         )
-        self.invaluable_session_check.pack(side=tk.LEFT, padx=(8, 0))
-        ttk.Label(
+        self.invaluable_session_check.grid(row=0, column=1, sticky="w", padx=(8, 0))
+        self.invaluable_connection_status_var = tk.StringVar(
+            value="Sign in once in Chrome to include posted sold prices when you refresh."
+        )
+        connection_status = ttk.Label(
             connection_controls,
-            text="Sign in once in Chrome to include posted sold prices when you refresh.",
-            style="Subtle.TLabel", wraplength=680,
-        ).pack(side=tk.LEFT, padx=(8, 0))
+            textvariable=self.invaluable_connection_status_var,
+            style="Subtle.TLabel", wraplength=680, width=1,
+        )
+        connection_status.grid(row=0, column=2, sticky="ew", padx=(8, 0))
+        connection_status.bind(
+            "<Configure>",
+            lambda event: connection_status.configure(wraplength=max(120, event.width)),
+        )
 
         saved_controls = ttk.Frame(results)
         saved_controls.grid(row=2, column=0, sticky="ew", pady=(0, 7))
@@ -412,6 +421,12 @@ class ArtistWatchlistPanel(ttk.Frame):
                 values[0] = "Yes" if item in self.selected_artists else ""
                 self.artist_tree.item(item, values=values)
 
+    def _set_invaluable_connection_status(self, text: str) -> None:
+        label = self.__dict__.get("invaluable_connection_status_var")
+        if label is not None:
+            label.set(text)
+        self._set_status(text)
+
     def connect_invaluable(self) -> None:
         if self.worker and self.worker.is_alive():
             return
@@ -419,14 +434,14 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.refresh_button.configure(state=tk.DISABLED)
         self._set_import_buttons_state(tk.DISABLED)
         self.stop_button.configure(state=tk.NORMAL)
-        self._set_status("Opening Invaluable in Chrome. Sign in there to connect sold-price refreshes…")
+        self._set_invaluable_connection_status("Opening Chrome for Invaluable sign-in…")
 
         def run() -> None:
             try:
                 connected = connect_invaluable(
                     self._invaluable_profile_directory,
                     stop_event=self.stop_event,
-                    progress=lambda text: self.after(0, lambda value=text: self._set_status(value)),
+                    progress=lambda text: self.after(0, lambda value=text: self._set_invaluable_connection_status(value)),
                 )
                 self.after(0, lambda: self._finish_invaluable_connection(connected))
             except WatchlistStopped:
@@ -446,13 +461,15 @@ class ArtistWatchlistPanel(ttk.Frame):
         if connected:
             self.invaluable_session_var.set(True)
             self._save_settings_hint()
-            self._set_status("Invaluable connected. Refreshing watched lots with your saved login…")
+            self._set_invaluable_connection_status("Invaluable connected. Your saved login is ready for refreshes.")
             if self.active_entries and self.selected_artists:
                 self.refresh_watchlist()
             else:
-                self._set_status("Invaluable connected. Select artists, then click Refresh Watchlist.")
+                self._set_invaluable_connection_status("Invaluable connected. Select artists, then click Refresh Watchlist.")
         else:
-            self._set_status("Invaluable connection not completed. Click Connect Invaluable to try again.")
+            self._set_invaluable_connection_status(
+                "Invaluable connection not completed. " + (error or "Sign-in was cancelled or timed out; click Connect Invaluable to try again.")
+            )
             if error:
                 messagebox.showwarning("Invaluable Connection", error, parent=self)
 

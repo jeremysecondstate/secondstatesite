@@ -64,7 +64,7 @@ class BrowserSessionTests(TestCase):
         launch = self.playwright.chromium.launch_persistent_context
         launch.assert_called_once_with(
             user_data_dir=str(self.profile.resolve()), channel="chrome", headless=False,
-            accept_downloads=False,
+            chromium_sandbox=True, accept_downloads=False,
         )
         self.assertTrue(self.profile.is_dir())
         self.context.close.assert_called_once()
@@ -296,6 +296,128 @@ class BrowserSessionTests(TestCase):
         self.context.close.assert_called_once()
         self.playwright.stop.assert_called_once()
 
+    def test_connect_brings_window_forward_before_navigation(self):
+        def navigate(*_args, **_kwargs):
+            self.page.bring_to_front.assert_called_once()
+            self.context.close.assert_not_called()
+            return Mock(status=200, url=LOT_URL)
+
+        self.page.goto.side_effect = navigate
+        self.assertTrue(connect_invaluable(self.profile, timeout_seconds=1))
+
+    def test_connect_sanitizes_window_error_and_closes_session(self):
+        self.page.bring_to_front.side_effect = RuntimeError("PRIVATE SESSION DETAILS")
+        with self.assertRaisesRegex(SourceAccessError, "Could not show") as raised:
+            connect_invaluable(self.profile)
+        self.assertNotIn("PRIVATE SESSION DETAILS", str(raised.exception))
+        self.page.goto.assert_not_called()
+        self.context.close.assert_called_once()
+        self.playwright.stop.assert_called_once()
+
+    def test_connect_keeps_blocked_page_open_until_user_reaches_visible_result(self):
+        progress = Mock()
+        self.page.goto.return_value.status = 202
+        self.show("<h1>Verify you are human</h1>", "Verify you are human")
+
+        def user_navigation(milliseconds):
+            self.context.close.assert_not_called()
+            self.page.bring_to_front.assert_called_once()
+            self.advance(milliseconds)
+            if self.now < 0.5:
+                self.show(GATED_HTML, GATED_TEXT)
+            else:
+                self.show(SOLD_HTML, SOLD_TEXT)
+
+        self.page.wait_for_timeout.side_effect = user_navigation
+        with patch("catalogapp.watchlist_browser.time.monotonic", side_effect=lambda: self.now):
+            self.assertTrue(connect_invaluable(self.profile, progress=progress, timeout_seconds=1))
+        self.page.goto.assert_called_once()
+        messages = [call.args[0] for call in progress.call_args_list]
+        self.assertTrue(any("access screen" in message for message in messages))
+        self.assertIn("connected", messages[-1])
+        self.context.close.assert_called_once()
+
+    def test_connect_waits_on_denied_access_without_retry_or_success(self):
+        for status in (202, 401, 403, 429):
+            with self.subTest(status=status):
+                self.now = 0
+                self.context.close.reset_mock()
+                self.page.goto.reset_mock()
+                self.page.goto.return_value.status = status
+                self.show("<h1>Access denied</h1>", "Access denied")
+                progress = Mock()
+
+                def wait(milliseconds):
+                    self.context.close.assert_not_called()
+                    self.advance(milliseconds)
+
+                self.page.wait_for_timeout.side_effect = wait
+                with patch("catalogapp.watchlist_browser.time.monotonic", side_effect=lambda: self.now):
+                    self.assertFalse(connect_invaluable(self.profile, progress=progress, timeout_seconds=1))
+                self.page.goto.assert_called_once()
+                self.context.close.assert_called_once()
+                messages = [call.args[0] for call in progress.call_args_list]
+                self.assertEqual(sum("access screen" in message for message in messages), 1)
+                self.assertFalse(any("connected" in message for message in messages))
+
+    def test_connect_keeps_window_open_after_navigation_failure(self):
+        self.page.goto.side_effect = RuntimeError("timeout PRIVATE SESSION DETAILS")
+        self.show(GATED_HTML, GATED_TEXT)
+        progress = Mock()
+
+        def user_navigation(milliseconds):
+            self.context.close.assert_not_called()
+            self.advance(milliseconds)
+            self.show(SOLD_HTML, SOLD_TEXT)
+
+        self.page.wait_for_timeout.side_effect = user_navigation
+        with patch("catalogapp.watchlist_browser.time.monotonic", side_effect=lambda: self.now):
+            self.assertTrue(connect_invaluable(self.profile, progress=progress, timeout_seconds=1))
+        self.page.goto.assert_called_once()
+        messages = [call.args[0] for call in progress.call_args_list]
+        self.assertTrue(any("did not finish loading" in message for message in messages))
+        self.assertFalse(any("PRIVATE SESSION DETAILS" in message for message in messages))
+
+    def test_connect_can_cancel_while_access_screen_is_visible(self):
+        event = threading.Event()
+        self.page.goto.return_value.status = 202
+        self.show("<h1>Access denied</h1>", "Access denied")
+        self.page.wait_for_timeout.side_effect = lambda _milliseconds: event.set()
+        with self.assertRaises(WatchlistStopped):
+            connect_invaluable(self.profile, stop_event=event, timeout_seconds=1)
+        self.page.goto.assert_called_once()
+        self.context.close.assert_called_once()
+        self.playwright.stop.assert_called_once()
+
+    def test_connect_stop_during_dom_read_does_not_report_success(self):
+        event = threading.Event()
+        progress = Mock()
+
+        def stop_during_read(**_kwargs):
+            event.set()
+            return SOLD_TEXT
+
+        self.page.locator.return_value.inner_text.side_effect = stop_during_read
+        with self.assertRaises(WatchlistStopped):
+            connect_invaluable(self.profile, stop_event=event, progress=progress, timeout_seconds=1)
+        self.assertFalse(any("connected" in call.args[0] for call in progress.call_args_list))
+        self.context.close.assert_called_once()
+        self.playwright.stop.assert_called_once()
+
+    def test_connect_handles_user_closing_blocked_browser(self):
+        self.page.goto.return_value.status = 202
+        self.show("<h1>Access denied</h1>", "Access denied")
+
+        def close_browser(milliseconds):
+            self.advance(milliseconds)
+            self.context.pages = []
+
+        self.page.wait_for_timeout.side_effect = close_browser
+        with patch("catalogapp.watchlist_browser.time.monotonic", side_effect=lambda: self.now):
+            self.assertFalse(connect_invaluable(self.profile, timeout_seconds=1))
+        self.page.goto.assert_called_once()
+        self.context.close.assert_called_once()
+
     def test_connect_never_accepts_bid_as_proof_of_sign_in(self):
         self.show("<h1>Alexander Calder</h1><p>Current bid: $11,000 USD</p>", "Current bid: $11,000 USD")
         with patch("catalogapp.watchlist_browser.time.monotonic", side_effect=lambda: self.now):
@@ -316,6 +438,15 @@ class BrowserSessionTests(TestCase):
         with patch("catalogapp.watchlist_browser.time.monotonic", side_effect=lambda: self.now):
             self.assertFalse(connect_invaluable(self.profile, timeout_seconds=0.5))
 
+    def test_connect_does_not_accept_result_after_redirect_during_dom_read(self):
+        def redirected_content():
+            self.page.url = "https://www.invaluable.com/auction-lot/another-lot"
+            return SOLD_HTML
+
+        self.page.content.side_effect = redirected_content
+        with patch("catalogapp.watchlist_browser.time.monotonic", side_effect=lambda: self.now):
+            self.assertFalse(connect_invaluable(self.profile, timeout_seconds=0.5))
+
     def test_connect_handles_user_closing_browser(self):
         self.context.pages = []
         self.context.new_page.return_value = self.page
@@ -323,23 +454,18 @@ class BrowserSessionTests(TestCase):
             self.assertFalse(connect_invaluable(self.profile, timeout_seconds=1))
         self.context.close.assert_called_once()
 
-    def test_connect_revisits_lot_after_observed_login_returns_home(self):
+    def test_connect_waits_for_user_to_return_to_lot_after_login(self):
         self.page.url = "https://www.invaluable.com/login"
-
-        def navigate(url, **_kwargs):
-            if self.page.goto.call_count > 1:
-                self.page.url = url
-            return Mock(status=200, url=url)
 
         def next_navigation(milliseconds):
             self.advance(milliseconds)
-            if self.page.goto.call_count == 1:
+            self.context.close.assert_not_called()
+            if self.now < 0.5:
                 self.page.url = "https://www.invaluable.com/"
+            else:
+                self.page.url = LOT_URL
 
-        self.page.goto.side_effect = navigate
         self.page.wait_for_timeout.side_effect = next_navigation
-        # Avoid a real clock-based throttle when testing the connection helper.
-        with patch("catalogapp.watchlist_browser.time.monotonic", side_effect=lambda: self.now), \
-                patch.object(InvaluableBrowserFetcher, "_throttle"):
+        with patch("catalogapp.watchlist_browser.time.monotonic", side_effect=lambda: self.now):
             self.assertTrue(connect_invaluable(self.profile, timeout_seconds=2))
-        self.assertEqual(self.page.goto.call_count, 2)
+        self.page.goto.assert_called_once()
