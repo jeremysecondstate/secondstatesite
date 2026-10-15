@@ -86,6 +86,37 @@ class InvaluableConnectionUiTests(TestCase):
         self.panel.invaluable_connection_status_var.set.assert_called_once_with(message)
         self.panel._set_status.assert_called_once_with(message)
 
+    def test_regular_chrome_uses_selected_profile_without_connecting_or_refreshing(self):
+        url = "https://www.invaluable.com/auction-lot/calder-106-c-d8e264e7ed"
+        self.panel.agenda_tree = Mock(selection=Mock(return_value=("lot-1",)))
+        self.panel._lot_urls = {"lot-1": url}
+        self.panel.chrome_profile_choices = {"Work (Profile 4)": "Profile 4"}
+        self.panel.chrome_profile_var = Mock(get=Mock(return_value="Work (Profile 4)"))
+        self.panel.chrome_open_status_var = Mock()
+        self.panel.refresh_watchlist = Mock()
+        with patch("catalogapp.watchlist_ui.open_invaluable_in_chrome") as launch:
+            self.panel.open_regular_chrome()
+        launch.assert_called_once_with(url, profile_directory="Profile 4")
+        self.assertEqual(self.panel._read_settings()["invaluable_chrome_profile"], "Profile 4")
+        self.panel.invaluable_session_var.set.assert_not_called()
+        self.panel.refresh_watchlist.assert_not_called()
+        self.assertIn("does not connect", self.panel.chrome_open_status_var.set.call_args.args[0])
+
+    def test_unavailable_regular_profile_does_not_claim_opened_or_change_preference(self):
+        self.panel.agenda_tree = Mock(selection=Mock(return_value=()))
+        self.panel._lot_urls = {}
+        self.panel.chrome_profile_choices = {"Saved profile unavailable": "Profile 4"}
+        self.panel.chrome_profile_var = Mock(get=Mock(return_value="Saved profile unavailable"))
+        self.panel.chrome_open_status_var = Mock()
+        with (
+            patch("catalogapp.watchlist_ui.open_invaluable_in_chrome", side_effect=ValueError("Choose an available profile.")),
+            patch("catalogapp.watchlist_ui.messagebox.showwarning") as warning,
+        ):
+            self.panel.open_regular_chrome()
+        warning.assert_called_once()
+        self.panel.chrome_open_status_var.set.assert_called_once_with("Choose an available profile.")
+        self.assertFalse(self.panel._settings_path.exists())
+
     def test_refresh_reuses_one_browser_and_closes_it_before_sync(self):
         result = WatchlistResult([], WatchlistMetrics())
         with (

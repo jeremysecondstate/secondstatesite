@@ -20,7 +20,8 @@ from catalogapp.bookmark_watchlist import (
     load_bookmarks_file,
 )
 from catalogapp.watchlist_cache import WatchlistCache
-from catalogapp.watchlist_browser import InvaluableBrowserFetcher, connect_invaluable
+from catalogapp.watchlist_browser import INVALUABLE_SIGN_IN_LOT, InvaluableBrowserFetcher, connect_invaluable
+from catalogapp.watchlist_chrome import chrome_profiles, open_invaluable_in_chrome
 from catalogapp.watchlist_fetch import WatchlistStopped
 from catalogapp.watchlist_exports import render_calendar_preview, render_csv, render_ics, render_markdown
 from catalogapp.watchlist_models import NormalizedLot, parse_lot_datetime
@@ -205,27 +206,55 @@ class ArtistWatchlistPanel(ttk.Frame):
         connection_controls = ttk.Frame(results)
         connection_controls.grid(row=1, column=0, sticky="ew", pady=(0, 7))
         connection_controls.columnconfigure(2, weight=1)
+        self.chrome_profile_choices = {"Chrome default": None}
+        for profile in chrome_profiles():
+            self.chrome_profile_choices[f"{profile.directory} — {profile.name}"] = profile.directory
+        saved_profile = self._read_settings().get("invaluable_chrome_profile")
+        profile_label = next(
+            (label for label, directory in self.chrome_profile_choices.items() if directory == saved_profile),
+            "Chrome default",
+        )
+        if saved_profile and profile_label == "Chrome default":
+            profile_label = "Saved profile unavailable"
+            self.chrome_profile_choices[profile_label] = saved_profile
+        self.chrome_profile_var = tk.StringVar(value=profile_label)
+        ttk.Button(
+            connection_controls, text="Open Invaluable in Chrome", command=self.open_regular_chrome,
+        ).grid(row=0, column=0, sticky="w", pady=(0, 7))
+        self.chrome_profile_picker = ttk.Combobox(
+            connection_controls, textvariable=self.chrome_profile_var,
+            values=tuple(self.chrome_profile_choices), width=23, state="readonly",
+        )
+        self.chrome_profile_picker.grid(row=0, column=1, sticky="w", padx=(8, 0), pady=(0, 7))
+        self.chrome_profile_picker.bind("<<ComboboxSelected>>", lambda _event: self._save_settings_hint())
+        self.chrome_open_status_var = tk.StringVar(value="Choose your usual Chrome profile. Opens the selected lot, or the Calder lot.")
+        chrome_status = ttk.Label(
+            connection_controls, textvariable=self.chrome_open_status_var,
+            style="Subtle.TLabel", wraplength=500, width=1,
+        )
+        chrome_status.grid(row=0, column=2, sticky="ew", padx=(8, 0), pady=(0, 7))
+        chrome_status.bind("<Configure>", lambda event: chrome_status.configure(wraplength=max(120, event.width)))
         self.invaluable_session_var = tk.BooleanVar(
             value=self._read_settings().get("invaluable_session_enabled") is True
         )
         self.connect_invaluable_button = ttk.Button(
             connection_controls, text="Connect Invaluable…", command=self.connect_invaluable,
         )
-        self.connect_invaluable_button.grid(row=0, column=0, sticky="w")
+        self.connect_invaluable_button.grid(row=1, column=0, sticky="w")
         self.invaluable_session_check = ttk.Checkbutton(
             connection_controls, text="Use saved login", variable=self.invaluable_session_var,
             command=self._save_settings_hint,
         )
-        self.invaluable_session_check.grid(row=0, column=1, sticky="w", padx=(8, 0))
+        self.invaluable_session_check.grid(row=1, column=1, sticky="w", padx=(8, 0))
         self.invaluable_connection_status_var = tk.StringVar(
-            value="Sign in once in Chrome to include posted sold prices when you refresh."
+            value="Uses a separate app browser for automatic sold-price refreshes."
         )
         connection_status = ttk.Label(
             connection_controls,
             textvariable=self.invaluable_connection_status_var,
             style="Subtle.TLabel", wraplength=680, width=1,
         )
-        connection_status.grid(row=0, column=2, sticky="ew", padx=(8, 0))
+        connection_status.grid(row=1, column=2, sticky="ew", padx=(8, 0))
         connection_status.bind(
             "<Configure>",
             lambda event: connection_status.configure(wraplength=max(120, event.width)),
@@ -426,6 +455,23 @@ class ArtistWatchlistPanel(ttk.Frame):
         if label is not None:
             label.set(text)
         self._set_status(text)
+
+    def open_regular_chrome(self) -> None:
+        selected = self.agenda_tree.selection()
+        url = self._lot_urls.get(selected[0], INVALUABLE_SIGN_IN_LOT) if selected else INVALUABLE_SIGN_IN_LOT
+        profile = self.chrome_profile_choices.get(self.chrome_profile_var.get())
+        try:
+            open_invaluable_in_chrome(url, profile_directory=profile)
+        except (ValueError, RuntimeError) as exc:
+            message = str(exc)
+            self.chrome_open_status_var.set(message)
+            self._set_status(message)
+            messagebox.showwarning("Open Invaluable in Chrome", message, parent=self)
+            return
+        self._save_settings_hint()
+        message = "Opened in your chosen Chrome profile. This does not connect automatic price refreshes."
+        self.chrome_open_status_var.set(message)
+        self._set_status(message)
 
     def connect_invaluable(self) -> None:
         if self.worker and self.worker.is_alive():
@@ -954,6 +1000,9 @@ class ArtistWatchlistPanel(ttk.Frame):
         session_var = self.__dict__.get("invaluable_session_var")
         if session_var is not None:
             payload["invaluable_session_enabled"] = bool(session_var.get())
+        chrome_profile_var = self.__dict__.get("chrome_profile_var")
+        if chrome_profile_var is not None:
+            payload["invaluable_chrome_profile"] = self.chrome_profile_choices.get(chrome_profile_var.get())
         self._settings_path.parent.mkdir(parents=True, exist_ok=True)
         self._settings_path.write_text(
             json.dumps(payload, indent=2),
