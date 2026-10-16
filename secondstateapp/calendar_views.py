@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone as datetime_timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -386,7 +386,7 @@ def auction_calendar(request):
         .order_by("-sent_at", "-id")
         .first()
     )
-    email_recipients = recipient_choices()
+    email_recipients = _email_recipient_choices(active_email_batch)
 
     context = {
         "month_title": selected_month.strftime("%B %Y"),
@@ -403,6 +403,7 @@ def auction_calendar(request):
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),
         "email_recipient_names": ", ".join(choice["name"] for choice in email_recipients),
+        "email_recipient_choices": email_recipients,
         "email_last_sent_batch": last_sent_batch,
         "email_configuration_warnings": configuration_warnings(),
     }
@@ -1634,6 +1635,48 @@ def _email_tray_redirect():
     return redirect(reverse("auction_email_tray"))
 
 
+def _email_recipient_choices(batch: AuctionEmailBatch | None) -> list[dict]:
+    choices = recipient_choices()
+    checked_keys = set(batch.recipient_keys) if batch and batch.status == AuctionEmailBatch.Status.FAILED else set()
+    if not checked_keys:
+        checked_keys = {choice["key"] for choice in choices if choice["configured"]}
+    return [
+        {**choice, "checked": choice["configured"] and choice["key"] in checked_keys}
+        for choice in choices
+    ]
+
+
+def _email_scope_date(value: str) -> date:
+    if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+        raise ValueError("Choose a valid calendar day before sending.")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("Choose a valid calendar day before sending.") from exc
+
+
+def _email_success_redirect(request):
+    if request.POST.get("return_view") == "catalog":
+        try:
+            selected_day = _email_scope_date(request.POST.get("day", ""))
+        except ValueError:
+            return _calendar_redirect(request)
+        query = urlencode({
+            "month": _month_start(request.POST.get("month"), selected_day).strftime("%Y-%m"),
+            "day": selected_day.isoformat(),
+            "view": "catalog",
+            "filter": "tray",
+        })
+        return redirect(f"{reverse('auction_calendar')}?{query}")
+    return _calendar_redirect(request)
+
+
+def _email_failure_redirect(request):
+    if "scope_day" in request.POST and request.POST.get("return_view") == "catalog":
+        return _email_success_redirect(request)
+    return _email_tray_redirect()
+
+
 @staff_member_required
 def review_auction_email_tray(request):
     batch = (
@@ -1644,13 +1687,7 @@ def review_auction_email_tray(request):
     )
     items = sorted(list(batch.items.all()), key=_email_item_sort_key) if batch else []
     composition = compose_auction_email([item.lot for item in items]) if items else None
-    checked_keys = set(batch.recipient_keys) if batch and batch.status == AuctionEmailBatch.Status.FAILED else set()
-    if not checked_keys:
-        checked_keys = {choice["key"] for choice in recipient_choices()}
-    choices = [
-        {**choice, "checked": choice["key"] in checked_keys}
-        for choice in recipient_choices()
-    ]
+    choices = _email_recipient_choices(batch)
     return render(
         request,
         "calendar/email_tray.html",
@@ -1724,6 +1761,13 @@ def clear_auction_email_tray(request):
 
 def _prepare_auction_email_dispatch(request, *, retry: bool):
     submitted_keys = request.POST.getlist("recipients")
+    scope_day = None
+    if "scope_day" in request.POST:
+        try:
+            scope_day = _email_scope_date(request.POST["scope_day"])
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return None
     with transaction.atomic():
         batch = _active_email_batch_for_update()
         if not batch or not batch.items.exists():
@@ -1752,6 +1796,24 @@ def _prepare_auction_email_dispatch(request, *, retry: bool):
             list(batch.items.select_related("lot__bid_board_analysis", "selected_by")),
             key=_email_item_sort_key,
         )
+        if scope_day is not None:
+            zone = _calendar_zone()
+            items = [
+                item for item in items
+                if item.lot.event_at is not None and timezone.localtime(item.lot.event_at, zone).date() == scope_day
+            ]
+            if not items:
+                messages.error(request, "No selected lots remain for this calendar day.")
+                return None
+            expected_ids = request.POST.getlist("expected_lot_ids")
+            if (
+                not expected_ids
+                or any(not re.fullmatch(r"[1-9][0-9]*", value) for value in expected_ids)
+                or len(expected_ids) != len(set(expected_ids))
+                or set(expected_ids) != {str(item.lot_id) for item in items}
+            ):
+                messages.error(request, "The selected lots for this day changed. Refresh the catalog and review them before sending.")
+                return None
         invalid_lots = []
         for item in items:
             try:
@@ -1810,7 +1872,7 @@ def _prepare_auction_email_dispatch(request, *, retry: bool):
 def _dispatch_auction_email(request, *, retry: bool):
     prepared = _prepare_auction_email_dispatch(request, retry=retry)
     if prepared is None:
-        return _email_tray_redirect()
+        return _email_failure_redirect(request)
     batch, recipients, composition = prepared
     try:
         message_id = send_auction_email(
@@ -1831,13 +1893,13 @@ def _dispatch_auction_email(request, *, retry: bool):
             updated_at=timezone.now(),
         )
         messages.error(request, f"Email delivery failed. The tray is ready to retry. {failure_summary}")
-        return _email_tray_redirect()
+        return _email_failure_redirect(request)
 
     with transaction.atomic():
         sending_batch = AuctionEmailBatch.objects.select_for_update().get(pk=batch.pk)
         if sending_batch.status != AuctionEmailBatch.Status.SENDING or not sending_batch.is_active:
             messages.error(request, "Gmail returned success, but the batch state changed unexpectedly.")
-            return _email_tray_redirect()
+            return _email_failure_redirect(request)
         sending_batch.status = AuctionEmailBatch.Status.SENT
         sending_batch.is_active = False
         sending_batch.gmail_message_id = message_id
@@ -1853,13 +1915,17 @@ def _dispatch_auction_email(request, *, retry: bool):
                 "updated_at",
             )
         )
+        remaining_items = sending_batch.items.exclude(lot_id__in=composition.lot_snapshots)
+        if remaining_items.exists():
+            next_batch = AuctionEmailBatch.objects.create()
+            remaining_items.update(batch=next_batch, lot_snapshot={})
 
     recipient_names = ", ".join(recipient.name for recipient in recipients)
     messages.success(
         request,
         f"Sent {composition.lot_count} selected auction lot{'s' if composition.lot_count != 1 else ''} to {recipient_names}.",
     )
-    return _calendar_redirect(request)
+    return _email_success_redirect(request)
 
 
 @staff_member_required

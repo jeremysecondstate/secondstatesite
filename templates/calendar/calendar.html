@@ -203,17 +203,20 @@
         <div class="day-gallery-day-nav" aria-label="Watched day navigation">
           <button id="day-gallery-previous" type="button" aria-label="Previous day with watched lots">← Previous day</button>
           <button id="day-gallery-next" type="button" aria-label="Next day with watched lots">Next day →</button>
-          <button id="day-gallery-browser-launch" class="day-gallery-browser-launch" type="button">Research this day →</button>
         </div>
         <nav class="month-nav day-gallery-month-nav" aria-label="Catalog month navigation">
           <a href="?month={{ previous_month }}">← Previous month</a>
           <a href="?month={{ next_month }}">Next month →</a>
         </nav>
+        <button id="day-gallery-browser-launch" class="day-gallery-browser-launch" type="button">Research this day →</button>
       </div>
     </header>
     <div class="day-gallery-tools">
-      <div id="day-gallery-filters" class="day-gallery-filters" role="group" aria-label="Filter the day's lots"></div>
-      <label for="day-gallery-sort">Sort
+      <div class="day-gallery-primary-actions">
+        <div id="day-gallery-filters" class="day-gallery-filters" role="group" aria-label="Filter the day's lots"></div>
+        <button id="day-gallery-send-launch" class="day-gallery-send-launch" type="button" hidden>Send Email</button>
+      </div>
+      <label class="day-gallery-sort-label" for="day-gallery-sort">Sort
         <select id="day-gallery-sort" class="day-gallery-sort">
           <option value="catalog">Catalog order</option>
           <option value="artist">Artist A–Z</option>
@@ -221,6 +224,7 @@
         </select>
       </label>
     </div>
+    <div id="day-gallery-house-filters" class="day-gallery-house-filters" role="group" aria-label="Filter by auction house"></div>
     <div class="day-gallery-count" aria-live="polite">
       <span id="day-gallery-description">A catalog across auction houses</span>
       <span id="day-gallery-results">0 lots</span>
@@ -314,6 +318,48 @@
       </footer>
     </div>
   </dialog>
+  <dialog id="catalog-email-dialog" class="catalog-email-dialog" aria-labelledby="catalog-email-title" aria-describedby="catalog-email-summary">
+    <div class="catalog-email-heading">
+      <div>
+        <p class="calendar-kicker">Email Tray</p>
+        <h2 id="catalog-email-title">{% if email_batch.status == 'failed' %}Retry Email{% else %}Send Email{% endif %}</h2>
+      </div>
+      <button id="catalog-email-close" type="button" aria-label="Close email dialog">×</button>
+    </div>
+    <p id="catalog-email-summary"></p>
+    <p class="catalog-email-scope">Only this day’s selected lots will be sent. Selections for other dates stay in your tray.</p>
+    {% if email_configuration_warnings %}
+      <p class="email-review-notice is-warning">{{ email_configuration_warnings|join:" " }}</p>
+    {% elif email_batch.status == 'sending' %}
+      <p class="email-review-notice">An email is already sending. Refresh once it finishes.</p>
+    {% elif email_batch.status == 'failed' %}
+      <p class="email-review-notice is-error">The last delivery failed. This will retry the selected lots for this day.</p>
+    {% endif %}
+    <form id="catalog-email-form" method="post" action="{% if email_batch.status == 'failed' %}{% url 'auction_email_retry' %}{% else %}{% url 'auction_email_send' %}{% endif %}">
+      {% csrf_token %}
+      <input type="hidden" name="return_view" value="catalog">
+      <input type="hidden" name="month" value="{{ month_value }}">
+      <input type="hidden" name="day" value="">
+      <input type="hidden" name="scope_day" value="">
+      <div id="catalog-email-lot-ids"></div>
+      <fieldset class="catalog-email-recipients">
+        <legend>Send to</legend>
+        <div class="email-recipient-list">
+          {% for choice in email_recipient_choices %}
+            <label class="email-recipient-choice{% if not choice.configured %} is-unconfigured{% endif %}">
+              <input type="checkbox" name="recipients" value="{{ choice.key }}" {% if choice.checked and choice.configured %}checked{% endif %} {% if not choice.configured or email_batch.status == 'sending' %}disabled{% endif %}>
+              <span><strong>{{ choice.name }}</strong><small>{{ choice.address }}{% if not choice.configured %} · not configured{% endif %}</small></span>
+            </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <p id="catalog-email-error" class="email-recipient-error" role="alert"></p>
+      <div class="catalog-email-actions">
+        <a href="{% url 'auction_email_tray' %}">Review full tray</a>
+        <button class="email-send-button" type="submit" {% if email_configuration_warnings or email_batch.status == 'sending' %}disabled{% endif %}>{% if email_batch.status == 'failed' %}Retry Email{% else %}Send Email{% endif %}</button>
+      </div>
+    </form>
+  </dialog>
 </section>
 
 {{ calendar_data|json_script:"auction-calendar-data" }}
@@ -371,6 +417,10 @@
   const galleryDate = document.getElementById("day-gallery-date");
   const gallerySummary = document.getElementById("day-gallery-summary");
   const galleryFilters = document.getElementById("day-gallery-filters");
+  const galleryHouseFilters = document.getElementById("day-gallery-house-filters");
+  const gallerySendLaunch = document.getElementById("day-gallery-send-launch");
+  const catalogEmailDialog = document.getElementById("catalog-email-dialog");
+  const catalogEmailForm = document.getElementById("catalog-email-form");
   const gallerySort = document.getElementById("day-gallery-sort");
   const galleryDescription = document.getElementById("day-gallery-description");
   const galleryResults = document.getElementById("day-gallery-results");
@@ -2818,29 +2868,36 @@
     lots.forEach((lot) => houseCounts.set(lot.auction_house, (houseCounts.get(lot.auction_house) || 0) + 1));
     const choices = [
       {key: "all", label: "All houses", count: houseCounts.size},
-      ...Array.from(houseCounts, ([house, count]) => ({key: `house:${house}`, label: house, count})),
       {key: "tray", label: "Email Tray", count: lots.filter((lot) => lot.email_tray_selected).length},
+      ...Array.from(houseCounts, ([house, count]) => ({key: `house:${house}`, label: house, count})),
     ];
     galleryFilters.replaceChildren();
+    galleryHouseFilters.replaceChildren();
+    gallerySendLaunch.hidden = galleryFilter !== "tray";
+    gallerySendLaunch.disabled = !lots.some((lot) => lot.email_tray_selected);
     choices.forEach(({key, label, count}) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "day-gallery-filter";
       button.dataset.galleryFilter = key;
       button.setAttribute("aria-pressed", String(galleryFilter === key));
-      button.textContent = label;
+      const name = document.createElement("span");
+      name.className = "day-gallery-filter-name";
+      name.textContent = label;
       const number = document.createElement("span");
+      number.className = "day-gallery-filter-count";
       number.textContent = String(count);
-      button.appendChild(number);
+      button.append(name, number);
       button.addEventListener("click", () => {
         galleryFilter = key;
         galleryVisibleCount = 24;
         renderGalleryFilters();
         renderGalleryCards();
-        Array.from(galleryFilters.querySelectorAll("button"))
+        updateCalendarLocation();
+        Array.from(galleryCatalog.querySelectorAll("[data-gallery-filter]"))
           .find((candidate) => candidate.dataset.galleryFilter === key)?.focus({preventScroll: true});
       });
-      galleryFilters.appendChild(button);
+      (key.startsWith("house:") ? galleryHouseFilters : galleryFilters).appendChild(button);
     });
   };
 
@@ -3518,6 +3575,8 @@
     else url.searchParams.delete("view");
     if (selectedDay) url.searchParams.set("day", selectedDay);
     else url.searchParams.delete("day");
+    if (activeView === "catalog" && galleryFilter === "tray") url.searchParams.set("filter", "tray");
+    else url.searchParams.delete("filter");
     if (activeView === "research") {
       url.searchParams.set("look", researchLook);
       const lot = (data[selectedDay] || [])[researchIndex];
@@ -3584,6 +3643,7 @@
       const requestedIndex = (data[selectedDay] || []).findIndex((lot) => lot.id === requestedLot);
       if (requestedIndex >= 0) researchIndex = requestedIndex;
       const view = params.get("view");
+      galleryFilter = params.get("filter") === "tray" ? "tray" : "all";
       setCalendarView(view);
       const focusTarget = view === "research" ? researchTitle
         : view === "catalog" ? document.getElementById("day-gallery-title") : calendarViewToggle;
@@ -3613,6 +3673,45 @@
     if (event.target instanceof Element && event.target.closest("input, select, textarea, .artprice-analysis, .artprice-form, .research-lot-list")) return;
     if (event.key === "ArrowLeft") { event.preventDefault(); moveResearchLot(-1); }
     if (event.key === "ArrowRight") { event.preventDefault(); moveResearchLot(1); }
+  });
+  gallerySendLaunch.addEventListener("click", () => {
+    const selectedLots = (data[selectedDay] || []).filter((lot) => lot.email_tray_selected);
+    if (!selectedLots.length) return;
+    catalogEmailForm.elements.namedItem("day").value = selectedDay;
+    catalogEmailForm.elements.namedItem("scope_day").value = selectedDay;
+    catalogEmailForm.elements.namedItem("month").value = selectedDay.slice(0, 7);
+    const lotInputs = document.getElementById("catalog-email-lot-ids");
+    lotInputs.replaceChildren();
+    selectedLots.forEach((lot) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "expected_lot_ids";
+      input.value = String(lot.id);
+      lotInputs.appendChild(input);
+    });
+    document.getElementById("catalog-email-summary").textContent = `Send ${selectedLots.length} selected lot${selectedLots.length === 1 ? "" : "s"} for ${formatCalendarDay(selectedDay, {weekday: "long", month: "long", day: "numeric", year: "numeric"})} in one email.`;
+    document.getElementById("catalog-email-error").textContent = "";
+    catalogEmailDialog.showModal();
+  });
+  document.getElementById("catalog-email-close").addEventListener("click", () => catalogEmailDialog.close());
+  catalogEmailDialog.addEventListener("close", () => gallerySendLaunch.focus({preventScroll: true}));
+  catalogEmailForm.addEventListener("submit", (event) => {
+    const recipients = catalogEmailForm.querySelectorAll('input[name="recipients"]:checked:not(:disabled)');
+    const error = document.getElementById("catalog-email-error");
+    if (!recipients.length) {
+      event.preventDefault();
+      error.textContent = "Choose at least one recipient.";
+      return;
+    }
+    error.textContent = "";
+    const button = catalogEmailForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    button.textContent = "Sending…";
+    catalogEmailForm.setAttribute("aria-busy", "true");
+    document.getElementById("catalog-email-close").disabled = true;
+  });
+  catalogEmailDialog.addEventListener("cancel", (event) => {
+    if (catalogEmailForm.getAttribute("aria-busy") === "true") event.preventDefault();
   });
   gallerySort.addEventListener("change", () => {
     galleryVisibleCount = 24;
@@ -3784,6 +3883,7 @@
   }
   activeView = requestedView === "catalog" || requestedView === "research" ? requestedView : "calendar";
   if (validRequestedDay || initialDay) showDay(validRequestedDay ? requestedDay : initialDay);
+  galleryFilter = initialParams.get("filter") === "tray" ? "tray" : "all";
   setCalendarView(requestedView);
   const requestedSavedBoard = initialParams.get("saved_bid_board");
   if (requestedSavedBoard && window.SavedBidBoard) {

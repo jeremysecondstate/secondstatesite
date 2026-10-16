@@ -3327,6 +3327,221 @@ class AuctionEmailBatchTests(TestCase):
         self.assertEqual(calendar.context["email_selected_count"], 0)
         self.assertEqual(calendar.context["email_last_sent_batch"], batch)
 
+    @patch("secondstateapp.calendar_views.send_auction_email", return_value="gmail-scoped-123")
+    def test_catalog_send_archives_only_displayed_day_and_preserves_other_selections(self, sender):
+        selected = watch_lot(artprice_url="https://www.artprice.com/artist/1/selected/lots/pasts")
+        other = watch_lot(
+            source_lot_id="other-day",
+            title="Keep this lot in the tray",
+            event_at=datetime(2026, 7, 26, 9, tzinfo=CALENDAR_ZONE),
+            artprice_url="",
+        )
+        batch, _lots = self.selected_batch(selected, other)
+        retained_item = batch.items.get(lot=other)
+        retained_at = retained_item.selected_at
+        retained_item.lot_snapshot = {"title": "An old failed attempt"}
+        retained_item.save(update_fields=("lot_snapshot",))
+        request_data = {
+            "recipients": ["jeremy", "alex"],
+            "scope_day": "2026-07-25",
+            "expected_lot_ids": [str(selected.pk)],
+            "return_view": "catalog",
+            "day": "2026-07-25",
+            "month": "2026-07",
+        }
+
+        response = self.client.post(reverse("auction_email_send"), request_data)
+
+        self.assertRedirects(
+            response,
+            "/calendar/?month=2026-07&day=2026-07-25&view=catalog&filter=tray",
+            fetch_redirect_response=False,
+        )
+        sender.assert_called_once()
+        self.assertEqual(sender.call_args.kwargs["recipients"], ["jeremy@secondstate.art", "alex@secondstate.art"])
+        self.assertNotIn(other.title, sender.call_args.kwargs["text_body"])
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.SENT)
+        self.assertFalse(batch.is_active)
+        self.assertEqual(list(batch.items.values_list("lot_id", flat=True)), [selected.pk])
+        self.assertEqual(batch.items.get().lot_snapshot["title"], selected.title)
+        self.assertEqual(batch.gmail_message_id, "gmail-scoped-123")
+        next_batch = AuctionEmailBatch.objects.get(is_active=True)
+        self.assertNotEqual(next_batch.pk, batch.pk)
+        self.assertEqual(next_batch.status, AuctionEmailBatch.Status.DRAFT)
+        self.assertEqual(next_batch.attempt_count, 0)
+        self.assertEqual(next_batch.recipient_keys, [])
+        self.assertEqual(next_batch.subject_snapshot, "")
+        retained_item.refresh_from_db()
+        self.assertEqual(retained_item.batch_id, next_batch.pk)
+        self.assertEqual(retained_item.selected_by_id, self.staff.pk)
+        self.assertEqual(retained_item.selected_at, retained_at)
+        self.assertEqual(retained_item.lot_snapshot, {})
+
+        # A second submission of this page must not send the next day's tray.
+        self.client.post(reverse("auction_email_send"), request_data)
+        sender.assert_called_once()
+        self.assertEqual(next_batch.items.get().lot_id, other.pk)
+
+    @patch("secondstateapp.calendar_views.send_auction_email", return_value="gmail-dst-day")
+    def test_catalog_send_scope_uses_local_day_including_both_repeated_dst_hours(self, sender):
+        utc = ZoneInfo("UTC")
+        instants = (
+            datetime(2026, 11, 1, 6, 59, tzinfo=utc),
+            datetime(2026, 11, 1, 7, 0, tzinfo=utc),
+            datetime(2026, 11, 1, 8, 30, tzinfo=utc),
+            datetime(2026, 11, 1, 9, 30, tzinfo=utc),
+            datetime(2026, 11, 2, 7, 59, tzinfo=utc),
+            datetime(2026, 11, 2, 8, 0, tzinfo=utc),
+        )
+        lots = [
+            watch_lot(
+                source_lot_id=f"dst-{index}",
+                event_at=instant,
+                artprice_url=f"https://www.artprice.com/artist/{index + 1}/example/lots/pasts",
+            )
+            for index, instant in enumerate(instants)
+        ]
+        batch, _lots = self.selected_batch(*lots)
+
+        self.client.post(reverse("auction_email_send"), {
+            "recipients": "jeremy",
+            "scope_day": "2026-11-01",
+            "expected_lot_ids": [str(lot.pk) for lot in lots[1:5]],
+        })
+
+        sender.assert_called_once()
+        self.assertSetEqual(set(batch.items.values_list("lot_id", flat=True)), {lot.pk for lot in lots[1:5]})
+        remaining = AuctionEmailBatch.objects.get(is_active=True)
+        self.assertSetEqual(set(remaining.items.values_list("lot_id", flat=True)), {lots[0].pk, lots[5].pk})
+
+    @patch("secondstateapp.calendar_views.send_auction_email")
+    def test_catalog_send_rejects_invalid_scope_and_changed_or_missing_lot_ids(self, sender):
+        batch, lots = self.selected_batch()
+        selected_id = str(lots[0].pk)
+        invalid_requests = [
+            {"scope_day": value, "expected_lot_ids": [selected_id]}
+            for value in ("", "20260725", "2026-W30-6", "2026-7-25", "2026-02-30", "0000-07-25", "2026-07-25 ")
+        ]
+        invalid_requests.extend(
+            {"scope_day": "2026-07-25", "expected_lot_ids": ids}
+            for ids in ([], ["0"], ["not-an-id"], [selected_id, selected_id], [selected_id, "999999"])
+        )
+        invalid_requests.extend((
+            {"scope_day": "2026-07-25"},
+            {"scope_day": "2026-07-26", "expected_lot_ids": [selected_id]},
+        ))
+        for submitted in invalid_requests:
+            with self.subTest(submitted=submitted):
+                response = self.client.post(reverse("auction_email_send"), {"recipients": "jeremy", **submitted})
+                self.assertRedirects(response, reverse("auction_email_tray"), fetch_redirect_response=False)
+        sender.assert_not_called()
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.DRAFT)
+        self.assertEqual(batch.attempt_count, 0)
+        self.assertEqual(batch.items.get().lot_snapshot, {})
+
+        # A newly selected lot on the displayed day invalidates the old review.
+        added = watch_lot(source_lot_id="added-after-review", artprice_url=lots[0].artprice_url)
+        AuctionEmailBatchItem.objects.create(batch=batch, lot=added)
+        response = self.client.post(reverse("auction_email_send"), {
+            "recipients": "jeremy", "scope_day": "2026-07-25", "expected_lot_ids": [selected_id],
+            "return_view": "catalog", "day": "2026-07-25", "month": "2026-07",
+        }, follow=True)
+        self.assertRedirects(response, "/calendar/?month=2026-07&day=2026-07-25&view=catalog&filter=tray")
+        self.assertContains(response, "The selected lots for this day changed.")
+        self.assertEqual(response.wsgi_request.GET["filter"], "tray")
+        sender.assert_not_called()
+        self.assertEqual(batch.items.count(), 2)
+
+    @patch("secondstateapp.calendar_views.send_auction_email")
+    def test_failed_catalog_send_keeps_all_selections_and_scoped_retry_only_sends_that_day(self, sender):
+        first = watch_lot(artprice_url="https://www.artprice.com/artist/1/first/lots/pasts")
+        other = watch_lot(
+            source_lot_id="retry-other-day",
+            event_at=datetime(2026, 7, 26, 9, tzinfo=CALENDAR_ZONE),
+            artprice_url="https://www.artprice.com/artist/2/other/lots/pasts",
+        )
+        batch, _lots = self.selected_batch(first, other)
+        request_data = {
+            "recipients": ["alex"], "scope_day": "2026-07-25", "expected_lot_ids": [str(first.pk)],
+            "return_view": "catalog", "day": "2026-07-25", "month": "2026-07",
+        }
+        sender.side_effect = RuntimeError("test delivery failed")
+
+        calendar = self.client.post(reverse("auction_email_send"), request_data, follow=True)
+
+        self.assertRedirects(calendar, "/calendar/?month=2026-07&day=2026-07-25&view=catalog&filter=tray")
+        self.assertContains(calendar, "Email delivery failed. The tray is ready to retry.")
+        self.assertContains(calendar, f'action="{reverse("auction_email_retry")}"')
+        self.assertEqual(calendar.wsgi_request.GET["day"], "2026-07-25")
+        self.assertEqual(calendar.wsgi_request.GET["filter"], "tray")
+        self.assertEqual(calendar.context["email_batch"].status, AuctionEmailBatch.Status.FAILED)
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.FAILED)
+        self.assertTrue(batch.is_active)
+        self.assertEqual(batch.items.count(), 2)
+        self.assertTrue(batch.items.get(lot=first).lot_snapshot)
+        self.assertEqual(batch.items.get(lot=other).lot_snapshot, {})
+        self.assertEqual(
+            [choice["key"] for choice in calendar.context["email_recipient_choices"] if choice["checked"]],
+            ["alex"],
+        )
+        self.client.post(reverse("auction_email_send"), request_data)
+        self.assertEqual(sender.call_count, 1)
+        sender.side_effect = None
+        sender.return_value = "gmail-scoped-retry"
+
+        self.client.post(reverse("auction_email_retry"), request_data)
+
+        self.assertEqual(sender.call_count, 2)
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.SENT)
+        self.assertEqual(batch.attempt_count, 2)
+        self.assertEqual(batch.items.get().lot_id, first.pk)
+        self.assertEqual(AuctionEmailBatch.objects.get(is_active=True).items.get().lot_id, other.pk)
+
+    @patch("secondstateapp.calendar_views.send_auction_email", return_value="gmail-all-days")
+    def test_unscoped_send_still_sends_entire_tray_across_days(self, sender):
+        first = watch_lot(artprice_url="https://www.artprice.com/artist/1/first/lots/pasts")
+        other = watch_lot(
+            source_lot_id="full-tray-other-day",
+            event_at=datetime(2026, 7, 26, 9, tzinfo=CALENDAR_ZONE),
+            artprice_url="https://www.artprice.com/artist/2/other/lots/pasts",
+        )
+        batch, _lots = self.selected_batch(first, other)
+
+        self.client.post(reverse("auction_email_send"), {"recipients": "jeremy"})
+
+        sender.assert_called_once()
+        batch.refresh_from_db()
+        self.assertEqual(batch.status, AuctionEmailBatch.Status.SENT)
+        self.assertEqual(batch.items.count(), 2)
+        self.assertFalse(AuctionEmailBatch.objects.filter(is_active=True).exists())
+
+    @override_settings(AUCTION_EMAIL_RECIPIENT_OLIVER="")
+    def test_calendar_recipient_defaults_only_select_configured_recipients(self):
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        choices = {choice["key"]: choice for choice in response.context["email_recipient_choices"]}
+        self.assertTrue(choices["jeremy"]["checked"])
+        self.assertTrue(choices["alex"]["checked"])
+        self.assertFalse(choices["oliver"]["checked"])
+        self.assertFalse(choices["oliver"]["configured"])
+
+    @patch("secondstateapp.calendar_views.send_auction_email", return_value="gmail-safe-redirect")
+    def test_catalog_send_does_not_use_invalid_day_in_return_url(self, sender):
+        _batch, lots = self.selected_batch()
+        response = self.client.post(reverse("auction_email_send"), {
+            "recipients": "jeremy",
+            "scope_day": "2026-07-25",
+            "expected_lot_ids": [str(lots[0].pk)],
+            "return_view": "catalog",
+            "day": "https://example.com/",
+            "month": "2026-07",
+        })
+        self.assertRedirects(response, "/calendar/?month=2026-07", fetch_redirect_response=False)
+        sender.assert_called_once()
+
     @patch("secondstateapp.calendar_views.send_auction_email")
     def test_recipient_allowlist_empty_recipient_and_empty_tray_are_rejected(self, sender):
         batch, _lots = self.selected_batch()
