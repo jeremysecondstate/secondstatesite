@@ -3351,6 +3351,11 @@
     const actionLinks = document.createElement("div");
     actionLinks.className = "lot-browser-action-links";
     if (lot.url) actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "Open auction lot ↗"));
+    if (lot.artist_artprice_url) {
+      const artistLink = externalLink(lot.artist_artprice_url, "lot-artist-artprice-link", "Open Artprice ↗");
+      artistLink.setAttribute("aria-label", `Open ${lot.artist || "artist"} on Artprice (opens in a new tab)`);
+      actionLinks.appendChild(artistLink);
+    }
     if (lot.artprice_url) actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
     overview.appendChild(actionLinks);
     content.appendChild(overview);
