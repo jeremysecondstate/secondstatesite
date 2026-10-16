@@ -84,7 +84,7 @@ class HttpPageFetcher:
         if response.status_code == 202:
             raise SourceAccessBlocked(
                 f"{urlsplit(url).hostname or 'The source'} returned an access page (HTTP 202). "
-                "The lot was not refreshed. Use Connect Invaluable if sign-in is required."
+                "The lot was not refreshed. Try Sync to Calendar again when source access is available."
             )
         if _has_access_challenge(response):
             raise SourceAccessBlocked(
@@ -114,9 +114,14 @@ class HttpPageFetcher:
                 "an access response" if blocked else "a non-JSON response"
             )
             error_class = SourceAccessBlocked if blocked else SourceAccessError
+            host = (urlsplit(url).hostname or "").casefold()
+            guidance = (
+                " Try Sync to Calendar again when Invaluable allows access. Existing cached lots are retained."
+                if blocked and (host == "invaluable.com" or host.endswith(".invaluable.com")) else ""
+            )
             raise error_class(
                 f"{urlsplit(url).hostname or 'The source'} returned {received} "
-                f"(HTTP {response.status_code}). Live auction data was not refreshed."
+                f"(HTTP {response.status_code}). Live auction data was not refreshed.{guidance}"
             )
         try:
             return response.json()

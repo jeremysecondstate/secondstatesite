@@ -2,13 +2,33 @@
 
 Issue #33 replaces broad Auction Search with a local, bookmark-driven agenda. The desktop app visits selected public auction URLs from an exported browser bookmark file. Invaluable artist searches and Heritage sale catalogs are supported; LiveAuctioneers and Drouot remain visible at import time but report that their adapters are not available yet.
 
+## Studio workflow
+
+Studio uses the approved dark appearance: charcoal workspace, slate panels,
+pale blue actions, and light text across all four tabs.
+
+1. Click **Import Bookmarks HTML…** and choose your updated `ARTIST-LINKZ.html`.
+2. Click **Sync to Calendar**. This reloads the chosen file, refreshes the selected artists, and uploads the resulting lots to the website calendar in one operation.
+
+The app remembers the last imported file. If it is unavailable, it tries the project's `docs/ARTIST-LINKZ.html`, then the legacy shared-drive bookmark location. The default is the **ARTISTS INVALUABLE** folder and a **30-day** look-ahead. **Review imported artists** opens optional folder, artist, and date-range choices in the main workspace; **Done reviewing artists** returns to the agenda. A sync preserves current selections and includes newly added artists in the selected folders. The normal **Sync to Calendar** action uses HTTP with no AI processing or browser session, including when legacy browser environment settings are present.
+
+The flat upcoming-lots list remains visible below the two actions. Select a lot to see its sale, time, bid, and cached-data status, or double-click to open its source page. **Stop** appears while work is running. **More** contains the detailed grouped agenda, Calendar preview, saved-page imports, and Markdown, CSV, and ICS exports. Results, Details, Preview Text, and Artist Watchlist share the Studio rounded tabs, icon buttons, cards, and status banners; the Results search, editing, upload, deletion, and export actions retain their existing behavior and order.
+
+Source retrieval and website upload are reported separately. A successful upload of cached lots does not mean the source was refreshed. A blocked artist with no cached lots is named in the warning, so a newly imported artist cannot silently appear to have synced.
+
+When cached lots reach the website but a source fails, the banner says **Calendar updated; source refresh incomplete** and includes the first source error. **Sync details** keeps the full report available after the warning is dismissed, including all affected-watch messages, import notes, and the earliest/latest observation times for retained cached lots (in UTC). Missing observation times are labeled unavailable. A later completed sync replaces this report. The website counts describe uploaded records: **updated** counts existing records received, and **ended** includes previously ended or sold lots; neither means those changes were freshly discovered. Invaluable HTTP 202 access pages cannot supply fresh auction data. Check the affected bookmark in your usual browser and retry when access is available; the supported saved-page imports remain under **More**.
+
+For Invaluable errors, **Retry with browser** appears beside **Sync details**. This explicit action rereads the bookmarks and opens a separate Chrome (or Edge) profile to retrieve the selected artists, then uploads the results through the usual calendar sync. It waits up to two minutes for visible search results, including a confirmed zero-item result, instead of rejecting an initial HTTP 202 before the site's JavaScript can load. If a verification screen appears, complete it yourself in that window; the app never solves it or copies your regular browser profile. **Stop** or closing the browser cancels the refresh before upload. A blocked or timed-out attempt retains cached lots and remains labeled incomplete. A later normal sync still uses HTTP; browser retry is never silently enabled.
+
+This public-search retry does not require a sold-price login. Its profile is `%LOCALAPPDATA%\SecondState\ArtistWatchlist\invaluable-public-browser`, separate from the older saved-login profile. Chrome or Edge and the optional packages in `requirements-watchlist-browser.txt` must be installed. A working search in your regular Chrome session does not guarantee that Invaluable will accept this separate session.
+
 ## Heritage sales
 
 1. Import your updated `ARTIST-LINKZ.html` with **Import Bookmarks HTML…**. The file stays on your computer.
-2. Enable the **HERITAGE** folder. **ARTISTS INVALUABLE** remains the default selection and can stay enabled.
+2. Expand **Review imported artists** and enable the **HERITAGE** folder. **ARTISTS INVALUABLE** remains the default selection and can stay enabled.
 3. Select the sale in **Artists / sales**. A bookmark such as **10-22 SALE** with `auction_name=8280` watches all lots returned by that catalog, including any non-print objects in the sale. The bookmark title identifies the sale selection; each lot keeps its own artist name.
-4. Choose a date horizon that includes the sale. For the October 22, 2026 sale viewed on October 10, use **14** or **30 days**; the default 7 days excludes it.
-5. Click **Refresh Watchlist**. Results use the existing agenda, exports, cache, and automatic website-calendar sync.
+4. Choose a look-ahead that includes the sale; the default is **30 days**.
+5. Click **Sync to Calendar**. Results use the existing agenda, exports, cache, and website-calendar sync.
 
 Heritage may reject direct requests with HTTP 403 even when a browser is logged in. The desktop app does not inherit your open browser session. If retrieval is blocked, save the sale's results pages using **Webpage, Complete** in that browser, select one Heritage sale in the watchlist, and click **Import Saved Heritage Pages…**. Keep the saved HTML and its matching companion folder together: for example, `10-22-HS.html` beside `10-22-HS_files`. Select all saved results pages for that sale together. This reads the saved HTML locally, retains other current agenda lots, and runs the same website-calendar sync. No login cookies or saved HTML are uploaded.
 
@@ -28,19 +48,9 @@ The optional [`heritage_prepare_images.js`](../scripts/heritage_prepare_images.j
 
 The helper updates the existing catalog images so the browser can include them in the saved page. A separate image wall or preview in a shadow DOM is not a reliable substitute for **Webpage, Complete**. Failed images retain their original source; restore and rerun to retry them. The helper leaves larger images in place and does not change bids, bid forms, or navigation. It does not read cookies, browser storage, or account details; it uses ordinary image loads from recognized Heritage CDN URLs, without `fetch`, canvas extraction, or CORS workarounds. If an image request is refused, it reports that image as failed.
 
-Saved pages are snapshots: their bids and availability reflect when you saved them. Pages from a different sale are rejected. A partial set of pages never marks missing lots ended. Retained cached lots can therefore show older bids and availability than the newly imported page; a successful calendar sync does not make those observations current. Save and import updated pages when you need newer bids, and use **Sync Website Calendar** if a sync needs to be retried.
+Saved pages are snapshots: their bids and availability reflect when you saved them. Pages from a different sale are rejected. A partial set of pages never marks missing lots ended. Retained cached lots can therefore show older bids and availability than the newly imported page; a successful calendar sync does not make those observations current. Save and import updated pages through **More → Import saved Heritage pages…** when you need newer bids. Re-import the same pages to retry their upload without a live refresh, or use **Sync to Calendar** to attempt a fresh source check and upload.
 
-If the local import succeeds but website sync is not configured, the app now explains the missing settings and leaves **Sync Website Calendar** clickable. Put the website's existing `CATALOG_API_KEY` in the ignored project-root `.env` (alongside `SECONDSTATE_BASE_URL=https://secondstate.art` if needed). A sync retry reloads newly added settings without another import. Live source-access warnings, such as Heritage HTTP 403, are separate from website-sync configuration.
-
-## Screenshots
-
-Bookmark import, safe folder selection, artist preview, and zero-AI default:
-
-![Artist Watchlist bookmark import](screenshots/artist-watchlist-import.png)
-
-Synthetic agenda with efficiency metrics and export controls:
-
-![Artist Watchlist agenda](screenshots/artist-watchlist-agenda.png)
+If the local import succeeds but website sync is not configured, the app explains the missing settings and leaves **Sync to Calendar** clickable. Put the website's existing `CATALOG_API_KEY` in the ignored project-root `.env` (alongside `SECONDSTATE_BASE_URL=https://secondstate.art` if needed). A sync retry reloads newly added settings. Live source-access warnings, such as Heritage HTTP 403, are separate from website-sync configuration.
 
 ## Architecture
 
@@ -68,17 +78,20 @@ The implementation is split by responsibility:
 - `catalogapp/watchlist_enrichment.py`: optional strict structured-output batching for ambiguous compact records.
 - `catalogapp/watchlist_exports.py`: agenda Markdown, CSV, and RFC 5545 ICS generation.
 - `catalogapp/watchlist_sync.py`: authenticated upload of normalized results to the staff-only website calendar.
-- `catalogapp/watchlist_ui.py`: bookmark/folder/artist/sale selection, refresh/stop controls, saved Heritage page import, agenda/calendar views, and exports.
+- `catalogapp/watchlist_ui.py`: the Studio import/sync workflow, optional folder/artist/sale review, saved-page imports, agenda/calendar views, and exports. Legacy browser handlers remain in this module but have no visible controls.
+- `catalogapp/studio_palette.py`: the approved dark Studio colors shared by widgets and drawn assets.
+- `catalogapp/studio_theme.py`: shared Studio fonts, table styles, and button styles for the desktop app.
+- `catalogapp/studio_assets.py`: locally drawn, antialiased line icons and stretchable rounded surfaces. Uses the existing Pillow dependency; no external asset downloads.
 
 ## Local data and privacy
 
 - The bookmark file is read locally and is never copied into the repository or website database.
 - The complete bookmark HTML and full scraped pages are never sent to OpenAI.
 - Only entries in a user-selected folder and the explicit `invaluable.com`, `liveauctioneers.com`, `drouot.com`, or `ha.com` allowlist are imported. Private Google Drive and unrelated URLs are rejected.
-- Normal HTTP retrieval is the default. **Connect Invaluable…** opts into a dedicated local Chrome session for Invaluable catalog and detail requests. Its login stays under `%LOCALAPPDATA%\SecondState\ArtistWatchlist\invaluable-browser` and is never uploaded. Other auction sources continue using their existing fetcher. The older environment-based Playwright option remains available separately.
+- Normal HTTP retrieval is the default. Only **Retry with browser** launches the separate public-search browser. The dormant login connection implementation and its local profile under `%LOCALAPPDATA%\SecondState\ArtistWatchlist\invaluable-browser` are retained; browser credentials are never uploaded. The older environment-based Playwright implementation also remains in the codebase.
 - The fetchers do not enter credentials, solve CAPTCHAs, bypass paywalls, or work around HTTP 401/403/429 controls.
 - Local settings and cache data live under `%LOCALAPPDATA%\SecondState\ArtistWatchlist`, outside the repository.
-- Zero-AI mode is enabled in the UI by default. Optional enrichment also requires `OPENAI_WATCHLIST_ENRICHMENT_ENABLED=1`.
+- Studio sync always uses zero-AI mode. The retained enrichment implementation also requires `OPENAI_WATCHLIST_ENRICHMENT_ENABLED=1` when used separately.
 - Enrichment sends only allowlisted normalized fields. URLs, bookmark data, page HTML, cookies, and credentials are excluded.
 - Website calendar sync sends normalized sale/lot fields, the source's public primary-image URL when available, and sanitized artwork thumbnails imported from a saved catalog. Original image metadata, local paths, bookmark files, page HTML, cookies, cache internals, and browser credentials are excluded from the uploaded records. The configured catalog API key is used only to authenticate the sync request.
 - The Responses API request has no tools and uses a strict JSON schema. Ambiguous records are batched and cached by deterministic content hash.
@@ -99,7 +112,9 @@ Each lot is keyed by source plus source lot ID, falling back to its canonical UR
 
 If a source is temporarily unavailable, the refresh keeps the last known active lots for that bookmark in the agenda and reports that cached data is being shown. It never marks lots ended from an incomplete or failed source refresh.
 
-Every refresh reports:
+When adding an artist, import the updated bookmark HTML and use **Sync to Calendar**. Subsequent syncs reread that file, preserving exclusions and selecting newly added artists in the chosen folders. If Invaluable returns an access page (HTTP 202/403), existing artists can still have cached lots to upload while a new artist has none. The source warning names watches with no cached lots and remains visible after an upload or saved-page import. If Invaluable continues to block access, no new lots can be retrieved until access is restored; changing the UI does not bypass that restriction.
+
+The controller retains these metrics for diagnostics:
 
 - pages fetched;
 - cache hits;
@@ -113,25 +128,19 @@ Invaluable's `currentBid` and `bidCount` values are normalized separately so the
 
 ### Posted sold prices
 
-After an auction, **Refresh Watchlist** rechecks previously watched Invaluable lot detail pages for up to 30 days after their source date/time, including lots that have disappeared from upcoming searches or were already marked ended. A posted result such as **Sold: $11,000 USD** is stored separately from the estimate and current bid, appears in the desktop **Current Bid / Sold** column and Markdown/CSV exports, and is uploaded by automatic calendar sync. The website displays the result in the catalog, day list, lot browser, and research view. A missing lot or its last bid alone never counts as a sold price. Confirmed sold lots remain in calendar history and are excluded from upcoming ICS events and reminders. Later syncs that omit the result preserve the saved price.
+After an auction, **Sync to Calendar** rechecks previously watched Invaluable lot detail pages for up to 30 days after their source date/time, including lots that have disappeared from upcoming searches or were already marked ended. A publicly visible posted result such as **Sold: $11,000 USD** is stored separately from the estimate and current bid, appears in the desktop **Current bid / sold** column and Markdown/CSV exports, and is uploaded by calendar sync. The website displays the result in the catalog, day list, lot browser, and research view. A missing lot or its last bid alone never counts as a sold price. Confirmed sold lots remain in calendar history and are excluded from upcoming ICS events and reminders. Later syncs that omit the result preserve the saved price.
 
-Some Invaluable pages show **Sold: Log in to view** to public requests. In the desktop app, click **Connect Invaluable…**, then sign in normally in the Chrome window that opens. Return to the displayed Calder lot after sign-in. When its posted sold amount appears, the app confirms the connection, saves the local browser session, and refreshes selected watches automatically. Future **Refresh Watchlist** runs reuse that login while **Use saved login** is checked. If it expires, reconnect. The app uses a dedicated profile rather than your regular Chrome profile; it never handles your password. Chrome (or Edge) must be installed. Browser support is a desktop-only dependency: `python -m pip install -r requirements-watchlist-browser.txt` using the Python that starts the app.
+Some Invaluable pages show **Sold: Log in to view** to public requests. Studio reports that these prices are unavailable and retains existing estimates and results. Ended lots without a verified price display **Sale ended · Sold price unavailable**. Access challenges stop further result requests for that refresh. Previously ended and sold lots remain available when the upcoming catalog fails, and an independent detail check may still update previously ended lots when the source permits access.
 
-**Open Invaluable in Chrome** opens the selected Invaluable lot in your regular Chrome; with no lot selected, it opens the Calder lot. Choose your usual profile (for example, **Work**) from the adjacent selector, and the app remembers it. **Chrome default** lets Chrome choose its profile/window; select a named profile to target your usual signed-in window. Chrome selects the window within that profile, so a specific existing tab is not replaced. The app reads only profile names and directories to populate the selector. Opening regular Chrome does not connect automatic price refreshes or transfer its login into the app's dedicated browser.
+The old **Connect Invaluable**, Chrome profile picker, and **Use saved login** controls have been removed. Their implementation remains in `watchlist_ui.py`, `watchlist_browser.py`, and `watchlist_chrome.py`, along with `requirements-watchlist-browser.txt`, for possible future development. The two-step Studio workflow does not invoke these handlers or enumerate Chrome profiles.
 
-If Chrome's cached profile name differs from the name in its toolbar, open `chrome://version` in the intended window and match the final folder in **Profile Path** (for example, **Profile 9**) to the selector. The directory is shown first so similarly named profiles remain distinguishable.
+As a manual fallback, save the individual sold lot page as HTML from your signed-in browser and use **More → Import saved sold results…** with its Invaluable artist selected. The importer matches the saved page to an existing watched lot and automatically syncs its posted result; it also works for older tracked lots outside the 30-day live recheck period. Only normalized result fields are imported. Page HTML, login cookies, and local filenames are not uploaded. Pages without an explicit visible sold amount or without a matching selected watch are reported and leave existing data intact.
 
-Ended lots without a verified price display **Sale ended · Sold price unavailable**. An explicit login gate produces a reconnect notice; access challenges stop further result requests for that refresh. Previously ended and sold lots remain available when the upcoming catalog fails, and an independent detail check may still update previously ended lots when the source permits access.
-
-**Connect Invaluable…** brings Chrome forward before loading the lot and keeps the sign-in window open if Invaluable returns an access page (including HTTP 202). Complete sign-in or any site prompt yourself, then return to the Calder lot. Connection status appears beside the button. The app does not retry blocked navigation or solve access challenges; automatic refresh still stops on blocked responses. Close the Chrome window or click **Stop** to cancel; a connection is only confirmed when the posted sold amount is visible.
-
-As a manual fallback, save the individual sold lot page as HTML from your signed-in browser and use **Import Saved Sold Results…** with its Invaluable artist selected. The importer matches the saved page to an existing watched lot and automatically syncs its posted result; it also works for older tracked lots outside the 30-day live recheck period. Only normalized result fields are imported. Page HTML, login cookies, and local filenames are not uploaded. Pages without an explicit visible sold amount or without a matching selected watch are reported and leave existing data intact.
-
-**Sync Website Calendar** retries the current local results; use **Refresh Watchlist** or the saved-result import first to retrieve a newly posted price. The bookmark file supplies artist searches, while each lot's detail page supplies its final result.
+The bookmark file supplies artist searches, while each lot's detail page supplies its final result.
 
 ICS output defaults to one event per auction sale. Matched artists and lots are grouped in the description. A timezone-aware source time is converted to UTC. A source date without a time becomes an all-day event and the description marks the time as unverified. Event-per-lot and reminders are supported by the export function but are intentionally not the noisy UI default.
 
-The private web calendar at `/calendar/` is populated automatically after a successful refresh and can be retried with **Sync Website Calendar**. A selected date with lots exposes **Browse all N lots**, which opens a single modal viewer with the current lot's primary image, details, counter, progress, wraparound previous/next controls, and keyboard navigation. Website staff can explicitly select lots with saved Artprice links for the shared Email Tray; sync never selects, deselects, or sends them. See [`auction-calendar.md`](auction-calendar.md) for authentication, deployment, and Gmail setup.
+The private web calendar at `/calendar/` is populated by **Sync to Calendar** or a saved-page import. A selected date with lots exposes **Browse all N lots**, which opens a single modal viewer with the current lot's primary image, details, counter, progress, wraparound previous/next controls, and keyboard navigation. Website staff can explicitly select lots with saved Artprice links for the shared Email Tray; sync never selects, deselects, or sends them. See [`auction-calendar.md`](auction-calendar.md) for authentication, deployment, and Gmail setup.
 
 ## Migration note
 
@@ -144,8 +153,8 @@ Historical migration `0012_auctionsearchjob.py` is retained because it may alrea
 3. Export a small synthetic or test browser bookmark HTML file. Do not add a real bookmark export to Git.
 4. Click **Import Bookmarks HTML…** and confirm `ARTISTS INVALUABLE` is selected by default.
 5. Confirm private/unrelated domains do not appear and source/artist/sale counts are shown before refresh. Enable a synthetic **HERITAGE** folder and confirm its sale title appears separately from artist names.
-6. Select a small artist subset, keep **Zero-AI mode** enabled, choose a horizon, and click **Refresh Watchlist**.
-7. Confirm status reports pages, cache hits, changes, AI records, and tokens; use **Stop** during a refresh once.
+6. Expand **Review imported artists**, select a small artist subset and look-ahead, then click **Sync to Calendar**.
+7. Confirm status distinguishes website upload from any source failures; use **Stop** during a refresh once. Add an artist to the chosen HTML file and confirm the next sync includes it while preserving earlier exclusions.
 8. Refresh the same fixture again and confirm unchanged complete lots produce cache hits and no repeated detail or AI request.
 9. Inspect Agenda and Calendar views, then export Markdown, CSV, and ICS. Import the ICS into a temporary calendar and confirm one event per sale.
 10. Verify upload, website listing edit/delete/reorder, gallery rendering, and artwork description generation still work.

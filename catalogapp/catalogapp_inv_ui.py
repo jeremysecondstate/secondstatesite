@@ -10,6 +10,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from tkinter import scrolledtext
 
 from catalogapp.catalog_paths import resolve_catalog_path
+from catalogapp.studio_theme import STUDIO_COLORS, apply_studio_theme, studio_icon
 from catalogapp.watchlist_ui import ArtistWatchlistPanel
 from secondstate.artwork_dimensions import format_catalog_dimensions, normalize_dimensions
 from secondstate.artwork_notes import clean_public_notes
@@ -63,11 +64,11 @@ class ArtCatalogApp:
         self.df = None
         self.current_results = None
         master.title(APP_TITLE)
-        master.geometry(f"{APP_MIN_W}x{APP_MIN_H}")
+        master.geometry("1280x860")
         master.minsize(APP_MIN_W, APP_MIN_H)
         self._style()
         self._build_ui()
-        master.bind_all("<Control-f>", self.search_catalog)
+        master.bind_all("<Control-f>", self._search_from_shortcut)
         master.bind_all("<Control-e>", lambda _e: self.export_to_word())
         master.bind_all("<Control-d>", lambda _e: self.export_entire_database())
         master.bind_all("<Control-u>", lambda _e: self.upload_artworks())
@@ -75,19 +76,7 @@ class ArtCatalogApp:
         master.after(100, self.load_excel)
 
     def _style(self):
-        self.style = ttk.Style(self.master)
-        try:
-            self.style.theme_use("clam")
-        except tk.TclError:
-            pass
-        self.style.configure(".", font=("Segoe UI", 11))
-        self.style.configure("Header.TLabel", font=("Segoe UI Semibold", 16))
-        self.style.configure("Subtle.TLabel", foreground="#5a5f73")
-        self.style.configure("Accent.TButton", padding=9, font=("Segoe UI Semibold", 11), foreground="white", background="#4E8DF5")
-        self.style.configure("Success.TButton", padding=9, font=("Segoe UI Semibold", 11), foreground="white", background="#28a745")
-        self.style.configure("Danger.TButton", padding=9, font=("Segoe UI Semibold", 11), foreground="white", background="#d9534f")
-        self.style.configure("Catalog.Treeview", rowheight=28)
-        self.style.configure("Catalog.Treeview.Heading", font=("Segoe UI Semibold", 11))
+        self.style = apply_studio_theme(self.master)
 
     def _build_ui(self):
         menubar = tk.Menu(self.master)
@@ -99,77 +88,222 @@ class ArtCatalogApp:
         menubar.add_cascade(label="Actions", menu=actions)
         self.master.config(menu=menubar)
 
-        header = ttk.Frame(self.master, padding=(16, 10))
+        header = ttk.Frame(self.master, padding=(24, 18), style="Surface.TFrame")
         header.pack(fill=tk.X)
-        ttk.Label(header, text="🎨 Art Catalog Uploader", style="Header.TLabel").pack(side=tk.LEFT)
-        ttk.Label(header, text="Search, manage, upload, edit, and generate descriptions.", style="Subtle.TLabel").pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Label(header, image=studio_icon(self.master, "brand", size=34),
+                  style="Surface.TLabel").pack(side=tk.LEFT, padx=(0, 12))
+        brand = ttk.Frame(header, style="Surface.TFrame")
+        brand.pack(side=tk.LEFT)
+        ttk.Label(brand, text="SECONDSTATE", font=("Georgia", 10, "bold"),
+                  style="Brand.TLabel").pack(anchor="w")
+        ttk.Label(brand, text="Catalog workspace", style="BrandSubtle.TLabel").pack(anchor="w", pady=(2, 0))
+        catalog_source = ttk.Frame(header, style="Surface.TFrame")
+        catalog_source.pack(side=tk.RIGHT)
+        tk.Label(catalog_source, text="●", font=("Segoe UI", 7), background=STUDIO_COLORS["surface"],
+                 foreground=STUDIO_COLORS["accent"]).pack(side=tk.LEFT, padx=(0, 6))
+        ttk.Label(catalog_source, text="Shared catalog database", style="SurfaceSubtle.TLabel").pack(side=tk.LEFT)
 
-        paned = ttk.Panedwindow(self.master, orient=tk.HORIZONTAL)
-        paned.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 10))
-        left = ttk.Frame(paned, padding=12)
-        right = ttk.Frame(paned)
-        paned.add(left, weight=0)
-        paned.add(right, weight=1)
+        footer = ttk.Frame(self.master)
+        footer.pack(side=tk.BOTTOM, fill=tk.X)
+        ttk.Separator(footer).pack(fill=tk.X)
+        self.status = ttk.Label(footer, text="Loading shared catalog database...", anchor="w", padding=(24, 10), style="Small.TLabel")
+        self.status.pack(fill=tk.X)
 
-        ttk.Label(left, text="Using shared catalog database", style="Subtle.TLabel").pack(anchor="w", pady=(0, 10))
-        ttk.Label(left, text="Search by Title or Artist").pack(anchor="w")
-        search_row = ttk.Frame(left)
-        search_row.pack(fill=tk.X, pady=(4, 12))
-        self.search_var = tk.StringVar()
-        self.search_entry = ttk.Entry(search_row, textvariable=self.search_var)
-        self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.search_entry.bind("<Return>", self.search_catalog)
-        ttk.Button(search_row, text="Search", command=self.search_catalog, style="Accent.TButton").pack(side=tk.LEFT, padx=(8, 0))
-
-        for text, cmd, style in [
-            ("Export Search -> Word", self.export_to_word, None),
-            ("Export Entire Database", self.export_entire_database, None),
-            ("Upload Artwork(s) to Website", self.upload_artworks, "Success.TButton"),
-            ("Generate Description for Selected", self.generate_description_for_selected, "Accent.TButton"),
-            ("Edit Website Listings", self.edit_website_listings, "Accent.TButton"),
-            ("Delete Artwork from Website", self.delete_artwork, "Danger.TButton"),
-            ("Go to Your Listings", lambda: webbrowser.open(f"{BASE_URL}/artworks/"), None),
-            ("Display All Inventory", self.display_all_inventory, "Accent.TButton"),
-        ]:
-            ttk.Button(left, text=text, command=cmd, style=style).pack(fill=tk.X, pady=4)
-
-        ttk.Label(left, text="Shortcuts\nCtrl+F Search\nCtrl+E Export search\nCtrl+D Export DB\nCtrl+U Upload\nCtrl+Q Quit", style="Subtle.TLabel", justify="left").pack(anchor="w", pady=(16, 0))
-
-        notebook = ttk.Notebook(right)
-        notebook.pack(fill=tk.BOTH, expand=True)
-        tab_results = ttk.Frame(notebook, padding=10)
-        tab_details = ttk.Frame(notebook, padding=10)
-        tab_preview = ttk.Frame(notebook, padding=10)
-        notebook.add(tab_results, text="Results")
-        notebook.add(tab_details, text="Details")
-        notebook.add(tab_preview, text="Preview Text")
+        # Keep catalog actions with Results, leaving every other tab its full width.
+        self.notebook = ttk.Notebook(self.master)
+        self.notebook.pack(fill=tk.BOTH, expand=True)
+        self.tab_results = ttk.Frame(self.notebook, padding=(24, 22))
+        tab_details = ttk.Frame(self.notebook, padding=(24, 22))
+        tab_preview = ttk.Frame(self.notebook, padding=(24, 22))
+        self.notebook.add(self.tab_results, text="Results", image=studio_icon(self.master, "grid"), compound=tk.LEFT)
+        self.notebook.add(tab_details, text="Details", image=studio_icon(self.master, "file"), compound=tk.LEFT)
+        self.notebook.add(tab_preview, text="Preview Text", image=studio_icon(self.master, "text"), compound=tk.LEFT)
         self.watchlist_panel = ArtistWatchlistPanel(
-            notebook,
+            self.notebook,
             status_callback=self._set_status,
             calendar_base_url=BASE_URL,
             calendar_api_key=CATALOG_API_KEY,
         )
-        notebook.add(self.watchlist_panel, text="Artist Watchlist")
+        self.notebook.add(self.watchlist_panel, text="Artist Watchlist",
+                          image=studio_icon(self.master, "calendar"), compound=tk.LEFT)
+
+        self.tab_results.rowconfigure(0, weight=1)
+        self.tab_results.columnconfigure(2, weight=1)
+        # The concept uses a compact action rail; long action names wrap without
+        # changing their words, order, handlers, or keyboard shortcuts.
+        left = ttk.Frame(self.tab_results, width=212, padding=(0, 0, 18, 0))
+        left.grid(row=0, column=0, sticky="ns")
+        left.grid_propagate(False)
+        left.pack_propagate(False)
+        ttk.Separator(self.tab_results, orient=tk.VERTICAL).grid(row=0, column=1, sticky="ns")
+        right = ttk.Frame(self.tab_results, padding=(25, 0, 0, 0))
+        right.grid(row=0, column=2, sticky="nsew")
+        self.results_content = right
+        right.columnconfigure(0, weight=1)
+        right.rowconfigure(4, weight=1)
+        right.bind("<Configure>", self._resize_results_table)
+
+        ttk.Label(left, text="Search by Title or Artist", style="Subtle.TLabel").pack(anchor="w")
+        search_row = ttk.Frame(left)
+        search_row.pack(fill=tk.X, pady=(7, 16))
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(search_row, textvariable=self.search_var, width=13)
+        self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.search_entry.bind("<Return>", self.search_catalog)
+        search_hint = tk.Label(self.search_entry, text="Artist or title", anchor="w", borderwidth=0,
+                               background=STUDIO_COLORS["surface"], foreground=STUDIO_COLORS["muted"],
+                               font=("Segoe UI", 9))
+        search_hint.place(x=9, rely=0.5, anchor="w")
+        search_hint.bind("<Button-1>", lambda _event: self.search_entry.focus_set())
+        def update_search_hint(*_args):
+            if self.search_var.get() or self.search_entry.focus_get() == self.search_entry:
+                search_hint.place_forget()
+            else:
+                search_hint.place(x=9, rely=0.5, anchor="w")
+        self.search_var.trace_add("write", update_search_hint)
+        self.search_entry.bind("<FocusIn>", update_search_hint)
+        self.search_entry.bind("<FocusOut>", update_search_hint)
+        ttk.Button(search_row, image=studio_icon(self.master, "search"), command=self.search_catalog,
+                   style="Secondary.TButton", width=2).pack(side=tk.LEFT, padx=(5, 0))
+
+        for text, cmd, style, icon_name in [
+            ("Export Search -> Word", self.export_to_word, "Rail.TButton", "export"),
+            ("Export Entire Database", self.export_entire_database, "Rail.TButton", "database"),
+            ("Upload Artwork(s) to\nWebsite", self.upload_artworks, "Upload.TButton", "upload"),
+            ("Generate Description for\nSelected", self.generate_description_for_selected, "Rail.TButton", "sparkles"),
+            ("Edit Website Listings", self.edit_website_listings, "Rail.TButton", "edit"),
+            ("Delete Artwork from\nWebsite", self.delete_artwork, "RailDanger.TButton", "trash"),
+            ("Go to Your Listings", lambda: webbrowser.open(f"{BASE_URL}/artworks/"), "Rail.TButton", "external"),
+            ("Display All Inventory", self.display_all_inventory, "Rail.TButton", "rows"),
+        ]:
+            icon_color = STUDIO_COLORS["on_accent"] if style == "Upload.TButton" else (
+                STUDIO_COLORS["danger"] if style == "RailDanger.TButton" else STUDIO_COLORS["ink"]
+            )
+            ttk.Button(left, text=text, command=cmd, style=style, compound=tk.LEFT,
+                       image=studio_icon(self.master, icon_name, color=icon_color, size=15)).pack(fill=tk.X, pady=3)
+
+        shortcuts = ttk.Frame(left, padding=(0, 12, 0, 0))
+        shortcuts.pack(fill=tk.X)
+        for label, key in (("Search", "Ctrl+F"), ("Export search", "Ctrl+E"),
+                           ("Export database", "Ctrl+D"), ("Upload selected", "Ctrl+U"), ("Quit", "Ctrl+Q")):
+            row = ttk.Frame(shortcuts)
+            row.pack(fill=tk.X, pady=2)
+            ttk.Label(row, text=label, style="Small.TLabel").pack(side=tk.LEFT)
+            ttk.Label(row, text=key, style="Small.TLabel").pack(side=tk.RIGHT)
+
+        result_heading = ttk.Frame(right)
+        result_heading.grid(row=0, column=0, sticky="ew")
+        ttk.Label(result_heading, text="Results", style="Header.TLabel").pack(side=tk.LEFT)
+        self.results_count = ttk.Label(result_heading, text="", style="Small.TLabel")
+        self.results_count.pack(side=tk.RIGHT)
+        ttk.Label(right, text="Search, select, edit and upload.", style="Subtle.TLabel").grid(
+            row=1, column=0, sticky="w", pady=(4, 18)
+        )
+        table_frame = ttk.Frame(right)
+        table_frame.grid(row=2, column=0, sticky="ew")
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
 
         cols = ("Artist", "Title", "Year", "Medium", "Catalog #")
-        self.tree = ttk.Treeview(tab_results, columns=cols, show="headings", style="Catalog.Treeview", selectmode="extended")
-        for c in cols:
-            self.tree.heading(c, text=c, command=partial(self._sort_tree, c, False))
-            self.tree.column(c, width=130, stretch=True)
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        vsb = ttk.Scrollbar(tab_results, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree = ttk.Treeview(table_frame, columns=cols, show="headings", style="Inventory.Treeview",
+                                 selectmode="extended", height=5)
+        for c, width, minimum in zip(cols, (190, 240, 70, 140, 100), (140, 170, 60, 110, 95)):
+            self.tree.heading(c, text=c, anchor="w", command=partial(self._sort_tree, c, False))
+            self.tree.column(c, width=width, minwidth=minimum, stretch=True, anchor="w")
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        hsb = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=lambda first, last: self._update_scrollbar(vsb, first, last),
+                            xscrollcommand=lambda first, last: self._update_scrollbar(hsb, first, last))
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
         self.tree.bind("<<TreeviewSelect>>", self._on_select_row)
+        self.results_empty = ttk.Frame(table_frame, padding=(24, 22))
+        ttk.Label(self.results_empty, image=studio_icon(self.master, "search", color=STUDIO_COLORS["muted"], size=24)).pack(pady=(0, 12))
+        self.results_empty_title = ttk.Label(self.results_empty, text="Your catalog, ready to explore",
+                                             font=("Segoe UI Semibold", 12))
+        self.results_empty_title.pack()
+        self.results_empty_hint = ttk.Label(self.results_empty,
+                                            text="Search by artist or title, or choose Display All Inventory.",
+                                            style="Subtle.TLabel")
+        self.results_empty_hint.pack(pady=(7, 0))
+        self.results_empty.place(x=0, y=55, relwidth=1)
 
-        self.details_text = scrolledtext.ScrolledText(tab_details, wrap=tk.WORD, font=("Segoe UI", 11))
-        self.details_text.pack(fill=tk.BOTH, expand=True)
-        self.details_text.configure(state=tk.DISABLED)
-        self.text_display = scrolledtext.ScrolledText(tab_preview, wrap=tk.WORD, font=("Segoe UI", 11))
-        self.text_display.pack(fill=tk.BOTH, expand=True)
-        self.text_display.configure(state=tk.DISABLED)
-        self.status = ttk.Label(self.master, text="Loading shared catalog database...", anchor="w", padding=(16, 6))
-        self.status.pack(fill=tk.X)
+        self.selection_bar = ttk.Frame(right, style="Status.TFrame", padding=(12, 10))
+        self.selection_bar.grid(row=3, column=0, sticky="ew", pady=(16, 0))
+        self.selection_summary = ttk.Label(self.selection_bar, text="No artwork selected", anchor="w",
+                                           style="Status.TLabel", font=("Segoe UI", 9))
+        self.selection_summary.pack(side=tk.LEFT)
+        ttk.Label(self.selection_bar, text="Ctrl or Shift to select multiple", anchor="e",
+                  style="Status.TLabel", foreground=STUDIO_COLORS["muted"],
+                  font=("Segoe UI", 8)).pack(side=tk.RIGHT)
+
+        self.details_text = self._build_text_tab(tab_details, "Details", "Catalog details for the selected artwork.")
+        self.text_display = self._build_text_tab(tab_preview, "Preview Text", "Formatted catalog text for the current results.")
+
+    @staticmethod
+    def _update_scrollbar(scrollbar, first, last):
+        scrollbar.set(first, last)
+        if float(first) <= 0 and float(last) >= 1:
+            scrollbar.grid_remove()
+        else:
+            scrollbar.grid()
+
+    def _resize_results_table(self, event=None):
+        if not hasattr(self, "tree"):
+            return
+        # Short results end at the selection strip, just like the concept. A
+        # longer inventory uses the available height and the normal scrollbar.
+        row_height = int(self.style.lookup("Inventory.Treeview", "rowheight") or 54)
+        available = max(3, (self.results_content.winfo_height() - 170) // row_height)
+        count = len(self.tree.get_children())
+        rows = min(max(4 if count == 0 else 1, count), available)
+        if int(self.tree.cget("height")) != rows:
+            self.tree.configure(height=rows)
+
+    def _update_results_presentation(self, empty_title=None, empty_hint=None):
+        # Presentation is optional for unit tests that exercise catalog logic
+        # without constructing the application window.
+        if not hasattr(self, "results_count"):
+            return
+        count = len(self.tree.get_children())
+        self.results_count.configure(text=f"{count:,} artwork{'s' if count != 1 else ''}" if count else "")
+        if count:
+            self.results_empty.place_forget()
+        else:
+            self.results_empty_title.configure(text=empty_title or "Your catalog, ready to explore")
+            self.results_empty_hint.configure(text=empty_hint or "Search by artist or title, or choose Display All Inventory.")
+            self.results_empty.place(x=0, y=55, relwidth=1)
+        selected = self.tree.selection()
+        summary = "Select artwork to view Details" if count else "No artwork selected"
+        if selected:
+            summary = f"{len(selected):,} selected"
+            if len(selected) == 1:
+                artist = self.tree.set(selected[0], "Artist")
+                if artist:
+                    summary += f" · {artist}"
+        self.selection_summary.configure(text=summary)
+        self._resize_results_table()
+
+    def _build_text_tab(self, tab, title, subtitle):
+        ttk.Label(tab, text=title, style="Header.TLabel").pack(anchor="w")
+        ttk.Label(tab, text=subtitle, style="Subtle.TLabel").pack(anchor="w", pady=(4, 18))
+        surface = ttk.Frame(tab, padding=1, style="Surface.TFrame")
+        surface.pack(fill=tk.BOTH, expand=True)
+        surface.rowconfigure(0, weight=1)
+        surface.columnconfigure(0, weight=1)
+        text = tk.Text(
+            surface, wrap=tk.WORD, height=16, font=("Segoe UI", 11), background=STUDIO_COLORS["surface"],
+            foreground=STUDIO_COLORS["ink"], relief=tk.FLAT, borderwidth=0, highlightthickness=1,
+            highlightbackground=STUDIO_COLORS["line"], highlightcolor=STUDIO_COLORS["accent"],
+            padx=22, pady=20, spacing1=3, spacing3=5, selectbackground=STUDIO_COLORS["soft"],
+            selectforeground=STUDIO_COLORS["ink"],
+        )
+        text.grid(row=0, column=0, sticky="nsew")
+        scrollbar = ttk.Scrollbar(surface, orient=tk.VERTICAL, command=text.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        text.configure(yscrollcommand=scrollbar.set, state=tk.DISABLED)
+        return text
 
     def _set_status(self, text):
         self.status.config(text=text)
@@ -245,6 +379,7 @@ class ArtCatalogApp:
             widget.configure(state=tk.NORMAL)
             widget.delete("1.0", tk.END)
             widget.configure(state=tk.DISABLED)
+        self._update_results_presentation()
 
     def _fill_results(self, results):
         self._clear_results()
@@ -255,6 +390,7 @@ class ArtCatalogApp:
         self.text_display.configure(state=tk.NORMAL)
         self.text_display.insert(tk.END, "\n\n".join(entries))
         self.text_display.configure(state=tk.DISABLED)
+        self._update_results_presentation()
 
     def display_all_inventory(self):
         if self.df is None:
@@ -274,12 +410,24 @@ class ArtCatalogApp:
         results = self.df[self.df["Title"].astype(str).str.lower().str.contains(query, na=False) | self.df["Artist"].astype(str).str.lower().str.contains(query, na=False)]
         if results.empty:
             self._clear_results()
+            self._update_results_presentation(
+                empty_title="No matching artworks",
+                empty_hint="Try another artist or title to search your catalog.",
+            )
             self._set_status("No results found.")
             return
         self._fill_results(results)
         self._set_status(f"Found {len(results)} result(s).")
 
+    def _search_from_shortcut(self, event=None):
+        self.notebook.select(self.tab_results)
+        self.search_entry.focus_set()
+        if self.search_var.get().strip():
+            self.search_catalog(event)
+        return "break"
+
     def _on_select_row(self, event=None):
+        self._update_results_presentation()
         row = self._selected_catalog_row()
         if row is None:
             return

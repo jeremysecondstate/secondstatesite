@@ -64,8 +64,7 @@ class _PostedResultChecks:
 
 
 _SOLD_LOGIN_NOTICE = (
-    "Invaluable requires sign-in to view sold prices. Choose Connect Invaluable, "
-    "sign in in the browser window, then refresh again. You can also use Import Saved Sold Results. "
+    "Invaluable requires sign-in to view these sold prices, so they are unavailable to this sync. "
     "Existing estimates and results have been retained."
 )
 
@@ -165,9 +164,12 @@ class WatchlistService:
                     result_checks.access_blocked = True
                 message = " ".join(str(exc).split())[:500]
                 cached_count = 0
+                uncached_watches: list[str] = []
                 for entry in adapter_entries:
                     batch_failed_urls.add(entry.url)
                     cached = self._cached_lots_for_entry(entry)
+                    if not cached:
+                        uncached_watches.append(entry.watch_label)
                     cached_count += len(cached)
                     refreshed_lots.extend(cached)
                     fallback_lot_keys.update(lot.cache_key for lot in cached)
@@ -177,6 +179,8 @@ class WatchlistService:
                 errors.append(
                     f"{adapter.source} ({len(adapter_entries)} artists): {message}{suffix}"
                 )
+                if uncached_watches:
+                    errors.append(_uncached_watches_message(uncached_watches))
 
         if stopped:
             metrics.pages_fetched = fetched_pages()
@@ -237,6 +241,8 @@ class WatchlistService:
                     sum(lot.cache_key not in observed_lot_keys for lot in cached), new_changed_only
                 )
                 errors.append(f"{entry.watch_label} ({entry.source}): {message}{suffix}")
+                if not cached:
+                    errors.append(_uncached_watches_message([entry.watch_label]))
                 self.cache.record_source_error(entry.url, message, observed_at)
                 if adapter.source == "Invaluable":
                     try:
@@ -517,3 +523,14 @@ def _cached_fallback_message(count: int, new_changed_only: bool) -> str:
     noun = "lot" if count == 1 else "lots"
     visibility = " Hidden by New/changed only." if new_changed_only else " Displayed as Cached."
     return f" Retained {count} cached {noun}; live data was not verified.{visibility}"
+
+
+def _uncached_watches_message(watch_labels: Iterable[str]) -> str:
+    labels = list(dict.fromkeys(" ".join(label.split()) for label in watch_labels))
+    displayed = [label if len(label) <= 80 else label[:77] + "..." for label in labels[:8]]
+    if len(labels) > len(displayed):
+        displayed.append(f"and {len(labels) - len(displayed)} more")
+    return (
+        f"No cached lots are available for calendar sync for: {', '.join(displayed)}. "
+        "Once source access is restored, click Sync to Calendar to fetch and upload new lots."
+    )

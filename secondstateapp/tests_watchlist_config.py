@@ -47,6 +47,7 @@ class CalendarSyncConfigurationTests(TestCase):
         )
         self.panel.current_lots = [self.lot]
         self.panel.fallback_lot_keys = set()
+        self.panel.source_refresh_errors = []
         self.result = WatchlistResult([self.lot], WatchlistMetrics(new_lots=1))
 
     @staticmethod
@@ -100,6 +101,7 @@ class CalendarSyncConfigurationTests(TestCase):
 
     def test_saved_page_import_automatically_syncs_with_newly_added_configuration(self):
         (self.root / ".env").write_text("CATALOG_API_KEY=offline-test-key\n", encoding="utf-8")
+        self.panel.source_refresh_errors = ["Francisco Zúñiga (Invaluable): HTTP 202; no cached lots."]
         entry = BookmarkEntry(
             folder_path=("HERITAGE",), title="10-22 SALE", source="Heritage",
             url="https://fineart.ha.com/c/search/results.zx?auction_name=8280&dept=1544&mode=live",
@@ -121,8 +123,12 @@ class CalendarSyncConfigurationTests(TestCase):
         self.panel.calendar_syncer.assert_called_once_with(
             [self.lot], base_url="https://secondstate.art", api_key="offline-test-key", artist_artprice_links={}
         )
-        self.warning.assert_not_called()
+        self.assertIn("Francisco Zúñiga", self.warning.call_args.args[1])
         self.assertIn("Website calendar synced", self.panel.status_callback.call_args.args[0])
+        self.warning.reset_mock()
+        with patch("catalogapp.watchlist_ui.threading.Thread", side_effect=self.immediate_thread):
+            self.panel.sync_website_calendar()
+        self.assertIn("Francisco Zúñiga", self.warning.call_args.args[1])
 
     def test_sync_error_is_not_reported_as_success_or_missing_configuration(self):
         self.panel.calendar_api_key = "offline-test-key"
@@ -134,6 +140,7 @@ class CalendarSyncConfigurationTests(TestCase):
 
     def test_saved_sold_result_import_merges_agenda_and_automatically_syncs(self):
         self.panel.calendar_api_key = "offline-test-key"
+        self.panel.source_refresh_errors = ["Francisco Zúñiga (Invaluable): HTTP 202; no cached lots."]
         entry = BookmarkEntry(
             folder_path=("ARTISTS INVALUABLE",), title="Alexander Calder", source="Invaluable",
             artist="Alexander Calder", url="https://www.invaluable.com/search?artistName=Alexander+Calder",
@@ -160,15 +167,16 @@ class CalendarSyncConfigurationTests(TestCase):
         self.assertEqual({lot.cache_key for lot in self.panel.current_lots}, {self.lot.cache_key, sold.cache_key})
         self.panel.calendar_syncer.assert_called_once()
         self.assertIn(sold, self.panel.calendar_syncer.call_args.args[0])
+        self.assertIn("Francisco Zúñiga", self.warning.call_args.args[1])
         self.panel.import_sold_button.configure.assert_called_with(state=tk.NORMAL)
-        self.warning.assert_not_called()
+        self.warning.assert_called_once()
 
     def test_unconfirmed_images_keep_deployment_guidance_visible_after_partial_sync(self):
         self.panel.calendar_api_key = "offline-test-key"
         self.result.errors = ["Heritage live refresh failed; retained cached lots."]
         self.panel.calendar_syncer.side_effect = CalendarSyncError(
             "Lot details reached the website, but saved artwork images were not confirmed. "
-            "Deploy the website's saved-image update, then click Sync Website Calendar again."
+            "Deploy the website's saved-image update, then click Sync to Calendar again."
         )
 
         def warning_is_open(_title, message, **_kwargs):
@@ -186,7 +194,7 @@ class CalendarSyncConfigurationTests(TestCase):
     def test_manual_sync_failure_preserves_partial_batch_retry_instructions(self):
         self.panel.calendar_api_key = "offline-test-key"
         self.panel.calendar_syncer.side_effect = CalendarSyncError(
-            "Could not reach the website calendar. Retry Sync Website Calendar; "
+            "Could not reach the website calendar. Retry Sync to Calendar; "
             "any completed batches will be updated without duplicates."
         )
         with (
@@ -227,6 +235,62 @@ class CalendarSyncConfigurationTests(TestCase):
         self.warning.side_effect = warning_is_open
         self.panel._sync_and_finish_result(self.result)
         self.warning.assert_called_once()
+
+    def test_manual_sync_preserves_missing_artist_warning_after_source_failure(self):
+        self.panel.calendar_api_key = "offline-test-key"
+        self.result.errors = [
+            "Invaluable returned an access page (HTTP 202).",
+            "No cached lots for Francisco Zúñiga; no lots available for calendar sync.",
+        ]
+        self.result.fallback_lot_keys = {self.lot.cache_key}
+        self.panel._sync_and_finish_result(self.result)
+        self.warning.reset_mock()
+        self.panel.calendar_syncer.reset_mock()
+
+        with patch("catalogapp.watchlist_ui.threading.Thread", side_effect=self.immediate_thread):
+            self.panel.sync_website_calendar()
+
+        self.panel.calendar_syncer.assert_called_once_with(
+            [self.lot], base_url="https://secondstate.art", api_key="offline-test-key", artist_artprice_links={}
+        )
+        title, message = self.warning.call_args.args
+        self.assertEqual(title, "Live Source Refresh Incomplete")
+        self.assertIn("Francisco Zúñiga", message)
+        self.assertIn("Artists without retrieved or cached lots cannot appear on the calendar yet", message)
+        self.assertIn("Sync to Calendar", message)
+        status = self.panel.status_callback.call_args.args[0]
+        self.assertIn("Website calendar synced", status)
+        self.assertIn("cached lots", status)
+        self.assertIn("Live source refresh remains incomplete", status)
+
+    def test_manual_sync_preserves_source_warning_without_fallback_lots(self):
+        self.panel.calendar_api_key = "offline-test-key"
+        self.result.errors = ["Francisco Zúñiga (Invaluable): HTTP 202; no cached lots."]
+        self.panel._sync_and_finish_result(self.result)
+        self.warning.reset_mock()
+
+        with patch("catalogapp.watchlist_ui.threading.Thread", side_effect=self.immediate_thread):
+            self.panel.sync_website_calendar()
+
+        self.warning.assert_called_once()
+        self.assertIn("Francisco Zúñiga", self.warning.call_args.args[1])
+        self.assertIn("Live source refresh remains incomplete", self.panel.status_callback.call_args.args[0])
+
+    def test_successful_refresh_clears_source_warning_for_later_sync(self):
+        self.panel.calendar_api_key = "offline-test-key"
+        self.result.errors = ["Invaluable: HTTP 202"]
+        self.result.fallback_lot_keys = {self.lot.cache_key}
+        self.panel._sync_and_finish_result(self.result)
+        self.panel._sync_and_finish_result(WatchlistResult([self.lot], WatchlistMetrics()))
+        self.warning.reset_mock()
+
+        with patch("catalogapp.watchlist_ui.threading.Thread", side_effect=self.immediate_thread):
+            self.panel.sync_website_calendar()
+
+        self.warning.assert_not_called()
+        self.assertEqual(self.panel.source_refresh_errors, [])
+        self.assertNotIn("cached", self.panel.status_callback.call_args.args[0])
+        self.assertNotIn("incomplete", self.panel.status_callback.call_args.args[0])
 
     def test_agenda_displays_fallback_as_cached_without_overwriting_lot_status(self):
         self.lot.status = "changed"

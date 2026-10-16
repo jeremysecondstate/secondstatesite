@@ -146,7 +146,7 @@ def sync_watchlist_lots(
             )
         except requests.RequestException as exc:
             raise CalendarSyncError(
-                "Could not reach the website calendar. Retry Sync Website Calendar; "
+                "Could not reach the website calendar. Retry Sync to Calendar; "
                 "any completed batches will be updated without duplicates."
             ) from exc
 
@@ -166,16 +166,16 @@ def sync_watchlist_lots(
         except (TypeError, ValueError) as exc:
             raise CalendarSyncError("Website calendar returned invalid sync counts.") from exc
         if counts["received"] != len(batch["lots"]):
-            raise CalendarSyncError("The website did not confirm every lot. Retry Sync Website Calendar.")
+            raise CalendarSyncError("The website did not confirm every lot. Retry Sync to Calendar.")
         if counts["images_received"] != expected_images:
             raise CalendarSyncError(
                 "Lot details reached the website, but saved artwork images were not confirmed. "
-                "Deploy the website's saved-image update, then click Sync Website Calendar again."
+                "Deploy the website's saved-image update, then click Sync to Calendar again."
             )
         if counts["sold_prices_received"] != expected_sold_prices:
             raise CalendarSyncError(
                 "Lot details reached the website, but sold prices were not confirmed. "
-                "Deploy the website's sold-price update and migration, then click Sync Website Calendar again."
+                "Deploy the website's sold-price update and migration, then click Sync to Calendar again."
             )
         for key in totals:
             totals[key] += counts[key]

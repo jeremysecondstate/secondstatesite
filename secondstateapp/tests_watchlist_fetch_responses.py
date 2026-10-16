@@ -38,6 +38,8 @@ class CatalogResponseTests(TestCase):
         message = str(raised.exception)
         self.assertIn("web page instead of auction data (HTTP 202)", message)
         self.assertIn("Live auction data was not refreshed", message)
+        self.assertIn("Try Sync to Calendar again when Invaluable allows access", message)
+        self.assertNotIn("Connect Invaluable", message)
         self.assertNotIn("PRIVATE RESPONSE CONTENT", message)
         self.assertEqual(session.post.call_count, 1)
 

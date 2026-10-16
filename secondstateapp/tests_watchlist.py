@@ -691,9 +691,10 @@ class CacheAndServiceTests(SimpleTestCase):
         self.assertEqual(len(result.lots), 1)
         self.assertEqual(result.lots[0].source_lot_id, "inv-24")
         self.assertEqual(result.metrics.cache_hits, 1)
-        self.assertEqual(len(result.errors), 1)
+        self.assertEqual(len(result.errors), 2)
         self.assertIn("2 artists", result.errors[0])
         self.assertIn("Retained 1 cached lot", result.errors[0])
+        self.assertIn("No cached lots are available for calendar sync for: Keith Haring", result.errors[1])
         self.assertEqual(result.fallback_lot_keys, {result.lots[0].cache_key})
 
 

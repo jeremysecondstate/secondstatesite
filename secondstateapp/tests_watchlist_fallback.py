@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 from catalogapp.bookmark_watchlist import BookmarkEntry
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_enrichment import EnrichmentMetrics
-from catalogapp.watchlist_fetch import SourceAccessError
+from catalogapp.watchlist_fetch import SourceAccessBlocked, SourceAccessError
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_service import WatchlistService
 
@@ -119,3 +119,87 @@ class WatchlistFallbackTests(TestCase):
         self.assertEqual(result.fallback_lot_keys, {self.lot.cache_key})
         self.assertEqual(result.lots[0].last_seen_at, PREVIOUS.isoformat())
         adapter.fetch_search_batch.assert_called_once()
+
+
+class InvaluableMissingCacheTests(TestCase):
+    def setUp(self):
+        self.cache = WatchlistCache(":memory:")
+        self.addCleanup(self.cache.close)
+        self.existing_entry = BookmarkEntry(
+            folder_path=("ARTISTS INVALUABLE",), title="Pablo Picasso", artist="Pablo Picasso",
+            source="Invaluable", url="https://www.invaluable.com/search?artistName=Pablo%20Picasso",
+        )
+        self.new_entry = replace(
+            self.existing_entry, title="Francisco Zúñiga", artist="Francisco Zúñiga",
+            url="https://www.invaluable.com/search?artistName=Francisco%20Z%C3%BA%C3%B1iga",
+        )
+        self.fetcher = Mock(pages_fetched=0)
+        self.fetcher.post_json.side_effect = SourceAccessBlocked(
+            "www.invaluable.com returned a web page instead of auction data (HTTP 202). "
+            "Live auction data was not refreshed."
+        )
+
+    def refresh(self, entries):
+        return WatchlistService(self.cache, fetcher=self.fetcher, now=lambda: NOW).refresh(
+            entries, selected_artists=[entry.watch_label for entry in entries], horizon_days=30,
+        )
+
+    def test_failed_batch_names_new_artist_without_cached_lots(self):
+        lot = NormalizedLot(
+            source="Invaluable", source_lot_id="picasso-101", artist="Pablo Picasso",
+            artist_watchlist_name="Pablo Picasso", title="Portrait", start_at="2026-10-22",
+            lot_url="https://www.invaluable.com/auction-lot/picasso-portrait-101",
+        )
+        self.cache.upsert(lot, watch_url=self.existing_entry.url, search_hash=lot.content_hash, observed_at=PREVIOUS)
+
+        result = self.refresh([self.existing_entry, self.new_entry])
+
+        self.assertEqual([item.cache_key for item in result.lots], [lot.cache_key])
+        self.assertEqual(result.fallback_lot_keys, {lot.cache_key})
+        self.assertEqual(result.lots[0].last_seen_at, PREVIOUS.isoformat())
+        self.assertIn("Invaluable (2 artists)", result.errors[0])
+        self.assertIn("HTTP 202", result.errors[0])
+        self.assertIn("Francisco Zúñiga", result.errors[1])
+        self.assertNotIn("Pablo Picasso", result.errors[1])
+        self.assertIn("No cached lots are available for calendar sync", result.errors[1])
+        self.assertIn("Sync to Calendar to fetch and upload new lots", result.errors[1])
+        self.assertNotIn("only retries existing lots", result.errors[1])
+        self.fetcher.post_json.assert_called_once()
+        self.fetcher.fetch.assert_not_called()
+
+    def test_failed_single_watch_explains_missing_calendar_lots(self):
+        result = self.refresh([self.new_entry])
+
+        self.assertEqual(result.lots, [])
+        self.assertIn("HTTP 202", result.errors[0])
+        self.assertIn("No cached lots are available for calendar sync for: Francisco Zúñiga", result.errors[1])
+        self.assertIn("Once source access is restored, click Sync to Calendar", result.errors[1])
+        self.fetcher.post_json.assert_called_once()
+
+    def test_successful_empty_search_does_not_report_failed_or_missing_cache(self):
+        self.fetcher.post_json.side_effect = None
+        self.fetcher.post_json.return_value = {"results": [{"hits": [], "nbPages": 0, "page": 0}]}
+
+        result = self.refresh([self.new_entry])
+
+        self.assertEqual(result.lots, [])
+        self.assertEqual(result.errors, [])
+        self.assertEqual(result.fallback_lot_keys, set())
+        self.fetcher.post_json.assert_called_once()
+
+    def test_many_missing_watches_keep_diagnostic_bounded(self):
+        entries = [
+            replace(
+                self.new_entry, title=f"Artist {number} " + "x" * 300,
+                artist=f"Artist {number} " + "x" * 300,
+                url=f"https://www.invaluable.com/search?artistName=Artist%20{number}",
+            )
+            for number in range(20)
+        ]
+
+        result = self.refresh(entries)
+
+        self.assertEqual(len(result.errors), 2)
+        self.assertIn("and 12 more", result.errors[1])
+        self.assertLess(len(result.errors[1]), 900)
+        self.fetcher.post_json.assert_called_once()

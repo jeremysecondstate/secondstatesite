@@ -399,7 +399,7 @@ class WatchlistSoldRefreshTests(TestCase):
         self.assertEqual(adapter.detail_calls, [self.lot.lot_url])
         self.assertEqual(result.errors, [])
         self.assertEqual(len(result.notices), 1)
-        self.assertIn("Connect Invaluable", result.notices[0])
+        self.assertIn("sold prices, so they are unavailable to this sync", result.notices[0])
         self.assertEqual(len(result.lots), 2)
         self.assertTrue(all(lot.sold_price is None for lot in result.lots))
 
@@ -462,7 +462,7 @@ class WatchlistSoldRefreshTests(TestCase):
 
         self.assertEqual(adapter.detail_calls, [self.lot.lot_url])
         self.assertEqual(len(result.notices), 1)
-        self.assertIn("Connect Invaluable", result.notices[0])
+        self.assertIn("sold prices, so they are unavailable to this sync", result.notices[0])
 
     def test_invaluable_fetcher_is_isolated_and_page_metrics_sum_both_sources(self):
         other_entry = replace(ENTRY, source="Heritage", artist="Miro", title="Miro", url="https://fineart.ha.com/catalog")

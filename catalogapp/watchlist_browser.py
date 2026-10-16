@@ -362,6 +362,111 @@ class InvaluableBrowserFetcher:
             self._last_request = self.monotonic()
 
 
+class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
+    """Explicit browser retry for public catalogs, independent of sold-price login.
+
+    Let the site's normal JavaScript load and leave verification to the user.
+    Never copy the user's Chrome profile, read cookies, or solve a challenge.
+    """
+
+    def __init__(self, profile_directory, *, progress=None, access_timeout_seconds=120, **kwargs):
+        super().__init__(profile_directory, **kwargs)
+        self.progress = progress or (lambda _message: None)
+        self.access_timeout_seconds = max(0, float(access_timeout_seconds))
+        self._public_catalog_ready = False
+
+    def _prepare_public_catalog(self, url: str) -> None:
+        self._ensure_context()
+        self._check_stopped()
+        self._page.bring_to_front()
+        self.progress(
+            "Opening Invaluable in the retry browser. If verification appears, complete it there; "
+            "sync continues when the search results load. Use Stop to cancel."
+        )
+        self.http_attempts += 1
+        try:
+            response = self._page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+        except Exception as exc:
+            raise SourceAccessError("The Invaluable retry browser could not open the search. Try Retry with browser again.") from exc
+        self._last_request = self.monotonic()
+        if response is None:
+            raise SourceAccessError("Invaluable did not return a search page. Try Retry with browser again.")
+        if not _allowed_url(response.url or url):
+            self._blocked("Invaluable redirected outside its website; browser retry stopped.")
+        # An interactive retry leaves verification visible for the user. Other
+        # failures, especially rate limits, must not become repeated requests.
+        if response.status not in {200, 202, 401, 403}:
+            self._check_status(response.status, response.url or url)
+        deadline = self.monotonic() + self.access_timeout_seconds
+        while True:
+            self._check_stopped()
+            if self._page.is_closed():
+                raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.")
+            if not _allowed_url(self._page.url):
+                self._blocked("Invaluable redirected outside its website; browser retry stopped.")
+            try:
+                text = self._page.locator("body").inner_text(timeout=1_000)
+                challenge = _CHALLENGE.search(f"{self._page.title()}\n{text[:3000]}")
+                if urlsplit(self._page.url).path.rstrip("/") == "/search" and not challenge:
+                    lot_visible = any(
+                        link.is_visible() for link in self._page.locator('a[href*="/auction-lot/"]').all()
+                    )
+                    counts = [
+                        heading.inner_text() for heading in self._page.locator("h4").all() if heading.is_visible()
+                    ]
+                    if lot_visible or any(re.fullmatch(r"\s*[\d,]+\s+items?\s*", count, re.I) for count in counts):
+                        self._public_catalog_ready = True
+                        self.progress("Invaluable search loaded. Retrieving live lots in the browser…")
+                        return
+            except Exception:
+                # A normal page navigation can replace the DOM while it is read.
+                # Keep Stop responsive; a closed page is handled on the next pass.
+                pass
+            if self.monotonic() >= deadline:
+                self._blocked(
+                    "Invaluable search did not become available in the retry browser. "
+                    "No fresh data was retrieved. Try Retry with browser again when access is available."
+                )
+            try:
+                self._pause()
+            except Exception:
+                if self._page.is_closed():
+                    raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.") from None
+                raise
+
+    def post_json(self, url: str, payload: object, *, referer: str = "") -> object:
+        if not _allowed_url(url) or urlsplit(url).path.rstrip("/") != "/catResults":
+            raise SourceAccessError("The Invaluable browser only posts to its catalog-results endpoint.")
+        if not referer or not _allowed_url(referer) or urlsplit(referer).netloc != urlsplit(url).netloc:
+            raise SourceAccessError("The Invaluable catalog referer must belong to the same website.")
+        if urlsplit(referer).path.rstrip("/") != "/search":
+            raise SourceAccessError("Browser retry requires an Invaluable search bookmark.")
+        if not self._public_catalog_ready:
+            self._prepare_public_catalog(referer)
+        try:
+            return super().post_json(url, payload, referer=referer)
+        except SourceAccessBlocked:
+            self._blocked(
+                "Invaluable still blocked the catalog request in the retry browser. "
+                "Cached lots were retained. Try Retry with browser again when source access is available."
+            )
+
+    def fetch(self, url: str) -> str:
+        """Read public details without requiring a signed-in numeric sold result."""
+        self._navigate(url)
+        deadline = self.monotonic() + self.render_timeout_seconds
+        while True:
+            self._check_stopped()
+            html, text = self._read_page()
+            lot = _dom_lot(html, url)
+            if lot and ("sold_price_login" in lot.ambiguities or _LOT_STATUS.search(text)):
+                self.pages_fetched += 1
+                return html
+            if self.monotonic() >= deadline:
+                raise SourceAccessError("Invaluable did not finish displaying this lot's details; cached data was retained.")
+            self._pause()
+
+
 def connect_invaluable(
     profile_directory: str | Path,
     *,
