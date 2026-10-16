@@ -1,0 +1,99 @@
+SECONDSTATE — APPROVED STUDIO DESKTOP REDESIGN
+
+User approved Studio and explicitly asked to build it in the current chat.
+Do not create a new chat unless the human explicitly requests one. Compaction
+does not cancel this task. Continue the implementation after compaction.
+
+Repository: C:\dev\secondstatesite
+Runtime/tests: .venv\Scripts\python.exe (Python 3.14, dependencies installed)
+Entry point: catalogapp\catalogapp_inv.py
+Inheritance: catalogapp_inv_ui_clean.ArtCatalogAppClean ->
+catalogapp_inv_ui_delete.ArtCatalogAppWithDelete -> catalogapp_inv_ui.ArtCatalogApp.
+
+Approved reference:
+C:\Users\WS 7950X\.codex\visualizations\2026\10\16\01a1461d-b639-7d63-8e2b-a033c36c206d\catalog-ui-concepts.html
+Choose the DARK Studio variant. The user confirmed this with the attached
+dark screenshot; older studio-results.png / studio-watchlist.png are light
+previews and are not the accepted palette. Preview auction data is illustrative.
+
+Scope / acceptance:
+- Studio appearance: charcoal #171E2A background, slate #202A38 panels,
+  pale blue #A7BEFF actions, light #EDF2FC text, Segoe UI; SECONDSTATE header
+  and four familiar tabs. Shared colors live in studio_palette.py.
+- Preserve Results workflow, handlers, search, edit/upload/delete/export,
+  selection/sorting, table columns and keyboard shortcuts. No backend rewrite.
+- Artist Watchlist primary flow: Import Bookmarks HTML -> Sync to Calendar.
+- Sync must re-read the loaded file, fetch selected upcoming lots, then upload;
+  it must not merely resend current_lots. Preserve selections and add new artists.
+- Remove exposed Connect Invaluable, Chrome/profile/login/sold-price controls.
+  Retain legacy browser/connect/import/export logic for future use. New primary
+  sync must not launch that browser or automatically reuse a hidden login setting.
+- Optional collapsed artist/folder review is okay. Default 30-day horizon,
+  zero AI. Keep Stop available during work and clear status/error messages.
+- Preserve cached data and honestly report blocked live sources / missing artists.
+- Import is local only. No automatic live network or website mutation during QA.
+- Remembered bookmark file should take precedence over absent old I: drive path.
+
+Confirmed preceding investigation:
+- docs/ARTIST-LINKZ.html parses 44 Invaluable artists including Francisco Zúñiga.
+- Local cache's latest source runs: all44 failed HTTP202 (HTML access response).
+  Prior browser request HTTP403. No cached Zúñiga lots. This is not a parser bug.
+- A successful cached-data upload cannot imply new Zúñiga lots were retrieved.
+- Existing warning improvements already made this chat in watchlist_fetch.py,
+  watchlist_service.py, watchlist_ui.py and tests. Preserve these changes.
+- All240 watchlist tests passed previously (238 passed,2 skipped).
+
+User changes to preserve:
+- docs/ARTIST-LINKZ.html modified before our work.
+- docs/screenshots/artist-watchlist-agenda.png and artist-watchlist-import.png
+  were deleted before our work.
+- data/ untracked existed before our work.
+- Do not overwrite/revert these or user settings/cache. No commit requested.
+
+Implementation complete (2026-10-16):
+- Shared Studio theme + full-width tabs and styled Results/Details/Preview.
+- Results actions and business handlers retained; Ctrl+F reveals Results/search.
+- Watchlist Import -> Sync reloads HTML, preserves exclusions, auto-adds new
+  artists in selected folders, uses HTTP without AI/browser, then uploads.
+- Optional Review occupies the main workspace; Done reviewing returns to agenda.
+- Saved-page imports/exports retained in More. Connection controls removed;
+  browser code retained. Stop/busy/error/retry states verified offline.
+- Missing-artist/source-block warnings retained and obsolete Connect advice
+  removed from active messages. Documentation updated for the new workflow.
+
+Validation:
+- 252 watchlist + Studio tests: 250 passed, 2 skipped.
+- 57 Results/catalog/listing/order regression tests passed.
+- Syntax compilation passed; git diff --check passed.
+- Native Windows Tk screenshots inspected at 1180x820 with synthetic data;
+  checked review, busy, completion, Ctrl+F, and catalog search. Network disabled,
+  temporary settings/cache, mock calendar upload; no live calendar modifications.
+- Independent read-only review found no blocking correctness regressions.
+
+No commit or deployment made. Restart catalogapp/catalogapp_inv.py to load
+the updated UI. Source access to Invaluable remains the original unresolved
+external constraint; do not claim the redesign retrieved new Zúñiga lots.
+
+Visual fidelity refinement (2026-10-16, after user feedback):
+- Replaced native beveled tabs/buttons with rounded image-element surfaces,
+  local line icons, rounded logo, and compact 212px Results action rail.
+- Results table now blends into the page with row separators, natural height,
+  real artwork count, a selection strip, and an honest empty-search state.
+- Watchlist uses the concept's rounded cards, flat upcoming lot list, and
+  blue/amber status banner. Detailed agenda/calendar remain under More.
+- studio_assets.py draws all icons/surfaces locally using existing Pillow.
+- New nullable-currency regression fixed in the compact estimate formatter.
+- 310 combined tests: 308 passed, 2 skipped. Native isolated preview checked
+  against the actual Studio reference with five synthetic artwork/lot rows.
+
+Dark Studio correction (2026-10-16, confirmed by the user's reference):
+- Applied the concept's exact charcoal/slate/pale-blue palette through the
+  shared studio_palette.py module, including icons, selected states, text,
+  warnings, secondary calendar, and dialog tables.
+- Removed Clam's light hover/disabled colors and bright separator bevels;
+  the calendar preview now uses a themed scrollbar.
+- Results handlers and Import -> Sync workflow remain unchanged.
+- 310 combined tests passed (2 skipped); 33 focused tests passed again after
+  secondary-widget refinements. Compilation and git diff --check passed.
+- Native Windows preview inspected with isolated synthetic data, temporary
+  settings/cache, and disabled networking. No live website/calendar writes.
