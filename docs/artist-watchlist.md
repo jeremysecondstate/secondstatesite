@@ -16,11 +16,33 @@ The flat upcoming-lots list remains visible below the two actions. Select a lot 
 
 Source retrieval and website upload are reported separately. A successful upload of cached lots does not mean the source was refreshed. A blocked artist with no cached lots is named in the warning, so a newly imported artist cannot silently appear to have synced.
 
-When cached lots reach the website but a source fails, the banner says **Calendar updated; source refresh incomplete** and includes the first source error. **Sync details** keeps the full report available after the warning is dismissed, including all affected-watch messages, import notes, and the earliest/latest observation times for retained cached lots (in UTC). Missing observation times are labeled unavailable. A later completed sync replaces this report. The website counts describe uploaded records: **updated** counts existing records received, and **ended** includes previously ended or sold lots; neither means those changes were freshly discovered. Invaluable HTTP 202 access pages cannot supply fresh auction data. Check the affected bookmark in your usual browser and retry when access is available; the supported saved-page imports remain under **More**.
+When cached lots reach the website but a source fails, the banner says **Calendar updated; source refresh incomplete** and includes the first source error. **Sync details** keeps the full report available after the compact warning is dismissed, including all affected-watch messages, import notes, and the earliest/latest observation times for retained cached lots (in UTC). Missing observation times are labeled unavailable. A later completed sync replaces this report. The website counts describe uploaded records: **updated** counts existing records received, and **ended** includes previously ended or sold lots; neither means those changes were freshly discovered. Invaluable HTTP 202 access pages cannot supply fresh auction data. The banner offers **Retry with browser** and **Import saved Invaluable pages…**; saved-page imports are also under **More**.
 
-For Invaluable errors, **Retry with browser** appears beside **Sync details**. This explicit action rereads the bookmarks and opens a separate Chrome (or Edge) profile to retrieve the selected artists, then uploads the results through the usual calendar sync. It waits up to two minutes for visible search results, including a confirmed zero-item result, instead of rejecting an initial HTTP 202 before the site's JavaScript can load. If a verification screen appears, complete it yourself in that window; the app never solves it or copies your regular browser profile. **Stop** or closing the browser cancels the refresh before upload. A blocked or timed-out attempt retains cached lots and remains labeled incomplete. A later normal sync still uses HTTP; browser retry is never silently enabled.
+For Invaluable errors, **Retry with browser** rereads the bookmarks and opens a separate Chrome (or Edge) profile to retrieve the selected artists, then uploads the results through the usual calendar sync. It reads the catalog response produced by the loaded search page itself, including that page's filters, rather than sending a separate reconstructed request from the browser. It waits up to two minutes for readable search results, including a confirmed zero-item result, instead of rejecting an initial HTTP 202 before the site's JavaScript can load. If a verification screen appears, complete it yourself in that window; the app never solves it or copies your regular browser profile. **Stop** or closing the browser cancels the refresh before upload. A blocked or timed-out attempt retains cached lots and remains labeled incomplete. A later normal sync still uses HTTP; browser retry is never silently enabled.
 
 This public-search retry does not require a sold-price login. Its profile is `%LOCALAPPDATA%\SecondState\ArtistWatchlist\invaluable-public-browser`, separate from the older saved-login profile. Chrome or Edge and the optional packages in `requirements-watchlist-browser.txt` must be installed. A working search in your regular Chrome session does not guarantee that Invaluable will accept this separate session.
+
+### Import saved Invaluable upcoming lots
+
+Use **Import saved Invaluable pages…** in the status banner or under **More** to add upcoming lots from a readable local snapshot. Select the matching Invaluable artists in **Review imported artists**, then choose one or more `.html`, `.htm`, or supported `.json` files. The app rereads the bookmark file, preserves exclusions, and includes newly added artists in selected folders before importing. Imported lots are synced to the website calendar automatically, using the same settings as **Sync to Calendar**.
+
+Saved HTML must contain the artist search's original URL and lot cards with full, verified sale dates. Save the loaded upcoming search results, not an access screen or an empty application shell. A normal **Ctrl+S** save is not sufficient if the page preserves only relative dates or dates without a year; the importer reports those limitations instead of inventing calendar dates. Use **Retry with browser** or the snapshot helper below for those pages. An HTML snapshot contains only the cards present when it was saved, so select every saved results page needed for the selected artists.
+
+The advanced JSON format contains a public Invaluable artist-search `source_url`, the snapshot's `captured_at` time, and `results` objects containing catalog `hits`. These snapshots must originate from the corresponding loaded search page and match the selected artist filters. They contain public auction fields, without credentials or browser session exports; arbitrary API responses and access pages are not supported imports.
+
+Saved snapshots reflect when they were captured. Importing them does not verify live access or mark absent lots ended. Other agenda lots and unobserved cached lots remain available, with cached labels retained. Source-access warnings remain in **Sync details** until a successful live refresh. Only the normalized lot fields and public artwork URLs are uploaded; the saved HTML/JSON, local filenames, cookies, and browser credentials stay local. For posted sold prices, use **Import saved sold results…** instead.
+
+### Export a dated snapshot from your normal browser
+
+If your regular browser loads the artist search but Studio's separate retry browser cannot, use [`invaluable_export_snapshot.js`](../scripts/invaluable_export_snapshot.js):
+
+1. Open the bookmarked Invaluable artist search in your regular Chrome or Edge and wait for its lot cards.
+2. Open **F12 → Console** and paste the complete helper file. A small snapshot panel appears.
+3. Change **Sort By** once. When the panel confirms the artist and lot count, click **Download lot snapshot**.
+4. Save each results page you need. After a full page navigation, paste the helper again; after an in-page change, wait for the new count before downloading.
+5. In Studio, choose **Import saved Invaluable pages…** and select the downloaded `.json` files together. The import adds dated lots and syncs them to the calendar.
+
+Each download covers the current results page, with its original total and exact source dates. The helper observes the page's own catalog responses and makes no auction-data requests. It exports only public lot fields, the artist-search URL, and the capture time; request parameters, account fields, and session tokens are excluded. A changed URL disables the previous download until matching results arrive. **Restore and close** removes the panel and restores the page's request handlers. Reloading the page also removes the helper.
 
 ## Heritage sales
 
@@ -74,6 +96,7 @@ The implementation is split by responsibility:
 - `catalogapp/watchlist_cache.py`: SQLite lot, membership, source-run, and AI-enrichment caches.
 - `catalogapp/watchlist_service.py`: incremental refresh, detail-fetch decisions, ended-item detection, horizons, and efficiency metrics.
 - `catalogapp/watchlist_saved_pages.py`: local saved Heritage results import, sale validation, and cache updates without treating partial snapshots as complete catalogs.
+- `catalogapp/watchlist_invaluable_pages.py`: local Invaluable upcoming search snapshots, selected-artist validation, verified date checks, and cache updates that retain unobserved lots.
 - `catalogapp/watchlist_images.py`: lot-to-thumbnail matching, companion-folder confinement, and bounded JPEG normalization without source image metadata.
 - `catalogapp/watchlist_enrichment.py`: optional strict structured-output batching for ambiguous compact records.
 - `catalogapp/watchlist_exports.py`: agenda Markdown, CSV, and RFC 5545 ICS generation.
@@ -112,7 +135,7 @@ Each lot is keyed by source plus source lot ID, falling back to its canonical UR
 
 If a source is temporarily unavailable, the refresh keeps the last known active lots for that bookmark in the agenda and reports that cached data is being shown. It never marks lots ended from an incomplete or failed source refresh.
 
-When adding an artist, import the updated bookmark HTML and use **Sync to Calendar**. Subsequent syncs reread that file, preserving exclusions and selecting newly added artists in the chosen folders. If Invaluable returns an access page (HTTP 202/403), existing artists can still have cached lots to upload while a new artist has none. The source warning names watches with no cached lots and remains visible after an upload or saved-page import. If Invaluable continues to block access, no new lots can be retrieved until access is restored; changing the UI does not bypass that restriction.
+When adding an artist, import the updated bookmark HTML and use **Sync to Calendar**. Subsequent syncs reread that file, preserving exclusions and selecting newly added artists in the chosen folders. If Invaluable returns an access page (HTTP 202/403), existing artists can still have cached lots to upload while a new artist has none. The source report names watches with no cached lots and remains available after an upload or saved-page import. **Retry with browser** can retrieve the data produced by a readable search page; **Import saved Invaluable pages…** can add verified lots from a saved snapshot even while automatic HTTP refresh is unavailable. Neither action treats an access page as auction data.
 
 The controller retains these metrics for diagnostics:
 
@@ -164,6 +187,7 @@ Historical migration `0012_auctionsearchjob.py` is retained because it may alrea
 ```powershell
 .\.venv\Scripts\python.exe manage.py test
 .\.venv\Scripts\python.exe -m compileall -q catalogapp secondstateapp
+node --test scripts/invaluable_export_snapshot.test.js
 ```
 
 The synthetic tests cover bookmark safety, repeated decoding, adapters, pagination, retries, caching/diffs, duplicate marking, timezone/all-day ICS behavior, zero-AI mode, strict compact batching, enrichment caching, legacy removal, and preserved website regressions. No test contacts an auction site or OpenAI.

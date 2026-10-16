@@ -1,47 +1,27 @@
-"""Browser recovery waits for public search access without requiring sold-price login."""
-
+"""Public browser recovery reads the page's own scoped catalog response."""
+from copy import deepcopy
+from datetime import datetime, timezone
+import json
 from pathlib import Path
-import re
 from tempfile import TemporaryDirectory
 import threading
 from unittest import TestCase
 from unittest.mock import Mock, patch
-
+from urllib.parse import urlencode
 from bs4 import BeautifulSoup
-
+from catalogapp.bookmark_watchlist import BookmarkEntry
+from catalogapp.watchlist_adapters import InvaluableAdapter
 from catalogapp.watchlist_browser import InvaluablePublicBrowserFetcher
+from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_fetch import SourceAccessBlocked, SourceAccessError, WatchlistStopped
+from catalogapp.watchlist_models import NormalizedLot
+from catalogapp.watchlist_service import WatchlistService
 
-
-SEARCH_URL = "https://www.invaluable.com/search?query=Alexander%20Calder"
+SEARCH_URL = "https://www.invaluable.com/search?artistName=Alexander+Calder&Fine+Art=Prints&query=fine+art&sort=endDateAsc"
 CATALOG_URL = "https://www.invaluable.com/catResults"
 LOT_URL = "https://www.invaluable.com/auction-lot/alexander-calder-116-c-example"
 SEARCH_HTML = f'<h4>1 items</h4><a href="{LOT_URL}">Alexander Calder</a>'
 GATED_HTML = "<h1>Lot 116: Alexander Calder</h1><p><b>Sold:</b> Log in to view</p>"
-
-
-class _Locator:
-    """Minimal DOM locator with meaningful visibility checks for search readiness."""
-
-    def __init__(self, nodes):
-        self.nodes = nodes
-
-    def all(self):
-        return [_Locator([node]) for node in self.nodes]
-
-    def is_visible(self, **_kwargs):
-        if not self.nodes:
-            return False
-        node = self.nodes[0]
-        return all(
-            not ancestor.has_attr("hidden")
-            and ancestor.get("aria-hidden") != "true"
-            and not re.search(r"(?:display\s*:\s*none|visibility\s*:\s*hidden)", ancestor.get("style", ""))
-            for ancestor in [node, *node.parents]
-        )
-
-    def inner_text(self, **_kwargs):
-        return self.nodes[0].get_text(" ", strip=True) if self.nodes else ""
 
 
 class PublicBrowserRecoveryTests(TestCase):
@@ -54,6 +34,15 @@ class PublicBrowserRecoveryTests(TestCase):
         self.title = "Search results | Invaluable"
         self.initial_status = 200
         self.after_wait = lambda: None
+        self.handlers = []
+        self.auto_response = True
+        self.request_body = InvaluableAdapter()._catalog_request_payload(SEARCH_URL)
+        self.result = {
+            "page": 0, "nbPages": 1, "nbHits": 1, "hitsPerPage": 96,
+            "hits": [{"objectID": "12345", "lotRef": "EXAMPLE", "lotNumber": "116",
+                      "lotTitle": "Alexander Calder lithograph", "houseName": "Example House",
+                      "dateTimeUTCUnix": 1792432800, "currencyCode": "USD"}],
+        }
         self.page = Mock()
         self.page.url = "about:blank"
         self.page.is_closed.return_value = False
@@ -62,10 +51,8 @@ class PublicBrowserRecoveryTests(TestCase):
         self.page.locator.side_effect = self.locator
         self.page.goto.side_effect = self.navigate
         self.page.wait_for_timeout.side_effect = self.advance
-        self.page.evaluate.return_value = {
-            "status": 200, "url": CATALOG_URL,
-            "content_type": "application/json", "data": {"results": []},
-        }
+        self.page.on.side_effect = lambda _event, handler: self.handlers.append(handler)
+        self.page.remove_listener.side_effect = lambda _event, handler: self.handlers.remove(handler)
         self.context = Mock()
         self.context.pages = [self.page]
         self.playwright = Mock()
@@ -78,10 +65,20 @@ class PublicBrowserRecoveryTests(TestCase):
 
     def locator(self, selector):
         soup = BeautifulSoup(f"<body>{self.html}</body>", "html.parser")
-        return _Locator(soup.select(selector))
+        return Mock(inner_text=Mock(return_value=" ".join(node.get_text(" ", strip=True) for node in soup.select(selector))))
+
+    def emit(self, *, body=None, result=None, payload=None, status=200, content_type="application/json", url=CATALOG_URL):
+        response = Mock(url=url, status=status, headers={"content-type": content_type},
+                        request=Mock(method="POST", post_data_json=body if body is not None else self.request_body))
+        response.json.return_value = payload if payload is not None else {"results": [result if result is not None else self.result]}
+        for handler in list(self.handlers):
+            handler(response)
+        return response
 
     def navigate(self, url, **_kwargs):
         self.page.url = url
+        if self.auto_response and "/search" in url:
+            self.emit()
         return Mock(status=self.initial_status, url=url)
 
     def advance(self, milliseconds):
@@ -89,88 +86,241 @@ class PublicBrowserRecoveryTests(TestCase):
         self.after_wait()
 
     def fetcher(self, **kwargs):
-        return InvaluablePublicBrowserFetcher(
-            self.profile, monotonic=lambda: self.now, min_interval_seconds=0,
-            access_timeout_seconds=1, **kwargs,
-        )
+        return InvaluablePublicBrowserFetcher(self.profile, monotonic=lambda: self.now,
+            min_interval_seconds=0, access_timeout_seconds=1, **kwargs)
 
-    def post(self, fetcher, payload=None):
-        return fetcher.post_json(CATALOG_URL, payload or {}, referer=SEARCH_URL)
+    def test_reads_own_response_without_synthetic_post_and_inherits_verified_artist(self):
+        with self.fetcher() as fetcher:
+            page = InvaluableAdapter().fetch_search_page(SEARCH_URL, fetcher)
+            lots = InvaluableAdapter().parse_search_page(page, SEARCH_URL, "Alexander Calder")
+            self.assertEqual(fetcher.pages_fetched, 1)
+        self.assertEqual(lots[0].artist, "Alexander Calder")
+        self.assertEqual(lots[0].source_lot_id, "12345")
+        self.page.goto.assert_called_once_with(SEARCH_URL, wait_until="domcontentloaded", timeout=45_000)
+        self.page.evaluate.assert_not_called()
+        self.assertEqual(self.handlers, [])
+        self.assertFalse(self.playwright.chromium.launch_persistent_context.call_args.kwargs["headless"])
 
-    def test_invalid_endpoint_or_referer_never_opens_browser(self):
-        for endpoint, referer in (
-            ("https://example.com/catResults", SEARCH_URL),
-            ("http://www.invaluable.com/catResults", SEARCH_URL),
-            ("https://www.invaluable.com/changePassword", SEARCH_URL),
-            ("https://user:password@www.invaluable.com/catResults", SEARCH_URL),
-            (CATALOG_URL, "https://example.com/search"),
-            (CATALOG_URL, "https://invaluable.com/search"),
-            (CATALOG_URL, "https://www.invaluable.com/login"),
-            (CATALOG_URL, ""),
-        ):
-            with self.subTest(endpoint=endpoint, referer=referer):
-                with self.assertRaises(SourceAccessError):
-                    self.fetcher().post_json(endpoint, {}, referer=referer)
+    def test_adapter_skips_or_batch_for_public_browser(self):
+        pages = InvaluableAdapter().fetch_search_batch(
+            [(SEARCH_URL, "Alexander Calder"), (SEARCH_URL.replace("Calder", "Other"), "Alexander Other")], self.fetcher())
+        self.assertEqual(pages, {})
         self.load.assert_not_called()
 
-    def test_initial_access_response_waits_for_search_without_repeated_navigation(self):
+    def test_invalid_search_and_direct_posts_never_open_browser(self):
+        for url in ("http://www.invaluable.com/search", "https://example.com/search", LOT_URL,
+                    "https://user:password@www.invaluable.com/search", "https://www.invaluable.com:444/search"):
+            with self.subTest(url=url), self.assertRaises(SourceAccessError):
+                self.fetcher().fetch_search_page(url)
+        with self.assertRaises(SourceAccessError):
+            self.fetcher().post_json(CATALOG_URL, {}, referer=SEARCH_URL)
+        self.load.assert_not_called()
+
+    def test_waits_for_full_category_hydration_and_ignores_facet_only_calls(self):
+        self.auto_response = False
+        incomplete = deepcopy(self.request_body)
+        incomplete["requests"][0]["params"]["facetFilters"] = [["artistName:Alexander Calder"]]
+        facet_only = deepcopy(self.request_body)
+        facet_only["requests"][0]["params"]["hitsPerPage"] = 0
+        steps = [lambda: self.emit(body=incomplete), lambda: self.emit(body=facet_only), self.emit]
+        self.after_wait = lambda: steps.pop(0)()
+        with self.fetcher() as fetcher:
+            self.assertEqual(json.loads(fetcher.fetch_search_page(SEARCH_URL))["results"][0], self.result)
+        self.assertEqual(self.now, 0.75)
+        self.page.goto.assert_called_once()
+        self.page.evaluate.assert_not_called()
+
+    def test_matches_response_index_instead_of_unrelated_first_result(self):
+        self.auto_response = False
+        facet_request = deepcopy(self.request_body["requests"][0])
+        facet_request["params"]["hitsPerPage"] = 0
+        body = {"isCatalogPageRequest": False, "requests": [facet_request, self.request_body["requests"][0]]}
+        unrelated = {"page": 0, "nbPages": 0, "nbHits": 76814, "hitsPerPage": 0, "hits": self.result["hits"]}
+        self.after_wait = lambda: self.emit(body=body, payload={"results": [unrelated, self.result]})
+        with self.fetcher() as fetcher:
+            self.assertEqual(json.loads(fetcher.fetch_search_page(SEARCH_URL)), {"results": [self.result]})
+
+    def test_initial_access_response_can_resolve_naturally_without_repeated_navigation(self):
         for status in (202, 401, 403):
             with self.subTest(status=status):
                 self.page.goto.reset_mock()
-                self.page.evaluate.reset_mock()
-                self.page.bring_to_front.reset_mock()
                 self.initial_status = status
-                self.html = "<p>Loading search results</p>"
-                self.after_wait = lambda: setattr(self, "html", SEARCH_HTML)
-                started = self.now
+                self.auto_response = False
+                self.html = "<h1>Verify you are human</h1>"
+                def loaded():
+                    self.html = SEARCH_HTML
+                    self.emit()
+                self.after_wait = loaded
                 with self.fetcher() as fetcher:
-                    self.assertEqual(self.post(fetcher), {"results": []})
-                self.assertGreater(self.now, started)
-                self.page.bring_to_front.assert_called_once()
-                self.page.goto.assert_called_once_with(SEARCH_URL, wait_until="domcontentloaded", timeout=45_000)
-                self.page.evaluate.assert_called_once()
-        self.assertFalse(self.playwright.chromium.launch_persistent_context.call_args.kwargs["headless"])
-
-    def test_visible_zero_item_count_is_a_ready_search(self):
-        self.html = "<h4>0 items</h4>"
-        with self.fetcher() as fetcher:
-            self.assertEqual(self.post(fetcher), {"results": []})
-        self.assertEqual(self.now, 0)
-        self.page.evaluate.assert_called_once()
-
-    def test_visible_auction_link_without_count_is_a_ready_search(self):
-        self.html = f'<a hidden href="{LOT_URL}">Hidden template</a><a href="{LOT_URL}">Alexander Calder</a>'
-        with self.fetcher() as fetcher:
-            self.assertEqual(self.post(fetcher), {"results": []})
-        self.assertEqual(self.now, 0)
-
-    def test_challenge_hidden_results_and_empty_shell_time_out_without_posting(self):
-        for html in (
-            "<h1>Verify you are human</h1>" + SEARCH_HTML,
-            f'<section hidden>{SEARCH_HTML}</section>',
-            "<script>const message = '0 items';</script><p>Loading</p>",
-            "<app-root></app-root>",
-        ):
-            with self.subTest(html=html):
-                self.page.goto.reset_mock()
-                self.html = html
-                started = self.now
-                with self.fetcher() as fetcher:
-                    for _ in range(2):
-                        with self.assertRaisesRegex(SourceAccessBlocked, "Retry with browser"):
-                            self.post(fetcher)
-                self.assertGreaterEqual(self.now - started, 1)
+                    self.assertEqual(json.loads(fetcher.fetch_search_page(SEARCH_URL))["results"][0], self.result)
                 self.page.goto.assert_called_once()
         self.page.evaluate.assert_not_called()
 
-    def test_stop_or_closed_window_cancels_wait_and_releases_browser(self):
+    def test_coherent_zero_result_including_artist_only_zero_is_accepted(self):
+        self.result.update(hits=[], nbPages=0, nbHits=0)
+        self.html = "<h4>0 items</h4>"
+        for artist_only in (False, True):
+            if artist_only:
+                self.request_body["requests"][0]["params"]["facetFilters"] = [["artistName:Alexander Calder"]]
+                self.request_body["requests"][0]["params"].pop("page")
+            with self.subTest(artist_only=artist_only), self.fetcher() as fetcher:
+                self.assertEqual(json.loads(fetcher.fetch_search_page(SEARCH_URL))["results"][0]["nbHits"], 0)
+                self.assertEqual(fetcher.pages_fetched, 1)
+
+    def test_additional_narrowing_controls_never_turn_zero_into_complete_search(self):
+        self.result.update(hits=[], nbPages=0, nbHits=0)
+        self.auto_response = False
+        original = deepcopy(self.request_body)
+        restrictions = {
+            "numericFilters": ["currentBid>10000000"], "tagFilters": ["private-sale"],
+            "aroundLatLng": "40,-73", "aroundLatLngViaIP": True,
+            "insideBoundingBox": [[40, -73, 41, -72]], "insidePolygon": [[40, -73, 41, -72, 42, -71]],
+            "restrictSearchableAttributes": ["lotTitle"], "distinct": 1,
+            "ruleContexts": ["private-view"], "enableRules": True, "unknownFilter": "limited",
+        }
+        for key, value in restrictions.items():
+            with self.subTest(parameter=key):
+                self.request_body = deepcopy(original)
+                self.request_body["requests"][0]["params"][key] = value
+                self.after_wait = self.emit
+                with self.fetcher() as fetcher:
+                    with self.assertRaisesRegex(SourceAccessBlocked, "additional unsupported search restrictions"):
+                        fetcher.fetch_search_page(SEARCH_URL)
+                    self.assertEqual(fetcher.pages_fetched, 0)
+
+    def test_normal_display_and_telemetry_params_and_empty_optional_filters_are_supported(self):
+        self.request_body["requests"][0]["params"].update({
+            "facets": ["*"], "attributesToRetrieve": ["lotTitle", "lotRef"],
+            "attributesToHighlight": [], "highlightPreTag": "<em>", "highlightPostTag": "</em>",
+            "maxValuesPerFacet": 100, "clickAnalytics": True, "analytics": True,
+            "userToken": "test-only-token", "numericFilters": [], "tagFilters": "",
+            "aroundLatLngViaIP": False,
+        })
+        with self.fetcher() as fetcher:
+            self.assertEqual(json.loads(fetcher.fetch_search_page(SEARCH_URL))["results"][0], self.result)
+
+    def test_narrowed_zero_preserves_existing_cache_membership_and_observation(self):
+        previous = datetime(2026, 10, 15, tzinfo=timezone.utc)
+        now = datetime(2026, 10, 16, tzinfo=timezone.utc)
+        entry = BookmarkEntry(folder_path=("ARTISTS INVALUABLE",), title="Calder", url=SEARCH_URL,
+                              artist="Alexander Calder", source="Invaluable")
+        lot = NormalizedLot(source="Invaluable", source_lot_id="existing", artist="Alexander Calder",
+                            artist_watchlist_name="Alexander Calder", title="Existing print",
+                            lot_url=LOT_URL, end_at="2026-10-24")
+        self.request_body["requests"][0]["params"]["numericFilters"] = ["currentBid>10000000"]
+        self.result.update(hits=[], nbPages=0, nbHits=0)
+        with WatchlistCache(":memory:") as cache, self.fetcher() as fetcher:
+            cache.upsert(lot, watch_url=SEARCH_URL, search_hash=lot.content_hash, observed_at=previous)
+            service = WatchlistService(cache, fetcher=fetcher, now=lambda: now)
+            result = service.refresh([entry], selected_artists=[entry.watch_label], horizon_days=30)
+            self.assertTrue(result.errors)
+            self.assertEqual(result.metrics.ended_lots, 0)
+            self.assertEqual(result.fallback_lot_keys, {lot.cache_key})
+            retained = cache.active_lots_for_watch_url(SEARCH_URL)
+            self.assertEqual(len(retained), 1)
+            self.assertEqual(retained[0].last_seen_at, previous.isoformat())
+
+    def test_missing_response_has_distinct_diagnostic_without_account_data(self):
+        self.auto_response = False
+        with self.fetcher() as fetcher:
+            with self.assertRaisesRegex(SourceAccessBlocked, "no catalog response was observed"):
+                fetcher.fetch_search_page(SEARCH_URL)
+
+    def test_visible_link_or_zero_label_without_scoped_response_never_proves_completeness(self):
+        self.auto_response = False
+        for html in (SEARCH_HTML, "<h4>0 items</h4>", "<app-root></app-root>"):
+            with self.subTest(html=html):
+                self.html = html
+                with self.fetcher() as fetcher:
+                    with self.assertRaisesRegex(SourceAccessBlocked, "complete catalog response"):
+                        fetcher.fetch_search_page(SEARCH_URL)
+                    self.assertEqual(fetcher.pages_fetched, 0)
+
+    def test_unrelated_request_scopes_and_external_responses_are_not_used(self):
+        variants = []
+        for key, value in (("page", 1), ("query", "other"), ("filters", "closed:true"),
+                           ("facetFilters", [["artistName:Other"], ["Fine Art:Prints"]])):
+            body = deepcopy(self.request_body)
+            body["requests"][0]["params"][key] = value
+            variants.append({"body": body})
+        body = deepcopy(self.request_body)
+        body["requests"][0]["indexName"] = "past_lots_prod"
+        variants.append({"body": body})
+        variants.extend([{"url": "https://example.com/catResults"}, {"url": "https://invaluable.com/catResults"}])
+        self.auto_response = False
+        for arguments in variants:
+            with self.subTest(arguments=arguments):
+                self.after_wait = lambda args=arguments: self.emit(**args)
+                with self.fetcher() as fetcher, self.assertRaisesRegex(SourceAccessBlocked, "complete catalog response"):
+                    fetcher.fetch_search_page(SEARCH_URL)
+
+    def test_incomplete_malformed_duplicate_and_capped_results_are_rejected(self):
+        variants = [{"hits": []}, {"nbHits": 2}, {"page": 1}, {"nbPages": 0}, {"nbHits": True},
+            {"nbHits": 200, "nbPages": 1}, {"hitsPerPage": 0},
+            {"hits": [{"objectID": "12345", "lotTitle": "Incomplete"}]},
+            {"hits": self.result["hits"] * 2, "nbHits": 2}]
+        self.auto_response = False
+        for changes in variants:
+            with self.subTest(changes=changes):
+                result = {**self.result, **changes}
+                self.after_wait = lambda value=result: self.emit(result=value)
+                with self.fetcher() as fetcher:
+                    with self.assertRaisesRegex(SourceAccessBlocked, "incomplete catalog data"):
+                        fetcher.fetch_search_page(SEARCH_URL)
+                    self.assertEqual(fetcher.pages_fetched, 0)
+
+    def test_pagination_navigates_each_page_and_retains_service_page_limit_metadata(self):
+        first = deepcopy(self.result)
+        first.update(nbHits=97, nbPages=2)
+        first["hits"] = [{**self.result["hits"][0], "objectID": str(index), "lotRef": f"REF{index}"} for index in range(96)]
+        self.result = first
+        with self.fetcher() as fetcher:
+            page = fetcher.fetch_search_page(SEARCH_URL)
+            next_url = InvaluableAdapter().extract_next_page_url(page, SEARCH_URL)
+            self.assertIn("page=2", next_url)
+            self.request_body = InvaluableAdapter()._catalog_request_payload(next_url)
+            self.result = {**first, "page": 1, "hits": [{**first["hits"][0], "objectID": "last", "lotRef": "LAST"}]}
+            last_page = fetcher.fetch_search_page(next_url)
+            self.assertEqual(InvaluableAdapter().extract_next_page_url(last_page, next_url), "")
+            self.assertEqual(fetcher.pages_fetched, 2)
+        self.assertEqual(self.page.goto.call_count, 2)
+        self.page.evaluate.assert_not_called()
+
+    def test_encoded_request_params_are_supported(self):
+        params = dict(self.request_body["requests"][0]["params"])
+        params["facetFilters"] = json.dumps(params["facetFilters"])
+        self.request_body["requests"][0]["params"] = urlencode(params)
+        with self.fetcher() as fetcher:
+            self.assertEqual(json.loads(fetcher.fetch_search_page(SEARCH_URL))["results"][0], self.result)
+
+    def test_denied_catalog_does_not_trigger_second_request(self):
+        self.auto_response = False
+        self.after_wait = lambda: self.emit(status=202, content_type="text/html")
+        with self.fetcher() as fetcher:
+            for _ in range(2):
+                with self.assertRaisesRegex(SourceAccessBlocked, "HTTP 202"):
+                    fetcher.fetch_search_page(SEARCH_URL)
+        self.page.goto.assert_called_once()
+        self.page.evaluate.assert_not_called()
+        self.assertEqual(self.handlers, [])
+
+    def test_rate_limit_stops_without_reposting(self):
+        self.auto_response = False
+        self.after_wait = lambda: self.emit(status=429)
+        with self.fetcher() as fetcher, self.assertRaisesRegex(SourceAccessBlocked, "HTTP 429"):
+            fetcher.fetch_search_page(SEARCH_URL)
+        self.assertEqual(self.now, 0.25)
+        self.page.goto.assert_called_once()
+        self.page.evaluate.assert_not_called()
+
+    def test_stop_and_closed_window_remove_listener_and_release_browser(self):
+        self.auto_response = False
         for cancellation in ("stop", "close", "close_during_wait"):
             with self.subTest(cancellation=cancellation):
                 self.context.close.reset_mock()
                 self.playwright.stop.reset_mock()
                 self.page.is_closed.return_value = False
                 event = threading.Event()
-                self.html = "<p>Loading</p>"
                 def cancel():
                     if cancellation == "stop":
                         event.set()
@@ -178,59 +328,36 @@ class PublicBrowserRecoveryTests(TestCase):
                         self.page.is_closed.return_value = True
                         if cancellation == "close_during_wait":
                             raise RuntimeError("Target page, context or browser has been closed")
-
                 self.after_wait = cancel
-                with self.assertRaises(WatchlistStopped):
-                    with self.fetcher(stop_event=event) as fetcher:
-                        self.post(fetcher)
+                with self.assertRaises(WatchlistStopped), self.fetcher(stop_event=event) as fetcher:
+                    fetcher.fetch_search_page(SEARCH_URL)
+                self.assertEqual(self.handlers, [])
                 self.context.close.assert_called_once()
                 self.playwright.stop.assert_called_once()
-        self.page.evaluate.assert_not_called()
 
-    def test_catalog_batches_reuse_one_warmup_and_never_visit_a_sold_sign_in_lot(self):
-        payloads = [{"page": 0}, {"page": 1}]
+    def test_challenge_never_accepts_successful_background_response(self):
+        self.html = "<h1>Verify you are human</h1>" + SEARCH_HTML
         with self.fetcher() as fetcher:
-            for payload in payloads:
-                self.assertEqual(self.post(fetcher, payload), {"results": []})
-            self.assertEqual(fetcher.pages_fetched, 2)
-        self.page.goto.assert_called_once_with(SEARCH_URL, wait_until="domcontentloaded", timeout=45_000)
-        self.assertEqual([call.args[1]["payload"] for call in self.page.evaluate.call_args_list], payloads)
-        self.playwright.chromium.launch_persistent_context.assert_called_once()
+            with self.assertRaisesRegex(SourceAccessBlocked, "access screen"):
+                fetcher.fetch_search_page(SEARCH_URL)
+            self.assertEqual(fetcher.pages_fetched, 0)
 
-    def test_denied_catalog_response_stops_source_without_reposting(self):
-        for status in (200, 202, 401, 403, 429):
-            with self.subTest(status=status):
-                self.page.goto.reset_mock()
-                self.page.evaluate.reset_mock()
-                self.page.evaluate.return_value = {"status": status, "url": CATALOG_URL, "content_type": "text/html"}
-                with self.fetcher() as fetcher:
-                    for _ in range(2):
-                        with self.assertRaisesRegex(SourceAccessBlocked, "Retry with browser"):
-                            self.post(fetcher)
-                    self.assertEqual(fetcher.pages_fetched, 0)
-                self.page.goto.assert_called_once()
-                self.page.evaluate.assert_called_once()
-
-    def test_rate_limited_initial_page_stops_immediately(self):
+    def test_initial_rate_limit_stops_immediately(self):
         self.initial_status = 429
-        with self.fetcher() as fetcher:
-            with self.assertRaisesRegex(SourceAccessBlocked, "HTTP 429"):
-                self.post(fetcher)
+        with self.fetcher() as fetcher, self.assertRaisesRegex(SourceAccessBlocked, "HTTP 429"):
+            fetcher.fetch_search_page(SEARCH_URL)
         self.assertEqual(self.now, 0)
-        self.page.wait_for_timeout.assert_not_called()
-        self.page.evaluate.assert_not_called()
 
     def test_sold_login_requirement_does_not_block_public_lot_html(self):
         with self.fetcher() as fetcher:
-            self.post(fetcher)
+            fetcher.fetch_search_page(SEARCH_URL)
             self.html = GATED_HTML
             self.assertEqual(fetcher.fetch(LOT_URL), GATED_HTML)
             self.assertEqual(fetcher.pages_fetched, 2)
-        self.assertEqual([call.args[0] for call in self.page.goto.call_args_list], [SEARCH_URL, LOT_URL])
 
     def test_later_lot_access_denial_keeps_strict_http_checks(self):
         with self.fetcher() as fetcher:
-            self.post(fetcher)
+            fetcher.fetch_search_page(SEARCH_URL)
             self.initial_status = 202
             for _ in range(2):
                 with self.assertRaisesRegex(SourceAccessBlocked, "HTTP 202"):

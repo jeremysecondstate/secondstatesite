@@ -1,6 +1,7 @@
 """Offline regressions for the Studio import → calendar workflow."""
 
 from contextlib import ExitStack
+from dataclasses import replace
 import json
 import os
 from pathlib import Path
@@ -84,7 +85,7 @@ class StudioWatchlistControllerTests(TestCase):
         panel.after = lambda _delay, callback: callback()
         panel._fill_agenda = Mock()
         for name in ('sync_to_calendar_button', 'stop_button', 'import_bookmarks_button', 'review_button',
-                     'more_button', 'metrics_var', 'retry_browser_button'):
+                     'more_button', 'metrics_var', 'retry_browser_button', 'import_invaluable_button'):
             setattr(panel, name, Mock())
         panel.refresh_button = panel.calendar_sync_button = panel.sync_to_calendar_button
         self.stack = ExitStack()
@@ -96,6 +97,7 @@ class StudioWatchlistControllerTests(TestCase):
         self.stack.enter_context(patch('catalogapp.watchlist_ui.threading.Thread', side_effect=self.immediate_thread))
         self.warning = self.stack.enter_context(patch('catalogapp.watchlist_ui.messagebox.showwarning'))
         self.error = self.stack.enter_context(patch('catalogapp.watchlist_ui.messagebox.showerror'))
+        self.info = self.stack.enter_context(patch('catalogapp.watchlist_ui.messagebox.showinfo'))
         self.browser = self.stack.enter_context(patch('catalogapp.watchlist_ui.InvaluableBrowserFetcher'))
         self.public_browser = self.stack.enter_context(patch('catalogapp.watchlist_ui.InvaluablePublicBrowserFetcher'))
         self.profiles = self.stack.enter_context(patch('catalogapp.watchlist_ui.chrome_profiles'))
@@ -277,6 +279,97 @@ class StudioWatchlistControllerTests(TestCase):
         self.panel.calendar_syncer.assert_not_called()
         self.assertEqual(self.error.call_args.args[0], 'Bookmark Import Failed')
 
+    def test_invaluable_import_reloads_selection_merges_observations_and_syncs(self):
+        self.panel.load_bookmarks(self.path)
+        self.panel.selected_artists.remove('Matisse')
+        self.path.write_text(bookmarks('Calder', 'Matisse', 'Zúñiga'), encoding='utf-8')
+        observed = replace(self.lot, title='Fresh print')
+        absent = replace(self.lot, source_lot_id='unobserved', title='Older print')
+        other = replace(self.lot, source='Heritage', source_lot_id='other', title='Other source')
+        self.panel.current_lots = [self.lot, absent, other]
+        self.panel.fallback_lot_keys = {lot.cache_key for lot in self.panel.current_lots}
+        failure = 'Invaluable returned HTTP 202; live refresh remains unavailable.'
+        self.panel.source_refresh_errors = [failure]
+        paths = ('calder.html', 'zuniga.json')
+        order = []
+
+        def imported(selected_paths, *, entries, cache, horizon_days, new_changed_only):
+            order.append('import')
+            self.assertEqual(selected_paths, paths)
+            self.assertEqual({entry.watch_label for entry in entries}, {'Calder', 'Zúñiga'})
+            self.assertTrue(all(entry.source == 'Invaluable' for entry in entries))
+            self.assertEqual(horizon_days, 30)
+            self.assertFalse(new_changed_only)
+            self.assertTrue(self.panel._busy)
+            self.panel.import_invaluable_button.configure.assert_called_with(state=tk.DISABLED)
+            return WatchlistResult(
+                [observed, absent], WatchlistMetrics(new_lots=1),
+                fallback_lot_keys={absent.cache_key}, notices=['Imported one saved snapshot.'],
+            )
+
+        def uploaded(lots, **_kwargs):
+            order.append('upload')
+            self.assertEqual({lot.cache_key for lot in lots}, {observed.cache_key, absent.cache_key, other.cache_key})
+            return CalendarSyncResult(3, 1, 2, 0)
+
+        self.panel.calendar_syncer.side_effect = uploaded
+        with (
+            patch('catalogapp.watchlist_ui.filedialog.askopenfilenames', return_value=paths),
+            patch('catalogapp.watchlist_ui.import_saved_invaluable_pages', side_effect=imported),
+        ):
+            self.panel.import_saved_invaluable_pages()
+        self.assertEqual(order, ['import', 'upload'])
+        self.assertEqual(self.panel.fallback_lot_keys, {absent.cache_key, other.cache_key})
+        self.assertEqual(self.panel.source_refresh_errors, [failure])
+        self.assertEqual(next(lot.title for lot in self.panel.current_lots if lot.cache_key == observed.cache_key), 'Fresh print')
+        self.assertIn('Imported one saved snapshot.', self.panel._sync_details_text)
+        self.assertFalse(self.panel._busy)
+        self.panel.import_invaluable_button.configure.assert_called_with(state=tk.NORMAL)
+        self.service.assert_not_called()
+        self.public_browser.assert_not_called()
+
+    def test_invaluable_import_missing_bookmarks_preserves_results_and_skips_picker(self):
+        self.panel.load_bookmarks(self.path)
+        self.panel.current_lots = [self.lot]
+        self.path.unlink()
+        with patch('catalogapp.watchlist_ui.filedialog.askopenfilenames') as picker:
+            self.panel.import_saved_invaluable_pages()
+        picker.assert_not_called()
+        self.panel.calendar_syncer.assert_not_called()
+        self.assertEqual(self.panel.current_lots, [self.lot])
+        self.assertEqual(self.error.call_args.args[0], 'Bookmark Import Failed')
+
+    def test_invaluable_import_cancelled_or_without_selected_artists_does_not_upload(self):
+        self.panel.load_bookmarks(self.path)
+        with (
+            patch('catalogapp.watchlist_ui.filedialog.askopenfilenames', return_value=()) as picker,
+            patch('catalogapp.watchlist_ui.import_saved_invaluable_pages') as importer,
+        ):
+            self.panel.import_saved_invaluable_pages()
+            picker.assert_called_once()
+            self.panel.selected_artists.clear()
+            self.panel.import_saved_invaluable_pages()
+            picker.assert_called_once()
+        importer.assert_not_called()
+        self.panel.calendar_syncer.assert_not_called()
+        self.assertFalse(self.panel._busy)
+        self.assertEqual(self.warning.call_args.args[0], 'Select Invaluable Artists')
+
+    def test_invaluable_import_failure_retains_previous_results_and_reenables_controls(self):
+        self.panel.load_bookmarks(self.path)
+        self.panel.current_lots = [self.lot]
+        self.panel.source_refresh_errors = ['Invaluable HTTP 202.']
+        with (
+            patch('catalogapp.watchlist_ui.filedialog.askopenfilenames', return_value=('bad.html',)),
+            patch('catalogapp.watchlist_ui.import_saved_invaluable_pages', side_effect=ValueError('Unreadable snapshot')),
+        ):
+            self.panel.import_saved_invaluable_pages()
+        self.panel.calendar_syncer.assert_not_called()
+        self.assertEqual(self.panel.current_lots, [self.lot])
+        self.assertFalse(self.panel._busy)
+        self.panel.import_invaluable_button.configure.assert_called_with(state=tk.NORMAL)
+        self.assertIn('Unreadable snapshot', self.panel._sync_details_text)
+
     def test_missing_file_keeps_existing_lots_and_does_not_upload_stale_results(self):
         self.panel.load_bookmarks(self.path)
         self.panel.current_lots = [self.lot]
@@ -300,6 +393,33 @@ class StudioWatchlistControllerTests(TestCase):
         self.assertIn('Francisco Zúñiga', self.warning.call_args.args[1])
         self.assertIn('live data was not verified', self.panel.sync_status_var.get())
         self.assertIn('Live source refresh remains incomplete', self.panel.sync_status_var.get())
+
+    def test_long_access_warning_is_compact_and_full_errors_remain_in_details(self):
+        failure = 'Invaluable HTTP 202. ' + 'Repeated diagnostic detail. ' * 80 + 'Missing artist at end.'
+        self.panel._finish_refresh(
+            WatchlistResult([self.lot], WatchlistMetrics(), errors=[failure]),
+            sync_result=CalendarSyncResult(1, 0, 1, 0),
+        )
+        warning = self.warning.call_args.args[1]
+        self.assertIn('Import saved Invaluable pages', warning)
+        self.assertLess(len(warning), 900)
+        self.assertIn(failure, self.panel._sync_details_text)
+
+    def test_compact_access_warning_keeps_separate_missing_artist_error(self):
+        failure = 'Invaluable HTTP 202. ' + 'Repeated diagnostic detail. ' * 80
+        missing = 'No cached lots are available for calendar sync for: Francisco Zúñiga, Alonzo Megargee.'
+        self.panel._finish_refresh(
+            WatchlistResult([self.lot], WatchlistMetrics(), errors=[failure, missing]),
+            sync_result=CalendarSyncResult(1, 0, 1, 0),
+        )
+        warning = self.warning.call_args.args[1]
+        self.assertIn('Francisco Zúñiga', warning)
+        self.assertIn('Alonzo Megargee', warning)
+        self.assertIn('Artists without retrieved or cached lots cannot appear on the calendar yet', warning)
+        self.assertIn('Sync to Calendar', warning)
+        self.assertLess(len(warning), 1100)
+        self.assertIn(failure, self.panel._sync_details_text)
+        self.assertIn(missing, self.panel._sync_details_text)
 
     def test_unavailable_source_without_cached_lots_does_not_claim_a_sync(self):
         self.panel.load_bookmarks(self.path)
@@ -342,11 +462,16 @@ class StudioWatchlistControllerTests(TestCase):
 
     def test_busy_import_and_sync_cannot_start_conflicting_work(self):
         self.panel._busy = True
-        with patch('catalogapp.watchlist_ui.filedialog.askopenfilename') as picker:
+        with (
+            patch('catalogapp.watchlist_ui.filedialog.askopenfilename') as picker,
+            patch('catalogapp.watchlist_ui.filedialog.askopenfilenames') as pages_picker,
+        ):
             self.panel.import_bookmarks()
             self.panel.sync_to_calendar()
             self.panel.retry_with_browser()
+            self.panel.import_saved_invaluable_pages()
         picker.assert_not_called()
+        pages_picker.assert_not_called()
         self.service.assert_not_called()
         self.public_browser.assert_not_called()
 
@@ -399,9 +524,23 @@ class StudioWatchlistWidgetTests(TestCase):
             self.assertFalse(panel.review_frame.winfo_manager())
             self.assertFalse(panel.stop_button.winfo_manager())
             self.assertFalse(panel.retry_browser_button.winfo_manager())
+            self.assertFalse(panel.import_invaluable_button.winfo_manager())
+            labels = [panel.more_menu.entrycget(index, 'label') for index in range(panel.more_menu.index('end') + 1)
+                      if panel.more_menu.type(index) == 'command']
+            self.assertIn('Import saved Invaluable pages…', labels)
             self.assertEqual(panel.sync_to_calendar_button.cget('text'), 'Sync to Calendar')
             self.assertNotIn('connect_invaluable_button', panel.__dict__)
             self.assertNotIn('chrome_profile_picker', panel.__dict__)
             profiles.assert_not_called()
+            panel.source_refresh_errors = ['Invaluable returned HTTP 202.']
+            panel._set_sync_details('Invaluable is blocked.')
+            self.assertEqual(panel.import_invaluable_button.winfo_manager(), 'grid')
+            panel._set_import_buttons_state(tk.DISABLED)
+            self.assertEqual(str(panel.import_invaluable_button.cget('state')), tk.DISABLED)
+            panel._set_import_buttons_state(tk.NORMAL)
+            self.assertEqual(str(panel.import_invaluable_button.cget('state')), tk.NORMAL)
+            panel.source_refresh_errors = ['Heritage returned HTTP 403.']
+            panel._set_sync_details('Only Heritage is blocked.')
+            self.assertFalse(panel.import_invaluable_button.winfo_manager())
             panel._toggle_review()
             self.assertEqual(panel.review_frame.winfo_manager(), 'grid')

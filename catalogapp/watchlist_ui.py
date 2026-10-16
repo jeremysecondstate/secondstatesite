@@ -28,6 +28,7 @@ from catalogapp.watchlist_chrome import chrome_profiles, open_invaluable_in_chro
 from catalogapp.watchlist_fetch import HttpPageFetcher, WatchlistStopped
 from catalogapp.watchlist_exports import render_calendar_preview, render_csv, render_ics, render_markdown
 from catalogapp.watchlist_models import NormalizedLot, parse_lot_datetime
+from catalogapp.watchlist_invaluable_pages import import_saved_invaluable_pages
 from catalogapp.watchlist_saved_pages import import_saved_heritage_pages
 from catalogapp.watchlist_sold_pages import import_saved_sold_pages
 from catalogapp.watchlist_service import WatchlistResult, WatchlistService
@@ -226,6 +227,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.more_menu.add_command(label="Detailed agenda", command=lambda: self._show_lot_view("agenda"))
         self.more_menu.add_command(label="Calendar preview", command=lambda: self._show_lot_view("calendar"))
         self.more_menu.add_separator()
+        self.more_menu.add_command(label="Import saved Invaluable pages…", command=self.import_saved_invaluable_pages)
         self.more_menu.add_command(label="Import saved Heritage pages…", command=self.import_saved_heritage_pages)
         self.more_menu.add_command(label="Import saved sold results…", command=self.import_saved_sold_results)
         self.more_menu.add_separator()
@@ -345,19 +347,28 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.status_message_label = status
         status.grid(row=1, column=1, sticky="ew", pady=(3, 0))
         status.bind("<Configure>", lambda event: status.configure(wraplength=max(200, event.width)))
-        self.stop_button = ttk.Button(footer, text="Stop", command=self.stop_refresh, style="Secondary.TButton")
-        self.stop_button.grid(row=0, column=2, rowspan=2, padx=(12, 0))
+        footer_actions = ttk.Frame(footer, style="Status.TFrame")
+        self.status_actions = footer_actions
+        footer_actions.grid(row=2, column=1, sticky="e", pady=(8, 0))
+        self.stop_button = ttk.Button(footer_actions, text="Stop", command=self.stop_refresh, style="Secondary.TButton")
+        self.stop_button.grid(row=0, column=0, padx=(12, 0))
         self.stop_button.grid_remove()
         self.sync_details_button = ttk.Button(
-            footer, text="Sync details", command=self.show_sync_details, style="Secondary.TButton",
+            footer_actions, text="Sync details", command=self.show_sync_details, style="Secondary.TButton",
         )
-        self.sync_details_button.grid(row=0, column=3, rowspan=2, padx=(12, 0))
+        self.sync_details_button.grid(row=0, column=1, padx=(12, 0))
         self.sync_details_button.grid_remove()
         self.retry_browser_button = ttk.Button(
-            footer, text="Retry with browser", command=self.retry_with_browser, style="Secondary.TButton",
+            footer_actions, text="Retry with browser", command=self.retry_with_browser, style="Secondary.TButton",
         )
-        self.retry_browser_button.grid(row=0, column=4, rowspan=2, padx=(12, 0))
+        self.retry_browser_button.grid(row=0, column=2, padx=(12, 0))
         self.retry_browser_button.grid_remove()
+        self.import_invaluable_button = ttk.Button(
+            footer_actions, text="Import saved Invaluable pages…", command=self.import_saved_invaluable_pages,
+            style="Secondary.TButton",
+        )
+        self.import_invaluable_button.grid(row=0, column=3, padx=(12, 0))
+        self.import_invaluable_button.grid_remove()
         # Metrics remain available to the controller and exports without making
         # implementation counters part of the everyday workflow.
         self.metrics_var = tk.StringVar()
@@ -764,6 +775,69 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.worker = threading.Thread(target=run, name="heritage-saved-page-import", daemon=True)
         self.worker.start()
 
+    def import_saved_invaluable_pages(self) -> None:
+        """Import readable search snapshots and upload their normalized lots."""
+        if self._is_busy():
+            return
+        path = self.bookmark_path_var.get().strip()
+        if not path:
+            messagebox.showwarning("No Bookmarks", "Import a bookmark HTML file first.", parent=self)
+            return
+        if not self.load_bookmarks(path, preserve_selection=True):
+            self._set_status("Bookmarks could not be read. Choose the file again with Import Bookmarks HTML.")
+            return
+        chosen = [
+            entry for entry in self.active_entries
+            if entry.source == "Invaluable" and entry.watch_label in self.selected_artists
+        ]
+        if not chosen:
+            messagebox.showwarning(
+                "Select Invaluable Artists",
+                "Open Review imported artists and select the Invaluable artists whose upcoming pages you saved.",
+                parent=self,
+            )
+            return
+        paths = filedialog.askopenfilenames(
+            title="Import saved Invaluable upcoming search pages",
+            filetypes=[("Saved Invaluable pages", "*.html *.htm *.json"), ("All Files", "*.*")],
+            parent=self,
+        )
+        if not paths:
+            return
+        previous_lots = list(self.current_lots)
+        previous_fallback_keys = set(self.fallback_lot_keys)
+        horizon_days = int(self.horizon_var.get())
+        self.stop_event = threading.Event()
+        self.refresh_button.configure(state=tk.DISABLED)
+        self._set_import_buttons_state(tk.DISABLED)
+        self._set_status("Importing saved Invaluable upcoming lots…")
+
+        def run() -> None:
+            try:
+                local_watchlist_directory().mkdir(parents=True, exist_ok=True)
+                with WatchlistCache(self._cache_path) as cache:
+                    result = import_saved_invaluable_pages(
+                        paths, entries=chosen, cache=cache, horizon_days=horizon_days,
+                        new_changed_only=False,
+                    )
+                merged = {lot.cache_key: lot for lot in previous_lots}
+                # The importer returns cached lots too. Only lots observed in
+                # the imported snapshot lose their previous fallback label.
+                observed_keys = {lot.cache_key for lot in result.lots} - result.fallback_lot_keys
+                result.fallback_lot_keys.update(previous_fallback_keys - observed_keys)
+                merged.update({lot.cache_key: lot for lot in result.lots})
+                result.lots = sorted(
+                    merged.values(),
+                    key=lambda lot: (lot.relevant_at or "9999", lot.artist_watchlist_name.casefold(), lot.lot_number),
+                )
+                self._sync_and_finish_result(result, preserve_source_errors=True)
+            except Exception as exc:
+                message = " ".join(str(exc).split())[:500]
+                self.after(0, lambda message=message: self._finish_refresh_error(message))
+
+        self.worker = threading.Thread(target=run, name="invaluable-saved-page-import", daemon=True)
+        self.worker.start()
+
     def _set_import_buttons_state(self, state) -> None:
         self._busy = state == tk.DISABLED
         for name in (
@@ -786,14 +860,15 @@ class ArtistWatchlistPanel(ttk.Frame):
         return any("invaluable" in error.casefold() for error in self.source_refresh_errors)
 
     def _update_browser_retry_button(self) -> None:
-        button = self.__dict__.get("retry_browser_button")
-        if button is None:
-            return
-        if self._has_invaluable_source_issue():
-            button.grid()
-            button.configure(state=tk.DISABLED if self.__dict__.get("_busy") else tk.NORMAL)
-        else:
-            button.grid_remove()
+        for name in ("retry_browser_button", "import_invaluable_button"):
+            button = self.__dict__.get(name)
+            if button is None:
+                continue
+            if self._has_invaluable_source_issue():
+                button.grid()
+                button.configure(state=tk.DISABLED if self.__dict__.get("_busy") else tk.NORMAL)
+            else:
+                button.grid_remove()
 
     def import_saved_sold_results(self) -> None:
         if self._is_busy():
@@ -1054,7 +1129,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             label += f" Includes {len(self.fallback_lot_keys)} cached lots; live data was not verified."
         if self.source_refresh_errors:
             label += (
-                " Live source refresh remains incomplete; try Retry with browser for Invaluable."
+                " Live source refresh remains incomplete; retry with browser or import saved Invaluable pages."
                 if self._has_invaluable_source_issue()
                 else " Live source refresh remains incomplete; try Sync to Calendar after source access is restored."
             )
@@ -1101,12 +1176,19 @@ class ArtistWatchlistPanel(ttk.Frame):
                     "readable auction data. Access is not guaranteed. Stop cancels the retry and keeps cached lots. "
                     "This retry does not use your usual Chrome profile or the old saved-login setting."
                 )
+                parts.append(
+                    "To add fresh Invaluable lots from your usual browser, load the selected artists' upcoming "
+                    "search results and use Import saved Invaluable pages (also under More). Import HTML pages "
+                    "that retain full sale dates, or supported JSON search snapshots. "
+                    "Imported lots sync to the calendar automatically; missing pages keep their cached data. "
+                    "Saved pages do not verify live access, and their bids reflect when they were saved."
+                )
             parts.append(
                 "Next steps: open the affected auction bookmark in your usual browser to check access, "
                 "then retry Sync to Calendar when the source is available. Browser sign-in does not connect "
                 "the app's automatic refresh to that session. "
                 "Artists with no retrieved or cached lots cannot appear on the calendar yet. "
-                "For saved Heritage catalogs or Invaluable sold lot pages, use the matching import under More."
+                "For saved Heritage catalogs or Invaluable upcoming/sold pages, use the matching import under More."
             )
         return "\n\n".join(parts)
 
@@ -1145,19 +1227,42 @@ class ArtistWatchlistPanel(ttk.Frame):
             if self.fallback_lot_keys else ""
         )
         retry_guidance = (
-            "Use Retry with browser to open Invaluable and try retrieving fresh lots. "
-            "Keep the browser open while it loads; if access remains unavailable, cached lots are retained. "
-            if self._has_invaluable_source_issue() else ""
+            "Use Retry with browser, or load upcoming results in your usual browser and use "
+            "Import saved Invaluable pages to add those lots to Calendar. "
+            if self._has_invaluable_source_issue()
+            else "Retry Sync to Calendar after source access is restored. "
+        )
+        cause = " ".join(self.source_refresh_errors[0].split()) if self.source_refresh_errors else ""
+        if len(cause) > 260:
+            cause = cause[:257] + "…"
+        missing = []
+        for error in self.source_refresh_errors:
+            text = " ".join(error.split())
+            position = text.casefold().find("no cached lots")
+            if position < 0:
+                continue
+            # Long source messages can put the missing-artist list after the
+            # cause. Keep that list visible even when the cause is shortened.
+            if position > 160:
+                text = text[position:]
+            missing.append(text)
+        missing_summary = " ".join(text for text in dict.fromkeys(missing) if text not in cause)
+        if len(missing_summary) > 300:
+            missing_summary = missing_summary[:297] + "…"
+        if missing_summary:
+            cause += "\n\n" + missing_summary
+        missing_guidance = (
+            "Artists without retrieved or cached lots cannot appear on the calendar yet. "
+            "After source access is restored, use Sync to Calendar. " if missing else ""
         )
         messagebox.showwarning(
             "Live Source Refresh Incomplete",
             "Some auction sources could not be refreshed live.\n\n"
             f"{sync_message}{cached_message}\n\n"
-            + "\n".join(self.source_refresh_errors[:8])
+            + cause
             + "\n\n" + retry_guidance
-            + "Artists without retrieved or cached lots cannot appear on the calendar yet. "
-            "After source access is restored, use Sync to Calendar to retrieve missing lots and sync them. "
-            "Use Sync details to review the full report and cached observation times.",
+            + missing_guidance
+            + "Use Sync details for the full report, missing artists, and cached observation times.",
             parent=self,
         )
 
@@ -1352,6 +1457,9 @@ class ArtistWatchlistPanel(ttk.Frame):
             title.set(heading)
             prefix = "WarningStatus" if warning else "Status"
             self.status_banner.configure(style=f"{prefix}.TFrame")
+            actions = self.__dict__.get("status_actions")
+            if actions is not None:
+                actions.configure(style=f"{prefix}.TFrame")
             self.status_title_label.configure(style=f"{prefix}.TLabel")
             self.status_message_label.configure(style=f"{prefix}.TLabel")
             self.status_icon.configure(style=f"{prefix}.TLabel", image=self._icons["alert" if warning else "check"])

@@ -128,6 +128,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         "pricedesc": "upcoming_lots_currentBid_desc_prod",
         "bidcountasc": "upcoming_lots_bidCount_asc_prod",
         "bidcountdesc": "upcoming_lots_bidCount_desc_prod",
+        "bidsdesc": "upcoming_lots_bidCount_desc_prod",
     }
     _category_facets = frozenset(
         {
@@ -155,6 +156,9 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         ``post_json`` retain the HTML parsing fallback.
         """
 
+        browser_search = getattr(fetcher, "fetch_search_page", None)
+        if getattr(fetcher, "uses_natural_catalog_requests", False) is True and callable(browser_search):
+            return browser_search(url)
         post_json = getattr(fetcher, "post_json", None)
         if urlsplit(url).path.rstrip("/").casefold() != "/search" or not callable(post_json):
             return super().fetch_search_page(url, fetcher)
@@ -180,6 +184,10 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         """
 
         items = [(url, artist) for url, artist in searches if url and artist]
+        # Public browser retrieval observes the site's own requests for each
+        # bookmarked search. Combining facets would require a synthetic POST.
+        if getattr(fetcher, "uses_natural_catalog_requests", False) is True:
+            return {}
         post_json = getattr(fetcher, "post_json", None)
         if len(items) < 2 or not callable(post_json):
             return {}

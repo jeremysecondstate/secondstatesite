@@ -9,11 +9,13 @@ Create, use, and close each fetcher on the same worker thread.
 from __future__ import annotations
 
 from pathlib import Path
+import json
+import math
 import re
 import threading
 import time
 from typing import Callable
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -369,87 +371,261 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
     Never copy the user's Chrome profile, read cookies, or solve a challenge.
     """
 
+    uses_natural_catalog_requests = True
+    _catalog_request_params = frozenset({
+        # Scope fields are checked separately below; the remaining fields only
+        # choose returned fields, display formatting, facet counts, or telemetry.
+        "query", "facetFilters", "filters", "page", "hitsPerPage",
+        "attributesToRetrieve", "attributesToHighlight", "attributesToSnippet",
+        "highlightPreTag", "highlightPostTag", "snippetEllipsisText",
+        "restrictHighlightAndSnippetArrays", "facets", "maxValuesPerFacet",
+        "facetingAfterDistinct", "getRankingInfo", "responseFields",
+        "analytics", "analyticsTags", "clickAnalytics", "userToken",
+    })
+
     def __init__(self, profile_directory, *, progress=None, access_timeout_seconds=120, **kwargs):
         super().__init__(profile_directory, **kwargs)
         self.progress = progress or (lambda _message: None)
         self.access_timeout_seconds = max(0, float(access_timeout_seconds))
-        self._public_catalog_ready = False
 
-    def _prepare_public_catalog(self, url: str) -> None:
+    @staticmethod
+    def _request_params(request: object) -> dict:
+        if not isinstance(request, dict):
+            return {}
+        params = request.get("params")
+        if isinstance(params, dict):
+            return params
+        if isinstance(params, str):
+            parsed = dict(parse_qsl(params, keep_blank_values=True))
+            if "facetFilters" in parsed:
+                try:
+                    parsed["facetFilters"] = json.loads(parsed["facetFilters"])
+                except (TypeError, ValueError):
+                    return {}
+            return parsed
+        return {}
+
+    @staticmethod
+    def _facet_groups(value: object) -> set[frozenset[str]] | None:
+        if not isinstance(value, list):
+            return None
+        groups = set()
+        for group in value:
+            values = [group] if isinstance(group, str) else group
+            if not isinstance(values, list) or not values or not all(isinstance(item, str) for item in values):
+                return None
+            groups.add(frozenset(values))
+        return groups
+
+    @classmethod
+    def _matching_requests(
+        cls, body: object, expected: dict, diagnostics: list[str] | None = None,
+    ) -> list[tuple[int, dict, bool]]:
+        """Select the requested results, excluding facet-only and hydration calls."""
+        def mismatch(reason: str) -> None:
+            if diagnostics is not None and reason not in diagnostics:
+                diagnostics.append(reason)
+
+        if not isinstance(body, dict) or body.get("isCatalogPageRequest") is not False:
+            mismatch("the page sent a different type of catalog request")
+            return []
+        requests = body.get("requests")
+        if not isinstance(requests, list):
+            mismatch("the page sent an unrecognized catalog request")
+            return []
+        wanted = expected["params"]
+        wanted_facets = cls._facet_groups(wanted["facetFilters"])
+        artist_facets = {group for group in (wanted_facets or set()) if all(value.startswith("artistName:") for value in group)}
+        matches = []
+        for index, request in enumerate(requests):
+            if not isinstance(request, dict) or request.get("indexName") != expected["indexName"]:
+                mismatch("the search sort did not match the bookmark")
+                continue
+            params = cls._request_params(request)
+            try:
+                page = int(params.get("page", 0))
+                page_size = int(params.get("hitsPerPage", 0))
+            except (TypeError, ValueError):
+                mismatch("the search request had invalid pagination")
+                continue
+            if page != wanted["page"] or page_size <= 0:
+                mismatch("only a different results page or facet counts were returned")
+                continue
+            # Additional numeric/tag/geo/attribute/rule filters can turn an
+            # ordinary artist search into a narrower zero. Never let that zero
+            # retire cached lots. Unknown nonempty controls are conservative
+            # failures until their semantics have been explicitly reviewed.
+            if any(key not in cls._catalog_request_params and value not in (None, "", False, [], {})
+                   for key, value in params.items()):
+                mismatch("the page applied additional unsupported search restrictions")
+                continue
+            if params.get("query", "") != wanted["query"]:
+                mismatch("the search text did not match the bookmark")
+                continue
+            actual_facets = cls._facet_groups(params.get("facetFilters", []))
+            # With no artist results the site may never add category facets.
+            # An exact-artist all-category zero also proves the subset empty;
+            # nonzero hydration responses still require every requested facet.
+            zero_only = bool(artist_facets and actual_facets == artist_facets and actual_facets != wanted_facets)
+            if actual_facets != wanted_facets and not zero_only:
+                mismatch("the artist or category filters did not match the bookmark")
+                continue
+            # These define upcoming/public listings. A different filter must
+            # not silently become a narrower (or archived) completed search.
+            if " ".join(str(params.get("filters", "")).split()) != wanted["filters"]:
+                mismatch("the upcoming-lot filters did not match the bookmark")
+                continue
+            matches.append((index, params, zero_only))
+        return matches
+
+    @staticmethod
+    def _validated_result(result: object, params: dict) -> dict | None:
+        if not isinstance(result, dict) or not isinstance(result.get("hits"), list):
+            return None
+        values = []
+        for key in ("page", "nbPages", "nbHits", "hitsPerPage"):
+            value = result.get(key)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                return None
+            values.append(value)
+        page, page_count, total, page_size = values
+        if page_size <= 0 or page != int(params.get("page", 0)):
+            return None
+        if page_size != int(params.get("hitsPerPage", 0)):
+            return None
+        # Truncated/capped pages are incomplete, never proof that missing lots
+        # ended. An explicit, coherent zero-result response is safe to accept.
+        expected_pages = math.ceil(total / page_size)
+        if page_count != expected_pages or (total and page >= page_count) or (not total and page != 0):
+            return None
+        hits = result["hits"]
+        expected_hits = min(page_size, max(0, total - page * page_size))
+        if len(hits) != expected_hits or any(not isinstance(hit, dict) for hit in hits):
+            return None
+        identities = [str(hit.get("objectID") or hit.get("lotRef") or "") for hit in hits]
+        if any(not identity for identity in identities) or len(set(identities)) != len(identities):
+            return None
+        if any(not hit.get("lotRef") or not (hit.get("lotTitle") or hit.get("title")) for hit in hits):
+            return None
+        return result
+
+    def fetch_search_page(self, url: str) -> str:
+        """Read the ordinary search page's own successful catalog response.
+
+        Observe only its matching public search response. Do not resend the
+        request, extract session cookies, or accept an earlier unfiltered call
+        while the site's artist/category controls are still hydrating.
+        """
+        if not _allowed_url(url) or urlsplit(url).path.rstrip("/") != "/search":
+            raise SourceAccessError("Browser retry requires an HTTPS Invaluable search bookmark.")
+        expected = InvaluableAdapter()._catalog_request_payload(url)["requests"][0]
         self._ensure_context()
+        self._throttle()
         self._check_stopped()
         self._page.bring_to_front()
         self.progress(
             "Opening Invaluable in the retry browser. If verification appears, complete it there; "
             "sync continues when the search results load. Use Stop to cancel."
         )
+        captured: list[dict] = []
+        failures: list[str] = []
+        mismatches: list[str] = []
+        rate_limited = False
+
+        def capture(response):
+            nonlocal rate_limited
+            try:
+                response_url = urlsplit(response.url)
+                if (not _allowed_url(response.url) or response_url.netloc != urlsplit(url).netloc
+                        or response_url.path.rstrip("/") != "/catResults"):
+                    return
+                request = response.request
+                if request.method != "POST":
+                    return
+                matches = self._matching_requests(request.post_data_json, expected, mismatches)
+                if not matches:
+                    return
+                status = response.status
+                if status == 429:
+                    rate_limited = True
+                if status != 200:
+                    failures.append(f"the search's catalog request returned HTTP {status}")
+                    return
+                if "json" not in str(response.headers.get("content-type", "")).casefold():
+                    failures.append("the search returned a web page instead of catalog data")
+                    return
+                payload = response.json()
+                results = payload.get("results") if isinstance(payload, dict) else None
+                if not isinstance(results, list):
+                    failures.append("the search returned invalid catalog data")
+                    return
+                for index, params, zero_only in matches:
+                    result = self._validated_result(results[index] if index < len(results) else None, params)
+                    if result is not None and (not zero_only or result["nbHits"] == 0):
+                        captured.append(result)
+                        return
+                failures.append("the search returned incomplete catalog data")
+            except Exception:
+                failures.append("the search's catalog response could not be read")
+
+        self._page.on("response", capture)
         self.http_attempts += 1
         try:
-            response = self._page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-        except Exception as exc:
-            raise SourceAccessError("The Invaluable retry browser could not open the search. Try Retry with browser again.") from exc
-        self._last_request = self.monotonic()
-        if response is None:
-            raise SourceAccessError("Invaluable did not return a search page. Try Retry with browser again.")
-        if not _allowed_url(response.url or url):
-            self._blocked("Invaluable redirected outside its website; browser retry stopped.")
-        # An interactive retry leaves verification visible for the user. Other
-        # failures, especially rate limits, must not become repeated requests.
-        if response.status not in {200, 202, 401, 403}:
-            self._check_status(response.status, response.url or url)
-        deadline = self.monotonic() + self.access_timeout_seconds
-        while True:
-            self._check_stopped()
-            if self._page.is_closed():
-                raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.")
-            if not _allowed_url(self._page.url):
+            try:
+                response = self._page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+            except Exception as exc:
+                raise SourceAccessError("The Invaluable retry browser could not open the search. Try Retry with browser again.") from exc
+            self._last_request = self.monotonic()
+            if response is None:
+                raise SourceAccessError("Invaluable did not return a search page. Try Retry with browser again.")
+            if not _allowed_url(response.url or url):
                 self._blocked("Invaluable redirected outside its website; browser retry stopped.")
-            try:
-                text = self._page.locator("body").inner_text(timeout=1_000)
-                challenge = _CHALLENGE.search(f"{self._page.title()}\n{text[:3000]}")
-                if urlsplit(self._page.url).path.rstrip("/") == "/search" and not challenge:
-                    lot_visible = any(
-                        link.is_visible() for link in self._page.locator('a[href*="/auction-lot/"]').all()
-                    )
-                    counts = [
-                        heading.inner_text() for heading in self._page.locator("h4").all() if heading.is_visible()
-                    ]
-                    if lot_visible or any(re.fullmatch(r"\s*[\d,]+\s+items?\s*", count, re.I) for count in counts):
-                        self._public_catalog_ready = True
-                        self.progress("Invaluable search loaded. Retrieving live lots in the browser…")
-                        return
-            except Exception:
-                # A normal page navigation can replace the DOM while it is read.
-                # Keep Stop responsive; a closed page is handled on the next pass.
-                pass
-            if self.monotonic() >= deadline:
-                self._blocked(
-                    "Invaluable search did not become available in the retry browser. "
-                    "No fresh data was retrieved. Try Retry with browser again when access is available."
-                )
-            try:
-                self._pause()
-            except Exception:
+            if response.status not in {200, 202, 401, 403}:
+                self._check_status(response.status, response.url or url)
+            deadline = self.monotonic() + self.access_timeout_seconds
+            while True:
+                self._check_stopped()
                 if self._page.is_closed():
-                    raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.") from None
-                raise
+                    raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.")
+                if not _allowed_url(self._page.url):
+                    self._blocked("Invaluable redirected outside its website; browser retry stopped.")
+                if rate_limited:
+                    self._blocked("Invaluable rate-limited its search (HTTP 429). Cached lots were retained.")
+                challenge_found = False
+                try:
+                    text = self._page.locator("body").inner_text(timeout=1_000)
+                    challenge = _CHALLENGE.search(f"{self._page.title()}\n{text[:3000]}")
+                    challenge_found = bool(challenge)
+                except Exception:
+                    challenge = True
+                if captured and not challenge and urlsplit(self._page.url).path.rstrip("/") == "/search":
+                    self.pages_fetched += 1
+                    self.progress("Invaluable search loaded. Retrieved its live catalog results.")
+                    return json.dumps({"results": [captured[-1]]}, ensure_ascii=False, separators=(",", ":"))
+                if self.monotonic() >= deadline:
+                    if challenge_found:
+                        reason = "the search page displayed an access screen"
+                    elif failures:
+                        reason = failures[-1]
+                    elif mismatches:
+                        reason = "; ".join(mismatches[-2:])
+                    else:
+                        reason = "no catalog response was observed"
+                    self._blocked(
+                        "Invaluable did not provide a complete catalog response for this bookmarked search"
+                        f" ({reason}). Cached lots were retained. Try Retry with browser again or import a saved search page."
+                    )
+                try:
+                    self._pause()
+                except Exception:
+                    if self._page.is_closed():
+                        raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.") from None
+                    raise
+        finally:
+            self._page.remove_listener("response", capture)
 
     def post_json(self, url: str, payload: object, *, referer: str = "") -> object:
-        if not _allowed_url(url) or urlsplit(url).path.rstrip("/") != "/catResults":
-            raise SourceAccessError("The Invaluable browser only posts to its catalog-results endpoint.")
-        if not referer or not _allowed_url(referer) or urlsplit(referer).netloc != urlsplit(url).netloc:
-            raise SourceAccessError("The Invaluable catalog referer must belong to the same website.")
-        if urlsplit(referer).path.rstrip("/") != "/search":
-            raise SourceAccessError("Browser retry requires an Invaluable search bookmark.")
-        if not self._public_catalog_ready:
-            self._prepare_public_catalog(referer)
-        try:
-            return super().post_json(url, payload, referer=referer)
-        except SourceAccessBlocked:
-            self._blocked(
-                "Invaluable still blocked the catalog request in the retry browser. "
-                "Cached lots were retained. Try Retry with browser again when source access is available."
-            )
+        raise SourceAccessError("Public browser retry reads the search page's own catalog response; direct catalog requests are disabled.")
 
     def fetch(self, url: str) -> str:
         """Read public details without requiring a signed-in numeric sold result."""

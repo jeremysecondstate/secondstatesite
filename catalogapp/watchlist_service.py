@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import re
 import threading
 from typing import Callable, Iterable
+from urllib.parse import urlsplit
 
 from catalogapp.bookmark_watchlist import BookmarkEntry
 from catalogapp.watchlist_adapters import BatchedSearchPage, BookmarkSourceAdapter, adapter_for_url
-from catalogapp.watchlist_cache import WatchlistCache
+from catalogapp.watchlist_cache import CacheLookup, WatchlistCache
 from catalogapp.watchlist_enrichment import OpenAIEnricher
 from catalogapp.watchlist_fetch import SourceAccessBlocked, SourceAccessError, WatchlistStopped, page_fetcher_from_environment
 from catalogapp.watchlist_models import (
@@ -67,6 +69,23 @@ _SOLD_LOGIN_NOTICE = (
     "Invaluable requires sign-in to view these sold prices, so they are unavailable to this sync. "
     "Existing estimates and results have been retained."
 )
+
+
+def _invaluable_lot_reference(url: str) -> str:
+    match = re.search(r"-c-([a-z0-9]+)(?:/|$)", urlsplit(url).path, re.I)
+    return match[1].casefold() if match else ""
+
+
+def _retain_missing_static_fields(card: NormalizedLot, previous: NormalizedLot) -> None:
+    """Preserve richer cached description fields without carrying old bids."""
+    if not card.saved_image_base64 and (not card.image_url or card.image_url == previous.image_url):
+        card.saved_image_base64 = previous.saved_image_base64
+    for field in ("title", "medium", "auction_house", "sale_title", "lot_number", "location", "sale_url", "image_url"):
+        if not getattr(card, field):
+            setattr(card, field, getattr(previous, field))
+    if card.medium.casefold() == "print" and previous.medium:
+        card.medium = previous.medium
+    card.content_hash = card.calculate_content_hash()
 
 
 class WatchlistService:
@@ -315,6 +334,9 @@ class WatchlistService:
         lots: list[NormalizedLot] = []
         complete = True
         use_preloaded_search = preloaded_search is not None
+        # Saved HTML identifies Invaluable lots by the stable URL reference;
+        # its live feed can identify the same lot by a numeric objectID.
+        watched_lots = self.cache.lots_for_watch_url(entry.url) if adapter.source == "Invaluable" else []
         while page_url and page_url not in visited_pages:
             if len(visited_pages) >= self.max_pages_per_bookmark:
                 complete = False
@@ -330,23 +352,25 @@ class WatchlistService:
                 page = adapter.fetch_search_page(page_url, fetcher)
             if stop.is_set():
                 raise WatchlistStopped("Watchlist refresh stopped by the user.")
-            cards = adapter.parse_search_page(page, page_url, entry.artist)
-            if len(visited_pages) > 1 and cards and all(card.cache_key in observed_keys for card in cards):
+            cards = [(card, self._reconcile_search_identity(card, watched_lots))
+                     for card in adapter.parse_search_page(page, page_url, entry.artist)]
+            if len(visited_pages) > 1 and cards and all(card.cache_key in observed_keys for card, _cached in cards):
                 raise SourceAccessError(
                     "The source repeated an earlier catalog page; existing lots have been retained."
                 )
-            for card in cards:
+            for card, cached in cards:
                 if card.cache_key in observed_keys:
                     continue
                 observed_keys.add(card.cache_key)
                 search_hash = card.content_hash
-                cached = self.cache.lookup(card)
                 if cached and cached.search_hash == search_hash and not adapter.needs_detail(cached.lot):
                     lot = cached.lot
                     lot.artist_watchlist_name = entry.artist or lot.artist
                     metrics.cache_hits += 1
                 else:
                     lot = card
+                    if cached:
+                        _retain_missing_static_fields(lot, cached.lot)
                     if adapter.needs_detail(lot) and lot.lot_url and not (
                         adapter.source == "Invaluable" and result_checks is not None and result_checks.access_blocked
                     ):
@@ -399,6 +423,25 @@ class WatchlistService:
         if observed_lot_keys is not None:
             observed_lot_keys.update(lot.cache_key for lot in ended)
         return lots, ended, complete
+
+    def _reconcile_search_identity(self, card: NormalizedLot, watched_lots: list[NormalizedLot]) -> CacheLookup | None:
+        cached = self.cache.lookup(card)
+        if card.source == "Invaluable":
+            reference = _invaluable_lot_reference(card.lot_url)
+            if cached and reference and _invaluable_lot_reference(cached.lot.lot_url) not in {"", reference}:
+                raise SourceAccessError("Invaluable returned conflicting lot identities; existing lots were retained.")
+            if cached is None and reference:
+                matches = [lot for lot in watched_lots
+                           if lot.source == card.source and _invaluable_lot_reference(lot.lot_url) == reference]
+                if len(matches) > 1:
+                    raise SourceAccessError("An Invaluable lot matches multiple cached identities; existing lots were retained.")
+                if matches:
+                    cached = self.cache.lookup(matches[0])
+        if cached:
+            card.source_lot_id = cached.lot.source_lot_id
+            card.lot_url = cached.lot.lot_url or card.lot_url
+            card.content_hash = card.calculate_content_hash()
+        return cached
 
     def _refresh_posted_results(
         self,
