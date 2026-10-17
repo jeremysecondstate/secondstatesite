@@ -17,9 +17,11 @@ class SingleArtistControllerTests(TestCase):
         studio_tests.StudioWatchlistControllerTests.setUp(self)
         self.path.write_text(studio_tests.bookmarks('Calder', 'Matisse', 'Will Barnet'), encoding='utf-8')
         self.panel.load_bookmarks(self.path)
+        self.panel._calendar_lot_keys = set()
+        self.panel._calendar_inventory = []
         self.target = 'Will Barnet'
         self.entries = {entry.watch_label: entry for entry in self.panel.active_entries}
-        # A row action is an explicit choice, independent of the bulk selection.
+        # A selected artist is an explicit choice, independent of the bulk selection.
         self.panel.selected_artists = {'Calder'}
         self.target_lot = replace(self.lot, source_lot_id='will-one', artist=self.target,
                                   artist_watchlist_name=self.target, title='Fresh Will Barnet print')
@@ -61,7 +63,7 @@ class SingleArtistControllerTests(TestCase):
         self.assertIn(self.other_lot.cache_key, self.panel.fallback_lot_keys)
         self.assertIn(self.other_coverage, self.panel.artist_coverage)
 
-    def test_sync_row_fetches_and_uploads_only_artist_without_changing_bulk_selection(self):
+    def test_sync_artist_fetches_and_uploads_only_artist_without_changing_bulk_selection(self):
         self.panel.sync_artist(self.target)
 
         self.assert_only_target_requested()

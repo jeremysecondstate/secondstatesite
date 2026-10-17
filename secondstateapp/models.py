@@ -154,6 +154,16 @@ class UserProfile(models.Model):
         return [item.strip() for item in raw_value.split(",") if item.strip()]
 
 
+class SharedArtistWatchlist(models.Model):
+    """Portable public watch configuration, separate from machine-local settings."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    entries = models.JSONField(default=list)
+    artist_artprice_links = models.JSONField(default=dict)
+    coverage = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class AuctionWatchArtist(models.Model):
     """A persistent artist identity imported through the Artist Watchlist."""
 

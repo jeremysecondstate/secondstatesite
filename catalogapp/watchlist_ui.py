@@ -40,12 +40,15 @@ from catalogapp.watchlist_service import WatchlistResult, WatchlistService
 from catalogapp.watchlist_registry import load_watchlist, save_watchlist
 from catalogapp.watchlist_sync import CalendarSyncResult, fetch_calendar_inventory, sync_watchlist_lots
 from catalogapp.watchlist_artist_inventory import artist_inventory_rows
+from catalogapp.watchlist_shared import fetch_shared_watchlist, merge_shared_watchlist, publish_shared_watchlist
+from catalogapp.watchlist_paths import remember_bookmark_path, resolve_saved_bookmark_path
+from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.studio_theme import STUDIO_COLORS, studio_icon
 from secondstate import environment
 
 
 DEFAULT_BOOKMARK_PATH = Path(r"I:\Shared drives\SECONDSTATE\ARTAPP\INVALUABLE-BM.html")
-PROJECT_BOOKMARK_PATH = Path(__file__).resolve().parents[1] / "docs" / "ARTIST-LINKZ.html"
+PROJECT_BOOKMARK_PATH = Path(__file__).resolve().parents[1] / "docs" / "ARTIST-LINKZZZZZZ.html"
 
 
 def local_watchlist_directory() -> Path:
@@ -81,6 +84,8 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.source_refresh_errors: list[str] = []
         self.artist_coverage = []
         self._calendar_inventory = None
+        self._calendar_lot_keys = None
+        self._selected_sync_artist = ""
         self._last_artist_scope = None
         self._sync_details_text = ""
         self.stop_event = threading.Event()
@@ -92,6 +97,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self._invaluable_profile_directory = local_watchlist_directory() / "invaluable-browser"
         self._build()
         self._load_initial_bookmarks()
+        self.after(250, lambda: self.load_shared_calendar(automatic=True))
 
     def _build(self) -> None:
         self.columnconfigure(0, weight=1)
@@ -130,12 +136,12 @@ class ArtistWatchlistPanel(ttk.Frame):
             workflow, text="Manage artists", command=self._toggle_review, style="SurfaceSecondary.TButton",
         )
         self.review_button.grid(row=0, column=2, rowspan=2, padx=(16, 12))
-        self.recover_pending_button = ttk.Button(
-            workflow, text="Recover pending", command=self.recover_pending, style="SurfaceSecondary.TButton",
+        self.sync_selected_button = ttk.Button(
+            workflow, text="Sync selected", command=self.sync_selected, style="SurfaceSecondary.TButton", state=tk.DISABLED,
         )
-        self.recover_pending_button.grid(row=0, column=3, rowspan=2, padx=(0, 12))
+        self.sync_selected_button.grid(row=0, column=3, rowspan=2, padx=(0, 12))
         self.sync_to_calendar_button = ttk.Button(
-            workflow, text="Update Calendar", image=self._icons["sync"], compound=tk.LEFT,
+            workflow, text="Sync all", image=self._icons["sync"], compound=tk.LEFT,
             command=self.sync_to_calendar, style="SurfaceAccent.TButton",
         )
         self.sync_to_calendar_button.grid(row=0, column=4, rowspan=2)
@@ -151,6 +157,10 @@ class ArtistWatchlistPanel(ttk.Frame):
             coverage_strip, text="View artist coverage", command=lambda: self._show_lot_view("coverage"), style="Quiet.TButton",
         )
         self.coverage_button.pack(side=tk.RIGHT)
+        self.selected_sync_var = tk.StringVar(value="Select an artist with new lots")
+        ttk.Label(workflow, textvariable=self.selected_sync_var, style="SurfaceSubtle.TLabel").grid(
+            row=2, column=2, columnspan=3, sticky="e", pady=(8, 0),
+        )
         self.review_frame = ttk.Frame(self, padding=16, style="Card.TFrame")
         # The review occupies the same flexible workspace as the agenda. It
         # must not push the sync status or calendar below smaller windows.
@@ -257,6 +267,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.more_menu.add_command(label="Calendar preview", command=lambda: self._show_lot_view("calendar"))
         self.more_menu.add_command(label="Artist coverage", command=lambda: self._show_lot_view("coverage"))
         self.more_menu.add_command(label="Scan bookmarks HTML…", command=self.choose_scan_html)
+        self.more_menu.add_command(label="Load from Calendar", command=self.load_shared_calendar)
         self.more_menu.add_separator()
         self.more_menu.add_command(label="Use my browser for Invaluable…", command=self.use_regular_browser)
         self.more_menu.add_command(label="Import saved Invaluable pages…", command=self.import_saved_invaluable_pages)
@@ -306,12 +317,12 @@ class ArtistWatchlistPanel(ttk.Frame):
         )
         self.scan_html_button.pack(side=tk.RIGHT)
         self.artist_inventory_tree = ttk.Treeview(
-            artists_tab, columns=("artist", "source", "local", "calendar", "state", "sync"), show="headings",
+            artists_tab, columns=("artist", "source", "local", "calendar", "state", "new"), show="headings",
             selectmode="browse", style="Studio.Agenda.Treeview",
         )
         for key, title, width in (
             ("artist", "Artist", 210), ("source", "Source", 100), ("local", "Saved lots", 80),
-            ("calendar", "Calendar lots", 100), ("state", "Source check", 200), ("sync", "Sync artist", 90),
+            ("calendar", "Calendar lots", 100), ("state", "Source check", 190), ("new", "Ready to add", 125),
         ):
             self.artist_inventory_tree.heading(key, text=title, anchor=tk.W)
             self.artist_inventory_tree.column(key, width=width, minwidth=width, stretch=key in {"artist", "state"})
@@ -319,12 +330,11 @@ class ArtistWatchlistPanel(ttk.Frame):
         inventory_scroll = ttk.Scrollbar(artists_tab, orient=tk.VERTICAL, command=self.artist_inventory_tree.yview)
         inventory_scroll.grid(row=1, column=1, sticky="ns")
         self.artist_inventory_tree.configure(yscrollcommand=inventory_scroll.set)
-        self.artist_inventory_tree.bind("<ButtonRelease-1>", self._inventory_sync_click)
-        self.artist_inventory_tree.bind("<Return>", self._sync_inventory_selection)
+        self.artist_inventory_tree.tag_configure("on_calendar", foreground=STUDIO_COLORS["muted"] if "muted" in STUDIO_COLORS else "#8894a5")
         self.artist_inventory_tree.bind("<<TreeviewSelect>>", self._inventory_selection_changed)
         inventory_actions = ttk.Frame(artists_tab, style="Surface.TFrame")
         inventory_actions.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
-        self.inventory_detail_var = tk.StringVar(value="Scan artists compares your saved bookmarks and Calendar. Click ↻ Sync for one artist.")
+        self.inventory_detail_var = tk.StringVar(value="Select an artist with new lots, then Sync selected. Existing Calendar lots are skipped.")
         ttk.Label(inventory_actions, textvariable=self.inventory_detail_var, style="SurfaceSubtle.TLabel", wraplength=750).pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.artist_browser_button = ttk.Button(
             inventory_actions, text="Use my browser for artist…", command=self._browser_for_inventory_selection,
@@ -355,18 +365,16 @@ class ArtistWatchlistPanel(ttk.Frame):
         upcoming_tab.columnconfigure(0, weight=1)
         upcoming_tab.rowconfigure(0, weight=1)
         self.upcoming_tree = ttk.Treeview(
-            upcoming_tab, columns=("date", "artist", "sync", "title", "lot", "estimate"), show="headings",
+            upcoming_tab, columns=("date", "artist", "title", "lot", "estimate"), show="headings",
             height=5, selectmode="browse", style="Studio.Agenda.Treeview",
         )
         for key, title, width, minimum in (
             ("date", "Date", 100, 90), ("artist", "Artist", 190, 130),
-            ("sync", "Sync artist", 85, 85),
             ("title", "Artwork", 280, 140), ("lot", "Lot", 70, 50), ("estimate", "Estimate", 140, 110),
         ):
             self.upcoming_tree.heading(key, text=title, anchor=tk.W)
             self.upcoming_tree.column(key, width=width, minwidth=minimum, stretch=key in {"artist", "title"}, anchor=tk.W)
         self.upcoming_tree.grid(row=0, column=0, sticky="nsew")
-        self.upcoming_tree.bind("<ButtonRelease-1>", self._lot_sync_click)
         upcoming_scroll = ttk.Scrollbar(upcoming_tab, orient=tk.VERTICAL, command=self.upcoming_tree.yview)
         upcoming_scroll.grid(row=0, column=1, sticky="ns")
 
@@ -431,7 +439,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.calendar_text.pack(fill=tk.BOTH, expand=True)
         self.calendar_text.configure(state=tk.DISABLED)
         self.empty_state = ttk.Label(
-            upcoming_tab, text="Your upcoming lots will appear here.\nChoose Update Calendar to check your saved artists.",
+            upcoming_tab, text="Your upcoming lots will appear here.\nChoose Sync all to check your saved artists.",
             style="SurfaceSubtle.TLabel", justify=tk.CENTER, padding=24,
         )
         self.empty_state.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
@@ -445,7 +453,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.status_title_var = tk.StringVar(value="Ready to sync")
         self.status_title_label = ttk.Label(footer, textvariable=self.status_title_var, style="Status.TLabel")
         self.status_title_label.grid(row=0, column=1, sticky="w")
-        self.sync_status_var = tk.StringVar(value="Choose Update Calendar to check your saved watchlist. Manage artists changes your selection.")
+        self.sync_status_var = tk.StringVar(value="Choose Sync all to check your saved watchlist. Manage artists changes your selection.")
         status = ttk.Label(footer, textvariable=self.sync_status_var, style="Status.TLabel", wraplength=900)
         self.status_message_label = status
         status.grid(row=1, column=1, sticky="ew", pady=(3, 0))
@@ -461,11 +469,6 @@ class ArtistWatchlistPanel(ttk.Frame):
         )
         self.sync_details_button.grid(row=0, column=1, padx=(12, 0))
         self.sync_details_button.grid_remove()
-        self.retry_browser_button = ttk.Button(
-            footer_actions, text="Retry with browser", command=self.retry_with_browser, style="Secondary.TButton",
-        )
-        self.retry_browser_button.grid(row=0, column=2, padx=(12, 0))
-        self.retry_browser_button.grid_remove()
         self.import_invaluable_button = ttk.Button(
             footer_actions, text="Use my browser…", command=self.use_regular_browser,
             style="Secondary.TButton",
@@ -530,7 +533,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         )
         if path and self._merge_scan_html(path):
             payload = self._read_settings()
-            payload["scan_html_path"] = str(Path(path).resolve())
+            remember_bookmark_path(payload, "scan_html_path", path, PROJECT_BOOKMARK_PATH.parents[1])
             self._settings_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             self.scan_artists()
 
@@ -567,42 +570,123 @@ class ArtistWatchlistPanel(ttk.Frame):
             return
         if not self._load_watchlist_for_update(self.bookmark_path_var.get().strip()):
             return
-        extra_path = self._read_settings().get("scan_html_path", "")
+        extra_path = resolve_saved_bookmark_path(self._read_settings(), "scan_html_path", PROJECT_BOOKMARK_PATH.parents[1])
         html_warning = ""
         if extra_path and not self._merge_scan_html(extra_path):
             html_warning = " The HTML file could not be read; saved artists were retained."
-        self._load_cached_agenda()
+        self._scan_missing_only = True
         self._show_lot_view("artists")
-        self._fill_artist_inventory()
+        self.load_shared_calendar(scan=True, html_warning=html_warning)
+
+    def load_shared_calendar(self, automatic: bool = False, *, scan: bool = False, html_warning: str = "") -> None:
+        """Restore public shared data; never request auction sites during a scan."""
+        if self._is_busy():
+            return
         self._set_import_buttons_state(tk.DISABLED)
         self.refresh_button.configure(state=tk.DISABLED)
-        self._set_status("Reading saved Calendar counts and artist bookmarks…")
+        self._set_status("Reading saved Calendar lots and artist bookmarks…")
         configured = self._calendar_sync_configured()
+        entries = list(self.all_entries)
+        links = dict(self.artist_artprice_links)
+        enabled = {entry.url for entry in self.active_entries if entry.watch_label in self.selected_artists}
+        horizon = self._horizon_days()
         def run():
-            inventory, error = None, ""
+            snapshot, inventory, error = None, None, ""
             try:
                 if configured:
+                    snapshot = fetch_shared_watchlist(base_url=self.calendar_base_url, api_key=self.calendar_api_key, horizon_days=horizon)
                     inventory = fetch_calendar_inventory(base_url=self.calendar_base_url, api_key=self.calendar_api_key)
+                    if scan:
+                        publish_shared_watchlist(entries, base_url=self.calendar_base_url, api_key=self.calendar_api_key,
+                                                 artist_artprice_links=links, enabled_watch_urls=enabled)
                 else:
                     error = "Calendar connection is not configured."
             except Exception as exc:
                 error = " ".join(str(exc).split())[:300]
-            self.after(0, lambda: self._finish_artist_scan(inventory, error, html_warning))
-        self.worker = threading.Thread(target=run, name="artist-calendar-scan", daemon=True)
+            self.after(0, lambda: self._finish_shared_calendar(snapshot, inventory, error, automatic,
+                                                             scan=scan, html_warning=html_warning))
+        self.worker = threading.Thread(target=run, name="shared-artist-calendar", daemon=True)
         self.worker.start()
 
-    def _finish_artist_scan(self, inventory, error: str, html_warning: str = "") -> None:
+    def _finish_shared_calendar(self, snapshot, inventory, error: str, automatic: bool = False,
+                                *, scan: bool = False, html_warning: str = "") -> None:
         self.worker = None
         self._calendar_inventory = inventory
+        self._calendar_lot_keys = snapshot.calendar_lot_keys if snapshot is not None else None
+        if snapshot is not None:
+            saved = self._read_settings()
+            known_artists = {entry.watch_label for entry in self.all_entries}
+            with WatchlistCache(self._cache_path) as cache:
+                merged = merge_shared_watchlist(snapshot, cache=cache, entries=self.all_entries,
+                                                artist_artprice_links=self.artist_artprice_links,
+                                                registry_path=self._registry_path)
+            self.all_entries = merged.entries
+            self.artist_artprice_links = merged.artist_artprice_links
+            self.artprice_match_result = ArtpriceMatchResult(dict(self.artist_artprice_links), (), (), 0)
+            self._update_artprice_summary()
+            self._build_folder_controls()
+            self._update_active_entries()
+            self._restore_watchlist_preferences(saved)
+            shared_disabled = {entry.watch_label for entry in snapshot.entries
+                               if entry.url not in snapshot.enabled_watch_urls}
+            shared_enabled = {entry.watch_label for entry in snapshot.entries
+                              if entry.url in snapshot.enabled_watch_urls}
+            self.selected_artists -= shared_disabled - shared_enabled - known_artists
+            self._shared_watchlist_loaded = True
+            self._refresh_artist_watch_marks()
+            self._save_settings_hint()
+            self._refresh_coverage_from_cache()
+        if snapshot is not None:
+            self._load_cached_agenda()
         self.refresh_button.configure(state=tk.NORMAL)
         self._set_import_buttons_state(tk.NORMAL)
         self._fill_artist_inventory()
-        extra = self._read_settings().get("scan_html_path", "")
-        source = f" Includes {Path(extra).name}." if extra else ""
         if error:
-            self._set_status(f"Artist scan ready; Calendar counts unavailable: {error}. You can still sync one artist.{html_warning}")
+            self._set_status(f"Calendar comparison incomplete: {error}. Sync selected requires a successful Calendar comparison.{html_warning}")
+        elif scan:
+            missing = len(self._missing_lots())
+            self._set_status(f"Artist scan ready. {missing} lots are not on the Calendar. Select an artist, then Sync selected. New artists without saved lots can be checked individually.{html_warning}")
         else:
-            self._set_status(f"Artist scan ready. Click ↻ Sync beside one artist to update only their lots.{source}{html_warning}")
+            self._set_status(f"Shared Calendar loaded: {len(self.selected_artists)} artists · {len(self.current_lots)} saved lots. Scan to find lots not yet on the Calendar.")
+
+    def _lot_on_calendar(self, lot) -> bool:
+        keys = self.__dict__.get("_calendar_lot_keys")
+        return keys is not None and (lot.cache_key in keys or
+            f"{lot.source.casefold()}:{canonicalize_bookmark_url(lot.lot_url)}" in keys)
+
+    def _missing_lots(self, artist: str | None = None):
+        if self.__dict__.get("_calendar_lot_keys") is None:
+            return []
+        return [lot for lot in self.current_lots if not self._lot_on_calendar(lot)
+                and (artist is None or artist_identity_key(lot.artist_watchlist_name or lot.artist) == artist_identity_key(artist))]
+
+    def _artist_has_missing_lots(self, artist: str) -> bool:
+        if not artist or self.__dict__.get("_calendar_lot_keys") is None:
+            return False
+        if not any(artist_identity_key(entry.watch_label) == artist_identity_key(artist) for entry in self.active_entries):
+            return False
+        if self._missing_lots(artist):
+            return True
+        rows = artist_inventory_rows(self.active_entries, self.current_lots,
+                                     self.__dict__.get("artist_coverage", []), self.__dict__.get("_calendar_inventory"))
+        return any(artist_identity_key(row.artist) == artist_identity_key(artist) and row.syncable
+                   and not row.local_count and row.calendar_count == 0
+                   and row.status not in {"verified", "empty"} for row in rows)
+
+    def _update_selected_sync(self) -> None:
+        artist = self.__dict__.get("_selected_sync_artist", "")
+        eligible = self._artist_has_missing_lots(artist)
+        button = self.__dict__.get("sync_selected_button")
+        if button is not None:
+            button.configure(state=tk.NORMAL if eligible and not self._is_busy() else tk.DISABLED)
+        label = self.__dict__.get("selected_sync_var")
+        if label is not None:
+            label.set(f"Selected: {artist}" if eligible else "Select an artist with new lots")
+
+    def sync_selected(self) -> None:
+        artist = self.__dict__.get("_selected_sync_artist", "")
+        if self._artist_has_missing_lots(artist):
+            self.sync_artist(artist)
 
     def _fill_artist_inventory(self) -> None:
         tree = self.__dict__.get("artist_inventory_tree")
@@ -623,14 +707,20 @@ class ArtistWatchlistPanel(ttk.Frame):
         for index, row in enumerate(rows):
             if query and query not in row.artist.casefold():
                 continue
+            eligible = row.syncable and self._artist_has_missing_lots(row.artist)
+            if self.__dict__.get("_scan_missing_only") and self.__dict__.get("_calendar_lot_keys") is not None and not eligible:
+                continue
+            missing_count = len(self._missing_lots(row.artist))
+            readiness = (f"{missing_count} new lots" if missing_count else "Check new artist") if eligible else (
+                "Load Calendar first" if self.__dict__.get("_calendar_lot_keys") is None else "On Calendar" if row.calendar_count else "No new lots")
             iid = f"inventory-{index}"
             self._inventory_rows[iid] = row
             tree.insert("", tk.END, iid=iid, values=(
                 row.artist, row.source or "—", row.local_count,
                 "Not scanned" if row.calendar_count is None else row.calendar_count,
                 "New · not checked" if row.status == "pending" and not row.local_count else labels.get(row.status, row.status),
-                "↻ Sync" if row.syncable else "—",
-            ))
+                readiness,
+            ), tags=() if eligible else ("on_calendar",))
             if previous and (previous.artist, previous.source) == (row.artist, row.source):
                 tree.selection_set(iid)
                 tree.see(iid)
@@ -642,13 +732,16 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def _inventory_selection_changed(self, _event=None) -> None:
         row = self._selected_inventory_row()
+        eligible = row and row.syncable and self._artist_has_missing_lots(row.artist)
+        self._selected_sync_artist = row.artist if eligible else ""
+        self._update_selected_sync()
         self.artist_browser_button.configure(
-            state=tk.NORMAL if row and row.syncable and row.source == "Invaluable" and not self._is_busy() else tk.DISABLED,
+            state=tk.NORMAL if eligible and row.source == "Invaluable" and not self._is_busy() else tk.DISABLED,
         )
         if row:
             counts = "Calendar not scanned" if row.calendar_count is None else f"{row.calendar_count} Calendar lots · {row.upcoming_count} upcoming"
             self.inventory_detail_var.set(f"{row.artist} · {counts}. " + (
-                "Sync checks this artist only." if row.syncable else "Add this artist’s auction bookmark to sync them."
+                "Sync selected adds this artist’s missing lots." if eligible else "No known lots to add. Scan again after adding or loading new lots."
             ))
 
     def _inventory_sync_click(self, event) -> None:
@@ -666,7 +759,7 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def _browser_for_inventory_selection(self) -> None:
         row = self._selected_inventory_row()
-        if row and row.syncable:
+        if row and row.syncable and self._artist_has_missing_lots(row.artist):
             self.use_regular_browser(artist_scope={row.artist})
 
     def _lot_sync_click(self, event) -> None:
@@ -729,7 +822,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             f"{len(self.current_lots)} saved lots loaded; source data has not been checked in this session. "
             if self.current_lots else "Your saved watchlist is ready. "
         )
-        self._set_status(lead + "Choose Update Calendar, or Recover pending to finish incomplete artists.")
+        self._set_status(lead + "Choose Scan artists to find lots missing from the Calendar, or Sync all to refresh everything.")
 
     def _update_coverage_display(self) -> None:
         selected_artists = self.__dict__.get("selected_artists", set())
@@ -785,7 +878,7 @@ class ArtistWatchlistPanel(ttk.Frame):
                     "The catalog search completed and returned no upcoming lots."
                     if row.state == "empty" else
                     "Known lots are saved source records; the Calendar uses your selected look-ahead period. "
-                    "Recover pending checks only unfinished artists."
+                    "Scan artists finds lots missing from the Calendar."
                 )
             )
 
@@ -809,7 +902,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         )
         if path:
             if self.load_bookmarks(path, source_kind="html"):
-                self._set_status("Bookmarks imported and saved. Click Update Calendar when you’re ready.")
+                self._set_status("Bookmarks imported and saved. Click Sync all when you’re ready.")
 
     def choose_browser_bookmarks(self) -> None:
         """Let the user select one local browser profile as the live bookmark source."""
@@ -833,7 +926,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         ttk.Label(content, text="Which browser profile holds your artist bookmarks?", style="Header.TLabel").pack(anchor="w")
         ttk.Label(
             content,
-            text="Studio reads its auction artist bookmarks and matching Artprice links on every Update Calendar.",
+            text="Studio reads its auction artist bookmarks and matching Artprice links on every Sync all.",
             wraplength=580,
         ).pack(anchor="w", pady=(8, 16))
         current = self.bookmark_path_var.get()
@@ -853,7 +946,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             if self.load_bookmarks(
                 source.path, preserve_selection=bool(self.all_entries), source_label=source.label, source_kind="browser",
             ):
-                self._set_status(f"{source.label} connected. New artist bookmarks will be read each time you choose Update Calendar.")
+                self._set_status(f"{source.label} connected. New artist bookmarks will be read each time you choose Sync all.")
                 picker.destroy()
 
         ttk.Button(actions, text="Use these bookmarks", command=use_selected_source, style="Accent.TButton").pack(side=tk.RIGHT)
@@ -878,7 +971,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         if filename is not None:
             connection = f"One {source.browser} profile connected. " if source is not None else ""
             filename.set(
-                f"{connection}New artists and Artprice links are read on every Update Calendar. Saved artists stay watched; exclude them here when needed."
+                f"{connection}New artists and Artprice links are read on every Sync all. Saved artists stay watched; exclude them here when needed."
                 if browser_source else
                 f"{Path(path).name} · Export bookmarks again after adding artists; Studio rereads this file on every update."
             )
@@ -899,7 +992,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         try:
             retained_entries, retained_links = [], {}
             registry = self.__dict__.get("_registry_path")
-            merge_saved = source_kind == "browser" or bool(saved.get("scan_html_path"))
+            merge_saved = source_kind == "browser" or bool(saved.get("scan_html_path") or saved.get("shared_watchlist_loaded"))
             if merge_saved:
                 if registry is not None:
                     retained_entries, retained_links = load_watchlist(registry)
@@ -1123,6 +1216,7 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def sync_to_calendar(self) -> None:
         """Update the saved watchlist, fetch selected watches, then publish lots."""
+        self._scan_missing_only = False
         self._sync_from_bookmarks(use_browser=False)
 
     def recover_pending(self) -> None:
@@ -1421,6 +1515,7 @@ class ArtistWatchlistPanel(ttk.Frame):
                     control.configure(state=state)
         self._update_browser_retry_button()
         self._update_coverage_display()
+        self._update_selected_sync()
 
     def _has_invaluable_source_issue(self) -> bool:
         return any("invaluable" in error.casefold() for error in self.source_refresh_errors)
@@ -1505,22 +1600,69 @@ class ArtistWatchlistPanel(ttk.Frame):
         sync_result = None
         sync_error = ""
         sync_setup_message = ""
+        calendar_lookup_error = ""
+        shared_publish_error = ""
+        already_on_calendar = 0
+        uploaded_lot_keys = None
+        calendar_lot_keys = self.__dict__.get("_calendar_lot_keys")
+        upload_lots = list(result.lots)
+        configured = self._calendar_sync_configured() if not result.stopped else False
         if not result.stopped and result.lots:
-            if self._calendar_sync_configured():
-                self.after(0, lambda: self._set_status("Watchlist updated. Syncing the website calendar..."))
+            if configured:
                 self.after(0, lambda: self._set_stop_available(False))
-                try:
-                    sync_result = self.calendar_syncer(
-                        result.lots,
-                        base_url=self.calendar_base_url,
-                        api_key=self.calendar_api_key,
-                        artist_artprice_links={name: url for name, url in self.artist_artprice_links.items()
-                                               if artist_scope is None or name in artist_scope},
-                    )
-                except Exception as exc:
-                    sync_error = " ".join(str(exc).split())[:500]
+                if artist_scope:
+                    self.after(0, lambda: self._set_status("Checking which selected lots are already on the Calendar..."))
+                    try:
+                        snapshot = fetch_shared_watchlist(base_url=self.calendar_base_url, api_key=self.calendar_api_key)
+                        calendar_lot_keys = set(snapshot.calendar_lot_keys)
+                        scoped_lots = [lot for lot in result.lots if self._lot_in_artist_scope(lot, artist_scope)]
+                        upload_lots = [lot for lot in scoped_lots if (
+                            lot.cache_key not in calendar_lot_keys
+                            and (not lot.lot_url or
+                                 f"{lot.source.casefold()}:{canonicalize_bookmark_url(lot.lot_url)}" not in calendar_lot_keys)
+                        )]
+                        already_on_calendar = len(scoped_lots) - len(upload_lots)
+                    except Exception as exc:
+                        # A missing inventory must never turn a selected import
+                        # into an update of every existing artist record.
+                        calendar_lot_keys = None
+                        upload_lots = []
+                        calendar_lookup_error = " ".join(str(exc).split())[:500]
+                if stop_event is not None and stop_event.is_set():
+                    result.stopped = True
+                    upload_lots = []
+                if upload_lots:
+                    self.after(0, lambda: self._set_status("Watchlist updated. Syncing the website calendar..."))
+                    try:
+                        sync_result = self.calendar_syncer(
+                            upload_lots,
+                            base_url=self.calendar_base_url,
+                            api_key=self.calendar_api_key,
+                            artist_artprice_links={name: url for name, url in self.artist_artprice_links.items()
+                                                   if artist_scope is None or name in artist_scope},
+                        )
+                        uploaded_lot_keys = {lot.cache_key for lot in upload_lots}
+                        if calendar_lot_keys is not None:
+                            calendar_lot_keys = set(calendar_lot_keys) | uploaded_lot_keys
+                            calendar_lot_keys.update(
+                                f"{lot.source.casefold()}:{canonicalize_bookmark_url(lot.lot_url)}"
+                                for lot in upload_lots if lot.lot_url
+                            )
+                    except Exception as exc:
+                        sync_error = " ".join(str(exc).split())[:500]
+                        calendar_lot_keys = None
             else:
                 sync_setup_message = self._calendar_sync_setup_message()
+        if configured and not result.stopped and not calendar_lookup_error:
+            try:
+                publish_shared_watchlist(
+                    self.all_entries, base_url=self.calendar_base_url, api_key=self.calendar_api_key,
+                    artist_artprice_links=self.artist_artprice_links, coverage=result.coverage,
+                    enabled_watch_urls={entry.url for entry in self.active_entries
+                                        if entry.watch_label in self.selected_artists},
+                )
+            except Exception as exc:
+                shared_publish_error = "Shared artist list could not be saved: " + " ".join(str(exc).split())[:400]
         inventory = self.__dict__.get("_calendar_inventory")
         if sync_result and inventory is not None:
             try:
@@ -1528,26 +1670,49 @@ class ArtistWatchlistPanel(ttk.Frame):
             except Exception:
                 # An inventory read failure cannot turn a successful upload into a failure.
                 inventory = None
+        if sync_result and calendar_lot_keys is None:
+            try:
+                calendar_lot_keys = set(fetch_shared_watchlist(
+                    base_url=self.calendar_base_url, api_key=self.calendar_api_key,
+                ).calendar_lot_keys)
+            except Exception:
+                # The next selected sync will check again before uploading.
+                calendar_lot_keys = None
         def finish():
             self._calendar_inventory = inventory
+            self._calendar_lot_keys = calendar_lot_keys
             options = dict(sync_result=sync_result, sync_error=sync_error, sync_setup_message=sync_setup_message)
             if artist_scope:
-                self._finish_scoped_refresh(result, artist_scope=artist_scope, inventory=inventory, **options)
+                self._finish_scoped_refresh(
+                    result, artist_scope=artist_scope, inventory=inventory,
+                    already_on_calendar=already_on_calendar, uploaded_lot_keys=uploaded_lot_keys,
+                    calendar_lookup_error=calendar_lookup_error, **options,
+                )
             else:
                 self._finish_refresh(result, **options)
                 self._fill_artist_inventory()
+            if shared_publish_error:
+                self._set_sync_details(self.__dict__.get("_sync_details_text", "") + "\n\n" + shared_publish_error)
+                self._set_status(self.sync_status_var.get() + " " + shared_publish_error)
         self.after(0, finish)
 
-    def _finish_scoped_refresh(self, result: WatchlistResult, *, artist_scope=None, inventory=None, **kwargs) -> None:
+    def _finish_scoped_refresh(self, result: WatchlistResult, *, artist_scope=None, inventory=None,
+                               already_on_calendar: int = 0, uploaded_lot_keys=None,
+                               calendar_lookup_error: str = "", **kwargs) -> None:
         previous_lots = list(self.current_lots)
         previous_fallback = set(self.fallback_lot_keys)
         previous_coverage = list(self.__dict__.get("artist_coverage", []))
         self._calendar_inventory = inventory
         # Build the status and upload report from this artist's actual result.
-        self._finish_refresh(result, **kwargs)
+        report_result = result
+        if uploaded_lot_keys is not None:
+            report_result = replace(result, lots=[lot for lot in result.lots if lot.cache_key in uploaded_lot_keys],
+                                    fallback_lot_keys=result.fallback_lot_keys & uploaded_lot_keys)
+        self._finish_refresh(report_result, **kwargs)
         if artist_scope:
             retained = {lot.cache_key: lot for lot in previous_lots if not self._lot_in_artist_scope(lot, artist_scope)}
             self.fallback_lot_keys.update(previous_fallback & set(retained))
+            self.fallback_lot_keys.update(result.fallback_lot_keys)
             retained.update({lot.cache_key: lot for lot in result.lots})
             self.current_lots = sorted(retained.values(), key=lambda lot: (
                 lot.relevant_at or "9999", lot.artist_watchlist_name.casefold(), lot.lot_number,
@@ -1558,6 +1723,26 @@ class ArtistWatchlistPanel(ttk.Frame):
             self._update_coverage_display()
             self._fill_agenda()
             label = self.sync_status_var.get()
+            extra_detail = ""
+            if calendar_lookup_error and not result.stopped:
+                label = "Calendar could not be checked, so no lots were imported. Local results are retained. Try Scan artists again."
+                extra_detail = label + "\n\n" + calendar_lookup_error
+            elif already_on_calendar and not kwargs.get("sync_error") and not result.stopped:
+                if kwargs.get("sync_result"):
+                    extra_detail = f"{already_on_calendar} lots were already on the Calendar and were left unchanged."
+                    label += " " + extra_detail
+                else:
+                    label = f"All {already_on_calendar} available lots are already on the Calendar. No lots were imported."
+                    if result.errors:
+                        label += " Source refresh remains incomplete; see Sync details."
+                    extra_detail = label
+            if extra_detail:
+                previous_details = self.__dict__.get("_sync_details_text", "")
+                if calendar_lookup_error or not kwargs.get("sync_result"):
+                    # Replace the default no-upcoming-lots paragraph when the
+                    # source did return lots but none were eligible to import.
+                    previous_details = previous_details.partition("\n\n")[2]
+                self._set_sync_details(extra_detail + ("\n\n" + previous_details if previous_details else ""))
             self._set_status(f"{', '.join(sorted(artist_scope))} only. {label}")
         self._fill_artist_inventory()
 
@@ -1587,7 +1772,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             f"The local lots are ready, but website calendar sync needs {' and '.join(missing)}.\n\n"
             f"Add the missing setting(s) to:\n{environment.PROJECT_ROOT / '.env'}\n\n"
             "Use SECONDSTATE_BASE_URL=https://secondstate.art and the same CATALOG_API_KEY "
-            "configured on the website. Then click Update Calendar again; "
+            "configured on the website. Then click Sync all again; "
             "the app reloads this file automatically."
         )
 
@@ -1621,7 +1806,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.metrics_var.set(result.metrics.summary())
         self._fill_agenda()
         label = (
-            "Calendar update stopped. Click Recover pending to continue." if result.stopped
+            "Calendar update stopped. Click Scan artists to continue." if result.stopped
             else "No upcoming lots found for the selected artists."
         )
         if sync_result:
@@ -1632,13 +1817,13 @@ class ArtistWatchlistPanel(ttk.Frame):
                 "See the sync message for the next step."
             )
         elif sync_setup_message:
-            label = "Local lots ready; website calendar not synced. Add the missing .env settings, then click Update Calendar."
+            label = "Local lots ready; website calendar not synced. Add the missing .env settings, then click Sync all."
         elif result.errors and not result.stopped:
             label = "Live source refresh incomplete; website calendar was not synced."
             if not result.lots:
                 label += " No lots were available to upload."
             if self._has_invaluable_source_issue():
-                label += " Choose Recover pending; Retry with browser or Import saved Invaluable pages are also available."
+                label += " Choose Scan artists to find missing lots, or Use my browser to load fresh Invaluable results."
             cause = " ".join(result.errors[0].split())
             label += "\nSource: " + (cause[:177] + "…" if len(cause) > 180 else cause)
             label += " See Sync details."
@@ -1687,7 +1872,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self._set_stop_available(False)
         self.worker = None
         self._set_sync_details("Calendar sync could not finish.\n\n" + message + "\n\n" + self._source_refresh_details())
-        self._set_status("Calendar sync could not finish. Your previous local results are still available; try Update Calendar again.")
+        self._set_status("Calendar sync could not finish. Your previous local results are still available; try Sync all again.")
         messagebox.showerror("Calendar Sync Failed", message, parent=self)
 
     def sync_website_calendar(self) -> None:
@@ -1695,7 +1880,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         if self._is_busy():
             return
         if not self.current_lots:
-            messagebox.showwarning("Nothing to Sync", "Use Update Calendar to retrieve upcoming lots first.", parent=self)
+            messagebox.showwarning("Nothing to Sync", "Use Sync all to retrieve upcoming lots first.", parent=self)
             return
         if not self._calendar_sync_configured():
             self._set_status("Website calendar not synced: missing .env settings. See the setup instructions.")
@@ -1751,7 +1936,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             label += (
                 " Live source refresh remains incomplete; choose Use my browser to import fresh Invaluable results from your usual browser."
                 if self._has_invaluable_source_issue()
-                else " Live source refresh remains incomplete; try Update Calendar after source access is restored."
+                else " Live source refresh remains incomplete; try Sync all after source access is restored."
             )
             cause = " ".join(self.source_refresh_errors[0].split())
             label += "\nSource: " + (cause[:177] + "…" if len(cause) > 180 else cause)
@@ -1802,14 +1987,14 @@ class ArtistWatchlistPanel(ttk.Frame):
             parts.append("Live source refresh issues:\n" + "\n\n".join(self.source_refresh_errors))
             if any("HTTP 202" in error for error in self.source_refresh_errors):
                 parts.append(
-                    "An HTTP 202 access page is not auction data. Update Calendar and Recover pending "
+                    "An HTTP 202 access page is not auction data. Sync all and Sync selected "
                     "automatically try a visible browser once for the affected Invaluable searches. "
                     "If the browser cannot retrieve them, their cached lots remain available."
                 )
             if self._has_invaluable_source_issue():
                 parts.append(
-                    "For Invaluable, click Retry with browser to retrieve the selected artists in a separate, "
-                    "visible browser and sync the results. Keep that browser open while it loads. "
+                    "For Invaluable, automatic source recovery may use a separate, "
+                    "visible browser. Keep that browser open while it loads. "
                     "If Invaluable asks for verification, complete it there. An Access Denied screen or a closed "
                     "retry window ends browser recovery; available lots still upload with a source warning. "
                     "Use my browser to import fresh results from your usual browser. Stop cancels the entire sync. "
@@ -1824,8 +2009,8 @@ class ArtistWatchlistPanel(ttk.Frame):
                     "Saved pages do not verify live access, and their bids reflect when they were saved."
                 )
             parts.append(
-                "Next steps: choose Recover pending to check unfinished artists individually. "
-                "Use Update Calendar for a new check of every selected artist. "
+                "Next steps: choose Scan artists, then Sync selected to add one artist’s missing lots. "
+                "Use Sync all for a new check of every selected artist. "
                 "Open the affected auction bookmark in your usual browser to check access. Browser sign-in does not connect "
                 "the app's automatic refresh to that session. "
                 "Artists with no retrieved or cached lots cannot appear on the calendar yet. "
@@ -1882,7 +2067,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         retry_guidance = (
             "Choose Use my browser to load upcoming results in your usual browser and import them into Calendar. "
             if self._has_invaluable_source_issue()
-            else "Retry Update Calendar after source access is restored. "
+            else "Retry Sync all after source access is restored. "
         )
         cause = " ".join(self.source_refresh_errors[0].split()) if self.source_refresh_errors else ""
         if len(cause) > 260:
@@ -1905,7 +2090,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             cause += "\n\n" + missing_summary
         missing_guidance = (
             "Artists without retrieved or cached lots cannot appear on the calendar yet. "
-            "After source access is restored, use Update Calendar. " if missing else ""
+            "After source access is restored, use Sync all. " if missing else ""
         )
         messagebox.showwarning(
             "Live Source Refresh Incomplete",
@@ -1936,9 +2121,11 @@ class ArtistWatchlistPanel(ttk.Frame):
         )
 
     def _fill_agenda(self) -> None:
+        filtered = self.__dict__.get("_scan_missing_only", False)
+        display_lots = self._missing_lots() if filtered else self.current_lots
         empty_state = self.__dict__.get("empty_state")
         if empty_state is not None:
-            if self.current_lots:
+            if display_lots:
                 empty_state.place_forget()
             else:
                 message = (
@@ -1951,18 +2138,22 @@ class ArtistWatchlistPanel(ttk.Frame):
                 ):
                     message = (
                         "No saved lots for these artists yet.\n"
-                        "Choose Update Calendar or Recover pending to check their catalogs."
+                        "Choose Sync all or Scan artists to check their catalogs."
                     )
                 if self._has_invaluable_source_issue():
                     message = (
                         "Invaluable lots could not be retrieved.\n"
-                        "Use Retry with browser or Use my browser below; Import saved Invaluable pages is under More."
+                        "Use my browser below; Import saved Invaluable pages is under More."
                     )
+                if filtered:
+                    message = ("No known lots are missing from the Calendar.\nNew artists can be checked in the Artists view."
+                               if self.__dict__.get("_calendar_lot_keys") is not None else
+                               "Load the Calendar to compare lots before selecting an artist.")
                 empty_state.configure(text=message)
                 empty_state.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
         lot_summary = self.__dict__.get("lot_summary_var")
         if lot_summary is not None:
-            lot_summary.set(f"Next {self.horizon_var.get()} days · {len(self.current_lots)} lots")
+            lot_summary.set(f"{len(display_lots)} lots not on Calendar" if filtered else f"Next {self.horizon_var.get()} days · {len(self.current_lots)} lots")
         for item in self.agenda_tree.get_children(""):
             self.agenda_tree.delete(item)
         upcoming = self.__dict__.get("upcoming_tree")
@@ -1974,7 +2165,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self._lot_urls.clear()
         date_nodes: dict[str, str] = {}
         artist_nodes: dict[tuple[str, str], str] = {}
-        for index, lot in enumerate(self.current_lots):
+        for index, lot in enumerate(display_lots):
             parsed, all_day = parse_lot_datetime(lot.relevant_at)
             date_label = parsed.date().isoformat() if parsed else "Date unverified"
             time_label = "All day" if parsed and all_day else parsed.strftime("%H:%M") if parsed else ""
@@ -2008,7 +2199,7 @@ class ArtistWatchlistPanel(ttk.Frame):
                     "", tk.END, iid=iid,
                     values=(
                         f"{parsed.day} {parsed.strftime('%b')}" if parsed else "Unverified",
-                        artist, "↻ Sync", lot.title, lot.lot_number, self._compact_estimate(lot),
+                        artist, lot.title, lot.lot_number, self._compact_estimate(lot),
                     ),
                     tags=(display_status,),
                 )
@@ -2031,14 +2222,11 @@ class ArtistWatchlistPanel(ttk.Frame):
             self._lot_urls[iid] = lot.lot_url
         self.calendar_text.configure(state=tk.NORMAL)
         self.calendar_text.delete("1.0", tk.END)
-        self.calendar_text.insert(tk.END, render_calendar_preview(self.current_lots))
+        self.calendar_text.insert(tk.END, render_calendar_preview(display_lots))
         self.calendar_text.configure(state=tk.DISABLED)
         self._fill_artist_inventory()
 
     def _open_selected_lot(self, _event=None) -> None:
-        if (_event is not None and _event.widget is self.__dict__.get("upcoming_tree")
-                and _event.widget.identify_column(_event.x) == "#3"):
-            return
         tree = _event.widget if _event is not None else (
             self.__dict__.get("upcoming_tree") if self.__dict__.get("_active_lot_view") == "upcoming"
             else self.agenda_tree
@@ -2063,6 +2251,8 @@ class ArtistWatchlistPanel(ttk.Frame):
     def _show_selected_lot_details(self, _event=None) -> None:
         selected = self.upcoming_tree.selection()
         lot = self.__dict__.get("_lots_by_iid", {}).get(selected[0]) if selected else None
+        self._selected_sync_artist = (lot.artist_watchlist_name or lot.artist) if lot else ""
+        self._update_selected_sync()
         if lot is None:
             return
         parsed, all_day = parse_lot_datetime(lot.relevant_at)
@@ -2075,7 +2265,7 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def _export(self, kind: str) -> None:
         if not self.current_lots:
-            messagebox.showwarning("Nothing to Export", "Use Update Calendar to retrieve upcoming lots first.", parent=self)
+            messagebox.showwarning("Nothing to Export", "Use Sync all to retrieve upcoming lots first.", parent=self)
             return
         config = {
             "md": ("Markdown", ".md", render_markdown),
@@ -2147,8 +2337,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         return payload if isinstance(payload, dict) else {}
 
     def _remembered_bookmark_path(self) -> Path | None:
-        path = self._read_settings().get("last_bookmark_path", "")
-        return Path(path) if path else None
+        return resolve_saved_bookmark_path(self._read_settings(), "last_bookmark_path", PROJECT_BOOKMARK_PATH.parents[1])
 
     def _load_initial_bookmarks(self) -> None:
         saved = self._read_settings()
@@ -2244,7 +2433,9 @@ class ArtistWatchlistPanel(ttk.Frame):
 
     def _save_settings_hint(self) -> None:
         payload = self._read_settings()
-        payload["last_bookmark_path"] = self.bookmark_path_var.get()
+        remember_bookmark_path(payload, "last_bookmark_path", self.bookmark_path_var.get(), PROJECT_BOOKMARK_PATH.parents[1])
+        if self.__dict__.get("_shared_watchlist_loaded"):
+            payload["shared_watchlist_loaded"] = True
         label = self.__dict__.get("_bookmark_source_label")
         if label:
             payload["bookmark_source_label"] = label

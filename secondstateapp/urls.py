@@ -7,6 +7,7 @@ from . import (
     catalog_api_views,
     ordering_views,
     upload_safe_views,
+    watchlist_shared_views,
     views,
 )
 
@@ -24,6 +25,7 @@ urlpatterns = [
     path("capital-dashboard/", capital_dashboard_views.capital_dashboard, name="capital_dashboard"),
     path("calendar/", calendar_views.auction_calendar, name="auction_calendar"),
     path("calendar/sync/", calendar_views.sync_auction_calendar, name="auction_calendar_sync"),
+    path("calendar/watchlist/", watchlist_shared_views.shared_artist_watchlist, name="shared_artist_watchlist"),
     path("calendar/inventory/", calendar_views.auction_calendar_inventory, name="auction_calendar_inventory"),
     path(
         "calendar/lots/<int:lot_id>/artprice-link/",

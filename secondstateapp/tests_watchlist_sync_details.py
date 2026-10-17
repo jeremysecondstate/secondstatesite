@@ -12,6 +12,7 @@ import tkinter as tk
 from catalogapp.studio_theme import apply_studio_theme
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_service import WatchlistMetrics, WatchlistResult
+from catalogapp.watchlist_shared import SharedWatchlistSnapshot
 from catalogapp.watchlist_sync import CalendarSyncResult
 from catalogapp.watchlist_ui import ArtistWatchlistPanel
 
@@ -36,6 +37,11 @@ class WatchlistSyncDetailsTests(TestCase):
         self.warning = stack.enter_context(patch("catalogapp.watchlist_ui.messagebox.showwarning"))
         self.error = stack.enter_context(patch("catalogapp.watchlist_ui.messagebox.showerror"))
         self.info = stack.enter_context(patch("catalogapp.watchlist_ui.messagebox.showinfo"))
+        self.shared_fetch = stack.enter_context(patch(
+            "catalogapp.watchlist_ui.fetch_shared_watchlist", return_value=SharedWatchlistSnapshot(),
+        ))
+        self.shared_publish = stack.enter_context(patch("catalogapp.watchlist_ui.publish_shared_watchlist", return_value=0))
+        self.inventory_fetch = stack.enter_context(patch("catalogapp.watchlist_ui.fetch_calendar_inventory", return_value=[]))
         self.status_callback = Mock()
         self.panel = ArtistWatchlistPanel(self.root, status_callback=self.status_callback)
         self.panel.pack(fill=tk.BOTH, expand=True)
@@ -99,7 +105,7 @@ class WatchlistSyncDetailsTests(TestCase):
         self.assertIn("2026-10-08", self.panel._sync_details_text)
         self.assertIn("Retry with browser", self.panel._sync_details_text)
         self.assertIn("Use my browser", self.warning.call_args.args[1])
-        self.assertEqual(self.panel.retry_browser_button.winfo_manager(), "grid")
+        self.assertEqual(self.panel.import_invaluable_button.winfo_manager(), "grid")
         self.status_callback.assert_called_with(self.panel.sync_status_var.get())
 
     def test_new_artist_with_blocked_source_has_actionable_empty_state_and_no_upload(self):
@@ -122,7 +128,7 @@ class WatchlistSyncDetailsTests(TestCase):
         self.assertNotIn("Calendar updated", status)
         self.assertNotIn("No upcoming lots found", status)
         self.assertIn("Retry with browser", self.panel.empty_state.cget("text"))
-        self.assertEqual(self.panel.retry_browser_button.winfo_manager(), "grid")
+        self.assertEqual(self.panel.import_invaluable_button.winfo_manager(), "grid")
         self.assertEqual(self.panel.import_invaluable_button.winfo_manager(), "grid")
         self.assertIn("John W Nieto", self.panel._sync_details_text)
         self.assertIn("John W Nieto", self.warning.call_args.args[1])
@@ -136,24 +142,24 @@ class WatchlistSyncDetailsTests(TestCase):
         self.panel.calendar_syncer.assert_not_called()
         self.assertEqual(self.panel.status_title_var.get(), "No upcoming lots")
         self.assertEqual(self.panel.empty_state.cget("text"), "No upcoming lots found for the selected artists.")
-        self.assertFalse(self.panel.retry_browser_button.winfo_manager())
+        self.assertFalse(self.panel.import_invaluable_button.winfo_manager())
         self.warning.assert_not_called()
 
-    def test_browser_retry_is_only_shown_for_invaluable_and_disabled_during_work(self):
-        self.assertFalse(self.panel.retry_browser_button.winfo_manager())
+    def test_usual_browser_action_is_only_shown_for_invaluable_and_disabled_during_work(self):
+        self.assertFalse(self.panel.import_invaluable_button.winfo_manager())
         self.panel._finish_refresh(self.result(errors=["Heritage returned HTTP 403."]))
-        self.assertFalse(self.panel.retry_browser_button.winfo_manager())
+        self.assertFalse(self.panel.import_invaluable_button.winfo_manager())
         self.panel._finish_refresh(self.result(errors=["www.INVALUABLE.com returned HTTP 202."]))
-        self.assertEqual(self.panel.retry_browser_button.winfo_manager(), "grid")
-        self.assertEqual(str(self.panel.retry_browser_button.cget("state")), tk.NORMAL)
+        self.assertEqual(self.panel.import_invaluable_button.winfo_manager(), "grid")
+        self.assertEqual(str(self.panel.import_invaluable_button.cget("state")), tk.NORMAL)
         self.panel._set_import_buttons_state(tk.DISABLED)
-        self.assertEqual(str(self.panel.retry_browser_button.cget("state")), tk.DISABLED)
+        self.assertEqual(str(self.panel.import_invaluable_button.cget("state")), tk.DISABLED)
         self.panel._set_import_buttons_state(tk.NORMAL)
-        with patch.object(self.panel, "_sync_from_bookmarks") as retry:
-            self.panel.retry_browser_button.invoke()
-        retry.assert_called_once_with(use_browser=True)
+        with patch.object(self.panel, "_load_watchlist_for_update", return_value=False) as recovery:
+            self.panel.import_invaluable_button.invoke()
+        recovery.assert_called_once()
         self.panel._finish_refresh(self.result(), sync_result=self.upload)
-        self.assertFalse(self.panel.retry_browser_button.winfo_manager())
+        self.assertFalse(self.panel.import_invaluable_button.winfo_manager())
 
     def test_cached_upload_without_source_error_has_distinct_heading(self):
         self.panel._finish_refresh(self.result(cached=True), sync_result=self.upload)
@@ -171,7 +177,7 @@ class WatchlistSyncDetailsTests(TestCase):
         self.assertNotIn(failure, self.panel._sync_details_text)
         self.assertNotIn("Upload timed out", self.panel._sync_details_text)
         self.assertNotIn("2026-10-08", self.panel._sync_details_text)
-        self.assertFalse(self.panel.retry_browser_button.winfo_manager())
+        self.assertFalse(self.panel.import_invaluable_button.winfo_manager())
 
     def test_report_retains_every_source_error_and_import_notice(self):
         errors = [f"Source issue {number}: missing artist {number}" for number in range(12)]

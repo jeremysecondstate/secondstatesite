@@ -15,6 +15,7 @@ from catalogapp.artprice_artist_links import ArtpriceMatchResult
 from catalogapp.watchlist_fetch import HttpPageFetcher
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_service import WatchlistMetrics, WatchlistResult
+from catalogapp.watchlist_shared import SharedWatchlistSnapshot
 from catalogapp.watchlist_sync import CalendarSyncResult
 from catalogapp.watchlist_ui import ArtistWatchlistPanel
 
@@ -85,7 +86,7 @@ class StudioWatchlistControllerTests(TestCase):
         panel.after = lambda _delay, callback: callback()
         panel._fill_agenda = Mock()
         for name in ('sync_to_calendar_button', 'stop_button', 'import_bookmarks_button', 'review_button',
-                     'more_button', 'metrics_var', 'retry_browser_button', 'import_invaluable_button'):
+                     'more_button', 'metrics_var', 'import_invaluable_button'):
             setattr(panel, name, Mock())
         panel.refresh_button = panel.calendar_sync_button = panel.sync_to_calendar_button
         self.stack = ExitStack()
@@ -102,6 +103,11 @@ class StudioWatchlistControllerTests(TestCase):
         self.public_browser = self.stack.enter_context(patch('catalogapp.watchlist_ui.InvaluablePublicBrowserFetcher'))
         self.profiles = self.stack.enter_context(patch('catalogapp.watchlist_ui.chrome_profiles'))
         self.service = self.stack.enter_context(patch('catalogapp.watchlist_ui.WatchlistService'))
+        self.shared_fetch = self.stack.enter_context(patch(
+            'catalogapp.watchlist_ui.fetch_shared_watchlist', return_value=SharedWatchlistSnapshot(),
+        ))
+        self.shared_publish = self.stack.enter_context(patch('catalogapp.watchlist_ui.publish_shared_watchlist', return_value=0))
+        self.inventory_fetch = self.stack.enter_context(patch('catalogapp.watchlist_ui.fetch_calendar_inventory', return_value=[]))
         self.lot = NormalizedLot(
             source='Invaluable', source_lot_id='test-1', artist='Zúñiga', artist_watchlist_name='Zúñiga',
             title='Print', start_at='2026-10-22',
@@ -202,7 +208,7 @@ class StudioWatchlistControllerTests(TestCase):
             self.assertTrue(kwargs['zero_ai'])
             self.assertFalse(kwargs['new_changed_only'])
             self.assertTrue(self.panel._busy)
-            self.panel.retry_browser_button.configure.assert_called_with(state=tk.DISABLED)
+            self.panel.import_invaluable_button.configure.assert_called_with(state=tk.DISABLED)
             self.assertEqual(self.panel.sync_status_var.get(), 'Opening browser to retrieve Invaluable lots…')
             return WatchlistResult([self.lot], WatchlistMetrics(new_lots=1))
 
@@ -232,7 +238,7 @@ class StudioWatchlistControllerTests(TestCase):
         self.profiles.assert_not_called()
         self.assertFalse(self.panel._busy)
         self.assertEqual(self.panel.source_refresh_errors, [])
-        self.panel.retry_browser_button.grid_remove.assert_called()
+        self.panel.import_invaluable_button.grid_remove.assert_called()
         self.assertTrue(self.panel._read_settings()['invaluable_session_enabled'])
 
         # The explicit retry does not change subsequent ordinary syncs.
@@ -267,8 +273,8 @@ class StudioWatchlistControllerTests(TestCase):
         self.panel.calendar_syncer.assert_not_called()
         self.assertEqual(self.panel.current_lots, [self.lot])
         self.assertFalse(self.panel._busy)
-        self.panel.retry_browser_button.grid.assert_called()
-        self.panel.retry_browser_button.configure.assert_called_with(state=tk.NORMAL)
+        self.panel.import_invaluable_button.grid.assert_called()
+        self.panel.import_invaluable_button.configure.assert_called_with(state=tk.NORMAL)
         self.assertIn('Invaluable browser could not open', self.panel._sync_details_text)
 
     def test_browser_retry_missing_bookmark_file_does_not_open_browser(self):
@@ -525,12 +531,16 @@ class StudioWatchlistWidgetTests(TestCase):
             self.assertTrue(panel.zero_ai_var.get())
             self.assertFalse(panel.review_frame.winfo_manager())
             self.assertFalse(panel.stop_button.winfo_manager())
-            self.assertFalse(panel.retry_browser_button.winfo_manager())
+            self.assertNotIn('retry_browser_button', panel.__dict__)
             self.assertFalse(panel.import_invaluable_button.winfo_manager())
             labels = [panel.more_menu.entrycget(index, 'label') for index in range(panel.more_menu.index('end') + 1)
                       if panel.more_menu.type(index) == 'command']
             self.assertIn('Import saved Invaluable pages…', labels)
-            self.assertEqual(panel.sync_to_calendar_button.cget('text'), 'Update Calendar')
+            self.assertEqual(panel.sync_to_calendar_button.cget('text'), 'Sync all')
+            self.assertEqual(panel.sync_selected_button.cget('text'), 'Sync selected')
+            self.assertEqual(str(panel.sync_selected_button.cget('state')), tk.DISABLED)
+            self.assertNotIn('sync', panel.upcoming_tree.cget('columns'))
+            self.assertNotIn('sync', panel.artist_inventory_tree.cget('columns'))
             self.assertNotIn('connect_invaluable_button', panel.__dict__)
             self.assertNotIn('chrome_profile_picker', panel.__dict__)
             profiles.assert_not_called()

@@ -279,6 +279,102 @@ class WatchlistCache:
                 ended.append(lot)
         return ended
 
+    def import_shared_lot(self, lot: NormalizedLot, *, watch_urls: Iterable[str]) -> bool:
+        """Restore Calendar data without recording a new auction-source observation.
+
+        A download is not a source check. Preserve its original timestamps and
+        never replace a newer local observation or retire lots absent remotely.
+        """
+        incoming = NormalizedLot.from_dict(lot.to_dict())
+        urls = tuple(dict.fromkeys(url for url in watch_urls if url))
+        if not urls:
+            return False
+        with self._lock, self.connection:
+            existing = self.connection.execute(
+                "SELECT payload_json, search_hash, active FROM lots WHERE cache_key = ?",
+                (incoming.cache_key,),
+            ).fetchone()
+            chosen = incoming
+            search_hash = ""
+            changed = existing is None
+            if existing is not None:
+                previous = NormalizedLot.from_dict(json.loads(existing["payload_json"]))
+                if not _newer(incoming.last_seen_at, previous.last_seen_at):
+                    chosen = previous
+                    search_hash = existing["search_hash"]
+                else:
+                    changed = True
+                    if incoming.sold_price is None and previous.sold_price is not None:
+                        chosen.sold_price = previous.sold_price
+                        chosen.sold_currency = previous.sold_currency or previous.currency
+                    if not incoming.saved_image_base64:
+                        chosen.saved_image_base64 = previous.saved_image_base64
+                first = [stamp for stamp in (incoming.first_seen_at, previous.first_seen_at) if stamp]
+                if first:
+                    chosen.first_seen_at = min(first, key=_timestamp)
+            chosen.content_hash = chosen.calculate_content_hash()
+            active = chosen.status != "ended" and chosen.sold_price is None
+            if existing is not None and chosen is not incoming:
+                active = bool(existing["active"])
+            self.connection.execute(
+                """
+                INSERT INTO lots (
+                    cache_key, source, source_lot_id, canonical_url, payload_json, content_hash,
+                    search_hash, first_seen_at, last_seen_at, status, active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(cache_key) DO UPDATE SET
+                    payload_json=excluded.payload_json, content_hash=excluded.content_hash,
+                    search_hash=excluded.search_hash, first_seen_at=excluded.first_seen_at,
+                    last_seen_at=excluded.last_seen_at, status=excluded.status,
+                    active=excluded.active, canonical_url=excluded.canonical_url
+                """,
+                (chosen.cache_key, chosen.source, chosen.source_lot_id, chosen.lot_url,
+                 json.dumps(chosen.to_dict(), ensure_ascii=False, sort_keys=True), chosen.content_hash,
+                 search_hash, chosen.first_seen_at, chosen.last_seen_at, chosen.status, int(active)),
+            )
+            for watch_url in urls:
+                membership = self.connection.execute(
+                    "SELECT last_seen_at FROM watch_memberships WHERE watch_url = ? AND cache_key = ?",
+                    (watch_url, chosen.cache_key),
+                ).fetchone()
+                if membership is not None and not _newer(incoming.last_seen_at, membership["last_seen_at"]):
+                    continue
+                self.connection.execute(
+                    """
+                    INSERT INTO watch_memberships (watch_url, cache_key, last_seen_at, active)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(watch_url, cache_key) DO UPDATE SET
+                        last_seen_at=excluded.last_seen_at, active=excluded.active
+                    """,
+                    (watch_url, chosen.cache_key, incoming.last_seen_at, int(active)),
+                )
+        return changed
+
+    def import_shared_coverage(self, coverage: WatchCoverage) -> bool:
+        """Merge dated source-check evidence; cached lots alone prove no coverage."""
+        if coverage.state not in {"verified", "empty", "partial", "blocked", "pending"}:
+            raise ValueError("Unknown watch coverage state")
+        if coverage.state != "pending" and not parse_lot_datetime(coverage.checked_at)[0]:
+            raise ValueError("Shared source coverage requires its original check time")
+        with self._lock, self.connection:
+            previous = self.connection.execute(
+                "SELECT last_attempt_at FROM watch_coverage WHERE watch_url = ?", (coverage.watch_url,),
+            ).fetchone()
+            if previous is not None and not _newer(coverage.checked_at, previous["last_attempt_at"]):
+                return False
+            self.connection.execute(
+                """
+                INSERT INTO watch_coverage (watch_url, state, last_attempt_at, detail, covered_until)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(watch_url) DO UPDATE SET
+                    state=excluded.state, last_attempt_at=excluded.last_attempt_at,
+                    detail=excluded.detail, covered_until=excluded.covered_until
+                """,
+                (coverage.watch_url, coverage.state, coverage.checked_at,
+                 " ".join(coverage.detail.split())[:500], coverage.covered_until),
+            )
+        return True
+
     def record_source_success(self, watch_url: str, observed_at: datetime | None = None) -> None:
         now = _iso(observed_at)
         with self._lock, self.connection:
@@ -435,3 +531,12 @@ def _iso(value: datetime | None = None) -> str:
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
     return current.isoformat()
+
+
+def _timestamp(value: str) -> datetime:
+    parsed, _ = parse_lot_datetime(value)
+    return parsed.astimezone(timezone.utc) if parsed else datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _newer(incoming: str, previous: str) -> bool:
+    return _timestamp(incoming) > _timestamp(previous)
