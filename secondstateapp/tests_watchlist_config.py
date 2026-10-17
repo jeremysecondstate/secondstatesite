@@ -11,6 +11,7 @@ import tkinter as tk
 from catalogapp.bookmark_watchlist import BookmarkEntry
 from catalogapp.watchlist_models import NormalizedLot
 from catalogapp.watchlist_service import WatchlistMetrics, WatchlistResult
+from catalogapp.watchlist_shared import SharedWatchlistSnapshot
 from catalogapp.watchlist_sync import CalendarSyncError, CalendarSyncResult
 from catalogapp.watchlist_ui import ArtistWatchlistPanel
 
@@ -29,11 +30,20 @@ class CalendarSyncConfigurationTests(TestCase):
         self.warning_patch = patch("catalogapp.watchlist_ui.messagebox.showwarning")
         self.warning = self.warning_patch.start()
         self.addCleanup(self.warning_patch.stop)
+        self.shared_fetch = patch('catalogapp.watchlist_ui.fetch_shared_watchlist', return_value=SharedWatchlistSnapshot())
+        self.shared_fetch.start()
+        self.addCleanup(self.shared_fetch.stop)
+        self.shared_publish = patch('catalogapp.watchlist_ui.publish_shared_watchlist', return_value=0)
+        self.shared_publish.start()
+        self.addCleanup(self.shared_publish.stop)
         # Exercise the real controller methods without creating a Tk window.
         self.panel = ArtistWatchlistPanel.__new__(ArtistWatchlistPanel)
         self.panel.calendar_base_url = "https://secondstate.art"
         self.panel.calendar_api_key = ""
         self.panel.artist_artprice_links = {}
+        self.panel.all_entries = []
+        self.panel.active_entries = []
+        self.panel.selected_artists = set()
         self.panel.worker = None
         self.panel.calendar_syncer = Mock(return_value=CalendarSyncResult(1, 1, 0, 0))
         self.panel.status_callback = Mock()
@@ -257,7 +267,7 @@ class CalendarSyncConfigurationTests(TestCase):
         self.assertEqual(title, "Live Source Refresh Incomplete")
         self.assertIn("Francisco Zúñiga", message)
         self.assertIn("Artists without retrieved or cached lots cannot appear on the calendar yet", message)
-        self.assertIn("Update Calendar", message)
+        self.assertIn("Sync all", message)
         status = self.panel.status_callback.call_args.args[0]
         self.assertIn("Website calendar synced", status)
         self.assertIn("cached lots", status)

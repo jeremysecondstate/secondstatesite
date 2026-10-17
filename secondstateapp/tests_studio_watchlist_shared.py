@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 
 from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.bookmark_watchlist import parse_bookmarks_html
+from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_shared import SharedWatchlistSnapshot
 from catalogapp.watchlist_sync import CalendarArtistInventory
 from secondstateapp import tests_studio_watchlist as studio_tests
@@ -127,8 +128,9 @@ class MissingArtistSelectionWidgetTests(TestCase):
     def test_artist_already_on_calendar_is_ineligible_but_new_artist_can_be_checked(self):
         self.assertFalse(self.panel._artist_has_missing_lots('Calder'))
         self.assertTrue(self.panel._artist_has_missing_lots('Will Barnet'))
+        self.panel._selected_sync_artist = 'Calder'
         with patch.object(self.panel, '_start_refresh') as refresh:
-            self.panel.sync_artist('Calder')
+            self.panel.sync_selected()
         refresh.assert_not_called()
 
     def test_existing_artist_becomes_eligible_only_when_a_lot_is_missing(self):
@@ -150,3 +152,66 @@ class MissingArtistSelectionWidgetTests(TestCase):
         with patch.object(self.panel, '_start_refresh') as refresh:
             self.panel.sync_selected()
         refresh.assert_not_called()
+
+    def test_same_calendar_url_with_changed_source_id_is_not_a_missing_lot(self):
+        lot = replace(self.calder, source_lot_id='different-local-id',
+                      lot_url='https://www.invaluable.com/auction-lot/calder-print-1-c-abcd')
+        self.panel.current_lots = [lot]
+        self.panel._calendar_lot_keys = {f'invaluable:{lot.lot_url}'}
+
+        self.assertEqual(self.panel._missing_lots(), [])
+        self.assertFalse(self.panel._artist_has_missing_lots('Calder'))
+
+    def test_scan_hides_calendar_lots_and_artists_then_selected_button_targets_missing_artist(self):
+        now = datetime.now(timezone.utc)
+        calder = replace(self.calder, start_at=(now + timedelta(days=2)).isoformat())
+        new_calder = replace(calder, source_lot_id='new-calder')
+        matisse = replace(calder, source_lot_id='existing-matisse', artist='Matisse', artist_watchlist_name='Matisse')
+        watches = {entry.watch_label: entry for entry in self.panel.active_entries}
+        with WatchlistCache(self.panel._cache_path) as cache:
+            for lot in (calder, new_calder, matisse):
+                cache.upsert(lot, watch_url=watches[lot.artist_watchlist_name].url, search_hash='', observed_at=now)
+        self.shared_fetch.return_value = SharedWatchlistSnapshot(
+            entries=list(self.panel.all_entries), lots=[calder, matisse],
+            enabled_watch_urls=frozenset(entry.url for entry in self.panel.active_entries),
+            calendar_lot_keys=frozenset({calder.cache_key, matisse.cache_key}),
+        )
+        self.inventory_fetch.return_value = [CalendarArtistInventory(
+            name, artist_identity_key(name), 'Invaluable', 1, 1, now.isoformat(),
+        ) for name in ('Calder', 'Matisse')]
+        self.panel._calendar_sync_configured = Mock(return_value=True)
+        self.panel.after = lambda _delay, callback: callback()
+        with (
+            patch('catalogapp.watchlist_ui.threading.Thread', side_effect=studio_tests.StudioWatchlistControllerTests.immediate_thread),
+            patch('catalogapp.watchlist_ui.WatchlistService') as service,
+            patch('catalogapp.watchlist_ui.InvaluablePublicBrowserFetcher') as browser,
+            patch.object(self.panel, 'calendar_syncer') as upload,
+        ):
+            self.panel.scan_artists()
+
+        self.assertTrue(self.panel._scan_missing_only)
+        self.assertEqual({lot.cache_key for lot in self.panel._lots_by_iid.values()}, {new_calder.cache_key})
+        self.assertEqual({row.artist for row in self.panel._inventory_rows.values()}, {'Calder', 'Will Barnet'})
+        self.assertIn('1 lots', self.panel.lot_summary_var.get())
+        self.assertEqual({lot.cache_key for lot in self.panel.current_lots},
+                         {calder.cache_key, new_calder.cache_key, matisse.cache_key})
+        service.assert_not_called()
+        browser.assert_not_called()
+        upload.assert_not_called()
+        self.shared_fetch.assert_called_once()
+        calder_row = next(iid for iid, row in self.panel._inventory_rows.items() if row.artist == 'Calder')
+        self.panel.artist_inventory_tree.selection_set(calder_row)
+        self.panel._inventory_selection_changed()
+        with patch.object(self.panel, '_start_refresh') as refresh:
+            self.panel.sync_selected_button.invoke()
+        refresh.assert_called_once()
+        self.assertEqual(refresh.call_args.kwargs['artist_scope'], {'Calder'})
+
+    def test_filtered_empty_agenda_reports_no_missing_lots_without_hiding_saved_data(self):
+        self.panel._scan_missing_only = True
+        self.panel._fill_agenda()
+
+        self.assertEqual(self.panel.upcoming_tree.get_children(''), ())
+        self.assertEqual(self.panel.current_lots, [self.calder])
+        self.assertIn('No known lots are missing', self.panel.empty_state.cget('text'))
+        self.assertNotIn('Calder', {row.artist for row in self.panel._inventory_rows.values()})

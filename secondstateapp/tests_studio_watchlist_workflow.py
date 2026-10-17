@@ -139,7 +139,7 @@ class SavedWatchlistWorkflowTests(TestCase):
         self.panel._finish_refresh(result, sync_result=CalendarSyncResult(1, 1, 0, 0))
 
         self.assertIn('Calder (Invaluable): partial', self.panel._sync_details_text)
-        self.assertIn('Recover pending', self.panel._sync_details_text)
+        self.assertIn('Scan artists', self.panel._sync_details_text)
         self.assertIn('incomplete', self.panel.sync_status_var.get())
         self.warning.assert_not_called()
 
@@ -152,7 +152,7 @@ class SavedWatchlistEmptyStateTests(TestCase):
         self.panel.artist_coverage = [WatchCoverage('Megargee', 'Invaluable', 'megargee')]
         self.panel._fill_agenda()
 
-        self.assertIn('Recover pending', self.panel.empty_state.cget('text'))
+        self.assertIn('Scan artists', self.panel.empty_state.cget('text'))
         self.assertNotIn('No upcoming lots found', self.panel.empty_state.cget('text'))
 
         self.panel.artist_coverage = [WatchCoverage('Megargee', 'Invaluable', 'megargee', state='empty')]

@@ -423,7 +423,7 @@ class StudioWatchlistControllerTests(TestCase):
         self.assertIn('Francisco Zúñiga', warning)
         self.assertIn('Alonzo Megargee', warning)
         self.assertIn('Artists without retrieved or cached lots cannot appear on the calendar yet', warning)
-        self.assertIn('Update Calendar', warning)
+        self.assertIn('Sync all', warning)
         self.assertLess(len(warning), 1100)
         self.assertIn(failure, self.panel._sync_details_text)
         self.assertIn(missing, self.panel._sync_details_text)
