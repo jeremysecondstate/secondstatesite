@@ -1,5 +1,6 @@
 """Shared, dependency-free Studio styling for the catalog desktop workspace."""
 
+import sys
 import tkinter as tk
 from tkinter import ttk
 
@@ -154,7 +155,51 @@ def apply_studio_theme(master) -> ttk.Style:
     style.configure("TProgressbar", background=colors["accent"], troughcolor=colors["soft"],
                     bordercolor=colors["soft"], lightcolor=colors["accent"], darkcolor=colors["accent"])
     _rounded_elements(master, style, colors)
+    if sys.platform == "win32":
+        # Tk creates its native wrapper while mapping the window. Reapply when
+        # restored as well, without reacting to every child widget's Map event.
+        master.after_idle(lambda: _style_windows_titlebar(master))
+        master.bind("<Map>", lambda event: _style_windows_titlebar(master)
+                    if event.widget == master else None, add="+")
     return style
+
+
+def _style_windows_titlebar(master):
+    """Color the native caption, retaining Windows sizing, snapping and controls."""
+    if sys.platform != "win32":
+        return
+
+    import ctypes
+    from ctypes import wintypes
+
+    try:
+        # winfo_id() is Tk's client HWND, not the decorated outer window.
+        # Explicit pointer-sized signatures also keep this safe on 64-bit Python.
+        user32 = ctypes.WinDLL("user32")
+        dwmapi = ctypes.WinDLL("dwmapi")
+        get_ancestor = user32.GetAncestor
+        get_ancestor.argtypes = [wintypes.HWND, wintypes.UINT]
+        get_ancestor.restype = wintypes.HWND
+        set_attribute = dwmapi.DwmSetWindowAttribute
+        set_attribute.argtypes = [wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD]
+        set_attribute.restype = ctypes.c_long
+        hwnd = get_ancestor(master.winfo_id(), 2)  # GA_ROOT
+        if not hwnd:
+            return
+
+        dark_mode = wintypes.BOOL(True)
+        set_attribute(hwnd, 20, ctypes.byref(dark_mode), ctypes.sizeof(dark_mode))
+        # Windows 11 supports exact caption/text/border colors. Older Windows
+        # versions can reject these attributes and keep their native fallback.
+        for attribute, color in ((34, STUDIO_COLORS["line"]),
+                                 (35, STUDIO_COLORS["surface"]),
+                                 (36, STUDIO_COLORS["ink"])):
+            red, green, blue = (int(color[index:index + 2], 16) for index in (1, 3, 5))
+            colorref = wintypes.DWORD(red | (green << 8) | (blue << 16))
+            set_attribute(hwnd, attribute, ctypes.byref(colorref), ctypes.sizeof(colorref))
+    except (AttributeError, OSError, tk.TclError):
+        # Cosmetic integration must never prevent the catalog from opening.
+        pass
 
 
 def _rounded_elements(master, style, colors):

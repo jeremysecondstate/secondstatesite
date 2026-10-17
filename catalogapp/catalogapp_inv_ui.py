@@ -18,7 +18,7 @@ from secondstate.environment import load_project_environment
 
 load_project_environment()
 BASE_URL = os.environ.get("SECONDSTATE_BASE_URL", "https://secondstate.art").rstrip("/")
-APP_TITLE = "Art Catalog Uploader"
+APP_TITLE = "SECONDSTATE — Catalog workspace"
 APP_MIN_W, APP_MIN_H = 1180, 820
 CATALOG_API_KEY = os.environ.get("CATALOG_API_KEY", "").strip()
 DEFAULT_CATALOG_SHEET = "Inventory for Fall 2026"
@@ -67,7 +67,10 @@ class ArtCatalogApp:
         master.geometry("1280x860")
         master.minsize(APP_MIN_W, APP_MIN_H)
         self._style()
+        master.iconphoto(True, studio_icon(master, "brand", size=16), studio_icon(master, "brand", size=32))
         self._build_ui()
+        master.bind("<Alt-a>", self._open_actions_menu, add="+")
+        master.bind("<F10>", self._open_actions_menu, add="+")
         master.bind_all("<Control-f>", self._search_from_shortcut)
         master.bind_all("<Control-e>", lambda _e: self.export_to_word())
         master.bind_all("<Control-d>", lambda _e: self.export_entire_database())
@@ -79,15 +82,6 @@ class ArtCatalogApp:
         self.style = apply_studio_theme(self.master)
 
     def _build_ui(self):
-        menubar = tk.Menu(self.master)
-        actions = tk.Menu(menubar, tearoff=False)
-        actions.add_command(label="Upload Artwork(s)", command=self.upload_artworks)
-        actions.add_command(label="Generate Description for Selected", command=self.generate_description_for_selected)
-        actions.add_command(label="Edit Website Listings", command=self.edit_website_listings)
-        actions.add_command(label="Delete Artwork from Website", command=self.delete_artwork)
-        menubar.add_cascade(label="Actions", menu=actions)
-        self.master.config(menu=menubar)
-
         header = ttk.Frame(self.master, padding=(24, 18), style="Surface.TFrame")
         header.pack(fill=tk.X)
         ttk.Label(header, image=studio_icon(self.master, "brand", size=34),
@@ -97,6 +91,17 @@ class ArtCatalogApp:
         ttk.Label(brand, text="SECONDSTATE", font=("Georgia", 10, "bold"),
                   style="Brand.TLabel").pack(anchor="w")
         ttk.Label(brand, text="Catalog workspace", style="BrandSubtle.TLabel").pack(anchor="w", pady=(2, 0))
+        # Keep global actions in the themed header; a native Windows menubar
+        # ignores Tk's dark palette and adds a bright strip above the workspace.
+        self.actions_button = ttk.Menubutton(header, text="Actions", underline=0,
+                                             style="Secondary.TMenubutton", takefocus=True)
+        self.actions_button.pack(side=tk.RIGHT, padx=(20, 0))
+        self.actions_menu = tk.Menu(self.actions_button, tearoff=False)
+        self.actions_menu.add_command(label="Upload Artwork(s)", command=self.upload_artworks, accelerator="Ctrl+U")
+        self.actions_menu.add_command(label="Generate Description for Selected", command=self.generate_description_for_selected)
+        self.actions_menu.add_command(label="Edit Website Listings", command=self.edit_website_listings)
+        self.actions_menu.add_command(label="Delete Artwork from Website", command=self.delete_artwork)
+        self.actions_button.configure(menu=self.actions_menu)
         catalog_source = ttk.Frame(header, style="Surface.TFrame")
         catalog_source.pack(side=tk.RIGHT)
         tk.Label(catalog_source, text="●", font=("Segoe UI", 7), background=STUDIO_COLORS["surface"],
@@ -240,6 +245,11 @@ class ArtCatalogApp:
 
         self.details_text = self._build_text_tab(tab_details, "Details", "Catalog details for the selected artwork.")
         self.text_display = self._build_text_tab(tab_preview, "Preview Text", "Formatted catalog text for the current results.")
+
+    def _open_actions_menu(self, event=None):
+        # ttk menubuttons do not receive Windows' native menu mnemonic handling.
+        self.actions_button.event_generate("<<Invoke>>")
+        return "break"
 
     @staticmethod
     def _update_scrollbar(scrollbar, first, last):
