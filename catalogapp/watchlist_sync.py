@@ -18,6 +18,18 @@ class CalendarSyncError(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class CalendarArtistInventory:
+    """Saved Calendar counts for one artist and auction source."""
+
+    name: str
+    normalized_name: str
+    source: str
+    lot_count: int
+    upcoming_count: int
+    last_synced_at: str
+
+
+@dataclass(frozen=True, slots=True)
 class CalendarSyncResult:
     received: int
     created: int
@@ -107,6 +119,60 @@ def _validated_base_url(base_url: str) -> str:
     if not parsed.netloc or parsed.username or parsed.password:
         raise CalendarSyncError("Calendar sync website URL is invalid.")
     return normalized
+
+
+def fetch_calendar_inventory(
+    *,
+    base_url: str,
+    api_key: str,
+    session=requests,
+    timeout: tuple[int, int] = (10, 30),
+) -> list[CalendarArtistInventory]:
+    """Read saved artist counts without refreshing sources or changing Calendar lots."""
+
+    if not api_key:
+        raise CalendarSyncError("CATALOG_API_KEY is required to scan the website calendar.")
+    endpoint = f"{_validated_base_url(base_url)}/calendar/inventory/"
+    try:
+        response = session.get(
+            endpoint,
+            headers={"X-API-KEY": api_key, "Accept": "application/json"},
+            timeout=timeout,
+            allow_redirects=False,
+        )
+    except requests.RequestException as exc:
+        raise CalendarSyncError("Could not read the website calendar. Your local artists are still available.") from exc
+    if response.status_code == 404:
+        raise CalendarSyncError("Deploy the website's artist scan update to read Calendar counts.")
+    if response.status_code != 200:
+        raise CalendarSyncError(f"Website calendar scan returned HTTP {response.status_code}.")
+    try:
+        payload = response.json()
+        if not isinstance(payload, dict) or payload.get("ok") is not True or not isinstance(payload.get("artists"), list):
+            raise ValueError("Unexpected inventory response")
+        result = []
+        seen = set()
+        for record in payload["artists"]:
+            if not isinstance(record, dict):
+                raise ValueError("Invalid artist")
+            name, normalized_name, source, last_synced_at = (
+                record.get(field) for field in ("name", "normalized_name", "source", "last_synced_at")
+            )
+            if not all(isinstance(value, str) for value in (name, normalized_name, source, last_synced_at)):
+                raise ValueError("Invalid artist fields")
+            if not normalized_name or normalized_name != artist_identity_key(name):
+                raise ValueError("Invalid artist identity")
+            lot_count, upcoming_count = record.get("lot_count"), record.get("upcoming_count")
+            if type(lot_count) is not int or type(upcoming_count) is not int or not 0 <= upcoming_count <= lot_count:
+                raise ValueError("Invalid artist counts")
+            identity = (normalized_name, source.casefold())
+            if identity in seen:
+                raise ValueError("Duplicate artist")
+            seen.add(identity)
+            result.append(CalendarArtistInventory(name, normalized_name, source, lot_count, upcoming_count, last_synced_at))
+        return result
+    except (TypeError, ValueError) as exc:
+        raise CalendarSyncError("Website calendar returned an invalid artist inventory.") from exc
 
 
 def sync_watchlist_lots(

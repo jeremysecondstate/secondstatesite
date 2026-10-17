@@ -20,6 +20,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import RequestDataTooBig, ValidationError
 from django.core.validators import URLValidator
 from django.db import transaction
+from django.db.models import Count, Max, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -1944,6 +1945,62 @@ def _sync_authorized(request) -> bool:
     expected = os.environ.get("CATALOG_API_KEY", "").strip()
     provided = request.headers.get("X-API-KEY", "").strip()
     return bool(expected and provided and secrets.compare_digest(expected, provided))
+
+
+@never_cache
+@require_http_methods(["GET"])
+def auction_calendar_inventory(request):
+    """Read saved artist/source counts for the desktop's selective sync table."""
+
+    if not _sync_authorized(request):
+        return JsonResponse({"ok": False, "error": "Unauthorized"}, status=401)
+    zone = _calendar_zone()
+    today_start = datetime.combine(timezone.localdate(timezone=zone), time.min, tzinfo=zone)
+    artists = {
+        artist_identity_key(row["name"]): row["name"]
+        for row in AuctionWatchArtist.objects.values("name")
+        if artist_identity_key(row["name"])
+    }
+    grouped = (
+        AuctionWatchLot.objects.filter(superseded_by__isnull=True)
+        .order_by()
+        .values("watchlist_artist__name", "artist_watchlist_name", "artist", "source")
+        .annotate(
+            lot_count=Count("pk"),
+            upcoming_count=Count("pk", filter=Q(active=True, event_at__gte=today_start)),
+            last_synced_at=Max("synced_at"),
+        )
+    )
+    inventory = {}
+    for row in grouped:
+        name = row["watchlist_artist__name"] or row["artist_watchlist_name"] or row["artist"]
+        normalized_name = artist_identity_key(name)
+        if not normalized_name:
+            continue
+        identity = (normalized_name, row["source"].casefold())
+        entry = inventory.setdefault(identity, {
+            "name": artists.get(normalized_name, name),
+            "normalized_name": normalized_name,
+            "source": row["source"],
+            "lot_count": 0,
+            "upcoming_count": 0,
+            "last_synced_at": "",
+        })
+        entry["lot_count"] += row["lot_count"]
+        entry["upcoming_count"] += row["upcoming_count"]
+        synced_at = row["last_synced_at"].isoformat() if row["last_synced_at"] else ""
+        entry["last_synced_at"] = max(entry["last_synced_at"], synced_at)
+    represented_artists = {identity[0] for identity in inventory}
+    for normalized_name, name in artists.items():
+        if normalized_name not in represented_artists:
+            inventory[(normalized_name, "")] = {
+                "name": name, "normalized_name": normalized_name, "source": "",
+                "lot_count": 0, "upcoming_count": 0, "last_synced_at": "",
+            }
+    return JsonResponse({
+        "ok": True,
+        "artists": sorted(inventory.values(), key=lambda row: (row["name"].casefold(), row["source"].casefold())),
+    })
 
 
 def _text(value, max_length: int) -> str:

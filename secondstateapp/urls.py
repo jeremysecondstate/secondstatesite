@@ -24,6 +24,7 @@ urlpatterns = [
     path("capital-dashboard/", capital_dashboard_views.capital_dashboard, name="capital_dashboard"),
     path("calendar/", calendar_views.auction_calendar, name="auction_calendar"),
     path("calendar/sync/", calendar_views.sync_auction_calendar, name="auction_calendar_sync"),
+    path("calendar/inventory/", calendar_views.auction_calendar_inventory, name="auction_calendar_inventory"),
     path(
         "calendar/lots/<int:lot_id>/artprice-link/",
         calendar_views.update_auction_lot_artprice_link,

@@ -4,6 +4,18 @@ Issue #33 replaces broad Auction Search with a local, bookmark-driven agenda. Th
 
 ## Studio workflow
 
+### Add or sync one artist
+
+Use **Artists** beside **Upcoming lots** to see one row per artist and source, including artists with no saved lots. **Scan artists** rereads your connected bookmarks and compares them with saved Calendar counts; it does not contact the auction sites or upload lots. Calendar counts include all stored dates, while saved lots reflect the desktop agenda.
+
+If you added an artist to a separate bookmark export, choose **Scan HTML…** in this table once. Studio remembers that file and merges its artist links into your saved watchlist while retaining your browser connection, folder choices, and exclusions. Subsequent **Scan artists** reads the same file again. If the file moves, previously saved artists remain available. Choose **Scan HTML…** again to select its new location.
+
+Find the artist and click **↻ Sync** in their row. Only that artist's source searches, lots, and matching Artprice links are refreshed and uploaded; other artists remain in the table and Calendar. The same **↻ Sync** action appears beside each lot in the Upcoming lots view. **Update Calendar** retains its existing all-selected-artists behavior.
+
+If Invaluable blocks this artist, **Use my browser for artist…** opens the snapshot helper for that artist only. The warning's **Use my browser…** and **Retry with browser** actions also retain the last individual artist scope. Importing those snapshots uploads only that artist's lots. Scanning bookmarks cannot bypass a source access failure; blocked searches remain distinct from confirmed empty searches.
+
+### Update the selected watchlist
+
 Studio uses the approved dark appearance: charcoal workspace, slate panels,
 pale blue actions, and light text across all four tabs.
 
