@@ -196,7 +196,7 @@ class PublicBrowserRecoveryTests(TestCase):
         self.page.goto.assert_called_once()
         self.assertEqual(self.handlers, [])
 
-    def test_close_or_stop_during_navigation_cancels_even_with_captured_results(self):
+    def test_close_is_source_failure_but_stop_cancels_during_navigation(self):
         for interruption in ("close_error", "close_timeout", "close_response", "stop_timeout"):
             with self.subTest(interruption=interruption):
                 self.page.is_closed.return_value = False
@@ -214,23 +214,24 @@ class PublicBrowserRecoveryTests(TestCase):
                         raise TimeoutError("Page.goto: navigation timed out")
                     raise RuntimeError("Target page, context or browser has been closed")
                 self.page.goto.side_effect = interrupted
-                with self.fetcher(stop_event=event) as fetcher, self.assertRaises(WatchlistStopped):
+                expected_error = WatchlistStopped if interruption == "stop_timeout" else SourceAccessBlocked
+                with self.fetcher(stop_event=event) as fetcher, self.assertRaises(expected_error):
                     fetcher.fetch_search_page(SEARCH_URL)
                 self.assertEqual(fetcher.pages_fetched, 0)
                 self.assertEqual(self.handlers, [])
 
-    def test_close_during_dom_read_at_deadline_cancels_instead_of_reporting_block(self):
+    def test_close_during_dom_read_at_deadline_reports_browser_unavailable(self):
         def closed_body(_selector):
             self.now = 1
             self.page.is_closed.return_value = True
             raise RuntimeError("Target page, context or browser has been closed")
         self.page.locator.side_effect = closed_body
-        with self.fetcher() as fetcher, self.assertRaises(WatchlistStopped):
+        with self.fetcher() as fetcher, self.assertRaisesRegex(SourceAccessBlocked, "browser was closed"):
             fetcher.fetch_search_page(SEARCH_URL)
         self.assertEqual(fetcher.pages_fetched, 0)
         self.assertEqual(self.handlers, [])
 
-    def test_close_during_throttle_or_listener_setup_cancels_before_navigation(self):
+    def test_close_during_throttle_or_listener_setup_is_source_failure_before_navigation(self):
         for stage in ("throttle", "listener"):
             with self.subTest(stage=stage):
                 self.page.is_closed.return_value = False
@@ -242,18 +243,19 @@ class PublicBrowserRecoveryTests(TestCase):
                     operation = patch.object(fetcher, "_throttle", side_effect=closed) if stage == "throttle" else (
                         patch.object(self.page, "on", side_effect=closed)
                     )
-                    with operation, self.assertRaises(WatchlistStopped):
+                    with operation, self.assertRaises(SourceAccessBlocked):
                         fetcher.fetch_search_page(SEARCH_URL)
                     self.assertEqual(fetcher.pages_fetched, 0)
                 self.page.goto.assert_not_called()
                 self.assertEqual(self.handlers, [])
 
-    def test_close_during_public_detail_navigation_or_wait_cancels_refresh(self):
-        for stage in ("navigation", "wait", "read"):
+    def test_close_during_public_detail_navigation_wait_or_content_is_source_failure(self):
+        for stage in ("navigation", "wait", "read", "content"):
             with self.subTest(stage=stage):
                 self.page.is_closed.return_value = False
                 self.page.goto.side_effect = self.navigate
                 self.page.locator.side_effect = self.locator
+                self.page.content.side_effect = lambda: self.html
                 self.after_wait = lambda: None
                 self.html = "<h1>Lot loading</h1>"
                 def closed(*_args, **_kwargs):
@@ -263,9 +265,11 @@ class PublicBrowserRecoveryTests(TestCase):
                     self.page.goto.side_effect = closed
                 elif stage == "read":
                     self.page.locator.side_effect = closed
+                elif stage == "content":
+                    self.page.content.side_effect = closed
                 else:
                     self.after_wait = closed
-                with self.fetcher() as fetcher, self.assertRaises(WatchlistStopped):
+                with self.fetcher() as fetcher, self.assertRaises(SourceAccessBlocked):
                     fetcher.fetch(LOT_URL)
                 self.assertEqual(fetcher.pages_fetched, 0)
 
@@ -479,7 +483,8 @@ class PublicBrowserRecoveryTests(TestCase):
                         if cancellation == "close_during_wait":
                             raise RuntimeError("Target page, context or browser has been closed")
                 self.after_wait = cancel
-                with self.assertRaises(WatchlistStopped), self.fetcher(stop_event=event) as fetcher:
+                expected_error = WatchlistStopped if cancellation == "stop" else SourceAccessBlocked
+                with self.assertRaises(expected_error), self.fetcher(stop_event=event) as fetcher:
                     fetcher.fetch_search_page(SEARCH_URL)
                 self.assertEqual(self.handlers, [])
                 self.context.close.assert_called_once()
@@ -491,6 +496,119 @@ class PublicBrowserRecoveryTests(TestCase):
             with self.assertRaisesRegex(SourceAccessBlocked, "access screen"):
                 fetcher.fetch_search_page(SEARCH_URL)
             self.assertEqual(fetcher.pages_fetched, 0)
+
+    def test_access_denied_screen_stops_immediately_and_does_not_reopen_browser(self):
+        self.title = "Access Denied"
+        self.html = "<h1>Access Denied</h1><p>Your request has been blocked by our security policies.</p>"
+        with self.fetcher() as fetcher:
+            for _ in range(2):
+                with self.assertRaisesRegex(SourceAccessBlocked, "Use my browser"):
+                    fetcher.fetch_search_page(SEARCH_URL)
+            self.assertEqual(fetcher.pages_fetched, 0)
+        self.assertEqual(self.now, 0)
+        self.page.goto.assert_called_once()
+        self.page.wait_for_timeout.assert_not_called()
+        self.assertEqual(self.handlers, [])
+
+    def test_security_policy_denial_is_detected_before_document_title_updates(self):
+        self.html = "<h1>Access Denied</h1><p>Your request has been blocked by our security policies.</p>"
+        with self.fetcher() as fetcher, self.assertRaisesRegex(SourceAccessBlocked, "denied access"):
+            fetcher.fetch_search_page(SEARCH_URL)
+        self.assertEqual(self.now, 0)
+        self.page.wait_for_timeout.assert_not_called()
+
+    def test_close_and_crash_races_do_not_require_is_closed_to_have_updated(self):
+        for stage in ("navigation", "wait", "body", "title", "status_check", "content"):
+            with self.subTest(stage=stage):
+                self.now = 0
+                self.auto_response = False
+                self.page.goto.side_effect = self.navigate
+                self.page.wait_for_timeout.side_effect = self.advance
+                self.page.locator.side_effect = self.locator
+                self.page.title.side_effect = lambda: self.title
+                self.page.content.side_effect = lambda: self.html
+                self.page.is_closed.side_effect = None
+                closed = RuntimeError("Target page, context or browser has been closed")
+                if stage == "navigation":
+                    self.page.goto.side_effect = closed
+                elif stage == "wait":
+                    self.page.wait_for_timeout.side_effect = RuntimeError("Page.wait_for_timeout: Page crashed")
+                elif stage == "body":
+                    self.page.locator.side_effect = closed
+                elif stage == "title":
+                    self.page.title.side_effect = closed
+                elif stage == "content":
+                    self.page.content.side_effect = closed
+                else:
+                    self.page.is_closed.side_effect = closed
+                with self.fetcher() as fetcher, self.assertRaisesRegex(SourceAccessBlocked, "browser was closed"):
+                    if stage == "content":
+                        fetcher.fetch(LOT_URL)
+                    else:
+                        fetcher.fetch_search_page(SEARCH_URL)
+                self.assertEqual(self.handlers, [])
+
+    def test_stop_takes_precedence_over_closed_browser_races(self):
+        self.auto_response = False
+        for stage in ("wait", "body", "content"):
+            with self.subTest(stage=stage):
+                event = threading.Event()
+                def stopped(*_args, **_kwargs):
+                    event.set()
+                    raise RuntimeError("Target page, context or browser has been closed")
+                self.page.wait_for_timeout.side_effect = self.advance
+                self.page.locator.side_effect = self.locator
+                self.page.content.side_effect = lambda: self.html
+                if stage == "wait":
+                    self.page.wait_for_timeout.side_effect = stopped
+                elif stage == "body":
+                    self.page.locator.side_effect = stopped
+                else:
+                    self.page.content.side_effect = stopped
+                with self.fetcher(stop_event=event) as fetcher, self.assertRaises(WatchlistStopped):
+                    if stage == "content":
+                        fetcher.fetch(LOT_URL)
+                    else:
+                        fetcher.fetch_search_page(SEARCH_URL)
+
+    def test_closed_target_during_listener_teardown_preserves_successful_result(self):
+        self.page.remove_listener.side_effect = RuntimeError("Target page, context or browser has been closed")
+        with self.fetcher() as fetcher:
+            result = fetcher.fetch_search_page(SEARCH_URL)
+        self.assertEqual(json.loads(result)["results"][0], self.result)
+
+    def test_unrelated_listener_teardown_error_is_not_hidden(self):
+        self.page.remove_listener.side_effect = RuntimeError("Unexpected listener failure")
+        with self.fetcher() as fetcher, self.assertRaisesRegex(RuntimeError, "Unexpected listener failure"):
+            fetcher.fetch_search_page(SEARCH_URL)
+
+    def test_closed_target_during_cleanup_does_not_mask_access_denial(self):
+        self.title = "Access Denied"
+        self.page.remove_listener.side_effect = RuntimeError("Target page, context or browser has been closed")
+        self.context.close.side_effect = RuntimeError("Target page, context or browser has been closed")
+        self.playwright.stop.side_effect = RuntimeError("Connection closed")
+        with self.assertRaisesRegex(SourceAccessBlocked, "denied access"), self.fetcher() as fetcher:
+            fetcher.fetch_search_page(SEARCH_URL)
+        self.context.close.assert_called_once()
+        self.playwright.stop.assert_called_once()
+
+    def test_context_close_race_after_success_cannot_abort_calendar_upload(self):
+        self.context.close.side_effect = RuntimeError("Target page, context or browser has been closed")
+        self.playwright.stop.side_effect = RuntimeError("Connection closed")
+        with self.fetcher() as fetcher:
+            result = fetcher.fetch_search_page(SEARCH_URL)
+        self.assertEqual(json.loads(result)["results"][0], self.result)
+        self.context.close.assert_called_once()
+        self.playwright.stop.assert_called_once()
+        fetcher.close()
+        self.context.close.assert_called_once()
+
+    def test_unrelated_cleanup_error_is_preserved_and_still_stops_playwright(self):
+        self.context.close.side_effect = RuntimeError("Could not flush profile to disk")
+        self.playwright.stop.side_effect = RuntimeError("Connection closed")
+        with self.assertRaisesRegex(RuntimeError, "flush profile"), self.fetcher() as fetcher:
+            fetcher.fetch_search_page(SEARCH_URL)
+        self.playwright.stop.assert_called_once()
 
     def test_initial_rate_limit_stops_immediately(self):
         self.initial_status = 429

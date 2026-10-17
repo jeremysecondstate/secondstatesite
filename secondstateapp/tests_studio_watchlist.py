@@ -402,7 +402,7 @@ class StudioWatchlistControllerTests(TestCase):
             sync_result=CalendarSyncResult(1, 0, 1, 0),
         )
         warning = self.warning.call_args.args[1]
-        self.assertIn('Import saved Invaluable pages', warning)
+        self.assertIn('Use my browser', warning)
         self.assertLess(len(warning), 900)
         self.assertIn(failure, self.panel._sync_details_text)
 

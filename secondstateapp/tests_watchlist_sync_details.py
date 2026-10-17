@@ -98,7 +98,7 @@ class WatchlistSyncDetailsTests(TestCase):
         self.assertIn(failure, self.panel._sync_details_text)
         self.assertIn("2026-10-08", self.panel._sync_details_text)
         self.assertIn("Retry with browser", self.panel._sync_details_text)
-        self.assertIn("Retry with browser", self.warning.call_args.args[1])
+        self.assertIn("Use my browser", self.warning.call_args.args[1])
         self.assertEqual(self.panel.retry_browser_button.winfo_manager(), "grid")
         self.status_callback.assert_called_with(self.panel.sync_status_var.get())
 

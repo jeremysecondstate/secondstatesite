@@ -8,6 +8,7 @@ from unittest.mock import Mock
 import tkinter as tk
 
 from catalogapp.watchlist_service import WatchCoverage, WatchlistMetrics, WatchlistResult
+from catalogapp.watchlist_browser import InvaluablePublicBrowserFetcher
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_sync import CalendarSyncResult
 from secondstateapp import tests_studio_watchlist as studio_tests
@@ -207,6 +208,39 @@ class AutomaticBrowserRecoveryControllerTests(TestCase):
         self.panel.calendar_syncer.assert_not_called()
         self.assertFalse(self.panel._busy)
         self.assertIn('stopped', self.panel.sync_status_var.get())
+
+    def test_unavailable_recovery_browser_still_uploads_and_offers_usual_browser(self):
+        self.panel.load_bookmarks(self.path)
+        source_error = 'Calder (Invaluable): The retry browser was closed. Use my browser.'
+        browser = InvaluablePublicBrowserFetcher(self.directory / 'retry-browser')
+        context = Mock()
+        context.close.side_effect = RuntimeError('Target page, context or browser has been closed')
+        playwright = Mock()
+        browser._context = context
+        browser._playwright = playwright
+        self.public_browser.return_value = browser
+
+        def refresh(*_args, **_kwargs):
+            self.service.call_args.kwargs['invaluable_recovery_factory']()
+            return WatchlistResult(
+                [self.lot], WatchlistMetrics(), errors=[source_error],
+                fallback_lot_keys={self.lot.cache_key},
+            )
+
+        self.service.return_value.refresh.side_effect = refresh
+        self.panel.sync_to_calendar()
+
+        context.close.assert_called_once()
+        playwright.stop.assert_called_once()
+        self.panel.calendar_syncer.assert_called_once()
+        self.error.assert_not_called()
+        self.assertFalse(self.panel._busy)
+        self.assertEqual(self.panel.source_refresh_errors, [source_error])
+        self.assertEqual(self.panel.fallback_lot_keys, {self.lot.cache_key})
+        self.assertIn('Website calendar synced', self.panel.sync_status_var.get())
+        self.assertIn('Use my browser', self.panel.sync_status_var.get())
+        self.panel.import_invaluable_button.grid.assert_called()
+        self.panel.import_invaluable_button.configure.assert_called_with(state=tk.NORMAL)
 
     def test_recover_pending_can_continue_in_browser_without_changing_selection(self):
         self.panel.load_bookmarks(self.path)

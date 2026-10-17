@@ -34,6 +34,17 @@ _CHALLENGE = re.compile(
     r"(?:please )?enable javascript(?: and cookies)?|javascript (?:is )?disabled)\b",
     re.I,
 )
+_PERMANENT_ACCESS_DENIAL = re.compile(
+    r"\byour request has been blocked by (?:our )?security policies\b",
+    re.I,
+)
+_BROWSER_UNAVAILABLE = re.compile(
+    r"(?:target page, context or browser has been closed|"
+    r"(?:target|page|browser) (?:has been |is )?crashed|"
+    r"(?:browser|context|page|connection) (?:has been |is )?closed|"
+    r"target closed)",
+    re.I,
+)
 _VISIBLE_SOLD = re.compile(
     r"\bSold(?:\s+(?:for|price))?\s*:\s*(?:[A-Z]{3}\s*)?[$€£¥]?\s*\d",
     re.I,
@@ -112,6 +123,17 @@ def _navigation_timed_out(error: Exception) -> bool:
     return isinstance(error, (TimeoutError, BrowserTimeoutError))
 
 
+def _browser_unavailable(error: Exception) -> bool:
+    """Recognize closure races, including wrapped navigation errors."""
+    seen = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if _BROWSER_UNAVAILABLE.search(str(error)):
+            return True
+        error = error.__cause__
+    return False
+
+
 def _dom_lot(html: str, url: str):
     # Embedded metadata is not proof that the signed-in user can see a result.
     soup = BeautifulSoup(html, "html.parser")
@@ -173,12 +195,19 @@ class InvaluableBrowserFetcher:
         context, playwright = self._context, self._playwright
         self._context = self._page = self._playwright = None
         self._owner_thread = None
-        try:
-            if context is not None:
-                context.close()
-        finally:
-            if playwright is not None:
-                playwright.stop()
+        close_error = None
+        for resource, method in ((context, "close"), (playwright, "stop")):
+            if resource is None:
+                continue
+            try:
+                getattr(resource, method)()
+            except Exception as exc:
+                # A user can close the recovery window before ExitStack runs.
+                # It is already released; do not let that race abort upload.
+                if not _browser_unavailable(exc) and close_error is None:
+                    close_error = exc
+        if close_error is not None:
+            raise close_error
 
     def _check_stopped(self) -> None:
         if self.stop_event.is_set():
@@ -519,13 +548,30 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
         return result
 
     def _check_browser_open(self) -> None:
-        if self._page.is_closed():
-            raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.")
         self._check_stopped()
+        if self._page.is_closed():
+            self._browser_unavailable()
 
-    def _raise_if_browser_cancelled(self) -> None:
-        if self.stop_event.is_set() or (self._page is not None and self._page.is_closed()):
-            raise WatchlistStopped("Invaluable browser retry cancelled.") from None
+    def _browser_unavailable(self) -> None:
+        self._blocked(
+            "The Invaluable retry browser was closed or stopped responding. "
+            "Cached lots were retained. Use my browser to recover this search."
+        )
+
+    def _raise_if_browser_unavailable(self, error: Exception) -> None:
+        if self.stop_event.is_set():
+            raise WatchlistStopped("Invaluable browser retry stopped by the user.") from None
+        if _browser_unavailable(error):
+            self._browser_unavailable()
+        if self._page is not None:
+            try:
+                closed = self._page.is_closed()
+            except Exception as exc:
+                if _browser_unavailable(exc):
+                    self._browser_unavailable()
+                raise
+            if closed:
+                self._browser_unavailable()
 
     @classmethod
     def _current_search_matches(cls, current_url: str, requested_url: str, expected: dict) -> bool:
@@ -552,10 +598,10 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
         """
         try:
             return self._fetch_search_page(url)
-        except Exception:
+        except Exception as exc:
             # Include context setup, throttling, and listener registration;
-            # closing during any of them must cancel before calendar upload.
-            self._raise_if_browser_cancelled()
+            # a failed optional browser must not cancel the calendar upload.
+            self._raise_if_browser_unavailable(exc)
             raise
 
     def _fetch_search_page(self, url: str) -> str:
@@ -646,11 +692,20 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
                 challenge_found = False
                 try:
                     text = self._page.locator("body").inner_text(timeout=1_000)
-                    challenge = _CHALLENGE.search(f"{self._page.title()}\n{text[:3000]}")
+                    title = self._page.title()
+                    challenge = _CHALLENGE.search(f"{title}\n{text[:3000]}")
                     challenge_found = bool(challenge)
-                except Exception:
+                except Exception as exc:
+                    self._raise_if_browser_unavailable(exc)
                     self._check_browser_open()
                     challenge = True
+                else:
+                    if (title.strip().casefold() == "access denied"
+                            or _PERMANENT_ACCESS_DENIAL.search(text[:3000])):
+                        self._blocked(
+                            "Invaluable denied access to the retry browser. Cached lots were retained. "
+                            "Use my browser to recover the search from your usual browser."
+                        )
                 self._check_browser_open()
                 search_matches = self._current_search_matches(self._page.url, url, expected)
                 if not search_matches:
@@ -676,7 +731,13 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
                     )
                 self._pause()
         finally:
-            self._page.remove_listener("response", capture)
+            try:
+                self._page.remove_listener("response", capture)
+            except Exception as exc:
+                # Listener teardown can race a closed window or connection.
+                # Preserve the useful result/failure already produced above.
+                if not _browser_unavailable(exc):
+                    raise
 
     def post_json(self, url: str, payload: object, *, referer: str = "") -> object:
         raise SourceAccessError("Public browser retry reads the search page's own catalog response; direct catalog requests are disabled.")
@@ -685,8 +746,8 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
         """Read public details without requiring a signed-in numeric sold result."""
         try:
             return self._fetch_public_lot(url)
-        except Exception:
-            self._raise_if_browser_cancelled()
+        except Exception as exc:
+            self._raise_if_browser_unavailable(exc)
             raise
 
     def _fetch_public_lot(self, url: str) -> str:

@@ -225,6 +225,29 @@ class AutomaticBrowserRecoveryTests(TestCase):
                 self.assertTrue(result.errors)
                 self.assertTrue(all(item.needs_recovery for item in result.coverage))
 
+    def test_closed_browser_after_success_preserves_results_and_skips_remaining_searches(self):
+        watched = self.entries[:3]
+        seeded = [self.seed(item) for item in watched]
+
+        def browser_handler(artist, page):
+            if artist == watched[0].artist:
+                return response([hit(artist, bid=200)])
+            raise SourceAccessBlocked("The Invaluable retry browser was closed. Use my browser.")
+
+        browser = PublicCatalogFetcher(browser_handler)
+        result = self.refresh(CatalogFetcher(self.blocked), browser, entries=watched)
+
+        self.assertFalse(result.stopped)
+        self.assertEqual(browser.calls, [(watched[0].artist, 0), (watched[1].artist, 0)])
+        self.assertEqual({lot.cache_key for lot in result.lots}, {lot.cache_key for lot in seeded})
+        self.assertEqual(result.fallback_lot_keys, {lot.cache_key for lot in seeded[1:]})
+        self.assertEqual(result.metrics.ended_lots, 0)
+        self.assertEqual(self.cache.get(seeded[0].cache_key).last_seen_at, NOW.isoformat())
+        for lot in seeded[1:]:
+            self.assertEqual(self.cache.get(lot.cache_key).last_seen_at, PREVIOUS.isoformat())
+        self.assertEqual(result.coverage[0].state, "verified")
+        self.assertTrue(all(item.needs_recovery for item in result.coverage[1:]))
+
     def test_browser_later_page_failure_preserves_both_http_and_browser_observations(self):
         prior = self.seed(self.entries[0], "unseen")
 

@@ -1458,7 +1458,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             label += f" Includes {len(self.fallback_lot_keys)} cached lots; live data was not verified."
         if self.source_refresh_errors:
             label += (
-                " Live source refresh remains incomplete; choose Recover pending, retry with browser, or import saved Invaluable pages."
+                " Live source refresh remains incomplete; choose Use my browser to import fresh Invaluable results from your usual browser."
                 if self._has_invaluable_source_issue()
                 else " Live source refresh remains incomplete; try Update Calendar after source access is restored."
             )
@@ -1519,8 +1519,9 @@ class ArtistWatchlistPanel(ttk.Frame):
                 parts.append(
                     "For Invaluable, click Retry with browser to retrieve the selected artists in a separate, "
                     "visible browser and sync the results. Keep that browser open while it loads. "
-                    "If Invaluable shows an access screen, check it in the opened browser; the app waits for "
-                    "readable auction data. Access is not guaranteed. Stop cancels the retry and keeps cached lots. "
+                    "If Invaluable asks for verification, complete it there. An Access Denied screen or a closed "
+                    "retry window ends browser recovery; available lots still upload with a source warning. "
+                    "Use my browser to import fresh results from your usual browser. Stop cancels the entire sync. "
                     "This retry does not use your usual Chrome profile or the old saved-login setting."
                 )
                 parts.append(
@@ -1588,8 +1589,7 @@ class ArtistWatchlistPanel(ttk.Frame):
             if self.fallback_lot_keys else ""
         )
         retry_guidance = (
-            "Use Retry with browser, or load upcoming results in your usual browser and use "
-            "Import saved Invaluable pages to add those lots to Calendar. "
+            "Choose Use my browser to load upcoming results in your usual browser and import them into Calendar. "
             if self._has_invaluable_source_issue()
             else "Retry Update Calendar after source access is restored. "
         )
