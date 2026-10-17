@@ -38,7 +38,10 @@ class CatalogResponseTests(TestCase):
         message = str(raised.exception)
         self.assertIn("web page instead of auction data (HTTP 202)", message)
         self.assertIn("Live auction data was not refreshed", message)
-        self.assertIn("Try Sync to Calendar again when Invaluable allows access", message)
+        self.assertIn("Use Retry with browser", message)
+        self.assertIn("Import saved Invaluable pages", message)
+        self.assertIn("cached lots, if any", message)
+        self.assertNotIn("Try Sync to Calendar again", message)
         self.assertNotIn("Connect Invaluable", message)
         self.assertNotIn("PRIVATE RESPONSE CONTENT", message)
         self.assertEqual(session.post.call_count, 1)
@@ -65,6 +68,30 @@ class CatalogResponseTests(TestCase):
                 fetcher = HttpPageFetcher(session=session, min_interval_seconds=0, max_retries=0)
                 with self.assertRaises(SourceAccessBlocked):
                     fetcher.fetch("https://www.invaluable.com/auction-lot/example-116")
+
+    def test_invaluable_access_errors_offer_recovery_without_assuming_a_cache_exists(self):
+        for method, status, html in (
+            ("get", 202, ""), ("get", 403, ""), ("post", 403, ""),
+            ("get", 200, "<h1>Verify you are human</h1>"),
+        ):
+            with self.subTest(method=method, status=status):
+                response = requests.Response()
+                response.status_code = status
+                response.headers["Content-Type"] = "text/html"
+                response._content = html.encode()
+                session = Mock()
+                getattr(session, method).return_value = response
+                fetcher = HttpPageFetcher(session=session, min_interval_seconds=0)
+                with self.assertRaises(SourceAccessBlocked) as raised:
+                    if method == "post":
+                        fetcher.post_json("https://www.invaluable.com/catResults", {})
+                    else:
+                        fetcher.fetch("https://www.invaluable.com/auction-lot/example-116")
+                message = str(raised.exception)
+                self.assertIn("Retry with browser", message)
+                self.assertIn("Import saved Invaluable pages", message)
+                self.assertIn("cached lots, if any", message)
+                self.assertEqual(getattr(session, method).call_count, 1)
 
     def test_missing_individual_lot_is_not_a_source_wide_block(self):
         response = requests.Response()

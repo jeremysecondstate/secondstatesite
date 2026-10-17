@@ -46,6 +46,16 @@ def _allowed_url(url: str) -> bool:
     )
 
 
+def _invaluable_access_guidance(url: str) -> str:
+    host = (urlsplit(url).hostname or "").casefold()
+    if host == "invaluable.com" or host.endswith(".invaluable.com"):
+        return (
+            " Use Retry with browser, or load the upcoming results in your usual browser and use "
+            "Import saved Invaluable pages. Existing cached lots, if any, are retained."
+        )
+    return ""
+
+
 class HttpPageFetcher:
     def __init__(
         self,
@@ -84,12 +94,14 @@ class HttpPageFetcher:
         if response.status_code == 202:
             raise SourceAccessBlocked(
                 f"{urlsplit(url).hostname or 'The source'} returned an access page (HTTP 202). "
-                "The lot was not refreshed. Try Sync to Calendar again when source access is available."
+                "The lot was not refreshed."
+                + _invaluable_access_guidance(url)
             )
         if _has_access_challenge(response):
             raise SourceAccessBlocked(
                 f"{urlsplit(url).hostname or 'The source'} returned an access challenge. "
                 "The lot was not refreshed."
+                + _invaluable_access_guidance(url)
             )
         return response.text
 
@@ -114,11 +126,7 @@ class HttpPageFetcher:
                 "an access response" if blocked else "a non-JSON response"
             )
             error_class = SourceAccessBlocked if blocked else SourceAccessError
-            host = (urlsplit(url).hostname or "").casefold()
-            guidance = (
-                " Try Sync to Calendar again when Invaluable allows access. Existing cached lots are retained."
-                if blocked and (host == "invaluable.com" or host.endswith(".invaluable.com")) else ""
-            )
+            guidance = _invaluable_access_guidance(url) if blocked else ""
             raise error_class(
                 f"{urlsplit(url).hostname or 'The source'} returned {received} "
                 f"(HTTP {response.status_code}). Live auction data was not refreshed.{guidance}"
@@ -158,7 +166,7 @@ class HttpPageFetcher:
                 guidance = (
                     " For Heritage, save the catalog page from your signed-in browser and use "
                     "Import Saved Heritage Pages in the watchlist."
-                    if host == "ha.com" or host.endswith(".ha.com") else ""
+                    if host == "ha.com" or host.endswith(".ha.com") else _invaluable_access_guidance(url)
                 )
                 raise SourceAccessBlocked(
                     f"{host} requires authentication or blocked automation (HTTP {response.status_code}). "

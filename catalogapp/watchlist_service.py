@@ -63,6 +63,8 @@ class WatchlistResult:
 class _PostedResultChecks:
     details: dict[str, NormalizedLot | None] = field(default_factory=dict)
     access_blocked: bool = False
+    blocked_detail_sources: set[str] = field(default_factory=set)
+    detail_errors_by_watch: dict[str, str] = field(default_factory=dict)
 
 
 _SOLD_LOGIN_NOTICE = (
@@ -86,6 +88,15 @@ def _retain_missing_static_fields(card: NormalizedLot, previous: NormalizedLot) 
     if card.medium.casefold() == "print" and previous.medium:
         card.medium = previous.medium
     card.content_hash = card.calculate_content_hash()
+
+
+def _has_usable_search_data(lot: NormalizedLot) -> bool:
+    """A failed optional detail request must not admit an undated calendar lot."""
+    try:
+        when, _all_day = parse_lot_datetime(lot.relevant_at)
+    except ValueError:
+        return False
+    return bool(lot.title.strip() and when is not None)
 
 
 class WatchlistService:
@@ -244,7 +255,10 @@ class WatchlistService:
                 if complete:
                     refreshed_lots.extend(ended)
                     metrics.ended_lots += len(ended)
-                self.cache.record_source_success(entry.url, observed_at)
+                if entry.url in result_checks.detail_errors_by_watch:
+                    self.cache.record_source_error(entry.url, result_checks.detail_errors_by_watch[entry.url], observed_at)
+                else:
+                    self.cache.record_source_success(entry.url, observed_at)
             except WatchlistStopped:
                 stopped = True
                 break
@@ -328,6 +342,9 @@ class WatchlistService:
         errors: list[str] | None = None,
         notices: list[str] | None = None,
     ) -> tuple[list[NormalizedLot], list[NormalizedLot], bool]:
+        result_checks = result_checks if result_checks is not None else _PostedResultChecks()
+        errors = errors if errors is not None else []
+        notices = notices if notices is not None else []
         page_url = entry.url
         visited_pages: set[str] = set()
         observed_keys: set[str] = set()
@@ -359,6 +376,8 @@ class WatchlistService:
                     "The source repeated an earlier catalog page; existing lots have been retained."
                 )
             for card, cached in cards:
+                if stop.is_set():
+                    raise WatchlistStopped("Watchlist refresh stopped by the user.")
                 if card.cache_key in observed_keys:
                     continue
                 observed_keys.add(card.cache_key)
@@ -371,28 +390,57 @@ class WatchlistService:
                     lot = card
                     if cached:
                         _retain_missing_static_fields(lot, cached.lot)
-                    if adapter.needs_detail(lot) and lot.lot_url and not (
-                        adapter.source == "Invaluable" and result_checks is not None and result_checks.access_blocked
-                    ):
-                        try:
-                            detail_page = adapter.fetch_lot_detail(lot.lot_url, fetcher)
-                        except SourceAccessError as exc:
-                            if adapter.source == "Invaluable" and result_checks is not None:
+                    if adapter.needs_detail(lot) and lot.lot_url:
+                        detail_blocked = adapter.source in result_checks.blocked_detail_sources or (
+                            adapter.source == "Invaluable" and result_checks.access_blocked
+                        )
+                        if detail_blocked:
+                            if not _has_usable_search_data(lot):
+                                raise SourceAccessError(
+                                    "A search result has no usable title or auction date, and lot-page access is unavailable."
+                                )
+                            notice = (
+                                f"Further {adapter.source} lot-page requests were skipped while access is unavailable. "
+                                "Dated search results were retained for calendar sync; their lot-page details remain unverified."
+                            )
+                            if notice not in notices:
+                                notices.append(notice)
+                            result_checks.detail_errors_by_watch.setdefault(entry.url, notice)
+                        else:
+                            try:
+                                detail_page = adapter.fetch_lot_detail(lot.lot_url, fetcher)
+                                if stop.is_set():
+                                    raise WatchlistStopped("Watchlist refresh stopped by the user.")
+                                metrics.detail_pages_fetched += 1
+                                detail = adapter.parse_lot_detail(detail_page, lot.lot_url, entry.artist)
+                                if detail is None:
+                                    raise SourceAccessError("The lot page did not contain recognizable auction details.")
+                            except WatchlistStopped:
+                                raise
+                            except Exception as exc:
+                                if stop.is_set():
+                                    raise WatchlistStopped("Watchlist refresh stopped by the user.") from exc
                                 result_checks.details[lot.cache_key] = None
                                 if isinstance(exc, SourceAccessBlocked):
-                                    result_checks.access_blocked = True
-                            raise
-                        metrics.detail_pages_fetched += 1
-                        detail = adapter.parse_lot_detail(detail_page, lot.lot_url, entry.artist)
-                        if detail is None:
-                            if adapter.source == "Invaluable" and result_checks is not None:
-                                result_checks.details[lot.cache_key] = None
-                            raise SourceAccessError("The lot page did not contain recognizable auction details.")
-                        if result_checks is not None:
-                            result_checks.details[lot.cache_key] = detail
-                            self._note_sold_access(detail, result_checks, notices if notices is not None else [])
-                        if detail:
-                            lot = adapter.merge_detail(lot, detail)
+                                    result_checks.blocked_detail_sources.add(adapter.source)
+                                    if adapter.source == "Invaluable":
+                                        result_checks.access_blocked = True
+                                if not _has_usable_search_data(lot):
+                                    raise
+                                message = " ".join(str(exc).split())[:300]
+                                detail_error = (
+                                    f"{entry.watch_label} ({adapter.source}), lot {lot.lot_number or lot.source_lot_id}: "
+                                    f"lot-page details could not be verified: {message}. "
+                                    "The dated search result was retained for calendar sync."
+                                )
+                                result_checks.detail_errors_by_watch[entry.url] = detail_error
+                                errors.append(detail_error)
+                            else:
+                                result_checks.details[lot.cache_key] = detail
+                                self._note_sold_access(detail, result_checks, notices)
+                                lot = adapter.merge_detail(lot, detail)
+                if stop.is_set():
+                    raise WatchlistStopped("Watchlist refresh stopped by the user.")
                 transition = self.cache.upsert(
                     lot,
                     watch_url=entry.url,
@@ -412,13 +460,15 @@ class WatchlistService:
             if next_url in visited_pages:
                 next_url = ""
             page_url = next_url
+        if stop.is_set():
+            raise WatchlistStopped("Watchlist refresh stopped by the user.")
         if complete and adapter.source == "Invaluable":
             lots = self._refresh_posted_results(
                 entry, adapter, fetcher, stop, metrics, observed_at, lots,
-                result_checks if result_checks is not None else _PostedResultChecks(),
-                errors if errors is not None else [], observed_lot_keys,
-                notices if notices is not None else [],
+                result_checks, errors, observed_lot_keys, notices,
             )
+        if stop.is_set():
+            raise WatchlistStopped("Watchlist refresh stopped by the user.")
         ended = self.cache.mark_missing_ended(entry.url, observed_keys, observed_at) if complete else []
         if observed_lot_keys is not None:
             observed_lot_keys.update(lot.cache_key for lot in ended)

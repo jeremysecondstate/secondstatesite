@@ -102,6 +102,43 @@ class WatchlistSyncDetailsTests(TestCase):
         self.assertEqual(self.panel.retry_browser_button.winfo_manager(), "grid")
         self.status_callback.assert_called_with(self.panel.sync_status_var.get())
 
+    def test_new_artist_with_blocked_source_has_actionable_empty_state_and_no_upload(self):
+        failure = "www.invaluable.com returned a web page instead of auction data (HTTP 202)."
+        self.panel.calendar_syncer = Mock()
+        result = WatchlistResult([], WatchlistMetrics(), errors=[
+            failure, "No cached lots are available for calendar sync for: John W Nieto.",
+        ])
+        self.panel.after = lambda _delay, callback: callback()
+
+        self.panel._sync_and_finish_result(result)
+
+        self.panel.calendar_syncer.assert_not_called()
+        self.assertEqual(self.panel.status_title_var.get(), "Sync needs attention")
+        status = self.panel.sync_status_var.get()
+        self.assertIn("No lots were available to upload", status)
+        self.assertIn("HTTP 202", status)
+        self.assertIn("Retry with browser", status)
+        self.assertIn("Import saved Invaluable pages", status)
+        self.assertNotIn("Calendar updated", status)
+        self.assertNotIn("No upcoming lots found", status)
+        self.assertIn("Retry with browser", self.panel.empty_state.cget("text"))
+        self.assertEqual(self.panel.retry_browser_button.winfo_manager(), "grid")
+        self.assertEqual(self.panel.import_invaluable_button.winfo_manager(), "grid")
+        self.assertIn("John W Nieto", self.panel._sync_details_text)
+        self.assertIn("John W Nieto", self.warning.call_args.args[1])
+
+    def test_verified_empty_search_keeps_zero_results_distinct_from_source_failure(self):
+        self.panel.calendar_syncer = Mock()
+        self.panel.after = lambda _delay, callback: callback()
+
+        self.panel._sync_and_finish_result(WatchlistResult([], WatchlistMetrics()))
+
+        self.panel.calendar_syncer.assert_not_called()
+        self.assertEqual(self.panel.status_title_var.get(), "No upcoming lots")
+        self.assertEqual(self.panel.empty_state.cget("text"), "No upcoming lots found for the selected artists.")
+        self.assertFalse(self.panel.retry_browser_button.winfo_manager())
+        self.warning.assert_not_called()
+
     def test_browser_retry_is_only_shown_for_invaluable_and_disabled_during_work(self):
         self.assertFalse(self.panel.retry_browser_button.winfo_manager())
         self.panel._finish_refresh(self.result(errors=["Heritage returned HTTP 403."]))

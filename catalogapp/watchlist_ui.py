@@ -1025,6 +1025,13 @@ class ArtistWatchlistPanel(ttk.Frame):
             label = "Local lots ready; website calendar not synced. Add the missing .env settings, then click Sync to Calendar."
         elif result.errors and not result.stopped:
             label = "Live source refresh incomplete; website calendar was not synced."
+            if not result.lots:
+                label += " No lots were available to upload."
+            if self._has_invaluable_source_issue():
+                label += " Use Retry with browser or Import saved Invaluable pages to retrieve the lots."
+            cause = " ".join(result.errors[0].split())
+            label += "\nSource: " + (cause[:177] + "…" if len(cause) > 180 else cause)
+            label += " See Sync details."
         report = [label]
         if sync_result:
             report.append(
@@ -1293,6 +1300,11 @@ class ArtistWatchlistPanel(ttk.Frame):
                     "No lots could be retrieved from the selected sources.\nSee the sync status below."
                     if self.source_refresh_errors else "No upcoming lots found for the selected artists."
                 )
+                if self._has_invaluable_source_issue():
+                    message = (
+                        "Invaluable lots could not be retrieved.\n"
+                        "Use Retry with browser or Import saved Invaluable pages below."
+                    )
                 empty_state.configure(text=message)
                 empty_state.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
         lot_summary = self.__dict__.get("lot_summary_var")
