@@ -156,6 +156,156 @@ class PublicBrowserRecoveryTests(TestCase):
                 self.page.goto.assert_called_once()
         self.page.evaluate.assert_not_called()
 
+    def test_navigation_timeout_keeps_already_captured_and_later_catalog_results(self):
+        for already_captured in (True, False):
+            with self.subTest(already_captured=already_captured):
+                self.page.goto.reset_mock()
+                self.now = 0
+                def timed_out(url, **_kwargs):
+                    self.page.url = url
+                    if already_captured:
+                        self.emit()
+                    raise TimeoutError("Page.goto: navigation timed out")
+                self.page.goto.side_effect = timed_out
+                self.after_wait = self.emit
+                with self.fetcher() as fetcher:
+                    self.assertEqual(json.loads(fetcher.fetch_search_page(SEARCH_URL))["results"][0], self.result)
+                    self.assertEqual(fetcher.pages_fetched, 1)
+                self.assertEqual(self.now, 0 if already_captured else 0.25)
+                self.page.goto.assert_called_once()
+                self.assertEqual(self.handlers, [])
+        self.page.evaluate.assert_not_called()
+
+    def test_navigation_timeout_without_results_uses_bounded_wait_without_reload(self):
+        def timed_out(url, **_kwargs):
+            self.page.url = url
+            raise TimeoutError("Page.goto: navigation timed out")
+        self.page.goto.side_effect = timed_out
+        with self.fetcher() as fetcher, self.assertRaisesRegex(SourceAccessBlocked, "no catalog response"):
+            fetcher.fetch_search_page(SEARCH_URL)
+        self.assertEqual(self.now, 1)
+        self.page.goto.assert_called_once()
+        self.page.evaluate.assert_not_called()
+        self.assertEqual(self.handlers, [])
+
+    def test_navigation_network_error_is_not_treated_as_a_loading_timeout(self):
+        self.page.goto.side_effect = RuntimeError("net::ERR_NAME_NOT_RESOLVED")
+        with self.fetcher() as fetcher, self.assertRaisesRegex(SourceAccessError, "could not open the search"):
+            fetcher.fetch_search_page(SEARCH_URL)
+        self.assertEqual(self.now, 0)
+        self.page.goto.assert_called_once()
+        self.assertEqual(self.handlers, [])
+
+    def test_close_or_stop_during_navigation_cancels_even_with_captured_results(self):
+        for interruption in ("close_error", "close_timeout", "close_response", "stop_timeout"):
+            with self.subTest(interruption=interruption):
+                self.page.is_closed.return_value = False
+                event = threading.Event()
+                def interrupted(url, **_kwargs):
+                    self.page.url = url
+                    self.emit()
+                    if interruption == "stop_timeout":
+                        event.set()
+                    else:
+                        self.page.is_closed.return_value = True
+                    if interruption == "close_response":
+                        return Mock(status=200, url=url)
+                    if interruption.endswith("timeout"):
+                        raise TimeoutError("Page.goto: navigation timed out")
+                    raise RuntimeError("Target page, context or browser has been closed")
+                self.page.goto.side_effect = interrupted
+                with self.fetcher(stop_event=event) as fetcher, self.assertRaises(WatchlistStopped):
+                    fetcher.fetch_search_page(SEARCH_URL)
+                self.assertEqual(fetcher.pages_fetched, 0)
+                self.assertEqual(self.handlers, [])
+
+    def test_close_during_dom_read_at_deadline_cancels_instead_of_reporting_block(self):
+        def closed_body(_selector):
+            self.now = 1
+            self.page.is_closed.return_value = True
+            raise RuntimeError("Target page, context or browser has been closed")
+        self.page.locator.side_effect = closed_body
+        with self.fetcher() as fetcher, self.assertRaises(WatchlistStopped):
+            fetcher.fetch_search_page(SEARCH_URL)
+        self.assertEqual(fetcher.pages_fetched, 0)
+        self.assertEqual(self.handlers, [])
+
+    def test_close_during_throttle_or_listener_setup_cancels_before_navigation(self):
+        for stage in ("throttle", "listener"):
+            with self.subTest(stage=stage):
+                self.page.is_closed.return_value = False
+                self.page.goto.reset_mock()
+                def closed(*_args):
+                    self.page.is_closed.return_value = True
+                    raise RuntimeError("Target page, context or browser has been closed")
+                with self.fetcher() as fetcher:
+                    operation = patch.object(fetcher, "_throttle", side_effect=closed) if stage == "throttle" else (
+                        patch.object(self.page, "on", side_effect=closed)
+                    )
+                    with operation, self.assertRaises(WatchlistStopped):
+                        fetcher.fetch_search_page(SEARCH_URL)
+                    self.assertEqual(fetcher.pages_fetched, 0)
+                self.page.goto.assert_not_called()
+                self.assertEqual(self.handlers, [])
+
+    def test_close_during_public_detail_navigation_or_wait_cancels_refresh(self):
+        for stage in ("navigation", "wait", "read"):
+            with self.subTest(stage=stage):
+                self.page.is_closed.return_value = False
+                self.page.goto.side_effect = self.navigate
+                self.page.locator.side_effect = self.locator
+                self.after_wait = lambda: None
+                self.html = "<h1>Lot loading</h1>"
+                def closed(*_args, **_kwargs):
+                    self.page.is_closed.return_value = True
+                    raise RuntimeError("Target page, context or browser has been closed")
+                if stage == "navigation":
+                    self.page.goto.side_effect = closed
+                elif stage == "read":
+                    self.page.locator.side_effect = closed
+                else:
+                    self.after_wait = closed
+                with self.fetcher() as fetcher, self.assertRaises(WatchlistStopped):
+                    fetcher.fetch(LOT_URL)
+                self.assertEqual(fetcher.pages_fetched, 0)
+
+    def test_captured_results_are_rejected_after_visible_search_scope_changes(self):
+        changed_urls = (
+            SEARCH_URL.replace("Alexander+Calder", "Pablo+Picasso"),
+            SEARCH_URL.replace("query=fine+art", "query=sculpture"),
+            SEARCH_URL.replace("Fine+Art=Prints", "Fine+Art=Paintings"),
+            SEARCH_URL + "&page=2",
+            SEARCH_URL.replace("sort=endDateAsc", "sort=priceAsc"),
+            LOT_URL,
+        )
+        for changed_url in changed_urls:
+            with self.subTest(url=changed_url):
+                self.now = 0
+                def navigated_elsewhere(url, **_kwargs):
+                    self.page.url = url
+                    self.emit()
+                    self.page.url = changed_url
+                    return Mock(status=200, url=url)
+                self.page.goto.side_effect = navigated_elsewhere
+                with self.fetcher() as fetcher:
+                    with self.assertRaisesRegex(SourceAccessBlocked, "visible search no longer matches"):
+                        fetcher.fetch_search_page(SEARCH_URL)
+                    self.assertEqual(fetcher.pages_fetched, 0)
+                self.assertEqual(self.handlers, [])
+
+    def test_returning_to_requested_search_requires_a_new_response(self):
+        def navigated_elsewhere(url, **_kwargs):
+            self.page.url = url
+            self.emit()
+            self.page.url = url.replace("Alexander+Calder", "Pablo+Picasso")
+            return Mock(status=200, url=url)
+        self.page.goto.side_effect = navigated_elsewhere
+        self.after_wait = lambda: setattr(self.page, "url", SEARCH_URL)
+        with self.fetcher() as fetcher, self.assertRaises(SourceAccessBlocked):
+            fetcher.fetch_search_page(SEARCH_URL)
+        self.assertEqual(fetcher.pages_fetched, 0)
+        self.assertEqual(self.handlers, [])
+
     def test_coherent_zero_result_including_artist_only_zero_is_accepted(self):
         self.result.update(hits=[], nbPages=0, nbHits=0)
         self.html = "<h4>0 items</h4>"

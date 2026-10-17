@@ -97,10 +97,19 @@ def _load_playwright():
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
         raise SourceAccessError(
-            "Invaluable sign-in needs the optional browser support. Install "
-            "requirements-watchlist-browser.txt with the desktop app's Python, then reconnect Invaluable."
+            "Invaluable browser access needs the optional browser support. Install "
+            "requirements-watchlist-browser.txt with the desktop app's Python, then retry the browser operation."
         ) from exc
     return sync_playwright()
+
+
+def _navigation_timed_out(error: Exception) -> bool:
+    """Recognize navigation timeouts without requiring the optional dependency."""
+    try:
+        from playwright.sync_api import TimeoutError as BrowserTimeoutError
+    except ImportError:
+        return isinstance(error, TimeoutError)
+    return isinstance(error, (TimeoutError, BrowserTimeoutError))
 
 
 def _dom_lot(html: str, url: str):
@@ -218,7 +227,7 @@ class InvaluableBrowserFetcher:
             self.close()
             raise SourceAccessError(
                 "Could not open the dedicated Invaluable browser. Install Chrome or Edge, close any "
-                "other Invaluable connection window, then try Connect Invaluable again."
+                "other Invaluable browser window, then retry the browser operation."
             ) from exc
 
     def _pause(self, seconds: float = 0.25) -> None:
@@ -509,6 +518,31 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
             return None
         return result
 
+    def _check_browser_open(self) -> None:
+        if self._page.is_closed():
+            raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.")
+        self._check_stopped()
+
+    def _raise_if_browser_cancelled(self) -> None:
+        if self.stop_event.is_set() or (self._page is not None and self._page.is_closed()):
+            raise WatchlistStopped("Invaluable browser retry cancelled.") from None
+
+    @classmethod
+    def _current_search_matches(cls, current_url: str, requested_url: str, expected: dict) -> bool:
+        """Do not use a captured response after the user changes the search."""
+        if (not _allowed_url(current_url)
+                or urlsplit(current_url).netloc != urlsplit(requested_url).netloc
+                or urlsplit(current_url).path.rstrip("/") != "/search"):
+            return False
+        current = InvaluableAdapter()._catalog_request_payload(current_url)["requests"][0]
+        wanted, actual = expected["params"], current["params"]
+        return (
+            current["indexName"] == expected["indexName"]
+            and actual["query"] == wanted["query"]
+            and actual["page"] == wanted["page"]
+            and cls._facet_groups(actual["facetFilters"]) == cls._facet_groups(wanted["facetFilters"])
+        )
+
     def fetch_search_page(self, url: str) -> str:
         """Read the ordinary search page's own successful catalog response.
 
@@ -516,13 +550,21 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
         request, extract session cookies, or accept an earlier unfiltered call
         while the site's artist/category controls are still hydrating.
         """
+        try:
+            return self._fetch_search_page(url)
+        except Exception:
+            # Include context setup, throttling, and listener registration;
+            # closing during any of them must cancel before calendar upload.
+            self._raise_if_browser_cancelled()
+            raise
+
+    def _fetch_search_page(self, url: str) -> str:
         if not _allowed_url(url) or urlsplit(url).path.rstrip("/") != "/search":
             raise SourceAccessError("Browser retry requires an HTTPS Invaluable search bookmark.")
         expected = InvaluableAdapter()._catalog_request_payload(url)["requests"][0]
         self._ensure_context()
         self._throttle()
         self._check_stopped()
-        self._page.bring_to_front()
         self.progress(
             "Opening Invaluable in the retry browser. If verification appears, complete it there; "
             "sync continues when the search results load. Use Stop to cancel."
@@ -571,23 +613,33 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
         self._page.on("response", capture)
         self.http_attempts += 1
         try:
+            self._check_browser_open()
+            self._page.bring_to_front()
+            navigation_timeout = False
+            response = None
             try:
                 response = self._page.goto(url, wait_until="domcontentloaded", timeout=45_000)
             except Exception as exc:
-                raise SourceAccessError("The Invaluable retry browser could not open the search. Try Retry with browser again.") from exc
-            self._last_request = self.monotonic()
-            if response is None:
+                self._check_browser_open()
+                if not _navigation_timed_out(exc):
+                    raise SourceAccessError("The Invaluable retry browser could not open the search. Try Retry with browser again.") from exc
+                # A slow document can already have produced the catalog data.
+                # Keep observing this navigation within the normal access wait;
+                # do not reload it or issue an additional catalog request.
+                navigation_timeout = True
+            finally:
+                self._last_request = self.monotonic()
+            self._check_browser_open()
+            if response is None and not navigation_timeout:
                 raise SourceAccessError("Invaluable did not return a search page. Try Retry with browser again.")
-            if not _allowed_url(response.url or url):
+            if response is not None and not _allowed_url(response.url or url):
                 self._blocked("Invaluable redirected outside its website; browser retry stopped.")
-            if response.status not in {200, 202, 401, 403}:
+            if response is not None and response.status not in {200, 202, 401, 403}:
                 self._check_status(response.status, response.url or url)
             deadline = self.monotonic() + self.access_timeout_seconds
             while True:
-                self._check_stopped()
-                if self._page.is_closed():
-                    raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.")
-                if not _allowed_url(self._page.url):
+                self._check_browser_open()
+                if not _allowed_url(self._page.url) and not (navigation_timeout and self._page.url == "about:blank"):
                     self._blocked("Invaluable redirected outside its website; browser retry stopped.")
                 if rate_limited:
                     self._blocked("Invaluable rate-limited its search (HTTP 429). Cached lots were retained.")
@@ -597,8 +649,15 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
                     challenge = _CHALLENGE.search(f"{self._page.title()}\n{text[:3000]}")
                     challenge_found = bool(challenge)
                 except Exception:
+                    self._check_browser_open()
                     challenge = True
-                if captured and not challenge and urlsplit(self._page.url).path.rstrip("/") == "/search":
+                self._check_browser_open()
+                search_matches = self._current_search_matches(self._page.url, url, expected)
+                if not search_matches:
+                    captured.clear()
+                    if "the visible search no longer matches the bookmark" not in mismatches:
+                        mismatches.append("the visible search no longer matches the bookmark")
+                if captured and not challenge and search_matches:
                     self.pages_fetched += 1
                     self.progress("Invaluable search loaded. Retrieved its live catalog results.")
                     return json.dumps({"results": [captured[-1]]}, ensure_ascii=False, separators=(",", ":"))
@@ -615,12 +674,7 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
                         "Invaluable did not provide a complete catalog response for this bookmarked search"
                         f" ({reason}). Cached lots were retained. Try Retry with browser again or import a saved search page."
                     )
-                try:
-                    self._pause()
-                except Exception:
-                    if self._page.is_closed():
-                        raise WatchlistStopped("Invaluable browser retry cancelled because its window was closed.") from None
-                    raise
+                self._pause()
         finally:
             self._page.remove_listener("response", capture)
 
@@ -629,11 +683,19 @@ class InvaluablePublicBrowserFetcher(InvaluableBrowserFetcher):
 
     def fetch(self, url: str) -> str:
         """Read public details without requiring a signed-in numeric sold result."""
+        try:
+            return self._fetch_public_lot(url)
+        except Exception:
+            self._raise_if_browser_cancelled()
+            raise
+
+    def _fetch_public_lot(self, url: str) -> str:
         self._navigate(url)
         deadline = self.monotonic() + self.render_timeout_seconds
         while True:
-            self._check_stopped()
+            self._check_browser_open()
             html, text = self._read_page()
+            self._check_browser_open()
             lot = _dom_lot(html, url)
             if lot and ("sold_price_login" in lot.ambiguities or _LOT_STATUS.search(text)):
                 self.pages_fetched += 1

@@ -76,6 +76,10 @@ _SOLD_LOGIN_NOTICE = (
 )
 
 
+class _CatalogAccessBlocked(SourceAccessBlocked):
+    """Distinguish a search failure from an optional or required detail denial."""
+
+
 def _invaluable_lot_reference(url: str) -> str:
     match = re.search(r"-c-([a-z0-9]+)(?:/|$)", urlsplit(url).path, re.I)
     return match[1].casefold() if match else ""
@@ -109,6 +113,7 @@ class WatchlistService:
         *,
         fetcher=None,
         invaluable_fetcher=None,
+        invaluable_recovery_factory: Callable[[], object] | None = None,
         enricher: OpenAIEnricher | None = None,
         now: Callable[[], datetime] | None = None,
         max_pages_per_bookmark: int = 10,
@@ -116,6 +121,7 @@ class WatchlistService:
         self.cache = cache
         self.fetcher = fetcher
         self.invaluable_fetcher = invaluable_fetcher
+        self.invaluable_recovery_factory = invaluable_recovery_factory
         self.enricher = enricher or OpenAIEnricher.from_environment(cache)
         self.now = now or (lambda: datetime.now(timezone.utc))
         self.max_pages_per_bookmark = max(1, min(int(max_pages_per_bookmark), 25))
@@ -137,6 +143,45 @@ class WatchlistService:
         invaluable_fetcher = self.invaluable_fetcher if self.invaluable_fetcher is not None else fetcher
         fetchers = {id(item): item for item in (fetcher, invaluable_fetcher)}
         started_pages = {key: int(getattr(item, "pages_fetched", 0)) for key, item in fetchers.items()}
+        recovery_fetcher = None
+        recovery_started = False
+        recovery_error: Exception | None = None
+        recovery_checks = _PostedResultChecks()
+
+        def can_recover(message: object, *, blocked: bool) -> bool:
+            # A 202 JavaScript access page can be loaded in the visible browser.
+            # Authentication denials and rate limits must not start this fallback.
+            return bool(
+                self.invaluable_recovery_factory is not None
+                and getattr(invaluable_fetcher, "uses_natural_catalog_requests", False) is not True
+                and blocked and re.search(r"\bHTTP\s+202\b", str(message), re.I)
+                and not re.search(r"\bHTTP\s+(?:401|403|429)\b", str(message), re.I)
+            )
+
+        def browser_recovery():
+            nonlocal recovery_fetcher, recovery_started, recovery_error
+            if stop.is_set():
+                raise WatchlistStopped("Watchlist refresh stopped by the user.")
+            if not recovery_started:
+                recovery_started = True
+                if progress:
+                    progress("Invaluable needs its browser page. Opening browser recovery for unfinished artists…")
+                try:
+                    recovery_fetcher = self.invaluable_recovery_factory()
+                    if getattr(recovery_fetcher, "uses_natural_catalog_requests", False) is not True:
+                        raise SourceAccessError("Recovery requires the public search browser.")
+                    key = id(recovery_fetcher)
+                    fetchers[key] = recovery_fetcher
+                    started_pages[key] = int(getattr(recovery_fetcher, "pages_fetched", 0))
+                except WatchlistStopped:
+                    raise
+                except Exception as exc:
+                    recovery_error = SourceAccessBlocked(
+                        "Invaluable browser recovery could not start: " + " ".join(str(exc).split())[:300]
+                    )
+            if recovery_error is not None:
+                raise recovery_error
+            return recovery_fetcher
 
         def source_fetcher(adapter: BookmarkSourceAdapter):
             return invaluable_fetcher if adapter.source == "Invaluable" else fetcher
@@ -209,6 +254,7 @@ class WatchlistService:
         batched_pages: dict[str, BatchedSearchPage] = {}
         batch_failed_urls: set[str] = set()
         batch_error_entries: dict[int, list[BookmarkEntry]] = {}
+        recovery_urls: set[str] = set()
         incomplete_uncached_watches: list[str] = []
         entries_by_adapter: dict[BookmarkSourceAdapter, list[BookmarkEntry]] = {}
         for entry in chosen:
@@ -248,7 +294,10 @@ class WatchlistService:
                         result_checks.access_blocked = True
                         result_checks.catalog_access_blocked = True
                     if page.error:
-                        failures.setdefault(page.error, []).append(entry)
+                        if adapter.source == "Invaluable" and can_recover(page.error, blocked=page.access_blocked):
+                            recovery_urls.add(entry.url)
+                        else:
+                            failures.setdefault(page.error, []).append(entry)
                 for message, affected_entries in failures.items():
                     batch_error_entries[len(errors)] = affected_entries
                     errors.append(f"{adapter.source} ({len(affected_entries)} artists): {message}")
@@ -260,6 +309,9 @@ class WatchlistService:
                     result_checks.access_blocked = True
                     result_checks.catalog_access_blocked = True
                 message = " ".join(str(exc).split())[:500]
+                if adapter.source == "Invaluable" and can_recover(exc, blocked=isinstance(exc, SourceAccessBlocked)):
+                    recovery_urls.update(entry.url for entry in adapter_entries)
+                    continue
                 cached_count = 0
                 uncached_watches: list[str] = []
                 for entry in adapter_entries:
@@ -312,33 +364,70 @@ class WatchlistService:
             if progress:
                 progress(f"Fetching {entry.watch_label} from {entry.source}…")
             attempted = True
+            entry_fetcher = source_fetcher(adapter)
+            entry_checks = result_checks
+            preloaded = batched_pages.get(entry.url)
+            prior_observations: dict[str, str] = {}
+            recovery_observations: list[NormalizedLot] = []
+
+            def use_recovery():
+                nonlocal entry_fetcher, entry_checks, preloaded, prior_observations, recovery_observations
+                # The first HTTP pages may already have updated the cache before
+                # a later page failed. Retain their transitions and provenance.
+                fresh = [lot for lot in self._cached_lots_for_entry(entry) if lot.cache_key in observed_lot_keys]
+                recovery_observations = fresh
+                prior_observations = {lot.cache_key: lot.status for lot in fresh}
+                entry_checks = recovery_checks
+                preloaded = None
+                entry_fetcher = browser_recovery()
+
             try:
+                if adapter.source == "Invaluable" and (
+                    entry.url in recovery_urls or (recovery_started and preloaded is None)
+                ):
+                    if preloaded is not None:
+                        # Incomplete HTTP pages are useful even if the browser
+                        # later fails. They cannot end absent lots.
+                        self._refresh_entry(
+                            entry, adapter, entry_fetcher, stop, metrics, observed_at,
+                            preloaded_search=preloaded, observed_lot_keys=observed_lot_keys,
+                            result_checks=result_checks, errors=errors, notices=notices,
+                            catalog_only=True,
+                        )
+                    use_recovery()
                 # Previously received pages remain usable after a later source
                 # block, but no further catalog or lot requests may be made.
-                if adapter.source == "Invaluable" and result_checks.catalog_access_blocked and entry.url not in batched_pages:
+                if adapter.source == "Invaluable" and entry_checks.catalog_access_blocked and preloaded is None:
                     attempted = False
                     raise SourceAccessBlocked(
                         "Further Invaluable requests were skipped because source access is unavailable."
                     )
-                lots, ended, complete = self._refresh_entry(
-                    entry,
-                    adapter,
-                    source_fetcher(adapter),
-                    stop,
-                    metrics,
-                    observed_at,
-                    preloaded_search=batched_pages.get(entry.url),
-                    observed_lot_keys=observed_lot_keys,
-                    result_checks=result_checks,
-                    errors=errors,
-                    notices=notices,
-                )
+                try:
+                    lots, ended, complete = self._refresh_entry(
+                        entry, adapter, entry_fetcher, stop, metrics, observed_at,
+                        preloaded_search=preloaded, observed_lot_keys=observed_lot_keys,
+                        result_checks=entry_checks, errors=errors, notices=notices,
+                        prior_observations=prior_observations,
+                    )
+                except SourceAccessBlocked as exc:
+                    if (adapter.source != "Invaluable" or entry_checks is recovery_checks
+                            or not isinstance(exc, _CatalogAccessBlocked) or not can_recover(exc, blocked=True)):
+                        raise
+                    result_checks.access_blocked = True
+                    result_checks.catalog_access_blocked = True
+                    use_recovery()
+                    lots, ended, complete = self._refresh_entry(
+                        entry, adapter, entry_fetcher, stop, metrics, observed_at,
+                        observed_lot_keys=observed_lot_keys, result_checks=entry_checks,
+                        errors=errors, notices=notices, prior_observations=prior_observations,
+                    )
+                if not complete:
+                    refreshed_lots.extend(recovery_observations)
                 refreshed_lots.extend(lots)
                 if complete:
                     refreshed_lots.extend(ended)
                     metrics.ended_lots += len(ended)
                 if not complete:
-                    preloaded = batched_pages.get(entry.url)
                     message = preloaded.error if preloaded is not None else ""
                     if not message:
                         message = (
@@ -360,8 +449,8 @@ class WatchlistService:
                         entry.url, "blocked" if preloaded is not None and preloaded.access_blocked else "partial",
                         detail=message, observed_at=observed_at,
                     )
-                elif entry.url in result_checks.detail_errors_by_watch:
-                    self.cache.record_source_error(entry.url, result_checks.detail_errors_by_watch[entry.url], observed_at)
+                elif entry.url in entry_checks.detail_errors_by_watch:
+                    self.cache.record_source_error(entry.url, entry_checks.detail_errors_by_watch[entry.url], observed_at)
                 else:
                     self.cache.record_source_success(entry.url, observed_at)
                 if complete:
@@ -379,10 +468,16 @@ class WatchlistService:
                 stopped = True
                 break
             except Exception as exc:
-                if adapter.source == "Invaluable" and isinstance(exc, SourceAccessBlocked):
-                    result_checks.access_blocked = True
-                    result_checks.catalog_access_blocked = True
+                if adapter.source == "Invaluable" and (
+                    isinstance(exc, SourceAccessBlocked)
+                    or (entry_checks is recovery_checks and not getattr(entry_fetcher, "pages_fetched", 0))
+                ):
+                    # A lazy browser startup failure must not launch once per
+                    # artist. Later ordinary page failures retain their scope.
+                    entry_checks.access_blocked = True
+                    entry_checks.catalog_access_blocked = True
                 message = " ".join(str(exc).split())[:500]
+                refreshed_lots.extend(recovery_observations)
                 cached = self._cached_lots_for_entry(entry)
                 refreshed_lots.extend(cached)
                 fallback_lot_keys.update(lot.cache_key for lot in cached)
@@ -403,8 +498,8 @@ class WatchlistService:
                 if adapter.source == "Invaluable":
                     try:
                         refreshed_lots.extend(self._refresh_posted_results(
-                            entry, adapter, source_fetcher(adapter), stop, metrics, observed_at, [],
-                            result_checks, errors, observed_lot_keys, notices, ended_only=True,
+                            entry, adapter, entry_fetcher, stop, metrics, observed_at, [],
+                            entry_checks, errors, observed_lot_keys, notices, ended_only=True,
                         ))
                     except WatchlistStopped:
                         stopped = True
@@ -475,10 +570,13 @@ class WatchlistService:
         result_checks: _PostedResultChecks | None = None,
         errors: list[str] | None = None,
         notices: list[str] | None = None,
+        catalog_only: bool = False,
+        prior_observations: dict[str, str] | None = None,
     ) -> tuple[list[NormalizedLot], list[NormalizedLot], bool]:
         result_checks = result_checks if result_checks is not None else _PostedResultChecks()
         errors = errors if errors is not None else []
         notices = notices if notices is not None else []
+        public_browser = adapter.source == "Invaluable" and getattr(fetcher, "uses_natural_catalog_requests", False) is True
         page_url = entry.url
         visited_pages: set[str] = set()
         observed_keys: set[str] = set()
@@ -500,7 +598,10 @@ class WatchlistService:
                 complete = complete and preloaded_search.complete
                 use_preloaded_search = False
             else:
-                page = adapter.fetch_search_page(page_url, fetcher)
+                try:
+                    page = adapter.fetch_search_page(page_url, fetcher)
+                except SourceAccessBlocked as exc:
+                    raise _CatalogAccessBlocked(str(exc)) from exc
             if stop.is_set():
                 raise WatchlistStopped("Watchlist refresh stopped by the user.")
             cards = [(card, self._reconcile_search_identity(card, watched_lots))
@@ -519,6 +620,10 @@ class WatchlistService:
             for card, cached in cards:
                 if stop.is_set():
                     raise WatchlistStopped("Watchlist refresh stopped by the user.")
+                if catalog_only and not _has_usable_search_data(card):
+                    # This is a partial HTTP snapshot awaiting browser recovery.
+                    # Keep only dated cards; the browser can retrieve missing dates.
+                    continue
                 if card.cache_key in observed_keys:
                     continue
                 observed_keys.add(card.cache_key)
@@ -531,7 +636,8 @@ class WatchlistService:
                     lot = card
                     if cached:
                         _retain_missing_static_fields(lot, cached.lot)
-                    if adapter.needs_detail(lot) and lot.lot_url:
+                    if (adapter.needs_detail(lot) and lot.lot_url
+                            and not ((catalog_only or public_browser) and _has_usable_search_data(lot))):
                         detail_blocked = adapter.source in result_checks.blocked_detail_sources or (
                             adapter.source == "Invaluable" and result_checks.access_blocked
                         )
@@ -590,6 +696,17 @@ class WatchlistService:
                 )
                 if observed_lot_keys is not None:
                     observed_lot_keys.add(lot.cache_key)
+                previous_transition = (prior_observations or {}).get(lot.cache_key)
+                if previous_transition in {"new", "changed", "unchanged"}:
+                    # Re-reading a partial HTTP card in browser recovery is one
+                    # observation for change counts, preserving the first new lot.
+                    priority = {"new": 2, "changed": 1, "unchanged": 0}
+                    if priority[previous_transition] >= priority[transition]:
+                        lot.status = previous_transition
+                        lots.append(lot)
+                        continue
+                    field = "unchanged_lots" if previous_transition == "unchanged" else previous_transition + "_lots"
+                    setattr(metrics, field, max(0, getattr(metrics, field) - 1))
                 if transition == "new":
                     metrics.new_lots += 1
                 elif transition == "changed":
@@ -672,6 +789,10 @@ class WatchlistService:
             if cached.status == "ended" and cached.cache_key not in current:
                 current[cached.cache_key] = cached
             if ended_only and cached.status != "ended":
+                continue
+            if getattr(fetcher, "uses_natural_catalog_requests", False) is True:
+                # Browser recovery is for the upcoming calendar. Retain sold
+                # history, but avoid optional detail pages that can block it.
                 continue
             when, _all_day = parse_lot_datetime(cached.relevant_at)
             if when is None or not now - timedelta(days=30) <= when <= now:

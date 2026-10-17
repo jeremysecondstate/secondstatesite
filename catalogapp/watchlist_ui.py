@@ -27,6 +27,7 @@ from catalogapp.watchlist_browser import (
     INVALUABLE_SIGN_IN_LOT, InvaluableBrowserFetcher, InvaluablePublicBrowserFetcher, connect_invaluable,
 )
 from catalogapp.watchlist_chrome import chrome_profiles, open_invaluable_in_chrome
+from catalogapp.watchlist_browser_helper import recovery_searches, show_browser_helper
 from catalogapp.watchlist_fetch import HttpPageFetcher, WatchlistStopped
 from catalogapp.watchlist_exports import render_calendar_preview, render_csv, render_ics, render_markdown
 from catalogapp.watchlist_models import NormalizedLot, lot_within_horizon, parse_lot_datetime
@@ -251,6 +252,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.more_menu.add_command(label="Calendar preview", command=lambda: self._show_lot_view("calendar"))
         self.more_menu.add_command(label="Artist coverage", command=lambda: self._show_lot_view("coverage"))
         self.more_menu.add_separator()
+        self.more_menu.add_command(label="Use my browser for Invaluable…", command=self.use_regular_browser)
         self.more_menu.add_command(label="Import saved Invaluable pages…", command=self.import_saved_invaluable_pages)
         self.more_menu.add_command(label="Import saved Heritage pages…", command=self.import_saved_heritage_pages)
         self.more_menu.add_command(label="Import saved sold results…", command=self.import_saved_sold_results)
@@ -410,7 +412,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.retry_browser_button.grid(row=0, column=2, padx=(12, 0))
         self.retry_browser_button.grid_remove()
         self.import_invaluable_button = ttk.Button(
-            footer_actions, text="Import saved Invaluable pages…", command=self.import_saved_invaluable_pages,
+            footer_actions, text="Use my browser…", command=self.use_regular_browser,
             style="Secondary.TButton",
         )
         self.import_invaluable_button.grid(row=0, column=3, padx=(12, 0))
@@ -966,13 +968,17 @@ class ArtistWatchlistPanel(ttk.Frame):
                         service = self.service_factory(cache)
                     else:
                         browser = None
-                        if use_browser and selected_invaluable:
-                            browser = InvaluablePublicBrowserFetcher(
+                        def public_browser():
+                            recovery_browser = InvaluablePublicBrowserFetcher(
                                 local_watchlist_directory() / "invaluable-public-browser",
                                 stop_event=self.stop_event, headless=False,
                                 progress=lambda text: self.after(0, lambda value=text: self._set_status(value)),
                             )
-                            resources.callback(browser.close)
+                            resources.callback(recovery_browser.close)
+                            return recovery_browser
+
+                        if use_browser and selected_invaluable:
+                            browser = public_browser()
                         elif use_invaluable_session:
                             browser = InvaluableBrowserFetcher(
                                 self._invaluable_profile_directory, stop_event=self.stop_event,
@@ -981,11 +987,17 @@ class ArtistWatchlistPanel(ttk.Frame):
                         if use_legacy_options:
                             service = WatchlistService(cache, invaluable_fetcher=browser)
                         else:
-                            # Only the explicit retry uses a browser; saved login
-                            # and legacy Playwright settings remain dormant.
+                            # Start with HTTP. The service opens one visible browser
+                            # only if an Invaluable catalog returns HTTP 202.
+                            # Saved login and legacy Playwright settings stay dormant.
                             fetcher = HttpPageFetcher(stop_event=self.stop_event)
                             resources.callback(fetcher.session.close)
-                            service = WatchlistService(cache, fetcher=fetcher, invaluable_fetcher=browser)
+                            service = WatchlistService(
+                                cache, fetcher=fetcher, invaluable_fetcher=browser,
+                                invaluable_recovery_factory=(
+                                    public_browser if selected_invaluable and not use_browser else None
+                                ),
+                            )
                     result = service.refresh(
                         entries,
                         selected_artists=selected_artists,
@@ -1063,6 +1075,22 @@ class ArtistWatchlistPanel(ttk.Frame):
 
         self.worker = threading.Thread(target=run, name="heritage-saved-page-import", daemon=True)
         self.worker.start()
+
+    def use_regular_browser(self) -> None:
+        """Guide an import from the browser where the user's searches load."""
+        if self._is_busy():
+            return
+        if not self._load_watchlist_for_update(self.bookmark_path_var.get().strip()):
+            return
+        entries = recovery_searches(
+            self.active_entries, self.selected_artists, self.__dict__.get("artist_coverage", []),
+        )
+        if not entries:
+            messagebox.showwarning(
+                "No Invaluable searches", "Use Manage artists to select at least one Invaluable artist search.", parent=self,
+            )
+            return
+        show_browser_helper(self, entries, import_snapshots=self.import_saved_invaluable_pages)
 
     def import_saved_invaluable_pages(self) -> None:
         """Import readable search snapshots and upload their normalized lots."""
@@ -1482,7 +1510,11 @@ class ArtistWatchlistPanel(ttk.Frame):
         if self.source_refresh_errors:
             parts.append("Live source refresh issues:\n" + "\n\n".join(self.source_refresh_errors))
             if any("HTTP 202" in error for error in self.source_refresh_errors):
-                parts.append("An HTTP 202 access page is not auction data.")
+                parts.append(
+                    "An HTTP 202 access page is not auction data. Update Calendar and Recover pending "
+                    "automatically try a visible browser once for the affected Invaluable searches. "
+                    "If the browser cannot retrieve them, their cached lots remain available."
+                )
             if self._has_invaluable_source_issue():
                 parts.append(
                     "For Invaluable, click Retry with browser to retrieve the selected artists in a separate, "
@@ -1493,7 +1525,8 @@ class ArtistWatchlistPanel(ttk.Frame):
                 )
                 parts.append(
                     "To add fresh Invaluable lots from your usual browser, load the selected artists' upcoming "
-                    "search results and use Import saved Invaluable pages (also under More). Import HTML pages "
+                    "search results and choose Use my browser for the guided snapshot helper. "
+                    "Import saved Invaluable pages is also under More. Import HTML pages "
                     "that retain full sale dates, or supported JSON search snapshots. "
                     "Imported lots sync to the calendar automatically; missing pages keep their cached data. "
                     "Saved pages do not verify live access, and their bids reflect when they were saved."
@@ -1632,7 +1665,7 @@ class ArtistWatchlistPanel(ttk.Frame):
                 if self._has_invaluable_source_issue():
                     message = (
                         "Invaluable lots could not be retrieved.\n"
-                        "Use Retry with browser or Import saved Invaluable pages below."
+                        "Use Retry with browser or Use my browser below; Import saved Invaluable pages is under More."
                     )
                 empty_state.configure(text=message)
                 empty_state.place(relx=0.5, rely=0.5, anchor=tk.CENTER)

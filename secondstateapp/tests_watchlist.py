@@ -225,6 +225,21 @@ class InvaluableAdapterTests(SimpleTestCase):
         self.adapter = InvaluableAdapter()
         self.url = "https://www.invaluable.com/search?keyword=Rufino+Tamayo"
 
+    def test_newly_listed_browser_url_selects_the_observed_catalog_index(self):
+        class CatalogFetcher:
+            def post_json(self, url, payload, *, referer=""):
+                self.payload = payload
+                return {"results": [{"page": 0, "nbPages": 0, "nbHits": 0, "hits": []}]}
+
+        fetcher = CatalogFetcher()
+        self.adapter.fetch_search_page(
+            "https://www.invaluable.com/search?artistName=Rufino+Tamayo&sort=postDateDesc",
+            fetcher,
+        )
+        request = fetcher.payload["requests"][0]
+        self.assertEqual(request["indexName"], "upcoming_lots_postDateTime_desc_prod")
+        self.assertEqual(request["params"]["facetFilters"], [["artistName:Rufino Tamayo"]])
+
     def test_parses_dom_cards_and_embedded_json(self):
         page = fixture("invaluable_search.html")
         lots = self.adapter.parse_search_page(page, self.url, "Rufino Tamayo")

@@ -48,6 +48,17 @@ test("exports only allowlisted scalar public fields and verified artist", () => 
   assert.deepEqual(Object.keys(snapshot.results[0]).sort(), ["hits", "hitsPerPage", "nbHits", "nbPages", "page"]);
 });
 
+test("Newly Listed Items URL matches the observed catalog sort and exports its lots", () => {
+  const data = fixture();
+  data.pageURL = PAGE.replace("endDateAsc", "postDateDesc");
+  data.body.requests[0].indexName = "upcoming_lots_postDateTime_desc_prod";
+  const snapshot = makeSnapshot(data);
+  assert.equal(new URL(snapshot.source_url).searchParams.get("sort"), "postdatedesc");
+  assert.equal(snapshot.results[0].hits[0].lotRef, "ABC123");
+  data.body.requests[0].indexName = "upcoming_lots_dateTimeUTCUnix_asc_prod";
+  assert.equal(makeSnapshot(data), null);
+});
+
 test("exports the category hierarchy needed to distinguish prints from their subjects", () => {
   const data = fixture();
   Object.assign(data.payload.results[0].hits[0], {

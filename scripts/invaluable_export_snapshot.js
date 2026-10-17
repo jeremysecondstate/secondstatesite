@@ -13,6 +13,7 @@
   const SORTS = {
     "": "upcoming_lots_prod", enddateasc: "upcoming_lots_dateTimeUTCUnix_asc_prod",
     newlylisted: "upcoming_lots_postDateTime_desc_prod", postdatetimedesc: "upcoming_lots_postDateTime_desc_prod",
+    postdatedesc: "upcoming_lots_postDateTime_desc_prod",
     priceasc: "upcoming_lots_currentBid_asc_prod", pricedesc: "upcoming_lots_currentBid_desc_prod",
     bidcountasc: "upcoming_lots_bidCount_asc_prod", bidcountdesc: "upcoming_lots_bidCount_desc_prod",
     bidsdesc: "upcoming_lots_bidCount_desc_prod",

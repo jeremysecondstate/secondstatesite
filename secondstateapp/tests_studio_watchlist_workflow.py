@@ -158,3 +158,70 @@ class SavedWatchlistEmptyStateTests(TestCase):
         self.panel._fill_agenda()
         self.assertEqual(self.panel.empty_state.cget('text'), 'No upcoming lots found for the selected artists.')
 
+
+class AutomaticBrowserRecoveryControllerTests(TestCase):
+    setUp = studio_tests.StudioWatchlistControllerTests.setUp
+    immediate_thread = staticmethod(studio_tests.StudioWatchlistControllerTests.immediate_thread)
+
+    def test_http202_continuation_closes_browser_before_single_calendar_upload(self):
+        self.panel.load_bookmarks(self.path)
+        order = []
+
+        def refresh(*_args, **_kwargs):
+            self.public_browser.assert_not_called()
+            factory = self.service.call_args.kwargs['invaluable_recovery_factory']
+            browser = factory()
+            self.assertIs(browser, self.public_browser.return_value)
+            self.assertIs(self.public_browser.call_args.kwargs['stop_event'], self.panel.stop_event)
+            self.assertFalse(self.public_browser.call_args.kwargs['headless'])
+            order.append('recovery')
+            return WatchlistResult([self.lot], WatchlistMetrics(new_lots=1))
+
+        def upload(lots, **_kwargs):
+            self.public_browser.return_value.close.assert_called_once()
+            self.assertEqual(lots, [self.lot])
+            order.append('upload')
+            return CalendarSyncResult(1, 1, 0, 0)
+
+        self.service.return_value.refresh.side_effect = refresh
+        self.panel.calendar_syncer.side_effect = upload
+        self.panel.sync_to_calendar()
+
+        self.assertEqual(order, ['recovery', 'upload'])
+        self.panel.calendar_syncer.assert_called_once()
+        self.browser.assert_not_called()
+        self.profiles.assert_not_called()
+
+    def test_stop_during_automatic_recovery_retains_calendar_without_upload(self):
+        self.panel.load_bookmarks(self.path)
+
+        def refresh(*_args, **_kwargs):
+            self.service.call_args.kwargs['invaluable_recovery_factory']()
+            self.panel.stop_refresh()
+            return WatchlistResult([self.lot], WatchlistMetrics())
+
+        self.service.return_value.refresh.side_effect = refresh
+        self.panel.sync_to_calendar()
+
+        self.public_browser.return_value.close.assert_called_once()
+        self.panel.calendar_syncer.assert_not_called()
+        self.assertFalse(self.panel._busy)
+        self.assertIn('stopped', self.panel.sync_status_var.get())
+
+    def test_recover_pending_can_continue_in_browser_without_changing_selection(self):
+        self.panel.load_bookmarks(self.path)
+        self.panel.selected_artists = {'Calder'}
+        self.panel.recover_pending()
+
+        self.assertTrue(callable(self.service.call_args.kwargs['invaluable_recovery_factory']))
+        self.assertTrue(self.service.return_value.refresh.call_args.kwargs['pending_only'])
+        self.assertEqual(self.service.return_value.refresh.call_args.kwargs['selected_artists'], {'Calder'})
+        self.public_browser.assert_not_called()
+
+    def test_explicit_browser_retry_does_not_install_another_automatic_retry(self):
+        self.panel.load_bookmarks(self.path)
+        self.panel.retry_with_browser()
+
+        self.public_browser.assert_called_once()
+        self.assertIsNone(self.service.call_args.kwargs['invaluable_recovery_factory'])
+
