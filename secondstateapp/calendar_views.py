@@ -2219,6 +2219,7 @@ def sync_auction_calendar(request):
     created_count = 0
     updated_count = 0
     ended_count = 0
+    stale_preserved_count = 0
     # Every record has passed validation before either files or database rows change.
     try:
         for prepared_lot, saved_image in zip(prepared, prepared_images):
@@ -2249,6 +2250,16 @@ def sync_auction_calendar(request):
                 source=source, source_lot_id=source_lot_id,
             ).first()
             if existing_lot is not None:
+                incoming_observed_at = defaults["source_last_seen_at"]
+                if existing_lot.source_last_seen_at is not None and (
+                    incoming_observed_at is None or incoming_observed_at < existing_lot.source_last_seen_at
+                ):
+                    # Another PC can upload retained cache after a source block.
+                    # Receiving it must not roll back fresher public observations
+                    # or make their original source/sync times appear newer.
+                    stale_preserved_count += 1
+                    ended_count += int(not existing_lot.active)
+                    continue
                 if existing_lot.superseded_by_id is not None:
                     defaults["active"] = False
                 if saved_image is None and is_saved_calendar_image_url(existing_lot.image_url):
@@ -2275,6 +2286,7 @@ def sync_auction_calendar(request):
             "created": created_count,
             "updated": updated_count,
             "ended": ended_count,
+            "stale_preserved": stale_preserved_count,
             "artist_links": len(prepared_artist_links),
             "images_received": sum(image is not None for image in prepared_images),
             "sold_prices_received": sum("sold_price" in prepared_lot[2] for prepared_lot in prepared),

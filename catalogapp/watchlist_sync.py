@@ -37,17 +37,22 @@ class CalendarSyncResult:
     ended: int
     images_received: int = 0
     sold_prices_received: int = 0
+    stale_preserved: int = 0
 
     def summary(self) -> str:
         message = (
             f"Website calendar synced: {self.received} lots "
             f"({self.created} new, {self.updated} updated, {self.ended} ended)."
         )
+        if self.stale_preserved:
+            noun = "observation" if self.stale_preserved == 1 else "observations"
+            message += f" Preserved {self.stale_preserved} newer Calendar {noun}."
+        receipt = "received" if self.stale_preserved else "synced"
         if self.images_received:
-            message += f" {self.images_received} saved artwork images synced."
+            message += f" {self.images_received} saved artwork images {receipt}."
         if self.sold_prices_received:
             noun = "price" if self.sold_prices_received == 1 else "prices"
-            message += f" {self.sold_prices_received} sold {noun} synced."
+            message += f" {self.sold_prices_received} sold {noun} {receipt}."
         return message
 
 
@@ -201,7 +206,7 @@ def sync_watchlist_lots(
         {"name": name, "artprice_url": url}
         for name, url in sorted(artist_links.values(), key=lambda item: item[0].casefold())
     ])
-    totals = dict(received=0, created=0, updated=0, ended=0, images_received=0, sold_prices_received=0)
+    totals = dict(received=0, created=0, updated=0, ended=0, images_received=0, sold_prices_received=0, stale_preserved=0)
     for batch in batches:
         try:
             response = session.post(

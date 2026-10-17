@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+import tkinter as tk
+
 from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.bookmark_watchlist import parse_bookmarks_html
 from catalogapp.watchlist_cache import WatchlistCache
@@ -108,6 +110,36 @@ class SharedWatchlistStartupControllerTests(TestCase):
         self.service.assert_not_called()
         self.public_browser.assert_not_called()
         self.assertEqual({lot.cache_key for lot in self.panel.current_lots}, self.snapshot.calendar_lot_keys)
+
+    def test_local_restore_failure_keeps_results_and_reenables_controls(self):
+        self.panel.current_lots = [self.calder]
+        self.panel._set_import_buttons_state(tk.DISABLED)
+        with patch('catalogapp.watchlist_ui.merge_shared_watchlist', side_effect=OSError('Cache is unavailable')):
+            self.finish()
+
+        self.assertEqual(self.panel.current_lots, [self.calder])
+        self.assertIsNone(self.panel._calendar_lot_keys)
+        self.assertFalse(self.panel._busy)
+        self.panel.refresh_button.configure.assert_called_with(state=tk.NORMAL)
+        self.panel.import_bookmarks_button.configure.assert_called_with(state=tk.NORMAL)
+        self.panel.sync_selected_button.configure.assert_called_with(state=tk.DISABLED)
+        self.assertIn('Cache is unavailable', self.panel.sync_status_var.get())
+
+    def test_new_shared_enabled_folder_is_selected_without_reenabling_old_excluded_folder(self):
+        self.panel.selected_artists.remove('Matisse')
+        self.panel._save_settings_hint()
+        self.snapshot.entries = [
+            replace(entry, folder_path=('Shared additions',)) if entry.watch_label == 'Will Barnet' else entry
+            for entry in self.snapshot.entries
+        ]
+
+        self.finish()
+
+        self.assertTrue(self.panel.folder_vars['Shared additions'].get())
+        self.assertFalse(self.panel.folder_vars['OTHER'].get())
+        self.assertEqual(self.panel.selected_artists, {'Calder', 'Will Barnet'})
+        self.assertEqual({lot.cache_key for lot in self.panel.current_lots},
+                         {self.calder.cache_key, self.will.cache_key})
 
 
 class MissingArtistSelectionWidgetTests(TestCase):

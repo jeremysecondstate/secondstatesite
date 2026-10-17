@@ -51,12 +51,19 @@ class InvaluableConnectionUiTests(TestCase):
 
     def test_settings_preserve_other_preferences_and_remember_opt_in(self):
         self.panel._settings_path.write_text(json.dumps({"other_preference": 3}), encoding="utf-8")
-        self.panel._save_settings_hint()
+        project = self.directory / "project"
+        project.mkdir()
+        path = project / "bookmarks.html"
+        path.write_text("<DL></DL>", encoding="utf-8")
+        self.panel.bookmark_path_var.get.return_value = str(path)
+        with patch("catalogapp.watchlist_ui.PROJECT_BOOKMARK_PATH", project / "docs" / "artists.html"):
+            self.panel._save_settings_hint()
         self.assertEqual(self.panel._read_settings(), {
-            "other_preference": 3, "last_bookmark_path": "bookmarks.html", "invaluable_session_enabled": True,
+            "other_preference": 3, "last_bookmark_path": str(path.resolve()),
+            "last_bookmark_path_relative": "bookmarks.html", "invaluable_session_enabled": True,
             "selected_artists": ["Alexander Calder"], "known_artists": ["Alexander Calder"], "horizon_days": 7,
         })
-        self.assertEqual(self.panel._remembered_bookmark_path(), Path("bookmarks.html"))
+        self.assertEqual(self.panel._remembered_bookmark_path(), path.resolve())
 
     def test_successful_connection_enables_session_and_starts_refresh(self):
         self.panel.refresh_watchlist = Mock()

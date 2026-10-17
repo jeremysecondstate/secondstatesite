@@ -113,7 +113,7 @@ class StudioBrowserBookmarkWorkflowTests(TestCase):
         self.assertEqual(self.panel.calendar_syncer.call_args.kwargs["artist_artprice_links"], {"Käthe Kollwitz": link})
         self.assertEqual(self.panel.bookmark_source_var.get(), "Chrome — Studio")
         self.assertEqual(self.panel._read_settings()["bookmark_source_label"], "Chrome — Studio")
-        self.assertIn("every Update Calendar", self.panel.bookmark_filename_var.get())
+        self.assertIn("every Sync all", self.panel.bookmark_filename_var.get())
         # Reading and publishing must never rewrite the browser's bookmark file.
         self.assertEqual(source.read_bytes(), original_bytes)
 

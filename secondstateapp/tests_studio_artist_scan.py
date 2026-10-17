@@ -1,4 +1,4 @@
-"""Scan bookmarks locally, compare Calendar counts, and target row actions."""
+"""Scan bookmarks locally, compare Calendar counts, and select missing artists."""
 
 from types import SimpleNamespace
 from unittest import TestCase
@@ -80,15 +80,21 @@ class StudioArtistScanTests(TestCase):
         self.assertIn("saved artists were retained", self.panel.sync_status_var.get())
         self.panel.calendar_syncer.assert_not_called()
 
-    def test_failed_calendar_read_is_unknown_and_leaves_artist_sync_available(self):
+    def test_failed_calendar_read_is_unknown_and_disables_selected_sync_until_rescanned(self):
         self.prepare_scan()
         self.panel._calendar_inventory = []
+        self.panel.sync_selected_button = Mock()
+        self.panel._selected_sync_artist = "Calder"
         with patch("catalogapp.watchlist_ui.fetch_calendar_inventory", side_effect=RuntimeError("Inventory unavailable")):
             self.panel.scan_artists()
         self.assertIsNone(self.panel._calendar_inventory)
-        self.assertIn("Calendar counts unavailable", self.panel.sync_status_var.get())
+        self.assertIn("Calendar comparison incomplete", self.panel.sync_status_var.get())
+        self.assertIn("Sync selected requires a successful Calendar comparison", self.panel.sync_status_var.get())
         self.assertFalse(self.panel._busy)
         self.panel.scan_artists_button.configure.assert_called_with(state=tk.NORMAL)
+        self.panel.sync_selected_button.configure.assert_called_with(state=tk.DISABLED)
+        self.panel.sync_selected()
+        self.service.assert_not_called()
         self.panel.calendar_syncer.assert_not_called()
 
     def test_scan_stops_while_another_operation_is_running(self):
@@ -122,14 +128,16 @@ class StudioArtistScanTests(TestCase):
         self.panel._lot_sync_click(event)
         self.panel.sync_artist.assert_called_once_with(self.lot.artist_watchlist_name)
 
-    def test_double_click_sync_cell_does_not_open_lot(self):
+    def test_double_click_artwork_column_opens_lot_without_syncing(self):
         self.panel.upcoming_tree = Mock()
         self.panel.upcoming_tree.identify_column.return_value = "#3"
         self.panel.upcoming_tree.selection.return_value = ("lot-0",)
         self.panel._lot_urls = {"lot-0": "https://www.invaluable.com/auction-lot/example"}
         with patch("catalogapp.watchlist_ui.webbrowser.open") as open_url:
             self.panel._open_selected_lot(SimpleNamespace(x=1, widget=self.panel.upcoming_tree))
-        open_url.assert_not_called()
+        open_url.assert_called_once_with("https://www.invaluable.com/auction-lot/example")
+        self.service.assert_not_called()
+        self.panel.calendar_syncer.assert_not_called()
 
     def test_inventory_row_sync_requires_action_cell_and_bookmark(self):
         tree = self.panel.artist_inventory_tree = Mock()
