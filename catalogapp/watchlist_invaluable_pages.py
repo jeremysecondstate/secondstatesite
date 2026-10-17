@@ -58,8 +58,12 @@ def _hit_matches_category(hit: dict, source_url: str) -> bool:
     if not categories:
         return True
     supercategory = InvaluableAdapter._artist_match_key(str(hit.get("supercategoryName") or ""))
-    subcategory = InvaluableAdapter._artist_match_key(str(hit.get("subcategoryName") or ""))
-    return any((not supercategory or supercategory == category) and (not subcategory or subcategory == value)
+    # URL facets describe supercategory -> category (Fine Art -> Prints).
+    # subcategoryName is one level deeper: Genre, Figural, Nude, etc. A print
+    # can legitimately have any of those subjects. Older snapshots omitted
+    # categoryName; their verified source URL still supplies the category scope.
+    category_name = InvaluableAdapter._artist_match_key(str(hit.get("categoryName") or ""))
+    return any((not supercategory or supercategory == category) and (not category_name or category_name == value)
                for category, value in categories)
 
 
@@ -397,6 +401,16 @@ def import_saved_invaluable_pages(
             metrics.unchanged_lots += 1
             metrics.cache_hits += 1
         combined[key] = lot
+    # New saved evidence can invalidate an earlier complete/empty result, but
+    # never proves that every live results page was checked. Preserve the last
+    # real request time so offline imports do not postpone recovery attempts.
+    imported_watch_urls = {url for urls in memberships.values() for url in urls}
+    for watch_url in sorted(imported_watch_urls):
+        cache.record_watch_coverage(
+            watch_url, "partial",
+            detail="Saved results imported; full live search remains unverified.",
+            attempted=False,
+        )
     lots = [lot for lot in combined.values() if lot_within_horizon(lot, observed_at, horizon_days)]
     if new_changed_only:
         lots = [lot for lot in lots if lot.cache_key not in fallback and lot.status in {"new", "changed"}]
@@ -411,4 +425,7 @@ def import_saved_invaluable_pages(
                        "Save the results with their auction dates visible.")
     if unmatched:
         notices.append(f"{unmatched} cards had incomplete lot identities or did not match the saved artist/category filters and were not imported.")
-    return WatchlistResult(lots=lots, metrics=metrics, errors=errors, notices=list(dict.fromkeys(notices)), fallback_lot_keys=fallback)
+    return WatchlistResult(
+        lots=lots, metrics=metrics, errors=errors, notices=list(dict.fromkeys(notices)),
+        fallback_lot_keys=fallback, coverage=cache.coverage_for_entries(chosen),
+    )

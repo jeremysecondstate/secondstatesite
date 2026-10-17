@@ -152,11 +152,12 @@ def parse_lot_datetime(value: str) -> tuple[datetime | None, bool]:
 
 
 def lot_within_horizon(lot: NormalizedLot, now: datetime, horizon_days: int) -> bool:
+    """Use an exact future cutoff, retaining the existing grace for today's dates."""
     parsed, _all_day = parse_lot_datetime(lot.relevant_at)
     if parsed is None:
         return True
     aware_now = now if now.tzinfo else now.replace(tzinfo=timezone.utc)
-    return aware_now - timedelta(days=1) <= parsed <= aware_now + timedelta(days=horizon_days + 1)
+    return aware_now - timedelta(days=1) <= parsed <= aware_now + timedelta(days=horizon_days)
 
 
 def _duplicate_signature(lot: NormalizedLot) -> tuple[str, ...]:

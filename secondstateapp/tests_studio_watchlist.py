@@ -69,7 +69,7 @@ class StudioWatchlistControllerTests(TestCase):
         panel.bookmark_filename_var = Value('')
         panel.import_summary_var = Value('')
         panel.sync_status_var = Value('')
-        panel.horizon_var = Value(30)
+        panel.horizon_var = Value(7)
         panel.zero_ai_var = Value(False)  # Studio always uses deterministic parsing.
         panel.new_changed_var = Value(True)  # Studio sync always sends the full selected agenda.
         panel.invaluable_session_var = Value(True)  # Old saved opt-in must be ignored.
@@ -119,7 +119,8 @@ class StudioWatchlistControllerTests(TestCase):
         with patch('catalogapp.watchlist_ui.filedialog.askopenfilename', return_value=str(self.path)):
             self.panel.import_bookmarks()
         self.assertEqual(self.panel.selected_artists, {'Calder', 'Matisse'})
-        self.assertEqual(self.panel.bookmark_filename_var.get(), 'artists.html')
+        self.assertIn('artists.html', self.panel.bookmark_filename_var.get())
+        self.assertIn('Export bookmarks again', self.panel.bookmark_filename_var.get())
         self.assertEqual(self.panel._read_settings()['last_bookmark_path'], str(self.path.resolve()))
         self.assertIn('Bookmarks imported', self.panel.sync_status_var.get())
         self.service.assert_not_called()
@@ -139,7 +140,7 @@ class StudioWatchlistControllerTests(TestCase):
             self.assertEqual({entry.watch_label for entry in entries}, {'Calder', 'Matisse', 'Zúñiga'})
             self.assertTrue(kwargs['zero_ai'])
             self.assertFalse(kwargs['new_changed_only'])
-            self.assertEqual(kwargs['horizon_days'], 30)
+            self.assertEqual(kwargs['horizon_days'], 7)
             self.assertFalse(self.panel.folder_vars['OTHER'].get())
             return WatchlistResult([self.lot], WatchlistMetrics(new_lots=1))
 
@@ -298,7 +299,7 @@ class StudioWatchlistControllerTests(TestCase):
             self.assertEqual(selected_paths, paths)
             self.assertEqual({entry.watch_label for entry in entries}, {'Calder', 'Zúñiga'})
             self.assertTrue(all(entry.source == 'Invaluable' for entry in entries))
-            self.assertEqual(horizon_days, 30)
+            self.assertEqual(horizon_days, 7)
             self.assertFalse(new_changed_only)
             self.assertTrue(self.panel._busy)
             self.panel.import_invaluable_button.configure.assert_called_with(state=tk.DISABLED)
@@ -416,7 +417,7 @@ class StudioWatchlistControllerTests(TestCase):
         self.assertIn('Francisco Zúñiga', warning)
         self.assertIn('Alonzo Megargee', warning)
         self.assertIn('Artists without retrieved or cached lots cannot appear on the calendar yet', warning)
-        self.assertIn('Sync to Calendar', warning)
+        self.assertIn('Update Calendar', warning)
         self.assertLess(len(warning), 1100)
         self.assertIn(failure, self.panel._sync_details_text)
         self.assertIn(missing, self.panel._sync_details_text)
@@ -519,7 +520,8 @@ class StudioWatchlistWidgetTests(TestCase):
             patch('catalogapp.watchlist_ui.chrome_profiles') as profiles,
         ):
             panel = ArtistWatchlistPanel(root)
-            self.assertEqual(panel.horizon_var.get(), 30)
+            self.assertEqual(panel.horizon_var.get(), 7)
+            self.assertEqual(panel.browser_bookmarks_button.cget('text'), 'Use browser bookmarks…')
             self.assertTrue(panel.zero_ai_var.get())
             self.assertFalse(panel.review_frame.winfo_manager())
             self.assertFalse(panel.stop_button.winfo_manager())
@@ -528,7 +530,7 @@ class StudioWatchlistWidgetTests(TestCase):
             labels = [panel.more_menu.entrycget(index, 'label') for index in range(panel.more_menu.index('end') + 1)
                       if panel.more_menu.type(index) == 'command']
             self.assertIn('Import saved Invaluable pages…', labels)
-            self.assertEqual(panel.sync_to_calendar_button.cget('text'), 'Sync to Calendar')
+            self.assertEqual(panel.sync_to_calendar_button.cget('text'), 'Update Calendar')
             self.assertNotIn('connect_invaluable_button', panel.__dict__)
             self.assertNotIn('chrome_profile_picker', panel.__dict__)
             profiles.assert_not_called()
@@ -542,5 +544,13 @@ class StudioWatchlistWidgetTests(TestCase):
             panel.source_refresh_errors = ['Heritage returned HTTP 403.']
             panel._set_sync_details('Only Heritage is blocked.')
             self.assertFalse(panel.import_invaluable_button.winfo_manager())
+            panel._set_status('Calendar updated; source refresh incomplete.')
+            retained_status = panel.sync_status_var.get()
+            retained_report = panel._sync_details_text
             panel._toggle_review()
             self.assertEqual(panel.review_frame.winfo_manager(), 'grid')
+            self.assertFalse(panel.status_banner.winfo_manager())
+            panel._toggle_review()
+            self.assertEqual(panel.status_banner.winfo_manager(), 'grid')
+            self.assertEqual(panel.sync_status_var.get(), retained_status)
+            self.assertEqual(panel._sync_details_text, retained_report)

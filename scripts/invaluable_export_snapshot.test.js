@@ -48,6 +48,19 @@ test("exports only allowlisted scalar public fields and verified artist", () => 
   assert.deepEqual(Object.keys(snapshot.results[0]).sort(), ["hits", "hitsPerPage", "nbHits", "nbPages", "page"]);
 });
 
+test("exports the category hierarchy needed to distinguish prints from their subjects", () => {
+  const data = fixture();
+  Object.assign(data.payload.results[0].hits[0], {
+    supercategoryName: "Fine Art", categoryName: "Prints", subcategoryName: "Genre",
+  });
+  const hit = makeSnapshot(data).results[0].hits[0];
+  assert.equal(hit.supercategoryName, "Fine Art");
+  assert.equal(hit.categoryName, "Prints");
+  assert.equal(hit.subcategoryName, "Genre");
+  data.payload.results[0].hits[0].categoryName = { account: "never-export" };
+  assert.ok(!Object.hasOwn(makeSnapshot(data).results[0].hits[0], "categoryName"));
+});
+
 test("matches results by request index and ignores facet-only responses", () => {
   const data = fixture();
   data.body.requests.unshift({ ...structuredClone(data.body.requests[0]), params: { ...data.body.requests[0].params, hitsPerPage: 0 } });

@@ -110,7 +110,7 @@ class SavedHeritageImportUiTests(TestCase):
 
         importer.assert_called_once()
         self.assertEqual(importer.call_args.args[:2], (("saved.html",), entry))
-        self.assertEqual(importer.call_args.kwargs, {"horizon_days": 30, "new_changed_only": False})
+        self.assertEqual(importer.call_args.kwargs, {"horizon_days": 7, "new_changed_only": False})
         panel._sync_and_finish_result.assert_called_once_with(imported, preserve_source_errors=True)
         self.assertEqual({lot.cache_key for lot in imported.lots}, {other.cache_key, updated.cache_key})
         self.assertEqual(next(lot for lot in imported.lots if lot.source == "Heritage").current_bid, 200)

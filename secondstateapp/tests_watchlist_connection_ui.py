@@ -54,6 +54,7 @@ class InvaluableConnectionUiTests(TestCase):
         self.panel._save_settings_hint()
         self.assertEqual(self.panel._read_settings(), {
             "other_preference": 3, "last_bookmark_path": "bookmarks.html", "invaluable_session_enabled": True,
+            "selected_artists": ["Alexander Calder"], "known_artists": ["Alexander Calder"], "horizon_days": 7,
         })
         self.assertEqual(self.panel._remembered_bookmark_path(), Path("bookmarks.html"))
 

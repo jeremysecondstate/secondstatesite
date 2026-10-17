@@ -25,7 +25,7 @@
     "clickAnalytics", "userToken",
   ]);
   const PUBLIC_FIELDS = [
-    "bidCount", "catalogRef", "countryName", "currencyCode", "currencySymbol", "currentBid",
+    "bidCount", "catalogRef", "categoryName", "countryName", "currencyCode", "currencySymbol", "currentBid",
     "dateTimeLocal", "dateTimeUTCUnix", "endTimeUTCUnix", "estimateHigh", "estimateLow",
     "houseName", "location", "lotDescription", "lotNumber", "lotRef", "lotTitle", "objectID",
     "photoPath", "soldPrice", "soldCurrencyCode", "stateName", "subcategoryName", "supercategoryName",

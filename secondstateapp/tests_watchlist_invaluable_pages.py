@@ -95,6 +95,42 @@ class SavedInvaluablePagesTests(TestCase):
         self.assertEqual(len(self.cache.active_lots_for_watch_url(ENTRY.url)), 2)
         self.assertEqual(self.cache.connection.execute("SELECT last_error FROM source_runs").fetchone()[0], "HTTP 202")
 
+    def test_new_saved_lots_replace_verified_empty_coverage_without_claiming_a_live_attempt(self):
+        self.cache.record_watch_coverage(ENTRY.url, "empty", observed_at=OLD)
+        self.cache.record_source_success(ENTRY.url, OLD)
+        self.cache.record_source_error(ENTRY.url, "HTTP 202", OLD)
+        prior_source_run = dict(self.cache.connection.execute(
+            "SELECT * FROM source_runs WHERE watch_url = ?", (ENTRY.url,),
+        ).fetchone())
+        with patch.object(self.cache, "mark_missing_ended", side_effect=AssertionError("Partial snapshot")):
+            result = self.run_import([self.snapshot()])
+        coverage = self.cache.coverage_for_entries([ENTRY])[0]
+        self.assertEqual((coverage.state, coverage.lot_count), ("partial", 1))
+        self.assertTrue(coverage.needs_recovery)
+        self.assertEqual(coverage.checked_at, OLD.isoformat())
+        self.assertIn("full live search remains unverified", coverage.detail)
+        self.assertEqual(result.coverage, [coverage])
+        self.assertEqual(result.metrics.ended_lots, 0)
+        self.assertEqual(dict(self.cache.connection.execute(
+            "SELECT * FROM source_runs WHERE watch_url = ?", (ENTRY.url,),
+        ).fetchone()), prior_source_run)
+
+    def test_saved_import_marks_only_accepted_watch_memberships_partial(self):
+        self.cache.record_watch_coverage(ENTRY.url, "empty", observed_at=OLD)
+        self.cache.record_watch_coverage(OTHER.url, "verified", observed_at=OLD)
+        bad_other = self.snapshot("wrong-artist.json", origin=OTHER.url, artist=ENTRY.artist)
+        result = self.run_import([self.snapshot(), bad_other], entries=(ENTRY, OTHER))
+        states = {item.watch_url: item for item in result.coverage}
+        self.assertEqual(states[ENTRY.url].state, "partial")
+        self.assertEqual(states[OTHER.url].state, "verified")
+        self.assertEqual(states[OTHER.url].checked_at, OLD.isoformat())
+        self.assertEqual(self.cache.active_lots_for_watch_url(OTHER.url), [])
+
+    def test_first_saved_import_does_not_invent_a_previous_live_attempt(self):
+        result = self.run_import([self.snapshot()])
+        self.assertEqual(result.coverage[0].state, "partial")
+        self.assertEqual(result.coverage[0].checked_at, "")
+
     def test_same_displayed_lot_number_from_different_auctions_keeps_both_source_references(self):
         for attributes in (True, False):
             with self.subTest(data_lot_id=attributes):
@@ -276,14 +312,40 @@ class SavedInvaluablePagesTests(TestCase):
 
     def test_snapshot_explicit_category_metadata_cannot_contradict_its_url(self):
         prints = replace(ENTRY, url=ENTRY.url + "&Fine+Art=Prints")
-        for metadata in ({"supercategoryName": "Fine Art", "subcategoryName": "Sculpture"},
-                         {"supercategoryName": "Decorative Art", "subcategoryName": "Prints"}):
+        for metadata in ({"supercategoryName": "Fine Art", "categoryName": "Sculpture", "subcategoryName": "Figural"},
+                         {"supercategoryName": "Decorative Art", "categoryName": "Prints", "subcategoryName": "General"},
+                         {"categoryName": "Paintings", "subcategoryName": "Prints"}):
             with self.subTest(metadata=metadata):
                 result = self.run_import([self.snapshot(origin=prints.url, **metadata)], entries=(prints,))
                 self.assertEqual(result.lots, [])
                 self.assertIn("artist/category filters", " ".join(result.notices))
-        result = self.run_import([self.snapshot(origin=prints.url, supercategoryName="Fine Art", subcategoryName="Prints")], entries=(prints,))
-        self.assertEqual(result.metrics.new_lots, 1)
+
+    def test_print_snapshots_keep_genre_subjects_at_the_correct_category_level(self):
+        prints = replace(ENTRY, url=ENTRY.url + "&Fine+Art=Prints&query=fine+art")
+        paths = [self.snapshot(f"subject-{index}.json", origin=prints.url, objectID=f"subject-{index}",
+                               lotRef=f"subject{index}", supercategoryName="Fine Art", categoryName="Prints",
+                               subcategoryName=subject)
+                 for index, subject in enumerate(("Genre", "Figural", "Nude", "Portrait", "General"))]
+        result = self.run_import(paths, entries=(prints,))
+        self.assertEqual(result.metrics.new_lots, 5)
+        self.assertEqual(result.errors, [])
+        self.assertEqual(len(self.cache.active_lots_for_watch_url(prints.url)), 5)
+
+    def test_older_snapshots_without_category_name_keep_verified_scope_and_subject(self):
+        prints = replace(ENTRY, url=ENTRY.url + "&Fine+Art=Prints")
+        # The previous exporter retained subcategoryName but omitted categoryName.
+        # These public-feed shapes used to discard every valid recovered lot.
+        paths = [self.snapshot(f"legacy-{index}.json", origin=prints.url, objectID=f"legacy-{index}",
+                               lotRef=f"legacy{index}", **metadata)
+                 for index, metadata in enumerate(({}, {"supercategoryName": "Fine Art", "subcategoryName": "Genre"},
+                                                    {"subcategoryName": "Figural"}))]
+        result = self.run_import(paths, entries=(prints,))
+        self.assertEqual(result.metrics.new_lots, 3)
+        self.assertEqual(result.errors, [])
+
+    def test_live_catalog_requests_retain_category_metadata_for_later_snapshot_validation(self):
+        request = InvaluableAdapter()._catalog_request_payload(ENTRY.url)
+        self.assertIn("categoryName", request["requests"][0]["params"]["attributesToRetrieve"])
 
     def test_html_search_scope_cannot_attach_sculpture_to_prints(self):
         prints = replace(ENTRY, url=ENTRY.url + "&Fine+Art=Prints")

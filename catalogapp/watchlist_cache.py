@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
 import threading
 from typing import Any, Iterable
 
-from catalogapp.watchlist_models import NormalizedLot
+from catalogapp.bookmark_watchlist import BookmarkEntry
+from catalogapp.watchlist_coverage import WatchCoverage
+from catalogapp.watchlist_models import NormalizedLot, lot_within_horizon, parse_lot_datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +73,12 @@ class WatchlistCache:
                     last_error_at TEXT,
                     last_error TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE IF NOT EXISTS watch_coverage (
+                    watch_url TEXT PRIMARY KEY,
+                    state TEXT NOT NULL DEFAULT 'pending',
+                    last_attempt_at TEXT NOT NULL DEFAULT '',
+                    detail TEXT NOT NULL DEFAULT ''
+                );
                 CREATE TABLE IF NOT EXISTS enrichments (
                     content_hash TEXT NOT NULL,
                     model TEXT NOT NULL,
@@ -83,6 +91,9 @@ class WatchlistCache:
             columns = {row["name"] for row in self.connection.execute("PRAGMA table_info(lots)")}
             if "search_hash" not in columns:
                 self.connection.execute("ALTER TABLE lots ADD COLUMN search_hash TEXT NOT NULL DEFAULT ''")
+            coverage_columns = {row["name"] for row in self.connection.execute("PRAGMA table_info(watch_coverage)")}
+            if "covered_until" not in coverage_columns:
+                self.connection.execute("ALTER TABLE watch_coverage ADD COLUMN covered_until TEXT NOT NULL DEFAULT ''")
 
     def lookup(self, lot: NormalizedLot) -> CacheLookup | None:
         with self._lock:
@@ -218,6 +229,8 @@ class WatchlistCache:
         watch_url: str,
         observed_keys: Iterable[str],
         observed_at: datetime | None = None,
+        *,
+        covered_until: datetime | None = None,
     ) -> list[NormalizedLot]:
         seen = set(observed_keys)
         ended: list[NormalizedLot] = []
@@ -229,6 +242,14 @@ class WatchlistCache:
             ).fetchall()
             missing = [row["cache_key"] for row in rows if row["cache_key"] not in seen]
             for cache_key in missing:
+                if covered_until is not None:
+                    prior = self.get(cache_key)
+                    when, _all_day = parse_lot_datetime(prior.relevant_at) if prior else (None, False)
+                    # A narrower query says nothing about later or undated lots.
+                    # The source predicate includes either normalized date, so
+                    # this check also handles different auction/closing times.
+                    if when is None or when > covered_until:
+                        continue
                 self.connection.execute(
                     "UPDATE watch_memberships SET active = 0, last_seen_at = ? WHERE watch_url = ? AND cache_key = ?",
                     (now, watch_url, cache_key),
@@ -271,6 +292,92 @@ class WatchlistCache:
                 """,
                 (watch_url, now),
             )
+
+    def record_watch_coverage(
+        self,
+        watch_url: str,
+        state: str,
+        *,
+        detail: str = "",
+        observed_at: datetime | None = None,
+        attempted: bool = True,
+        covered_until: datetime | None = None,
+    ) -> None:
+        """Record catalog coverage without confusing failed optional details with it.
+
+        A skipped watch is still unresolved, but does not move to the back of
+        the recovery queue as if a request had actually been attempted.
+        """
+        if state not in {"verified", "empty", "partial", "blocked", "pending"}:
+            raise ValueError("Unknown watch coverage state")
+        checked_at = _iso(observed_at) if attempted else ""
+        message = " ".join((detail or "").split())[:500]
+        with self._lock, self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO watch_coverage (watch_url, state, last_attempt_at, detail, covered_until)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(watch_url) DO UPDATE SET
+                    state=excluded.state,
+                    last_attempt_at=CASE WHEN ? THEN excluded.last_attempt_at
+                        ELSE watch_coverage.last_attempt_at END,
+                    detail=excluded.detail,
+                    covered_until=excluded.covered_until
+                """,
+                (watch_url, state, checked_at, message, _iso(covered_until) if covered_until else "", int(attempted)),
+            )
+
+    def coverage_for_entries(
+        self, entries: Iterable[BookmarkEntry], *, observed_at: datetime | None = None,
+        horizon_days: int | None = None,
+    ) -> list[WatchCoverage]:
+        """Read coverage after restart; older caches start honestly as pending.
+
+        Lot counts do not imply coverage: a verified zero is different from an
+        unread search, and cached lots alone never prove a complete catalog.
+        """
+        result: list[WatchCoverage] = []
+        with self._lock:
+            for entry in entries:
+                row = self.connection.execute(
+                    "SELECT state, last_attempt_at, detail, covered_until FROM watch_coverage WHERE watch_url = ?",
+                    (entry.url,),
+                ).fetchone()
+                count = self.connection.execute(
+                    """
+                    SELECT COUNT(*) FROM watch_memberships
+                    JOIN lots ON lots.cache_key = watch_memberships.cache_key
+                    WHERE watch_memberships.watch_url = ?
+                      AND watch_memberships.active = 1 AND lots.active = 1
+                    """,
+                    (entry.url,),
+                ).fetchone()[0]
+                state = row["state"] if row else "pending"
+                detail = row["detail"] if row else "No complete source check recorded yet."
+                covered_until = row["covered_until"] if row else ""
+                if observed_at is not None:
+                    now = observed_at if observed_at.tzinfo else observed_at.replace(tzinfo=timezone.utc)
+                    now = now.astimezone(timezone.utc)
+                    if horizon_days is not None:
+                        count = sum(lot_within_horizon(lot, now, horizon_days)
+                                    for lot in self.active_lots_for_watch_url(entry.url))
+                    if state in {"verified", "empty"}:
+                        checked, _ = parse_lot_datetime(row["last_attempt_at"])
+                        end, _ = parse_lot_datetime(covered_until)
+                        if checked is None or checked.astimezone(timezone.utc).date() != now.date():
+                            state, detail = "pending", "A fresh source check is needed for today's calendar window."
+                        elif (end is not None and horizon_days is not None
+                              and end.date() < (now + timedelta(days=horizon_days)).date()):
+                            state, detail = "pending", "The requested calendar window extends beyond the last complete check."
+                        else:
+                            state = "verified" if count else "empty"
+                result.append(WatchCoverage(
+                    artist=entry.watch_label, source=entry.source, watch_url=entry.url,
+                    state=state, lot_count=count,
+                    checked_at=row["last_attempt_at"] if row else "",
+                    detail=detail, covered_until=covered_until,
+                ))
+        return result
 
     def record_source_error(self, watch_url: str, message: str, observed_at: datetime | None = None) -> None:
         now = _iso(observed_at)

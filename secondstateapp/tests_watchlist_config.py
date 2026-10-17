@@ -257,7 +257,7 @@ class CalendarSyncConfigurationTests(TestCase):
         self.assertEqual(title, "Live Source Refresh Incomplete")
         self.assertIn("Francisco Zúñiga", message)
         self.assertIn("Artists without retrieved or cached lots cannot appear on the calendar yet", message)
-        self.assertIn("Sync to Calendar", message)
+        self.assertIn("Update Calendar", message)
         status = self.panel.status_callback.call_args.args[0]
         self.assertIn("Website calendar synced", status)
         self.assertIn("cached lots", status)

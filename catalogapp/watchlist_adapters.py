@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup, Comment, NavigableString
 
 from catalogapp.bookmark_watchlist import canonicalize_bookmark_url
 from catalogapp.watchlist_models import NormalizedLot
-from catalogapp.watchlist_fetch import SourceAccessError
+from catalogapp.watchlist_fetch import SourceAccessBlocked, SourceAccessError, WatchlistStopped
 from catalogapp.watchlist_images import heritage_preview_url
 
 
@@ -83,12 +83,16 @@ class _Money:
 class BatchedSearchPage:
     page: str
     complete: bool = True
+    error: str = ""
+    access_blocked: bool = False
 
 
 class InvaluableAdapter(BookmarkSourceAdapter):
     source = "Invaluable"
     domains = ("invaluable.com",)
     _catalog_path = "/catResults"
+    catalog_end: datetime | None = None
+    _batch_artist_limit = 8
     _catalog_filters = (
         "banned:false AND channelIDs:1 AND unlotted:false AND onlineOnly:false "
         "AND closed:false AND NOT subcategoryRef:7IA742QGM5"
@@ -97,6 +101,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         "artistName",
         "bidCount",
         "catalogRef",
+        "categoryName",
         "countryName",
         "currencyCode",
         "currencySymbol",
@@ -147,6 +152,12 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         re.IGNORECASE,
     )
 
+    def with_catalog_end(self, end: datetime) -> "InvaluableAdapter":
+        """Scope this refresh without mutating the shared adapter instance."""
+        scoped = copy(self)
+        scoped.catalog_end = end if end.tzinfo else end.replace(tzinfo=timezone.utc)
+        return scoped
+
     def fetch_search_page(self, url: str, fetcher: PageFetcher) -> str:
         """Use the same public JSON feed as Invaluable's JavaScript search page.
 
@@ -164,9 +175,12 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             return super().fetch_search_page(url, fetcher)
         parts = urlsplit(url)
         endpoint = urlunsplit((parts.scheme, parts.netloc, self._catalog_path, "", ""))
-        payload = post_json(endpoint, self._catalog_request_payload(url), referer=url)
-        if self._catalog_result(payload) is None:
+        request = self._catalog_request_payload(url)
+        payload = post_json(endpoint, request, referer=url)
+        catalog_result = self._catalog_result(payload)
+        if catalog_result is None:
             raise RuntimeError("Invaluable returned an unexpected catalog-search response.")
+        self._validate_catalog_pagination(catalog_result, request["requests"][0]["params"]["page"])
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
     def fetch_search_batch(
@@ -176,11 +190,13 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         *,
         max_pages: int = 10,
     ) -> dict[str, BatchedSearchPage]:
-        """Fetch compatible artist searches with one OR-facet request per page.
+        """Fetch compatible artist searches in bounded OR-facet groups.
 
         Invaluable accepts an Algolia-style OR group for artist facets. Combining
         selected artists avoids a burst of near-identical requests while keeping
         each bookmark's cache membership separate after the response is split.
+        A later failure retains earlier pages. An access block stops the entire
+        source; ordinary failures affect only their own group.
         """
 
         items = [(url, artist) for url, artist in searches if url and artist]
@@ -216,9 +232,13 @@ class InvaluableAdapter(BookmarkSourceAdapter):
 
         pages: dict[str, BatchedSearchPage] = {}
         page_limit = max(1, min(int(max_pages), 25))
-        for signature, group in grouped.items():
-            if len(group) < 2:
-                continue
+        request_groups = [
+            (signature, group[start:start + self._batch_artist_limit])
+            for signature, group in grouped.items()
+            for start in range(0, len(group), self._batch_artist_limit)
+        ]
+        blocked_error = ""
+        for signature, group in request_groups:
             template = request_templates[signature]
             artist_names = list(dict.fromkeys(item[2] for item in group))
             params_template = dict(template["params"])
@@ -232,33 +252,52 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             hits: list[dict[str, Any]] = []
             seen_hits: set[str] = set()
             complete = True
+            error = blocked_error
+            access_blocked = bool(blocked_error)
             page_index = 0
+            page_count = 0
             result_template: dict[str, Any] = {}
 
-            while page_index < page_limit:
+            while not error and page_index < page_limit:
                 page_params = dict(params_template)
                 page_params["page"] = page_index
-                payload = post_json(
-                    endpoint,
-                    {
-                        "requests": [{"indexName": template["indexName"], "params": page_params}],
-                        "isCatalogPageRequest": False,
-                    },
-                    referer=first_url,
-                )
-                catalog_result = self._catalog_result(payload)
-                if catalog_result is None:
-                    raise RuntimeError("Invaluable returned an unexpected batched catalog-search response.")
+                try:
+                    payload = post_json(
+                        endpoint,
+                        {
+                            "requests": [{"indexName": template["indexName"], "params": page_params}],
+                            "isCatalogPageRequest": False,
+                        },
+                        referer=first_url,
+                    )
+                    catalog_result = self._catalog_result(payload)
+                    if catalog_result is None:
+                        raise SourceAccessError("Invaluable returned an unexpected batched catalog-search response.")
+                    self._validate_catalog_pagination(catalog_result, page_index)
+                    page_hits = [
+                        (
+                            self._text_value(hit, "objectID", "lotRef")
+                            or json.dumps(hit, ensure_ascii=False, sort_keys=True, default=str),
+                            hit,
+                        )
+                        for hit in catalog_result["hits"]
+                    ]
+                    if page_index and page_hits and all(identity in seen_hits for identity, _hit in page_hits):
+                        raise SourceAccessError("Invaluable repeated an earlier catalog page; the refresh is incomplete.")
+                except WatchlistStopped:
+                    raise
+                except Exception as exc:
+                    error = " ".join(str(exc).split())[:500] or "Invaluable catalog retrieval failed."
+                    access_blocked = isinstance(exc, SourceAccessBlocked)
+                    if access_blocked:
+                        blocked_error = error
+                    break
                 result_template = {
                     key: value
                     for key, value in catalog_result.items()
                     if key not in {"hits", "page", "nbPages", "nbHits", "hitsPerPage"}
                 }
-                for hit in catalog_result.get("hits", []):
-                    if not isinstance(hit, dict):
-                        continue
-                    identity = self._text_value(hit, "objectID", "lotRef")
-                    identity = identity or json.dumps(hit, ensure_ascii=False, sort_keys=True, default=str)
+                for identity, hit in page_hits:
                     if identity in seen_hits:
                         continue
                     seen_hits.add(identity)
@@ -273,8 +312,13 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             else:
                 complete = False
 
-            if page_index + 1 < page_count:
+            if error or page_index + 1 < page_count:
                 complete = False
+            if not complete and not error:
+                error = (
+                    f"Invaluable reached the {page_limit}-page limit for this artist group before all lots "
+                    "could be checked. Existing cached lots were retained; live data was not verified for them."
+                )
             hits_by_artist: dict[str, list[dict[str, Any]]] = {}
             for hit in hits:
                 key = self._artist_match_key(self._text_value(hit, "artistName", "artist"))
@@ -297,6 +341,8 @@ class InvaluableAdapter(BookmarkSourceAdapter):
                         separators=(",", ":"),
                     ),
                     complete=complete,
+                    error=error,
+                    access_blocked=access_blocked,
                 )
         return pages
 
@@ -477,6 +523,14 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             if key.casefold() in self._category_facets and value.strip():
                 facet_filters.append([f"{key}:{value.strip()}"])
 
+        filters = self._catalog_filters
+        if self.catalog_end is not None:
+            cutoff = int(self.catalog_end.timestamp())
+            # Include either valid source timestamp: normalization prefers the
+            # lot's closing time, then the auction time. This is a conservative
+            # superset when a timed auction begins before its lots close.
+            filters += f" AND (dateTimeUTCUnix <= {cutoff} OR endTimeUTCUnix:1 TO {cutoff})"
+
         return {
             "requests": [
                 {
@@ -487,7 +541,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
                         "clickAnalytics": False,
                         "facetFilters": facet_filters,
                         "facets": [],
-                        "filters": self._catalog_filters,
+                        "filters": filters,
                         "getRankingInfo": False,
                         "hitsPerPage": 96,
                         "page": page_number - 1,
@@ -530,6 +584,40 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         if not isinstance(results[0].get("hits"), list):
             return None
         return results[0]
+
+    @staticmethod
+    def _validate_catalog_pagination(result: dict[str, Any], expected_page: int) -> None:
+        """Only an explicitly complete catalog can end absent cached lots.
+
+        Parsing a saved page is deliberately more permissive. Live retrieval
+        needs real pagination metadata; a truncated API response must not be
+        interpreted as a complete zero or a final page.
+        """
+        page = result.get("page")
+        pages = result.get("nbPages")
+        hits = result["hits"]
+        if (type(page) is not int or type(pages) is not int or page < 0 or pages < 0
+                or page != expected_page or (pages == 0 and (page != 0 or hits))
+                or (pages > 1 and not hits)
+                or (pages > 0 and page >= pages)):
+            raise SourceAccessError(
+                "Invaluable returned missing or inconsistent catalog pagination; the refresh is incomplete."
+            )
+        if any(not isinstance(hit, dict) for hit in hits):
+            raise SourceAccessError("Invaluable returned malformed catalog lots; the refresh is incomplete.")
+        total = result.get("nbHits")
+        size = result.get("hitsPerPage")
+        if total is not None and (
+            type(total) is not int or total < len(hits) or (total > 0 and not hits)
+        ):
+            raise SourceAccessError("Invaluable returned inconsistent catalog lot counts; the refresh is incomplete.")
+        if size is not None and (type(size) is not int or size < 1 or len(hits) > size):
+            raise SourceAccessError("Invaluable returned inconsistent catalog page sizes; the refresh is incomplete.")
+        if total is not None and size is not None:
+            expected_pages = (total + size - 1) // size
+            if (pages not in ({0, 1} if total == 0 else {expected_pages})
+                    or len(hits) != min(size, max(0, total - page * size))):
+                raise SourceAccessError("Invaluable returned a truncated catalog page; the refresh is incomplete.")
 
     def _raw_from_catalog_hit(
         self,

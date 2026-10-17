@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from catalogapp.bookmark_watchlist import BookmarkEntry
 from catalogapp.watchlist_adapters import BatchedSearchPage, BookmarkSourceAdapter, adapter_for_url
 from catalogapp.watchlist_cache import CacheLookup, WatchlistCache
+from catalogapp.watchlist_coverage import WatchCoverage
 from catalogapp.watchlist_enrichment import OpenAIEnricher
 from catalogapp.watchlist_fetch import SourceAccessBlocked, SourceAccessError, WatchlistStopped, page_fetcher_from_environment
 from catalogapp.watchlist_models import (
@@ -57,12 +58,14 @@ class WatchlistResult:
     # View-only provenance: the source failed and these lots were not observed
     # in this refresh. Do not overwrite their stored transition or timestamp.
     fallback_lot_keys: set[str] = field(default_factory=set)
+    coverage: list[WatchCoverage] = field(default_factory=list)
 
 
 @dataclass(slots=True)
 class _PostedResultChecks:
     details: dict[str, NormalizedLot | None] = field(default_factory=dict)
     access_blocked: bool = False
+    catalog_access_blocked: bool = False
     blocked_detail_sources: set[str] = field(default_factory=set)
     detail_errors_by_watch: dict[str, str] = field(default_factory=dict)
 
@@ -127,6 +130,7 @@ class WatchlistService:
         new_changed_only: bool = False,
         stop_event: threading.Event | None = None,
         progress: Callable[[str], None] | None = None,
+        pending_only: bool = False,
     ) -> WatchlistResult:
         stop = stop_event or threading.Event()
         fetcher = self.fetcher or page_fetcher_from_environment(stop)
@@ -140,11 +144,38 @@ class WatchlistService:
         def fetched_pages() -> int:
             return sum(max(0, int(getattr(item, "pages_fetched", 0)) - started_pages[key]) for key, item in fetchers.items())
 
+        observed_at = self.now()
+        observed_at = observed_at if observed_at.tzinfo else observed_at.replace(tzinfo=timezone.utc)
+        horizon_days = max(1, int(horizon_days))
+        catalog_end = observed_at + timedelta(days=horizon_days)
+        scoped_adapters: dict[int, BookmarkSourceAdapter] = {}
+
+        def configured_adapter(url: str) -> BookmarkSourceAdapter | None:
+            adapter = adapter_for_url(url)
+            if adapter is None:
+                return None
+            if id(adapter) not in scoped_adapters:
+                scope = getattr(adapter, "with_catalog_end", None)
+                scoped_adapters[id(adapter)] = scope(catalog_end) if callable(scope) else adapter
+            return scoped_adapters[id(adapter)]
+
+        def coverage():
+            return self.cache.coverage_for_entries(
+                all_chosen, observed_at=observed_at, horizon_days=horizon_days,
+            )
+
         selected = {artist.casefold() for artist in selected_artists}
-        chosen = [entry for entry in entries if entry.watch_label.casefold() in selected]
+        all_chosen = [entry for entry in entries if entry.watch_label.casefold() in selected]
+        previous_coverage = {item.watch_url: item for item in coverage()}
+        chosen = all_chosen
+        if pending_only:
+            chosen = sorted(
+                (entry for entry in all_chosen if previous_coverage[entry.url].needs_recovery),
+                key=lambda entry: (bool(self._cached_lots_for_entry(entry)), previous_coverage[entry.url].checked_at),
+            )
         metrics = WatchlistMetrics(
-            bookmark_urls=len(chosen),
-            artists=len({entry.watch_label.casefold() for entry in chosen}),
+            bookmark_urls=len(all_chosen),
+            artists=len({entry.watch_label.casefold() for entry in all_chosen}),
         )
         errors: list[str] = []
         notices: list[str] = []
@@ -158,40 +189,76 @@ class WatchlistService:
         observed_lot_keys: set[str] = set()
         result_checks = _PostedResultChecks()
         stopped = False
-        observed_at = self.now()
+        if pending_only:
+            requested_urls = {entry.url for entry in chosen}
+            for entry in all_chosen:
+                if entry.url in requested_urls:
+                    continue
+                cached = self._cached_lots_for_entry(entry)
+                refreshed_lots.extend(cached)
+                fallback_lot_keys.update(lot.cache_key for lot in cached)
+                metrics.cache_hits += len(cached)
+            notices.append(
+                f"Recovering {len(chosen)} pending watches individually. Previously verified searches "
+                "are retained from cache; use Update Calendar to check every watch again."
+            )
         profile_directory = getattr(fetcher, "profile_directory", None)
         if profile_directory and progress:
             progress(f"Using the explicitly selected browser profile: {profile_directory}")
 
         batched_pages: dict[str, BatchedSearchPage] = {}
         batch_failed_urls: set[str] = set()
+        batch_error_entries: dict[int, list[BookmarkEntry]] = {}
+        incomplete_uncached_watches: list[str] = []
         entries_by_adapter: dict[BookmarkSourceAdapter, list[BookmarkEntry]] = {}
         for entry in chosen:
-            adapter = adapter_for_url(entry.url)
+            adapter = configured_adapter(entry.url)
             if adapter is not None:
                 entries_by_adapter.setdefault(adapter, []).append(entry)
         for adapter, adapter_entries in entries_by_adapter.items():
             batcher = getattr(adapter, "fetch_search_batch", None)
-            if len(adapter_entries) < 2 or not callable(batcher):
+            if pending_only or len(adapter_entries) < 2 or not callable(batcher):
                 continue
             if progress:
                 progress(
-                    f"Fetching {len(adapter_entries)} {adapter.source} artists in a rate-safe batchâ€¦"
+                    f"Fetching {len(adapter_entries)} {adapter.source} artists in small groups…"
                 )
+            batch_entries = adapter_entries
+            if adapter.source == "Invaluable":
+                # Give newly added watches a chance before a later source block
+                # can leave them perpetually absent from the calendar.
+                batch_entries = sorted(adapter_entries, key=lambda entry: (
+                    not previous_coverage[entry.url].needs_recovery,
+                    bool(self._cached_lots_for_entry(entry)),
+                    previous_coverage[entry.url].checked_at,
+                ))
             try:
-                batched_pages.update(
-                    batcher(
-                        [(entry.url, entry.artist) for entry in adapter_entries],
-                        source_fetcher(adapter),
-                        max_pages=self.max_pages_per_bookmark,
-                    )
+                fetched = batcher(
+                    [(entry.url, entry.artist) for entry in batch_entries],
+                    source_fetcher(adapter),
+                    max_pages=self.max_pages_per_bookmark,
                 )
+                batched_pages.update(fetched)
+                failures: dict[str, list[BookmarkEntry]] = {}
+                for entry in adapter_entries:
+                    page = fetched.get(entry.url)
+                    if page is None:
+                        continue
+                    if page.access_blocked and adapter.source == "Invaluable":
+                        result_checks.access_blocked = True
+                        result_checks.catalog_access_blocked = True
+                    if page.error:
+                        failures.setdefault(page.error, []).append(entry)
+                for message, affected_entries in failures.items():
+                    batch_error_entries[len(errors)] = affected_entries
+                    errors.append(f"{adapter.source} ({len(affected_entries)} artists): {message}")
             except WatchlistStopped:
                 stopped = True
                 break
             except Exception as exc:
                 if adapter.source == "Invaluable" and isinstance(exc, SourceAccessBlocked):
                     result_checks.access_blocked = True
+                    result_checks.catalog_access_blocked = True
                 message = " ".join(str(exc).split())[:500]
                 cached_count = 0
                 uncached_watches: list[str] = []
@@ -205,6 +272,10 @@ class WatchlistService:
                     fallback_lot_keys.update(lot.cache_key for lot in cached)
                     metrics.cache_hits += len(cached)
                     self.cache.record_source_error(entry.url, message, observed_at)
+                    self.cache.record_watch_coverage(
+                        entry.url, "blocked" if isinstance(exc, SourceAccessBlocked) else "pending",
+                        detail=message, observed_at=observed_at,
+                    )
                 suffix = _cached_fallback_message(cached_count, new_changed_only)
                 errors.append(
                     f"{adapter.source} ({len(adapter_entries)} artists): {message}{suffix}"
@@ -214,13 +285,16 @@ class WatchlistService:
 
         if stopped:
             metrics.pages_fetched = fetched_pages()
-            return WatchlistResult(lots=[], metrics=metrics, errors=errors, stopped=True, notices=notices)
+            return WatchlistResult(
+                lots=[], metrics=metrics, errors=errors, stopped=True, notices=notices,
+                coverage=coverage(),
+            )
 
         for entry in chosen:
             if stop.is_set():
                 stopped = True
                 break
-            adapter = adapter_for_url(entry.url)
+            adapter = configured_adapter(entry.url)
             if adapter is None:
                 errors.append(f"{entry.source or 'Unsupported source'} adapter is not available yet: {entry.watch_label}")
                 continue
@@ -237,7 +311,15 @@ class WatchlistService:
                 continue
             if progress:
                 progress(f"Fetching {entry.watch_label} from {entry.source}…")
+            attempted = True
             try:
+                # Previously received pages remain usable after a later source
+                # block, but no further catalog or lot requests may be made.
+                if adapter.source == "Invaluable" and result_checks.catalog_access_blocked and entry.url not in batched_pages:
+                    attempted = False
+                    raise SourceAccessBlocked(
+                        "Further Invaluable requests were skipped because source access is unavailable."
+                    )
                 lots, ended, complete = self._refresh_entry(
                     entry,
                     adapter,
@@ -255,16 +337,51 @@ class WatchlistService:
                 if complete:
                     refreshed_lots.extend(ended)
                     metrics.ended_lots += len(ended)
-                if entry.url in result_checks.detail_errors_by_watch:
+                if not complete:
+                    preloaded = batched_pages.get(entry.url)
+                    message = preloaded.error if preloaded is not None else ""
+                    if not message:
+                        message = (
+                            "The catalog refresh reached its page limit before all lots could be checked. "
+                            "Existing cached lots were retained; live data was not verified for them."
+                        )
+                        errors.append(f"{entry.watch_label} ({entry.source}): {message}")
+                    cached = [
+                        lot for lot in self._cached_lots_for_entry(entry)
+                        if lot.cache_key not in observed_lot_keys
+                    ]
+                    refreshed_lots.extend(cached)
+                    fallback_lot_keys.update(lot.cache_key for lot in cached)
+                    metrics.cache_hits += len(cached)
+                    if not lots and not cached:
+                        incomplete_uncached_watches.append(entry.watch_label)
+                    self.cache.record_source_error(entry.url, message, observed_at)
+                    self.cache.record_watch_coverage(
+                        entry.url, "blocked" if preloaded is not None and preloaded.access_blocked else "partial",
+                        detail=message, observed_at=observed_at,
+                    )
+                elif entry.url in result_checks.detail_errors_by_watch:
                     self.cache.record_source_error(entry.url, result_checks.detail_errors_by_watch[entry.url], observed_at)
                 else:
                     self.cache.record_source_success(entry.url, observed_at)
+                if complete:
+                    source_end = getattr(adapter, "catalog_end", None)
+                    active = self.cache.active_lots_for_watch_url(entry.url)
+                    visible = [lot for lot in active if lot_within_horizon(lot, observed_at, horizon_days)]
+                    self.cache.record_watch_coverage(
+                        entry.url, "verified" if visible else "empty",
+                        observed_at=observed_at,
+                        covered_until=source_end,
+                        detail=(f"Complete catalog check for the next {horizon_days} days, through "
+                                f"{source_end.astimezone(timezone.utc):%Y-%m-%d %H:%M} UTC.") if source_end else "",
+                    )
             except WatchlistStopped:
                 stopped = True
                 break
             except Exception as exc:
                 if adapter.source == "Invaluable" and isinstance(exc, SourceAccessBlocked):
                     result_checks.access_blocked = True
+                    result_checks.catalog_access_blocked = True
                 message = " ".join(str(exc).split())[:500]
                 cached = self._cached_lots_for_entry(entry)
                 refreshed_lots.extend(cached)
@@ -277,6 +394,12 @@ class WatchlistService:
                 if not cached:
                     errors.append(_uncached_watches_message([entry.watch_label]))
                 self.cache.record_source_error(entry.url, message, observed_at)
+                self.cache.record_watch_coverage(
+                    entry.url, "blocked" if isinstance(exc, SourceAccessBlocked) else "partial" if any(
+                        lot.cache_key in observed_lot_keys for lot in cached
+                    ) else "pending",
+                    detail=message, observed_at=observed_at, attempted=attempted,
+                )
                 if adapter.source == "Invaluable":
                     try:
                         refreshed_lots.extend(self._refresh_posted_results(
@@ -287,8 +410,18 @@ class WatchlistService:
                         stopped = True
                         break
 
+        if incomplete_uncached_watches:
+            errors.append(_uncached_watches_message(incomplete_uncached_watches))
         metrics.pages_fetched = fetched_pages()
         fallback_lot_keys.difference_update(observed_lot_keys)
+        for error_index, affected_entries in batch_error_entries.items():
+            retained_keys = {
+                lot.cache_key
+                for entry in affected_entries
+                for lot in self._cached_lots_for_entry(entry)
+                if lot.cache_key in fallback_lot_keys
+            }
+            errors[error_index] += _cached_fallback_message(len(retained_keys), new_changed_only)
         freshly_observed_lots = [lot for lot in refreshed_lots if lot.cache_key not in fallback_lot_keys]
         enrichment = self.enricher.enrich(freshly_observed_lots, zero_ai=zero_ai)
         metrics.ai_enriched_records = enrichment.records_enriched
@@ -326,6 +459,7 @@ class WatchlistService:
             lots=lots, metrics=metrics, errors=errors, stopped=stopped,
             notices=notices,
             fallback_lot_keys=fallback_lot_keys.intersection(lot.cache_key for lot in lots),
+            coverage=coverage(),
         )
 
     def _refresh_entry(
@@ -371,6 +505,13 @@ class WatchlistService:
                 raise WatchlistStopped("Watchlist refresh stopped by the user.")
             cards = [(card, self._reconcile_search_identity(card, watched_lots))
                      for card in adapter.parse_search_page(page, page_url, entry.artist)]
+            catalog_reader = getattr(adapter, "_catalog_result", None)
+            catalog_result = catalog_reader(page) if adapter.source == "Invaluable" and callable(catalog_reader) else None
+            if catalog_result is not None and catalog_result["hits"] and not cards:
+                raise SourceAccessError(
+                    "Invaluable returned lots that could not be read as this artist's calendar records; "
+                    "the search has not been verified as empty."
+                )
             if len(visited_pages) > 1 and cards and all(card.cache_key in observed_keys for card, _cached in cards):
                 raise SourceAccessError(
                     "The source repeated an earlier catalog page; existing lots have been retained."
@@ -469,7 +610,9 @@ class WatchlistService:
             )
         if stop.is_set():
             raise WatchlistStopped("Watchlist refresh stopped by the user.")
-        ended = self.cache.mark_missing_ended(entry.url, observed_keys, observed_at) if complete else []
+        ended = self.cache.mark_missing_ended(
+            entry.url, observed_keys, observed_at, covered_until=getattr(adapter, "catalog_end", None),
+        ) if complete else []
         if observed_lot_keys is not None:
             observed_lot_keys.update(lot.cache_key for lot in ended)
         return lots, ended, complete
