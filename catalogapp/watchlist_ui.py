@@ -21,7 +21,9 @@ from catalogapp.bookmark_watchlist import (
     canonicalize_bookmark_url,
     folder_counts,
 )
-from catalogapp.watchlist_bookmark_source import bookmark_source_paths, discover_bookmark_sources, load_bookmark_source
+from catalogapp.watchlist_bookmark_source import (
+    bookmark_source_paths, discover_bookmark_sources, load_bookmark_source, selected_bookmark_source,
+)
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_browser import (
     INVALUABLE_SIGN_IN_LOT, InvaluableBrowserFetcher, InvaluablePublicBrowserFetcher, connect_invaluable,
@@ -636,14 +638,19 @@ class ArtistWatchlistPanel(ttk.Frame):
         if label is None and saved.get("last_bookmark_path") == resolved:
             label = saved.get("bookmark_source_label") or None
         browser_source = self.__dict__.get("_bookmark_source_kind") == "browser"
+        source = selected_bookmark_source(path) if browser_source else None
+        if source is not None:
+            label = source.label
         self._bookmark_source_label = str(label or ("Browser bookmarks" if browser_source else "Bookmark export"))
+        display_label = source.display_label if source is not None else self._bookmark_source_label.removesuffix(f" ({Path(path).parent.name})")
         source_var = self.__dict__.get("bookmark_source_var")
         if source_var is not None:
-            source_var.set(self._bookmark_source_label if browser_source else f"Bookmark export · {Path(path).name}")
+            source_var.set(display_label if browser_source else f"Bookmark export · {Path(path).name}")
         filename = self.__dict__.get("bookmark_filename_var")
         if filename is not None:
+            connection = f"One {source.browser} profile connected. " if source is not None else ""
             filename.set(
-                "New artists and Artprice links are read on every Update Calendar. Saved artists stay watched; exclude them here when needed."
+                f"{connection}New artists and Artprice links are read on every Update Calendar. Saved artists stay watched; exclude them here when needed."
                 if browser_source else
                 f"{Path(path).name} · Export bookmarks again after adding artists; Studio rereads this file on every update."
             )

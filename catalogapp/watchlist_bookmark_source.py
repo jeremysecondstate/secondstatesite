@@ -45,6 +45,10 @@ class BookmarkSource:
     def label(self) -> str:
         return f"{self.browser} — {self.profile_name} ({self.profile_directory})"
 
+    @property
+    def display_label(self) -> str:
+        return f"{self.browser} — {self.profile_name}"
+
 
 def _clean_label(value: object, default: str = "") -> str:
     if not isinstance(value, str):
@@ -195,6 +199,47 @@ def load_bookmark_source(
     return entries, parse_artprice_artist_links(html, names)
 
 
+def _profile_metadata(user_data: Path) -> tuple[dict, str]:
+    try:
+        with (user_data / "Local State").open("rb") as source:
+            content = source.read(_MAX_BYTES + 1)
+        metadata = json.loads(content.decode("utf-8-sig")) if len(content) <= _MAX_BYTES else {}
+        profile = metadata.get("profile", {}) if isinstance(metadata, dict) else {}
+        information = profile.get("info_cache", {}) if isinstance(profile, dict) else {}
+        last_used = profile.get("last_used", "") if isinstance(profile, dict) else ""
+        return information if isinstance(information, dict) else {}, last_used
+    except (OSError, ValueError, RecursionError):
+        # Chrome can be saving metadata while its bookmark stores remain readable.
+        return {}, ""
+
+
+def selected_bookmark_source(path: str | Path) -> BookmarkSource | None:
+    """Refresh only the selected profile's display name, without choosing another.
+
+    Missing or busy metadata returns None so the UI retains its saved label.
+    The selected path stays stable even when Chrome renames a profile or moves
+    bookmarks between its local and account stores.
+    """
+
+    selected = Path(path)
+    local_directory = os.environ.get("LOCALAPPDATA")
+    if not local_directory or selected.name.casefold() not in {name.casefold() for name in _BOOKMARK_FILES}:
+        return None
+    try:
+        for browser, relative in _BROWSER_DIRECTORIES:
+            root = Path(local_directory).joinpath(*relative)
+            if selected.parent.resolve().parent != root.resolve() or not _profile_bookmark_paths(selected.parent, root):
+                continue
+            information, last_used = _profile_metadata(root)
+            details = information.get(selected.parent.name, {})
+            name = _clean_label(details.get("name") if isinstance(details, dict) else None)[:120]
+            if name:
+                return BookmarkSource(selected, browser, name, selected.parent.name, selected.parent.name == last_used)
+    except (OSError, ValueError, RuntimeError):
+        pass
+    return None
+
+
 def discover_bookmark_sources() -> list[BookmarkSource]:
     """Discover existing Chrome/Edge bookmark files from safe profile metadata."""
 
@@ -206,22 +251,7 @@ def discover_bookmark_sources() -> list[BookmarkSource]:
         user_data = Path(local_directory).joinpath(*relative)
         try:
             root = user_data.resolve()
-            metadata_path = user_data / "Local State"
-            information, last_used = {}, ""
-            if metadata_path.is_file():
-                try:
-                    with metadata_path.open("rb") as source:
-                        content = source.read(_MAX_BYTES + 1)
-                    metadata = json.loads(content.decode("utf-8-sig")) if len(content) <= _MAX_BYTES else {}
-                    profile = metadata.get("profile", {}) if isinstance(metadata, dict) else {}
-                    information = profile.get("info_cache", {}) if isinstance(profile, dict) else {}
-                    last_used = profile.get("last_used", "") if isinstance(profile, dict) else ""
-                except (OSError, ValueError, RecursionError):
-                    # Profile labels can be saved separately from Bookmarks.
-                    # Existing safe profile directories remain selectable.
-                    pass
-            if not isinstance(information, dict):
-                information = {}
+            information, last_used = _profile_metadata(user_data)
             directories = {path.name for path in user_data.iterdir() if _PROFILE_DIRECTORY.fullmatch(path.name)}
             for directory in directories:
                 candidate = user_data / directory

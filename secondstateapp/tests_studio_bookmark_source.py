@@ -33,6 +33,69 @@ class StudioBrowserBookmarkWorkflowTests(TestCase):
     setUp = studio_tests.StudioWatchlistControllerTests.setUp
     immediate_thread = staticmethod(studio_tests.StudioWatchlistControllerTests.immediate_thread)
 
+    def named_profile(self):
+        user_data = self.directory / "Google" / "Chrome" / "User Data"
+        profile = user_data / "Profile 9"
+        profile.mkdir(parents=True)
+        source = profile / "Bookmarks"
+        source.write_text(browser_bookmarks(["Calder"]), encoding="utf-8")
+        other = user_data / "Profile 2"
+        other.mkdir()
+        (other / "Bookmarks").write_text(browser_bookmarks(["Other profile artist"]), encoding="utf-8")
+        metadata = user_data / "Local State"
+        metadata.write_text(json.dumps({"profile": {
+            "last_used": "Profile 2", "info_cache": {
+                "Profile 2": {"name": "secondstate.art"},
+                "Profile 9": {"name": "secondstate.art"},
+            },
+        }}), encoding="utf-8")
+        self.panel.bookmark_source_var = studio_tests.Value("")
+        self.stack.enter_context(patch.dict(os.environ, {"LOCALAPPDATA": str(self.directory)}))
+        return source, metadata
+
+    def test_friendly_profile_header_keeps_only_selected_profile_connected(self):
+        source, metadata = self.named_profile()
+        original = {path: path.read_bytes() for path in (source, metadata)}
+        with patch("catalogapp.watchlist_ui.discover_bookmark_sources") as discover:
+            self.panel.load_bookmarks(source, source_label="Chrome — secondstate.art (Profile 9)")
+            self.panel.sync_to_calendar()
+
+        self.assertEqual(self.panel.bookmark_source_var.get(), "Chrome — secondstate.art")
+        self.assertIn("One Chrome profile connected.", self.panel.bookmark_filename_var.get())
+        self.assertEqual(self.service.return_value.refresh.call_args.kwargs["selected_artists"], {"Calder"})
+        self.assertEqual(self.panel._read_settings()["last_bookmark_path"], str(source.resolve()))
+        self.assertEqual(self.panel._read_settings()["bookmark_source_label"], "Chrome — secondstate.art (Profile 9)")
+        self.assertEqual({path: path.read_bytes() for path in original}, original)
+        discover.assert_not_called()
+
+    def test_update_and_restart_refresh_renamed_profile_without_switching_source(self):
+        source, metadata = self.named_profile()
+        self.panel.load_bookmarks(source)
+        for name, refresh in (("SECONDSTATE research", self.panel.sync_to_calendar), ("Art Studio", self.panel._load_initial_bookmarks)):
+            with self.subTest(name=name):
+                payload = json.loads(metadata.read_text(encoding="utf-8"))
+                payload["profile"]["info_cache"]["Profile 9"]["name"] = name
+                metadata.write_text(json.dumps(payload), encoding="utf-8")
+                refresh()
+
+                self.assertEqual(self.panel.bookmark_source_var.get(), f"Chrome — {name}")
+                self.assertEqual(self.panel._read_settings()["bookmark_source_label"], f"Chrome — {name} (Profile 9)")
+                self.assertEqual(self.panel.bookmark_path_var.get(), str(source.resolve()))
+                self.assertEqual(self.panel.selected_artists, {"Calder"})
+
+    def test_unavailable_profile_metadata_keeps_saved_friendly_label(self):
+        source, metadata = self.named_profile()
+        self.panel.load_bookmarks(source)
+        for content in ('{"profile":', '{}'):
+            with self.subTest(content=content):
+                metadata.write_text(content, encoding="utf-8")
+                self.panel.sync_to_calendar()
+
+                self.assertEqual(self.panel.bookmark_source_var.get(), "Chrome — secondstate.art")
+                self.assertEqual(self.panel._read_settings()["bookmark_source_label"], "Chrome — secondstate.art (Profile 9)")
+                self.assertEqual(self.panel.bookmark_path_var.get(), str(source.resolve()))
+                self.assertEqual(self.panel.selected_artists, {"Calder"})
+
     def test_update_reads_new_browser_artists_and_artprice_links_preserving_exclusions(self):
         source = self.directory / "Bookmarks"
         source.write_text(browser_bookmarks(["Calder", "Matisse"]), encoding="utf-8")

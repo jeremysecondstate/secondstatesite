@@ -168,6 +168,7 @@ class BookmarkSourceTests(TestCase):
         self.assertEqual({source.label for source in sources}, {
             "Chrome — secondstate.art (Profile 2)", "Chrome — secondstate.art (Profile 9)",
         })
+        self.assertEqual({source.display_label for source in sources}, {"Chrome — secondstate.art"})
 
     def test_discovery_works_without_local_state_and_with_missing_browser_directory(self):
         profile = self.root / "Google" / "Chrome" / "User Data" / "Default"
