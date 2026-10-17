@@ -29,9 +29,13 @@ _PRIVATE_QUERY_KEYS = {
 }
 
 
-def _public_watch(entry: BookmarkEntry) -> bool:
+def _public_link(url: str) -> bool:
     return not any(key.casefold() in _PRIVATE_QUERY_KEYS
-                   for key, _ in parse_qsl(urlsplit(entry.url).query, keep_blank_values=True))
+                   for key, _ in parse_qsl(urlsplit(url).query, keep_blank_values=True))
+
+
+def _public_watch(entry: BookmarkEntry) -> bool:
+    return _public_link(entry.url)
 
 
 @dataclass(slots=True)
@@ -145,7 +149,7 @@ def _metadata(payload: object) -> SharedWatchlistSnapshot:
     if not isinstance(raw_links, dict):
         raise ValueError("Invalid shared research links")
     _, links = _normalize(entries.values(), raw_links)
-    if links != raw_links:
+    if links != raw_links or any(not _public_link(url) for url in links.values()):
         raise ValueError("Invalid shared research link")
     checks = payload.get("coverage", [])
     if not isinstance(checks, list) or len(checks) > len(entries):
@@ -236,7 +240,7 @@ def publish_shared_watchlist(
     if not api_key:
         raise CalendarSyncError("CATALOG_API_KEY is required to share your artist watchlist.")
     normalized, links = _normalize(entries, dict(artist_artprice_links or {}))
-    if any(not _public_watch(entry) for entry in normalized):
+    if any(not _public_watch(entry) for entry in normalized) or any(not _public_link(url) for url in links.values()):
         raise CalendarSyncError("Only public artist bookmark URLs can be shared; remove private access parameters.")
     if len(normalized) > 10000:
         raise CalendarSyncError("Too many artists for one shared watchlist.")
@@ -281,7 +285,9 @@ def merge_shared_watchlist(
     local_entries, local_links = _normalize(entries, dict(artist_artprice_links or {}))
     merged = {entry.url: entry for entry in snapshot.entries}
     merged.update({entry.url: entry for entry in local_entries})
-    links = {**snapshot.artist_artprice_links, **local_links}
+    # The website may have a corrected research link. A stale desktop copy
+    # must not win here and then overwrite that correction on its next sync.
+    links = {**local_links, **snapshot.artist_artprice_links}
     memberships: dict[tuple[str, str], list[str]] = {}
     sales = {}
     for entry in merged.values():

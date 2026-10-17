@@ -614,30 +614,12 @@ class ArtistWatchlistPanel(ttk.Frame):
         self._calendar_inventory = inventory
         self._calendar_lot_keys = snapshot.calendar_lot_keys if snapshot is not None else None
         if snapshot is not None:
-            saved = self._read_settings()
-            known_artists = {entry.watch_label for entry in self.all_entries}
-            with WatchlistCache(self._cache_path) as cache:
-                merged = merge_shared_watchlist(snapshot, cache=cache, entries=self.all_entries,
-                                                artist_artprice_links=self.artist_artprice_links,
-                                                registry_path=self._registry_path)
-            self.all_entries = merged.entries
-            self.artist_artprice_links = merged.artist_artprice_links
-            self.artprice_match_result = ArtpriceMatchResult(dict(self.artist_artprice_links), (), (), 0)
-            self._update_artprice_summary()
-            self._build_folder_controls()
-            self._update_active_entries()
-            self._restore_watchlist_preferences(saved)
-            shared_disabled = {entry.watch_label for entry in snapshot.entries
-                               if entry.url not in snapshot.enabled_watch_urls}
-            shared_enabled = {entry.watch_label for entry in snapshot.entries
-                              if entry.url in snapshot.enabled_watch_urls}
-            self.selected_artists -= shared_disabled - shared_enabled - known_artists
-            self._shared_watchlist_loaded = True
-            self._refresh_artist_watch_marks()
-            self._save_settings_hint()
-            self._refresh_coverage_from_cache()
-        if snapshot is not None:
-            self._load_cached_agenda()
+            try:
+                self._apply_shared_watchlist(snapshot)
+                self._load_cached_agenda()
+            except Exception as exc:
+                self._calendar_lot_keys = None
+                error = "Shared Calendar could not be restored locally: " + " ".join(str(exc).split())[:300]
         self.refresh_button.configure(state=tk.NORMAL)
         self._set_import_buttons_state(tk.NORMAL)
         self._fill_artist_inventory()
@@ -648,6 +630,36 @@ class ArtistWatchlistPanel(ttk.Frame):
             self._set_status(f"Artist scan ready. {missing} lots are not on the Calendar. Select an artist, then Sync selected. New artists without saved lots can be checked individually.{html_warning}")
         else:
             self._set_status(f"Shared Calendar loaded: {len(self.selected_artists)} artists · {len(self.current_lots)} saved lots. Scan to find lots not yet on the Calendar.")
+
+    def _apply_shared_watchlist(self, snapshot) -> None:
+        saved = self._read_settings()
+        known_artists = {entry.watch_label for entry in self.all_entries}
+        with WatchlistCache(self._cache_path) as cache:
+            merged = merge_shared_watchlist(snapshot, cache=cache, entries=self.all_entries,
+                                            artist_artprice_links=self.artist_artprice_links,
+                                            registry_path=self._registry_path)
+        self.all_entries = merged.entries
+        self.artist_artprice_links = merged.artist_artprice_links
+        self.artprice_match_result = ArtpriceMatchResult(dict(self.artist_artprice_links), (), (), 0)
+        self._update_artprice_summary()
+        self._build_folder_controls()
+        known_folders = set(saved.get("known_folders", saved.get("selected_folders", [])))
+        for entry in snapshot.entries:
+            if entry.url in snapshot.enabled_watch_urls and entry.watch_label not in known_artists:
+                for folder in entry.folder_path or ("Unfiled",):
+                    if folder in self.folder_vars and folder not in known_folders:
+                        self.folder_vars[folder].set(True)
+        self._update_active_entries()
+        self._restore_watchlist_preferences(saved)
+        shared_disabled = {entry.watch_label for entry in snapshot.entries
+                           if entry.url not in snapshot.enabled_watch_urls}
+        shared_enabled = {entry.watch_label for entry in snapshot.entries
+                          if entry.url in snapshot.enabled_watch_urls}
+        self.selected_artists -= shared_disabled - shared_enabled - known_artists
+        self._shared_watchlist_loaded = True
+        self._refresh_artist_watch_marks()
+        self._save_settings_hint()
+        self._refresh_coverage_from_cache()
 
     def _lot_on_calendar(self, lot) -> bool:
         keys = self.__dict__.get("_calendar_lot_keys")

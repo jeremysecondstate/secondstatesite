@@ -157,6 +157,10 @@ class SharedWatchlistTransportTests(TestCase):
         with self.assertRaisesRegex(CalendarSyncError, "public artist"):
             publish_shared_watchlist([private], base_url="https://secondstate.art", api_key="key", session=transport)
         transport.post.assert_not_called()
+        with self.assertRaisesRegex(CalendarSyncError, "public artist"):
+            publish_shared_watchlist([WATCH], base_url="https://secondstate.art", api_key="key", session=transport,
+                artist_artprice_links={"Will Barnet": "https://www.artprice.com/artist/1474/will-r-barnet?access_token=secret"})
+        transport.post.assert_not_called()
 
     def test_incomplete_identity_inventory_cannot_hide_existing_calendar_lot(self):
         with self.assertRaisesRegex(CalendarSyncError, "incomplete Calendar lot inventory"):
@@ -281,6 +285,16 @@ class SharedWatchlistRestoreTests(TestCase):
         self.assertEqual(merged.enabled_watch_urls, frozenset())
         self.assertEqual(len(self.cache.active_lots_for_watch_url(WATCH.url)), 1)
 
+    def test_current_website_link_wins_over_stale_pc_link_and_retains_local_only_artists(self):
+        other = replace(WATCH, artist="Käthe Kollwitz", title="Käthe Kollwitz", url="https://www.invaluable.com/search?artistName=Kathe+Kollwitz")
+        correct = "https://www.artprice.com/artist/1474/will-r-barnet"
+        local_only = "https://www.artprice.com/artist/15398/kathe-kollwitz"
+        merged = merge_shared_watchlist(self.snapshot(artist_artprice_links={"Will Barnet": correct}),
+            cache=self.cache, entries=[WATCH, other], artist_artprice_links={
+                "Will Barnet": "https://www.artprice.com/artist/1/stale-link", "Käthe Kollwitz": local_only,
+            })
+        self.assertEqual(merged.artist_artprice_links, {"Will Barnet": correct, "Käthe Kollwitz": local_only})
+
 
 class SharedWatchlistRoundTripTests(DjangoTestCase):
     def test_real_endpoint_restores_another_pc_with_original_provenance(self):
@@ -311,7 +325,7 @@ class SharedWatchlistRoundTripTests(DjangoTestCase):
             self.assertEqual(publish_shared_watchlist([WATCH], coverage=[check], **kwargs), 1)
             shared = fetch_shared_watchlist(**kwargs)
             self.assertEqual(shared.entries, [WATCH])
-            self.assertEqual(shared.calendar_lot_keys, {"invaluable:123", "invaluable:historical"})
+            self.assertEqual(shared.calendar_lot_keys, {"invaluable:123", "invaluable:historical", "invaluable:" + lot().lot_url})
             self.assertEqual(len(shared.lots), 1)
             with WatchlistCache(":memory:") as second_pc:
                 merged = merge_shared_watchlist(shared, cache=second_pc)
