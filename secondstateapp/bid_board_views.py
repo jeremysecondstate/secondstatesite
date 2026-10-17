@@ -16,6 +16,7 @@ from django.views.decorators.http import require_http_methods
 
 from .bid_board import BidBoardError, BidLadder, build_board, normalize_assumptions
 from .bid_board_snapshot import saved_board_snapshot, saved_board_summary
+from .currency import convert_to_usd
 from .liveart_resale import resale_candidate_selectable
 from .models import AuctionBidBoardAnalysis, AuctionEmailBatch, AuctionWatchLot, LiveArtResaleAnalysis
 
@@ -74,10 +75,10 @@ class _StaleResearch(BidBoardError):
     pass
 
 
-def _initial_assumptions(lot, resale):
+def _initial_assumptions(lot, resale, source_hammer):
     initial = {}
-    if lot.current_bid is not None and lot.current_bid > 0 and lot.currency.upper() == "USD":
-        initial["starting_hammer"] = str(lot.current_bid)
+    if source_hammer:
+        initial["starting_hammer"] = source_hammer["usd_amount"]
         initial["starting_basis"] = "opening" if lot.bid_count == 0 else "current"
     if resale:
         previous = resale.assumptions
@@ -112,7 +113,16 @@ def auction_lot_bid_board(request, lot_id):
         supplied = payload.get("assumptions", {})
         if not isinstance(supplied, dict):
             raise BidBoardError("Bid assumptions must be an object.")
-        assumptions = normalize_assumptions({**_initial_assumptions(lot, resale), **(previous.assumptions if previous else {}), **supplied})
+        source_hammer = convert_to_usd(lot.current_bid, lot.currency)
+        saved_assumptions = dict(previous.assumptions) if previous else {}
+        # Old non-USD boards saved an empty start. Fill those now that the
+        # source can be converted, but preserve saved amounts and explicit edits.
+        if (previous and not previous.analysis.get("usd_normalization_version")
+                and source_hammer and source_hammer["source_currency"] != "USD"
+                and saved_assumptions.get("starting_hammer") in (None, "")):
+            saved_assumptions.pop("starting_hammer", None)
+            saved_assumptions.pop("starting_basis", None)
+        assumptions = normalize_assumptions({**_initial_assumptions(lot, resale, source_hammer), **saved_assumptions, **supplied})
         research, candidates, selected_ids = _evidence(request, lot, payload, resale)
         from .calendar_views import _candidates_with_selection, _liveart_search_context, _lot_resale_scenarios
         evidence_assumptions = {**(resale.assumptions if resale else {}), "downside_factor": assumptions["downside_factor"], "upside_factor": assumptions["upside_factor"]}
@@ -136,13 +146,28 @@ def auction_lot_bid_board(request, lot_id):
         previous_records = [{key: value for key, value in item.items() if key != "selected"} for item in previous.evidence_snapshot.get("selected_records", [])] if previous else []
         board.update({"selected_ids": selected_ids, "saved": bool(previous), "updated_at": previous.updated_at.isoformat() if previous else None,
                       "evidence_changed_since_save": bool(previous and (previous.evidence_snapshot.get("source_summary") != summary or previous_records != selected_records)),
-                      "lot_currency": lot.currency or None})
-        if lot.currency.upper() != "USD":
-            board["notices"].append("This board calculates USD amounts. The lot's source currency is not USD or is unavailable; no exchange rate or hammer conversion has been assumed.")
-        elif lot.current_bid is not None and lot.current_bid > 0:
-            board["source_current_hammer"] = f"{lot.current_bid:.2f}"
-            if assumptions["starting_hammer"] is not None and lot.current_bid > Decimal(assumptions["starting_hammer"]):
-                board["notices"].append(f"The latest synced source reports a ${lot.current_bid:,.2f} USD hammer, above this board's starting amount. Update the current/opening input before relying on available bid ceilings; your saved assumption has been preserved.")
+                      "lot_currency": lot.currency or None, "usd_normalization_version": 1})
+        if source_hammer:
+            usd_hammer = Decimal(source_hammer["usd_amount"])
+            board["source_current_hammer"] = source_hammer["usd_amount"]
+            if source_hammer["source_currency"] != "USD":
+                board["source_hammer_conversion"] = source_hammer
+                basis = "opening" if lot.bid_count == 0 else "current"
+                board["notices"].append(
+                    f"Source {basis} hammer: {source_hammer['source_currency']} {Decimal(source_hammer['source_amount']):,.2f} "
+                    f"≈ ${usd_hammer:,.2f} USD "
+                    f"(1 {source_hammer['source_currency']} = {source_hammer['rate']} USD; "
+                    f"{source_hammer['provider']}, {source_hammer['rate_date']}). "
+                    "The USD starting amount is editable. Bid increments and costs are USD assumptions."
+                )
+            if assumptions["starting_hammer"] is not None and usd_hammer > Decimal(assumptions["starting_hammer"]):
+                board["notices"].append(f"The latest synced source reports a ${usd_hammer:,.2f} USD hammer, above this board's starting amount. Update the current/opening input before relying on available bid ceilings; your entered or saved assumption has been preserved.")
+        elif not lot.currency or not lot.currency.strip():
+            board["notices"].append("The lot's source currency is unavailable. Verify it and enter a current or opening hammer in USD.")
+        elif lot.current_bid is None or lot.current_bid <= 0:
+            board["notices"].append("The source has not supplied a current or opening hammer. Enter one in USD; the estimate is not an opening bid.")
+        elif lot.currency.strip().upper() != "USD":
+            board["notices"].append(f"USD conversion is unavailable for the {lot.currency.strip().upper()} source hammer. Enter a converted current or opening hammer in USD, or try again later.")
         if summary.get("calculation_error"):
             board["notices"].append(summary["calculation_error"])
         if request.method == "POST" and action == "save":

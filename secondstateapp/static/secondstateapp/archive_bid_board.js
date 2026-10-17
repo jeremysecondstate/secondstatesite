@@ -101,7 +101,7 @@
       const values = Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, key === "starting_hammer" && !field.value.trim() ? null : field.value]));
       values.resale_overrides = Object.fromEntries(cases.map(key => [key, resaleFields[key].value.trim() || null]));
       values.tiers = analysis?.assumptions?.tiers || [];
-      try {sessionStorage.setItem(storageKey, JSON.stringify({assumptions: values, tier_text: tiers.value, page, selected_bid: selectedBid, selected_case: selectedCase, base_updated_at: analysis?.updated_at || null}));} catch (_) {}
+      try {sessionStorage.setItem(storageKey, JSON.stringify({assumptions: values, tier_text: tiers.value, page, selected_bid: selectedBid, selected_case: selectedCase, base_updated_at: analysis?.updated_at || null, usd_normalization_version: 1}));} catch (_) {}
     }
     const stateText = message => {status.textContent = message; status.classList.remove("is-error");};
     function invalidate() {
@@ -159,10 +159,12 @@
         const currency = String(data.lot_currency || "").trim().toUpperCase();
         const ready = availableCases ? `${availableCases === 1 ? "Your resale scenario is" : "Your resale scenarios are"} ready. ` : "Add eligible sold evidence or enter a manual resale assumption under Costs, resale cases & bid rules. ";
         const currencyHelp = currency && currency !== "USD"
-          ? `This lot is listed in ${currency}. Enter a current or opening hammer in USD using your chosen conversion; the board does not convert currencies.`
+          ? data.source_hammer_conversion
+            ? `This lot is listed in ${currency}. The converted source hammer is ${money(data.source_current_hammer)} USD. Enter it or another USD starting amount to calculate bids, costs, and profit.`
+            : `This lot is listed in ${currency}. A converted starting hammer is not available. Enter a current or opening hammer in USD to calculate bids, costs, and profit.`
           : currency === "USD"
             ? "Enter the current or opening hammer in USD to calculate available bids, costs, and profit."
-            : "The lot's source currency is unavailable. Verify it and enter a current or opening hammer in USD; the board does not convert currencies.";
+            : "The lot's source currency is unavailable. Verify it and enter a current or opening hammer in USD.";
         setupMessage.textContent = ready + currencyHelp;
         setupCopy.append(el("h3", "Add a starting hammer to build the bid grid"), setupMessage);
         const enterHammer = el("button", "Enter starting hammer", "ab-primary"); enterHammer.type = "button";
@@ -327,7 +329,15 @@
           const data = await request(null, controller.signal); if (current !== revision) return;
           render(data); setFields(data.assumptions || {}); loaded = true;
           if (draft?.assumptions) {
-            setFields(draft.assumptions); if (typeof draft.tier_text === "string") tiers.value = draft.tier_text;
+            const draftAssumptions = {...draft.assumptions};
+            // Drafts from before USD normalization stored the unavailable start
+            // as blank. Keep the new converted default while restoring costs.
+            // Versioned drafts preserve intentional clears as well as amounts.
+            if (!draft.usd_normalization_version && (draftAssumptions.starting_hammer == null || draftAssumptions.starting_hammer === "") && data.source_hammer_conversion && data.assumptions.starting_hammer != null) {
+              delete draftAssumptions.starting_hammer;
+              delete draftAssumptions.starting_basis;
+            }
+            setFields(draftAssumptions); if (typeof draft.tier_text === "string") tiers.value = draft.tier_text;
             page = draft.page || 0; selectedBid = draft.selected_bid || null; selectedCase = draft.selected_case || "working"; dirty = true;
             stateText("Restored this browser’s unsaved Bid Board draft."); markStale();
           } else stateText(data.saved ? "Saved Bid Board loaded." : "Review costs and house bid rules before saving.");

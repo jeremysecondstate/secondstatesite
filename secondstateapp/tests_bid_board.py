@@ -131,6 +131,15 @@ class BidBoardAPITests(TestCase):
         session[f"liveart_research_{self.lot.pk}"] = {"research_id": "session-proof", "candidates": candidates or [self.candidate()], "selected_ids": ["501"], "retrieved_at": timezone.now().isoformat(), "data_units_spent": 1.5, "search_category": {"id": "2", "label": "Prints & Multiples"}}
         session.save()
 
+    def zar_conversion(self):
+        return {"source_currency": "ZAR", "source_amount": "19000.00", "usd_amount": "1064.00", "rate": "0.056", "rate_date": "2026-10-16", "provider": "Frankfurter"}
+
+    def use_zar_lot(self, bid_count=0):
+        self.lot.currency = "ZAR"
+        self.lot.current_bid = Decimal("19000")
+        self.lot.bid_count = bid_count
+        self.lot.save(update_fields=["currency", "current_bid", "bid_count"])
+
     def test_staff_and_csrf_required(self):
         self.client.logout()
         self.assertEqual(self.client.get(self.url).status_code, 302)
@@ -222,13 +231,135 @@ class BidBoardAPITests(TestCase):
         self.assertEqual(stored.selected_ids, ["503"])
         self.assertTrue(stored.candidates[0]["manual_selectable"])
 
-    def test_unknown_start_and_non_usd_hammer_remain_empty(self):
+    @patch("secondstateapp.bid_board_views.convert_to_usd")
+    def test_non_usd_source_hammer_is_converted_with_opening_or_current_basis(self, convert):
+        convert.return_value = self.zar_conversion()
+        for bid_count, basis, first_bid in ((0, "opening", "1064.00"), (2, "current", "1164.00"), (None, "current", "1164.00")):
+            with self.subTest(bid_count=bid_count):
+                self.use_zar_lot(bid_count)
+                result = self.client.get(self.url).json()["analysis"]
+                self.assertEqual(result["assumptions"]["starting_hammer"], "1064.00")
+                self.assertEqual(result["assumptions"]["starting_basis"], basis)
+                self.assertEqual(result["rows"][0]["bid"], first_bid)
+                self.assertEqual(result["source_current_hammer"], "1064.00")
+                self.assertEqual(result["source_hammer_conversion"], self.zar_conversion())
+                notices = " ".join(result["notices"])
+                for attribution in ("ZAR", "Frankfurter", "2026-10-16"):
+                    self.assertIn(attribution, notices)
+
+    @patch("secondstateapp.currency.requests.get")
+    def test_usd_source_hammer_does_not_fetch_rate(self, rate_request):
+        result = self.client.get(self.url).json()["analysis"]
+        self.assertEqual(result["assumptions"]["starting_hammer"], "1000.00")
+        self.assertEqual(result["source_current_hammer"], "1000.00")
+        self.assertNotIn("source_hammer_conversion", result)
+        rate_request.assert_not_called()
+
+    @patch("secondstateapp.bid_board_views.convert_to_usd", return_value=None)
+    def test_unavailable_non_usd_conversion_leaves_new_board_empty(self, convert):
         self.lot.currency = "GBP"
         self.lot.save(update_fields=["currency"])
         result = self.client.get(self.url).json()["analysis"]
         self.assertIsNone(result["assumptions"]["starting_hammer"])
         self.assertFalse(result["rows"])
-        self.assertTrue(any("no exchange rate" in notice for notice in result["notices"]))
+        self.assertNotIn("source_current_hammer", result)
+        self.assertNotIn("source_hammer_conversion", result)
+        self.assertTrue(any("USD conversion is unavailable" in notice for notice in result["notices"]))
+        convert.assert_called_once()
+
+    @patch("secondstateapp.currency.requests.get")
+    def test_missing_or_zero_source_bid_does_not_convert_estimate(self, rate_request):
+        self.use_zar_lot()
+        self.lot.estimate_low = Decimal("20000")
+        for current_bid in (None, Decimal("0")):
+            with self.subTest(current_bid=current_bid):
+                self.lot.current_bid = current_bid
+                self.lot.save(update_fields=["current_bid", "estimate_low"])
+                result = self.client.get(self.url).json()["analysis"]
+                self.assertIsNone(result["assumptions"]["starting_hammer"])
+                self.assertEqual(result["rows"], [])
+                self.assertNotIn("source_current_hammer", result)
+                self.assertNotIn("source_hammer_conversion", result)
+        rate_request.assert_not_called()
+
+    @patch("secondstateapp.bid_board_views.convert_to_usd")
+    def test_converted_source_preserves_saved_and_explicit_starting_hammers(self, convert):
+        self.use_zar_lot()
+        convert.return_value = self.zar_conversion()
+        response = self.post(action="save", assumptions={"starting_hammer": "900"})
+        self.assertEqual(response.status_code, 200, response.content)
+        loaded = self.client.get(self.url).json()["analysis"]
+        self.assertEqual(loaded["assumptions"]["starting_hammer"], "900.00")
+        self.assertEqual(loaded["source_current_hammer"], "1064.00")
+        self.assertTrue(any("latest synced source" in notice for notice in loaded["notices"]))
+        for supplied, expected in (("1500", "1500.00"), (None, None)):
+            with self.subTest(supplied=supplied):
+                result = self.post(assumptions={"starting_hammer": supplied}).json()["analysis"]
+                self.assertEqual(result["assumptions"]["starting_hammer"], expected)
+        self.assertEqual(AuctionBidBoardAnalysis.objects.get(lot=self.lot).assumptions["starting_hammer"], "900.00")
+
+    @patch("secondstateapp.bid_board_views.convert_to_usd")
+    def test_legacy_empty_start_is_backfilled_from_converted_source_on_get(self, convert):
+        convert.return_value = None
+        self.lot.current_bid = None
+        self.lot.save(update_fields=["current_bid"])
+        self.assertEqual(self.post(action="save").status_code, 200)
+        stored = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+        stored.analysis.pop("usd_normalization_version", None)
+        stored.save(update_fields=["analysis"])
+        self.use_zar_lot()
+        convert.return_value = self.zar_conversion()
+        result = self.client.get(self.url).json()["analysis"]
+        self.assertEqual(result["assumptions"]["starting_hammer"], "1064.00")
+        self.assertEqual(result["assumptions"]["starting_basis"], "opening")
+        self.assertEqual(result["rows"][0]["bid"], "1064.00")
+        self.assertIsNone(AuctionBidBoardAnalysis.objects.get(lot=self.lot).assumptions["starting_hammer"])
+
+    def test_newly_saved_explicit_empty_usd_start_stays_empty(self):
+        response = self.post(action="save", assumptions={"starting_hammer": None})
+        self.assertEqual(response.status_code, 200, response.content)
+        result = self.client.get(self.url).json()["analysis"]
+        self.assertIsNone(result["assumptions"]["starting_hammer"])
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(result["source_current_hammer"], "1000.00")
+
+    @patch("secondstateapp.bid_board_views.convert_to_usd")
+    def test_newly_saved_explicit_empty_non_usd_start_stays_empty(self, convert):
+        self.use_zar_lot()
+        convert.return_value = self.zar_conversion()
+        response = self.post(action="save", assumptions={"starting_hammer": None})
+        self.assertEqual(response.status_code, 200, response.content)
+        result = self.client.get(self.url).json()["analysis"]
+        self.assertIsNone(result["assumptions"]["starting_hammer"])
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(result["source_current_hammer"], "1064.00")
+
+    def test_legacy_saved_empty_usd_start_stays_empty(self):
+        response = self.post(action="save", assumptions={"starting_hammer": None})
+        self.assertEqual(response.status_code, 200, response.content)
+        stored = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+        stored.analysis.pop("usd_normalization_version", None)
+        stored.save(update_fields=["analysis"])
+        result = self.client.get(self.url).json()["analysis"]
+        self.assertIsNone(result["assumptions"]["starting_hammer"])
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(result["source_current_hammer"], "1000.00")
+
+    @patch("secondstateapp.bid_board_views.convert_to_usd")
+    def test_saved_snapshot_retains_conversion_without_refreshing_rate(self, convert):
+        self.use_zar_lot()
+        convert.return_value = self.zar_conversion()
+        response = self.post(action="save")
+        self.assertEqual(response.status_code, 200, response.content)
+        stored = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+        self.assertEqual(stored.analysis["source_hammer_conversion"], self.zar_conversion())
+        convert.reset_mock()
+        convert.return_value = None
+        saved_url = reverse("auction_lot_saved_bid_board", args=(self.lot.pk,))
+        snapshot = self.client.get(saved_url).json()["board"]
+        self.assertEqual(snapshot["analysis"]["source_hammer_conversion"], self.zar_conversion())
+        self.assertEqual(snapshot["assumptions"]["starting_hammer"], "1064.00")
+        convert.assert_not_called()
 
     def test_euro_lot_retains_resale_cases_until_usd_start_is_entered(self):
         self.lot.currency = "EUR"
@@ -262,6 +393,7 @@ class BidBoardAPITests(TestCase):
         self.assertTrue(any("latest synced source" in notice for notice in result["notices"]))
         self.lot.currency = "GBP"
         self.lot.save(update_fields=["currency"])
-        result = self.client.get(self.url).json()["analysis"]
+        with patch("secondstateapp.bid_board_views.convert_to_usd", return_value=None):
+            result = self.client.get(self.url).json()["analysis"]
         self.assertEqual(result["assumptions"]["starting_hammer"], "900.00")
         self.assertNotIn("source_current_hammer", result)
