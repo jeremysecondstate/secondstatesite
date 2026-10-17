@@ -13,6 +13,26 @@ from .tests_calendar import liveart_artwork, liveart_lot, liveart_page, stored_a
 
 
 class LiveArtSearchParsingTests(SimpleTestCase):
+    def test_verified_nieto_middle_initial_matches_only_john_nieto(self):
+        for source_name in (
+            "John W Nieto", "John W. NIETO", "Nieto, John W.",
+            "John W (1936) Nieto", "NIETO, JOHN W. (1936–2018)",
+        ):
+            with self.subTest(source_name=source_name):
+                self.assertEqual(liveart_artist_search_name(source_name), "John Nieto")
+                self.assertTrue(liveart_artist_names_match(source_name, "John NIETO"))
+                self.assertTrue(liveart_artist_names_match("Nieto, John", source_name))
+        for other_name in (
+            "John A Nieto", "John William Nieto", "John Nieto Jr", "John W Nieto Jr",
+            "Paul Nieto", "ATTRIBUTED TO JOHN W NIETO", "After John Nieto",
+        ):
+            with self.subTest(other_name=other_name):
+                self.assertEqual(liveart_artist_search_name(other_name), other_name)
+                self.assertFalse(liveart_artist_names_match(other_name, "John Nieto"))
+                self.assertFalse(liveart_artist_names_match("John W Nieto", other_name))
+        self.assertFalse(liveart_artist_names_match("John W Smith", "John Smith"))
+        self.assertFalse(liveart_artist_names_match("John William Smith", "John Smith"))
+
     def test_verified_bearden_full_name_matches_only_romare_bearden(self):
         for source_name in (
             "Romare Howard Bearden", "ROMARE HOWARD BEARDEN", "Bearden, Romare Howard",
@@ -140,6 +160,60 @@ class LiveArtTermSearchViewTests(TestCase):
             {"artist_id": "calder", "status": "sold", "search": term, "category_id": 2, "sort": "SALE_DATE_DESC", "limit": 10}
             for term in ("Boomerangs", "Stabiles")
         ])
+
+    def test_nieto_middle_initial_finds_prints_and_rejects_artist_conflicts(self):
+        self.lot.artist = "John W. NIETO"
+        self.lot.artist_watchlist_name = "John W Nieto"
+        self.lot.title = "Chicken"
+        self.lot.medium = "Serigraph"
+        self.lot.save(update_fields=("artist", "artist_watchlist_name", "title", "medium"))
+        # These are synthetic provider identities; the request must stay mocked.
+        self.api.list_artists.return_value = liveart_page([
+            {"id": "nieto-attributed", "name": "ATTRIBUTED TO JOHN W NIETO"},
+            {"id": "nieto-other", "name": "John A Nieto"},
+            {"id": "nieto", "name": "John Nieto"},
+        ])
+        self.api.list_lots.return_value = liveart_page([
+            liveart_lot(
+                "nieto-print", artist_id="nieto", artist="John NIETO", title="Chicken",
+                medium="Serigraph", lot_num="133", hammer_usd=4800,
+            ),
+            liveart_lot(
+                "nieto-attributed-print", artist_id="nieto-attributed",
+                artist="ATTRIBUTED TO JOHN W NIETO", title="Chicken",
+                medium="Serigraph", lot_num="134", hammer_usd=900,
+            ),
+            liveart_lot(
+                "nieto-other-print", artist_id="nieto-other", artist="John A Nieto",
+                title="Chicken", medium="Serigraph", lot_num="135", hammer_usd=800,
+            ),
+        ])
+
+        response = self.research(search_terms="Chicken")
+
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.api.list_artists.assert_called_once_with(q="John Nieto", limit=3)
+        self.api.list_artworks.assert_not_called()
+        self.api.list_lots.assert_called_once_with(
+            artist_id="nieto", status="sold", search="Chicken", category_id=2,
+            sort="SALE_DATE_DESC", limit=20,
+        )
+        candidates = {row["id"]: row for row in payload["candidates"]}
+        self.assertEqual(set(candidates), {"nieto-print", "nieto-attributed-print", "nieto-other-print"})
+        self.assertTrue(candidates["nieto-print"]["credible"])
+        self.assertEqual(candidates["nieto-print"]["hammer_usd"], "4800.00")
+        for identifier in ("nieto-attributed-print", "nieto-other-print"):
+            with self.subTest(identifier=identifier):
+                self.assertFalse(candidates[identifier]["credible"])
+                self.assertFalse(candidates[identifier]["manual_selectable"])
+                self.assertEqual(self.save(payload, [identifier]).status_code, 400)
+        self.assertEqual(payload["selected_ids"], [])
+        self.assertFalse(LiveArtResaleAnalysis.objects.filter(lot=self.lot).exists())
+        saved = self.save(payload, ["nieto-print"])
+        self.assertEqual(saved.status_code, 200, saved.content)
+        self.assertEqual(saved.json()["analysis"]["selected_ids"], ["nieto-print"])
+        self.assertEqual(LiveArtResaleAnalysis.objects.get(lot=self.lot).selected_ids, ["nieto-print"])
 
     def test_bearden_full_name_finds_carolina_prints_and_rejects_attributed_artist(self):
         self.lot.artist = "Romare Howard Bearden"

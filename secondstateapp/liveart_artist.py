@@ -13,6 +13,9 @@ _LIVEART_NAMES = {
     # Calendar/Artprice use his middle name. Verified against LiveArt artist
     # 11328 (8Bwp9T/romare-bearden, 1911-1988) and lot 2086, 2026-10-15.
     artist_identity_key("Romare Howard Bearden"): "Romare Bearden",
+    # Invaluable's watchlist uses John W Nieto; the paired Artprice artist
+    # 190556 (john-nieto) and nieto-chick.html sales use John NIETO, 2026-10-17.
+    artist_identity_key("John W Nieto"): "John Nieto",
 }
 
 
