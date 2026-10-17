@@ -4,7 +4,7 @@
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012b">
-  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=saved-board-20261015">
+  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=starting-hammer-20261016">
 {% endblock %}
 
 {% block main_class %}calendar-page-shell{% endblock %}
@@ -364,7 +364,7 @@
 
 {{ calendar_data|json_script:"auction-calendar-data" }}
 {{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
-<script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=saved-board-20261015"></script>
+<script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=starting-hammer-20261016"></script>
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=saved-board-20261015"></script>
 <script>
 (() => {

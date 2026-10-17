@@ -230,6 +230,30 @@ class BidBoardAPITests(TestCase):
         self.assertFalse(result["rows"])
         self.assertTrue(any("no exchange rate" in notice for notice in result["notices"]))
 
+    def test_euro_lot_retains_resale_cases_until_usd_start_is_entered(self):
+        self.lot.currency = "EUR"
+        self.lot.current_bid = None
+        self.lot.save(update_fields=["currency", "current_bid"])
+        candidates = [self.candidate(str(501 + index), hammer_usd=str(2000 + 100 * index)) for index in range(12)]
+        self.save_research(candidates)
+        evidence = {"research_id": "session-proof", "selected_ids": [item["id"] for item in candidates]}
+        result = self.post(**evidence).json()["analysis"]
+        self.assertEqual(result["source_summary"]["combined_comp_count"], 12)
+        self.assertEqual([case["resale_hammer"] for case in result["cases"]], ["1600.00", "2550.00", "3410.00"])
+        self.assertTrue(all(case["origin"] == "evidence" for case in result["cases"]))
+        self.assertIsNone(result["assumptions"]["starting_hammer"])
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(result["shortlist"], [])
+
+        preview = self.post(**evidence, assumptions={"starting_hammer": "1000"}).json()["analysis"]
+        self.assertEqual(preview["rows"][0]["bid"], "1000.00")
+        self.assertEqual(len(preview["rows"]), 8)
+        self.assertEqual(preview["cases"], result["cases"])
+        cleared = self.post(**evidence, assumptions={"starting_hammer": None}).json()["analysis"]
+        self.assertEqual(cleared["rows"], [])
+        self.assertEqual(cleared["cases"], result["cases"])
+        self.assertFalse(AuctionBidBoardAnalysis.objects.exists())
+
     def test_new_source_bid_warns_without_overwriting_saved_assumptions(self):
         response = self.post(action="save", assumptions={"starting_hammer": "900"})
         result = response.json()["analysis"]

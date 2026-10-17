@@ -135,11 +135,43 @@
       const caseList = Array.isArray(data.cases) ? data.cases : cases.map(key => ({key, ...(data.cases?.[key] || {})}));
       caseList.forEach(c => {const key = c.key || c.case_key; if (basisTexts[key]) basisTexts[key].textContent = `${money(c.resale_hammer)} · ${c.basis || "No evidence available"}${c.origin === "manual" && !c.basis?.includes("Manual") ? " · Manual override" : ""}`;});
       result.replaceChildren(); result.classList.remove("ab-stale"); result.removeAttribute("aria-label"); result.inert = saving; stale = false;
+      fields.starting_hammer.removeAttribute("aria-describedby");
       notice.textContent += ` ${data.assumptions.starting_basis === "current" ? "Current hammer is a reference; the grid starts at the next available bid." : "Opening hammer is available as the first bid."}`;
       (data.notices || []).forEach(message => result.append(el("p", message, "ab-notice")));
       if (data.evidence_changed_since_save) result.append(el("p", "Selected evidence has changed since the saved analysis. Review and save the refreshed Bid Board.", "ab-notice"));
       if (data.evidence_notice) result.append(el("p", data.evidence_notice, "ab-notice"));
       if (data.message) result.append(el("p", data.message, "ab-notice"));
+      if (data.assumptions.starting_hammer == null || data.assumptions.starting_hammer === "") {
+        const scenarioTitle = el("div", null, "ab-section-title");
+        scenarioTitle.append(el("h3", "Resale scenarios"), el("small", "USD resale assumptions used to compare each bid"));
+        const scenarioCards = el("div", null, "ab-scenarios");
+        caseList.forEach(c => {
+          const key = c.key || c.case_key, card = el("div", null, "ab-scenario-card");
+          card.append(el("span", labels[key] || c.label), el("strong", money(c.resale_hammer)));
+          card.append(el("small", c.origin === "manual" ? "Manual resale assumption" : c.resale_hammer != null ? "From selected sold evidence" : "Add eligible evidence or a manual resale assumption"));
+          if (c.basis && c.resale_hammer != null) card.append(el("p", c.basis));
+          scenarioCards.append(card);
+        });
+        const setup = el("div", null, "ab-start-required");
+        const setupCopy = el("div"), setupMessage = el("p");
+        setupMessage.id = `archive-board-${options.lot.id}-start-help`;
+        const availableCases = caseList.filter(c => c.resale_hammer != null).length;
+        const currency = String(data.lot_currency || "").trim().toUpperCase();
+        const ready = availableCases ? `${availableCases === 1 ? "Your resale scenario is" : "Your resale scenarios are"} ready. ` : "Add eligible sold evidence or enter a manual resale assumption under Costs, resale cases & bid rules. ";
+        const currencyHelp = currency && currency !== "USD"
+          ? `This lot is listed in ${currency}. Enter a current or opening hammer in USD using your chosen conversion; the board does not convert currencies.`
+          : currency === "USD"
+            ? "Enter the current or opening hammer in USD to calculate available bids, costs, and profit."
+            : "The lot's source currency is unavailable. Verify it and enter a current or opening hammer in USD; the board does not convert currencies.";
+        setupMessage.textContent = ready + currencyHelp;
+        setupCopy.append(el("h3", "Add a starting hammer to build the bid grid"), setupMessage);
+        const enterHammer = el("button", "Enter starting hammer", "ab-primary"); enterHammer.type = "button";
+        enterHammer.addEventListener("click", () => {fields.starting_hammer.focus(); fields.starting_hammer.scrollIntoView({block: "center", behavior: "smooth"});});
+        setup.append(setupCopy, enterHammer);
+        fields.starting_hammer.setAttribute("aria-describedby", setupMessage.id);
+        result.append(scenarioTitle, scenarioCards, setup);
+        return;
+      }
       const pickTitle = el("div", null, "ab-section-title"); pickTitle.append(el("span", "BIDS TO REVIEW", "ab-overline"), el("small", "Highest available bid meeting both minimums in each case"));
       const picks = el("div", null, "ab-shortlist");
       (data.shortlist || []).forEach(pick => {
@@ -152,7 +184,7 @@
         if (pick.bid == null) button.append(el("small", pick.reason || "No available bid meets both minimums."));
         button.addEventListener("click", () => choose(pick.bid, key)); picks.append(button);
       });
-      result.append(pickTitle, picks);
+      if (picks.childElementCount) result.append(pickTitle, picks);
       if (!data.rows?.length) {result.append(el("p", data.empty_reason || "Enter a starting hammer and add eligible evidence or manual resale cases to build the grid.", "ab-empty")); return;}
       const tableTitle = el("div", null, "ab-section-title");
       tableTitle.append(el("h3", "The bid × resale grid"), el("small", "Each cell: net profit / return on cost. ✓ meets both minimums."));
