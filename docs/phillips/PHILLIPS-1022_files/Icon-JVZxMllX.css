@@ -1,0 +1,1 @@
+@layer vendor,seldon.foundation,seldon.components,seldon.patterns,seldon.site;@layer seldon.components{.seldon-icon{align-items:center;display:flex;justify-content:center}.seldon-icon svg{max-height:100%;max-width:100%}}

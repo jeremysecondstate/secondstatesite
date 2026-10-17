@@ -1,0 +1,65 @@
+﻿/* Regular */
+@font-face {
+  font-family: "Maiola";
+  src: url("/fonts/Maiola/Maiola-Regular.woff2") format("woff2"),
+       url("/fonts/Maiola/Maiola-Regular.woff") format("woff"),
+       url("/fonts/Maiola/Maiola-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Italic */
+@font-face {
+  font-family: "Maiola";
+  src: url("/fonts/Maiola/Maiola-Italic.woff2") format("woff2"),
+       url("/fonts/Maiola/Maiola-Italic.woff") format("woff"),
+       url("/fonts/Maiola/Maiola-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Book */
+@font-face {
+  font-family: "Maiola";
+  src: url("/fonts/Maiola/Maiola-Book.woff2") format("woff2"),
+       url("/fonts/Maiola/Maiola-Book.woff") format("woff"),
+       url("/fonts/Maiola/Maiola-Book.ttf") format("truetype");
+  font-weight: 350;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Book Italic */
+@font-face {
+  font-family: "Maiola";
+  src: url("/fonts/Maiola/Maiola-BookItalic.woff2") format("woff2"),
+       url("/fonts/Maiola/Maiola-BookItalic.woff") format("woff"),
+       url("/fonts/Maiola/Maiola-BookItalic.ttf") format("truetype");
+  font-weight: 350;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Bold */
+@font-face {
+  font-family: "Maiola";
+  src: url("/fonts/Maiola/Maiola-Bold.woff2") format("woff2"),
+       url("/fonts/Maiola/Maiola-Bold.woff") format("woff"),
+       url("/fonts/Maiola/Maiola-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Bold Italic */
+@font-face {
+  font-family: "Maiola";
+  src: url("/fonts/Maiola/Maiola-BoldItalic.woff2") format("woff2"),
+       url("/fonts/Maiola/Maiola-BoldItalic.woff") format("woff"),
+       url("/fonts/Maiola/Maiola-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}

@@ -1,0 +1,1 @@
+@layer vendor,seldon.foundation,seldon.components,seldon.patterns,seldon.site;@layer seldon.patterns{.seldon-subscribe{max-width:600px;width:100%}.seldon-subscribe__title{margin-bottom:var(--spacing-xsm)}.seldon-subscribe__input__wrapper{margin-top:var(--spacing-md)}.seldon-subscribe__button{margin:.25rem 0 var(--spacing-sm);max-width:240px;width:100%}}
