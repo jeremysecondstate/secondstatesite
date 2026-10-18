@@ -35,7 +35,7 @@ Scope / acceptance:
 - Remembered bookmark file should take precedence over absent old I: drive path.
 
 Confirmed preceding investigation:
-- docs/ARTIST-LINKZ.html parses 44 Invaluable artists including Francisco Zúñiga.
+- docs/artist-links.html parses 44 Invaluable artists including Francisco Zúñiga.
 - Local cache's latest source runs: all44 failed HTTP202 (HTML access response).
   Prior browser request HTTP403. No cached Zúñiga lots. This is not a parser bug.
 - A successful cached-data upload cannot imply new Zúñiga lots were retrieved.
@@ -44,7 +44,7 @@ Confirmed preceding investigation:
 - All240 watchlist tests passed previously (238 passed,2 skipped).
 
 User changes to preserve:
-- docs/ARTIST-LINKZ.html modified before our work.
+- docs/artist-links.html modified before our work.
 - docs/screenshots/artist-watchlist-agenda.png and artist-watchlist-import.png
   were deleted before our work.
 - data/ untracked existed before our work.
