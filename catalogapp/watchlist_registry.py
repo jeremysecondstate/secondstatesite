@@ -11,7 +11,7 @@ from typing import Iterable, Mapping
 from urllib.parse import urlsplit
 
 from catalogapp.artprice_artist_links import _valid_artprice_artist_url
-from catalogapp.bookmark_watchlist import BookmarkEntry, canonicalize_bookmark_url, source_for_url
+from catalogapp.bookmark_watchlist import BookmarkEntry, canonicalize_watch_url, source_for_url
 
 
 def _entry(value: object) -> BookmarkEntry | None:
@@ -26,7 +26,7 @@ def _entry(value: object) -> BookmarkEntry | None:
                 or parsed.port not in {None, 80, 443}
                 or any(ord(character) < 32 for character in raw_url)):
             return None
-        url = canonicalize_bookmark_url(raw_url)
+        url = canonicalize_watch_url(raw_url)
         source = source_for_url(url)
     except ValueError:
         return None

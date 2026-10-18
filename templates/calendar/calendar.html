@@ -594,6 +594,19 @@
   };
 
   const appendArtpriceEditor = (item, lot, actionLinks, options = {}) => {
+    if (!lot.artist_artprice_url && lot.artist_artprice_search_url) {
+      const artistSearch = externalLink(lot.artist_artprice_search_url, "lot-artprice-artist-search", "Search Artprice artist ↗");
+      artistSearch.setAttribute("aria-label", `Search Artprice for ${lot.artist || "this artist"} (opens in a new tab)`);
+      actionLinks.appendChild(artistSearch);
+    }
+    if (lot.artprice_search_url) {
+      const titleOnly = lot.artprice_search_scope !== "artist";
+      const searchLink = externalLink(lot.artprice_search_url, "lot-artprice-search", titleOnly ? "Search Artprice title ↗" : "Search Artprice comps ↗");
+      searchLink.title = titleOnly
+        ? "Title search across all artists. Select the correct artist in Artprice."
+        : "Search this artist's sales by artwork title.";
+      actionLinks.appendChild(searchLink);
+    }
     const form = document.createElement("form");
     const idPrefix = options.idPrefix ? `${options.idPrefix}-` : "";
     const inputId = `${idPrefix}artprice-link-${lot.id}`;

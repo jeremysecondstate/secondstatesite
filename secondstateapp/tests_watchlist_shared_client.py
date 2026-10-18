@@ -227,6 +227,70 @@ class SharedWatchlistRestoreTests(TestCase):
         self.assertEqual(merged.lots, [])
         self.assertEqual(self.cache.lots_for_watch_url(WATCH.url), [])
 
+    def test_whole_sale_restore_matches_doyle_id_and_phillips_code_across_url_forms(self):
+        doyle = BookmarkEntry(("Doyle",), "DOYLE-1020",
+            "https://doyle.com/auction/search?au=9224&mc=219&pn=1", source="Doyle")
+        phillips = BookmarkEntry(("Phillips",), "PHILLIPS-1022",
+            "https://www.phillips.com/auction/NY030726/browse", source="Phillips")
+        records = [
+            lot(source="Doyle", source_lot_id="9224-1", artist="Unbookmarked Artist",
+                artist_watchlist_name="Unbookmarked Artist",
+                lot_url="https://doyle.com/auction/lot/lot-1-example/?lot=100001&au=9224",
+                sale_url="https://www.doyle.com/auction/26pm03-prints--multiples?au=9224"),
+            lot(source="Phillips", source_lot_id="NY030726-236058", artist="Another Artist",
+                artist_watchlist_name="Another Artist",
+                lot_url="https://www.phillips.com/detail/example/236058",
+                sale_url="https://phillips.com/auction/NY030726/"),
+        ]
+        restored = merge_shared_watchlist(self.snapshot(entries=[doyle, phillips], lots=records), cache=self.cache)
+        self.assertEqual({item.cache_key for item in restored.lots}, {item.cache_key for item in records})
+        for watch, original in zip((doyle, phillips), records):
+            saved = self.cache.active_lots_for_watch_url(watch.url)
+            self.assertEqual([item.cache_key for item in saved], [original.cache_key])
+            self.assertEqual(saved[0].last_seen_at, OLD)
+
+    def test_whole_sale_restore_rejects_different_ids_domains_and_ambiguous_urls(self):
+        cases = [
+            ("Doyle", "https://doyle.com/auction/search?au=9224", [
+                "https://doyle.com/auction/26pm03-prints--multiples?au=9999",
+                "https://doyle.com/auction/26pm03-prints--multiples",
+                "https://doyle.com/auction/26pm03-prints--multiples?au=9224&au=9999",
+                "https://doyle.com/auction/26pm03-prints--multiples?au=9224&au=",
+                "https://example.com/auction/26pm03-prints--multiples?au=9224",
+                "https://doyle.com.evil.example/auction/search?au=9224",
+                "https://doyle.com/unrelated?au=9224",
+            ]),
+            ("Phillips", "https://www.phillips.com/auction/NY030726/browse", [
+                "https://www.phillips.com/auction/NY999926",
+                "https://www.phillips.com/auction/NY030726/unrelated",
+                "https://example.com/auction/NY030726",
+                "https://phillips.com.evil.example/auction/NY030726",
+                "https://user:password@www.phillips.com/auction/NY030726",
+            ]),
+        ]
+        for source, watch_url, sale_urls in cases:
+            watch = BookmarkEntry((source,), "A sale", watch_url, source=source)
+            for sale_url in sale_urls:
+                with self.subTest(source=source, sale_url=sale_url):
+                    record = lot(source=source, source_lot_id="outside-sale", sale_url=sale_url)
+                    # Exercise the merge boundary too; normal transport rejects
+                    # credentials before NormalizedLot canonicalizes its URLs.
+                    record.sale_url = sale_url
+                    merged = merge_shared_watchlist(self.snapshot(entries=[watch], lots=[record]), cache=self.cache)
+                    self.assertEqual(merged.lots, [])
+                    self.assertEqual(self.cache.lots_for_watch_url(watch.url), [])
+
+    def test_whole_sale_restore_retains_heritage_exact_url_behavior(self):
+        watch = BookmarkEntry(("Heritage",), "A sale",
+            "https://fineart.ha.com/c/search/results.zx?auction_name=8280", source="Heritage")
+        mismatch = lot(source="Heritage", source_lot_id="8280-65001",
+            sale_url="https://fineart.ha.com/c/search.zx?saleNo=8280")
+        merged = merge_shared_watchlist(self.snapshot(entries=[watch], lots=[mismatch]), cache=self.cache)
+        self.assertEqual(merged.lots, [])
+        exact = replace(mismatch, sale_url=watch.url)
+        merged = merge_shared_watchlist(self.snapshot(entries=[watch], lots=[exact]), cache=self.cache)
+        self.assertEqual([item.cache_key for item in merged.lots], [exact.cache_key])
+
     def test_source_check_coverage_restores_timestamp_without_becoming_new(self):
         check = WatchCoverage(WATCH.artist, WATCH.source, WATCH.url, "verified", checked_at=OLD,
                               covered_until="2026-10-24T12:00:00+00:00")

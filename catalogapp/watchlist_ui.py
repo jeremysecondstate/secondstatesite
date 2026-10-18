@@ -35,6 +35,7 @@ from catalogapp.watchlist_exports import render_calendar_preview, render_csv, re
 from catalogapp.watchlist_models import NormalizedLot, lot_within_horizon, parse_lot_datetime
 from catalogapp.watchlist_invaluable_pages import import_saved_invaluable_pages
 from catalogapp.watchlist_saved_pages import import_saved_heritage_pages
+from catalogapp.watchlist_sale_pages import import_saved_sale_pages
 from catalogapp.watchlist_sold_pages import import_saved_sold_pages
 from catalogapp.watchlist_service import WatchlistResult, WatchlistService
 from catalogapp.watchlist_registry import load_watchlist, save_watchlist
@@ -48,7 +49,7 @@ from secondstate import environment
 
 
 DEFAULT_BOOKMARK_PATH = Path(r"I:\Shared drives\SECONDSTATE\ARTAPP\INVALUABLE-BM.html")
-PROJECT_BOOKMARK_PATH = Path(__file__).resolve().parents[1] / "docs" / "ARTIST-LINKZZZZZZ.html"
+PROJECT_BOOKMARK_PATH = Path(__file__).resolve().parents[1] / "docs" / "ARTIST-LINKZZZZZZZ.html"
 
 
 def local_watchlist_directory() -> Path:
@@ -272,6 +273,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.more_menu.add_command(label="Use my browser for Invaluable…", command=self.use_regular_browser)
         self.more_menu.add_command(label="Import saved Invaluable pages…", command=self.import_saved_invaluable_pages)
         self.more_menu.add_command(label="Import saved Heritage pages…", command=self.import_saved_heritage_pages)
+        self.more_menu.add_command(label="Import saved Doyle / Phillips pages…", command=self.import_saved_sale_pages)
         self.more_menu.add_command(label="Import saved sold results…", command=self.import_saved_sold_results)
         self.more_menu.add_separator()
         for label, kind in (("Export Markdown…", "md"), ("Export CSV…", "csv"), ("Export calendar file…", "ics")):
@@ -1369,16 +1371,23 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.worker.start()
 
     def import_saved_heritage_pages(self) -> None:
+        self._import_saved_catalog(("Heritage",), import_saved_heritage_pages)
+
+    def import_saved_sale_pages(self) -> None:
+        self._import_saved_catalog(("Doyle", "Phillips"), import_saved_sale_pages)
+
+    def _import_saved_catalog(self, sources, importer) -> None:
         if self._is_busy():
             return
+        source_label = " / ".join(sources)
         chosen = [
             entry for entry in self.active_entries
-            if entry.source == "Heritage" and entry.is_sale and entry.watch_label in self.selected_artists
+            if entry.source in sources and entry.is_sale and entry.watch_label in self.selected_artists
         ]
         if len(chosen) != 1:
             messagebox.showwarning(
-                "Select One Heritage Sale",
-                "Enable the Heritage folder and select exactly one Heritage sale to import. "
+                f"Select One {source_label} Sale",
+                f"Enable the {source_label} folder and select exactly one sale to import. "
                 "Other sources can remain selected.",
                 parent=self,
             )
@@ -1398,13 +1407,13 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.stop_event = threading.Event()
         self.refresh_button.configure(state=tk.DISABLED)
         self._set_import_buttons_state(tk.DISABLED)
-        self._set_status(f"Importing saved Heritage results for {entry.watch_label}…")
+        self._set_status(f"Importing saved {entry.source} results for {entry.watch_label}…")
 
         def run() -> None:
             try:
                 local_watchlist_directory().mkdir(parents=True, exist_ok=True)
                 with WatchlistCache(self._cache_path) as cache:
-                    result = import_saved_heritage_pages(
+                    result = importer(
                         paths,
                         entry,
                         cache,
@@ -1425,7 +1434,7 @@ class ArtistWatchlistPanel(ttk.Frame):
                 message = " ".join(str(exc).split())[:500]
                 self.after(0, lambda message=message: self._finish_refresh_error(message))
 
-        self.worker = threading.Thread(target=run, name="heritage-saved-page-import", daemon=True)
+        self.worker = threading.Thread(target=run, name="catalog-saved-page-import", daemon=True)
         self.worker.start()
 
     def use_regular_browser(self, *, artist_scope: set[str] | None = None) -> None:

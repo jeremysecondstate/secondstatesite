@@ -304,6 +304,8 @@ class WatchlistCache:
                     search_hash = existing["search_hash"]
                 else:
                     changed = True
+                    if incoming.source == "Doyle" and incoming.title == f"Lot {incoming.lot_number}" and previous.title:
+                        chosen.title = previous.title
                     if incoming.sold_price is None and previous.sold_price is not None:
                         chosen.sold_price = previous.sold_price
                         chosen.sold_currency = previous.sold_currency or previous.currency

@@ -108,12 +108,22 @@ Saved pages are snapshots: their bids and availability reflect when you saved th
 
 If the local import succeeds but website sync is not configured, the app explains the missing settings and leaves **Sync all** clickable. Put the website's existing `CATALOG_API_KEY` in the ignored project-root `.env` (alongside `SECONDSTATE_BASE_URL=https://secondstate.art` if needed). A sync retry reloads newly added settings. Live source-access warnings, such as Heritage HTTP 403, are separate from website-sync configuration.
 
+## Doyle and Phillips sale catalogs
+
+Doyle `/auction/search/?au=...` and Phillips `/auction/<code>/browse` bookmarks are whole-sale watches. Every catalog artist is included, even without a separate Invaluable or Artprice bookmark. **More → Import saved Doyle / Phillips pages…** imports the selected sale's saved HTML and artwork images from its matching `_files` directories. Select one sale at a time; multiple Doyle catalog pages can be selected together.
+
+The Phillips adapter assigns each lot to its published session, including sales spanning multiple dates. Doyle saves that only show the auction date remain date-only; if the catalog omits artwork titles, the Calendar displays `Lot N`. Missing bids and sale times are not inferred. Saved files retain their embedded source timestamp where available, with file modification time as fallback. Partial imports never end missing lots or overwrite newer cached observations. Normal refreshes use the same adapters and report source-access or incomplete-catalog failures while keeping cached lots.
+
+For a reproducible import, validate first with `python scripts/import_sale_catalogs.py --bookmarks docs/ARTIST-LINKZZZZZZZ.html --source Doyle --pages docs/doyle/DOYLE-1020-1.html docs/doyle/DOYLE-1020-2.html`. Use `--source Phillips --pages docs/phillips/PHILLIPS-1022.html` for Phillips. Add `--sync` to upload through the existing authenticated Calendar API, `--cache <path>` to retain local normalized records, or `--report <path>` to save an audit without image pixels. The command prints exact counts, sessions, image coverage, and title availability before any upload.
+
+Calendar research controls reuse `artpricelinkgen.url_builder.ArtpriceURLBuilder`. Existing Artprice artist bookmarks scope artwork searches to a known numeric artist ID. Artists without a bookmark get an artist-name search and a clearly labeled title-only search; `Lot N` placeholders do not create a meaningless title search. These are research suggestions, not verified lot matches, and do not replace staff-saved URLs or enable email selection automatically.
+
 ## Architecture
 
 ```text
 local Chrome/Edge bookmarks or bookmark HTML
   -> selected folders + explicit domain allowlist
-  -> Invaluable public catalog JSON / Heritage catalog HTML adapters
+  -> Invaluable public catalog JSON / Heritage, Doyle, Phillips catalog adapters
   -> normalized lot records
   -> local SQLite content-hash cache and diff
   -> optional compact ambiguous-record enrichment
@@ -138,6 +148,7 @@ The implementation is split by responsibility:
 - `catalogapp/watchlist_cache.py`: SQLite lot, membership, source-run, and AI-enrichment caches.
 - `catalogapp/watchlist_service.py`: incremental refresh, lazy HTTP 202 browser recovery, detail-fetch decisions, ended-item detection, horizons, and efficiency metrics.
 - `catalogapp/watchlist_saved_pages.py`: local saved Heritage results import, sale validation, and cache updates without treating partial snapshots as complete catalogs.
+- `catalogapp/doyle.py`, `catalogapp/phillips.py`, and `catalogapp/watchlist_sale_pages.py`: whole-sale catalogs, source/session dates, saved artwork images, and snapshot imports for Doyle and Phillips.
 - `catalogapp/watchlist_invaluable_pages.py`: local Invaluable upcoming search snapshots, selected-artist validation, verified date checks, and cache updates that retain unobserved lots.
 - `catalogapp/watchlist_images.py`: lot-to-thumbnail matching, companion-folder confinement, and bounded JPEG normalization without source image metadata.
 - `catalogapp/watchlist_enrichment.py`: optional strict structured-output batching for ambiguous compact records.
@@ -152,7 +163,7 @@ The implementation is split by responsibility:
 
 - The bookmark file is read locally and is never copied into the repository or website database.
 - The complete bookmark HTML and full scraped pages are never sent to OpenAI.
-- Only entries in a user-selected folder and the explicit `invaluable.com`, `liveauctioneers.com`, `drouot.com`, or `ha.com` allowlist are imported. Private Google Drive and unrelated URLs are rejected.
+- Only entries in a user-selected folder and the explicit `invaluable.com`, `liveauctioneers.com`, `drouot.com`, `ha.com`, `doyle.com`, or `phillips.com` allowlist are imported. Private Google Drive and unrelated URLs are rejected.
 - Normal HTTP retrieval is the default. Automatic Invaluable catalog HTTP 202 recovery launches the separate public-search browser. The dormant login connection implementation and its local profile under `%LOCALAPPDATA%\SecondState\ArtistWatchlist\invaluable-browser` are retained; browser credentials are never uploaded. The older environment-based Playwright implementation also remains in the codebase.
 - The fetchers do not enter credentials, solve CAPTCHAs, bypass paywalls, or work around HTTP 401/403/429 controls.
 - Local settings and cache data live under `%LOCALAPPDATA%\SecondState\ArtistWatchlist`, outside the repository.

@@ -70,6 +70,13 @@ class SavedCalendarImageValidationTests(SimpleTestCase):
             with self.subTest(url=url):
                 self.assertEqual(_calendar_image_url(url), "")
 
+    def test_doyle_and_phillips_images_use_only_recognized_hosts(self):
+        for url in ("https://dist.phillips.com/auction-assets/NY030726/123.jpg",
+                    "https://goauctiondoyle.blob.core.windows.net/stock/123.jpg"):
+            self.assertEqual(_calendar_image_url(url), url)
+        self.assertEqual(_calendar_image_url("https://other.blob.core.windows.net/123.jpg"), "")
+        self.assertEqual(_calendar_image_url("https://dist.phillips.com.evil.test/123.jpg"), "")
+
 
 @override_settings(CALENDAR_TIME_ZONE="America/New_York")
 @patch.dict(os.environ, {"CATALOG_API_KEY": "saved-image-test-key"}, clear=False)

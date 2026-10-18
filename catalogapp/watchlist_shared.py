@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 import math
 from pathlib import Path
+import re
 from typing import Iterable, Mapping
 from urllib.parse import parse_qsl, urlsplit
 
@@ -69,6 +70,28 @@ def _public_url(value: str) -> bool:
                     and "\\" not in value and not any(ord(char) < 32 for char in value))
     except ValueError:
         return False
+
+
+def _sale_identity(source: str, url: str) -> tuple[str, str] | None:
+    """Match the two whole-sale sources across their catalog/detail URL forms."""
+    source = source.casefold()
+    if source not in {"doyle", "phillips"} or not _public_url(url) or not _public_link(url):
+        return None
+    if source_for_url(url).casefold() != source:
+        return None
+    parts = urlsplit(url)
+    if source == "doyle":
+        # Doyle cards link to the sale slug; bookmarks link to /auction/search.
+        # Both must carry exactly one unambiguous numeric auction identifier.
+        if not re.fullmatch(r"/auction/[^/]+/?", parts.path, re.I):
+            return None
+        identifiers = [value for key, value in parse_qsl(parts.query, keep_blank_values=True)
+                       if key.casefold() == "au"]
+        if len(identifiers) == 1 and re.fullmatch(r"[0-9]+", identifiers[0]):
+            return source, identifiers[0]
+        return None
+    match = re.fullmatch(r"/auction/([A-Z]{2}[0-9]+)(?:/browse)?/?", parts.path, re.I)
+    return (source, match[1].upper()) if match else None
 
 
 def _lot(record: object) -> NormalizedLot:
@@ -290,18 +313,27 @@ def merge_shared_watchlist(
     links = {**local_links, **snapshot.artist_artprice_links}
     memberships: dict[tuple[str, str], list[str]] = {}
     sales = {}
+    sale_memberships: dict[tuple[str, str], list[str]] = {}
     for entry in merged.values():
         if entry.is_sale:
             sales[entry.url] = entry
+            sale_identity = _sale_identity(entry.source, entry.url)
+            if sale_identity is not None:
+                sale_memberships.setdefault(sale_identity, []).append(entry.url)
         else:
             memberships.setdefault((artist_identity_key(entry.artist or entry.title), entry.source.casefold()), []).append(entry.url)
     restored = []
     for lot in snapshot.lots:
         identity = (artist_identity_key(lot.artist_watchlist_name or lot.artist), lot.source.casefold())
         urls = list(memberships.get(identity, ()))
-        sale_entry = sales.get(lot.sale_url)
-        if sale_entry is not None and sale_entry.source.casefold() == lot.source.casefold():
-            urls.append(sale_entry.url)
+        if lot.source.casefold() in {"doyle", "phillips"}:
+            sale_identity = _sale_identity(lot.source, lot.sale_url)
+            if sale_identity is not None:
+                urls.extend(sale_memberships.get(sale_identity, ()))
+        else:
+            sale_entry = sales.get(lot.sale_url)
+            if sale_entry is not None and sale_entry.source.casefold() == lot.source.casefold():
+                urls.append(sale_entry.url)
         if urls:
             cache.import_shared_lot(lot, watch_urls=urls)
             restored.append(cache.get(lot.cache_key))

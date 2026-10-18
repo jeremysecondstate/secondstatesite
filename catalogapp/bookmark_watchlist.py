@@ -15,6 +15,8 @@ DEFAULT_ALLOWED_DOMAINS = (
     "liveauctioneers.com",
     "drouot.com",
     "ha.com",
+    "doyle.com",
+    "phillips.com",
 )
 _TRACKING_QUERY_KEYS = {
     "fbclid",
@@ -59,7 +61,7 @@ class BookmarkEntry:
         """Return the picker label without treating a sale title as an artist."""
 
         if self.is_sale:
-            return self.title or "Heritage sale"
+            return self.title or f"{self.source or 'Auction'} sale"
         return self.artist or self.title or "Unknown artist"
 
 
@@ -160,13 +162,25 @@ def source_for_url(url: str) -> str:
         return "Drouot"
     if host == "ha.com" or host.endswith(".ha.com"):
         return "Heritage"
+    if host == "doyle.com" or host.endswith(".doyle.com"):
+        return "Doyle"
+    if host == "phillips.com" or host.endswith(".phillips.com"):
+        return "Phillips"
     return ""
 
 
 def is_sale_bookmark_url(url: str) -> bool:
-    """Recognize a Heritage catalog selected by its public auction number."""
+    """Recognize supported whole-sale bookmarks by their public sale identity."""
 
-    return source_for_url(url) == "Heritage" and any(
+    source = source_for_url(url)
+    parts = urlsplit(url)
+    if source == "Doyle":
+        return parts.path.rstrip("/").casefold() == "/auction/search" and any(
+            key.casefold() == "au" and value.isdigit() for key, value in parse_qsl(parts.query)
+        )
+    if source == "Phillips":
+        return bool(re.fullmatch(r"/auction/[A-Za-z0-9]+(?:/browse)?/?", parts.path))
+    return source == "Heritage" and any(
         key.casefold() in {"auction_name", "saleno"} and value.strip()
         for key, value in parse_qsl(urlsplit(url).query, keep_blank_values=False)
     )
@@ -212,6 +226,17 @@ def normalize_artist_label(value: str) -> str:
     return _clean_text(label).strip(" -|–—:_")
 
 
+def canonicalize_watch_url(url: str) -> str:
+    """Start a whole-sale Doyle watch at page one, preserving other filters."""
+    canonical = canonicalize_bookmark_url(url)
+    if canonical and source_for_url(canonical) == "Doyle" and is_sale_bookmark_url(canonical):
+        parts = urlsplit(canonical)
+        query = [(key, "1" if key.casefold() == "pn" else value)
+                 for key, value in parse_qsl(parts.query, keep_blank_values=True)]
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
+    return canonical
+
+
 def artist_from_bookmark(title: str, url: str) -> str:
     if is_sale_bookmark_url(url):
         return ""
@@ -251,7 +276,7 @@ def parse_bookmarks_html(
     for raw in parse_netscape_bookmarks(html):
         if not _folder_selected(raw.folder_path, selected):
             continue
-        canonical = canonicalize_bookmark_url(raw.url)
+        canonical = canonicalize_watch_url(raw.url)
         if not canonical:
             continue
         parts = urlsplit(canonical)

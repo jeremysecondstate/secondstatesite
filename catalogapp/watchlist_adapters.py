@@ -1357,4 +1357,11 @@ ADAPTERS: tuple[BookmarkSourceAdapter, ...] = (InvaluableAdapter(), HeritageAdap
 
 
 def adapter_for_url(url: str) -> BookmarkSourceAdapter | None:
+    # These adapters reuse the shared interface without an import cycle.
+    from catalogapp.doyle import DoyleAdapter
+    from catalogapp.phillips import PhillipsAdapter
+
+    for adapter in (DoyleAdapter(), PhillipsAdapter()):
+        if adapter.supports(url):
+            return adapter
     return next((adapter for adapter in ADAPTERS if adapter.supports(url)), None)

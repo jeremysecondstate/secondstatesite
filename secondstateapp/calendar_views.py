@@ -34,6 +34,7 @@ from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
 
 from .artprice_max_bid import ArtpriceAnalysisError, _artprice_lot_url, analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity, merge_artprice_sources
+from .artprice_research_links import artprice_research_links
 from .auction_email import (
     AuctionEmailConfigurationError,
     compose_auction_email,
@@ -75,7 +76,7 @@ LIVEART_ARTIST_YEAR_MARKER = re.compile(
     r"\(\s*(?:c\.?\s*)?\d{4}(?:\s*[-\u2013\u2014]\s*\d{0,4})?\s*\)", re.IGNORECASE
 )
 # Heritage serves lot photographs separately from its bookmarked auction pages.
-CALENDAR_IMAGE_DOMAINS = (*DEFAULT_ALLOWED_DOMAINS, "heritagestatic.com")
+CALENDAR_IMAGE_DOMAINS = (*DEFAULT_ALLOWED_DOMAINS, "heritagestatic.com", "goauctiondoyle.blob.core.windows.net")
 
 
 def _calendar_zone() -> ZoneInfo:
@@ -257,6 +258,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "sold_price": _decimal_json(lot.sold_price),
         "sold_currency": lot.sold_currency or (lot.currency if lot.sold_price else ""),
         "artist_artprice_url": artist_artprice_url,
+        **artprice_research_links(lot.artist_watchlist_name or lot.artist, lot.title, artist_artprice_url),
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
         "artprice_analysis_url": reverse("auction_lot_artprice_analysis", args=(lot.pk,)),
@@ -2262,6 +2264,8 @@ def sync_auction_calendar(request):
                     continue
                 if existing_lot.superseded_by_id is not None:
                     defaults["active"] = False
+                if source == "Doyle" and defaults["title"] == f"Lot {defaults['lot_number']}" and existing_lot.title:
+                    defaults.pop("title")
                 if saved_image is None and is_saved_calendar_image_url(existing_lot.image_url):
                     defaults.pop("image_url", None)
                 if existing_lot.sold_price is not None and existing_lot.sold_price > 0:

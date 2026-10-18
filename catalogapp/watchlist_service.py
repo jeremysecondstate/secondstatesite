@@ -87,6 +87,8 @@ def _invaluable_lot_reference(url: str) -> str:
 
 def _retain_missing_static_fields(card: NormalizedLot, previous: NormalizedLot) -> None:
     """Preserve richer cached description fields without carrying old bids."""
+    if card.source == "Doyle" and card.title == f"Lot {card.lot_number}" and previous.title:
+        card.title = previous.title
     if not card.saved_image_base64 and (not card.image_url or card.image_url == previous.image_url):
         card.saved_image_base64 = previous.saved_image_base64
     for field in ("title", "medium", "auction_house", "sale_title", "lot_number", "location", "sale_url", "image_url"):
