@@ -1,0 +1,570 @@
+{
+  "version": 1,
+  "artists": [
+    {
+      "name": "Agnes Martin",
+      "url": "https://www.artprice.com/artist/18956/agnes-martin/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/18956/agnes-martin",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/artprice-news/9152/latest-new-york-summits",
+        "https://www.artprice.com/artprice-news/7565/women-artists-collectively-cross-the-billion-dollar-line-in-2021-"
+      ]
+    },
+    {
+      "name": "Ai Weiwei",
+      "url": "https://www.artprice.com/artist/173258/weiwei-ai/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/173258/weiwei-ai",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/15524/ai-weiwei-transforms-aviva-studios-with-button-up-from-7-july-to-6-september-2026",
+        "https://www.artprice.com/artprice-news/artist/605886/9086/the-top-ten-contemporary-sculptures?idnewstype=2"
+      ]
+    },
+    {
+      "name": "Amy Sillman",
+      "url": "https://www.artprice.com/artist/188391/amy-sillman/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/188391/amy-sillman",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/13601/krasner-pollock-au-metropolitan-museum-of-art-past-continuous-la-grande-reecriture-de-l-abstraction-americaine"
+      ]
+    },
+    {
+      "name": "Anish Kapoor",
+      "url": "https://www.artprice.com/artist/15096/anish-kapoor/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/15096/anish-kapoor",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/15311/anish-kapoor-at-the-lehmbruck-museum-an-immersive-retrospective-questions-the-limits-of-contemporary-sculpture"
+      ]
+    },
+    {
+      "name": "BANKSY",
+      "url": "https://www.artprice.com/artist/282428/banksy/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/282428/banksy",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://it.artprice.com/artprice-news/7577/banksy-and-21st-century-editions",
+        "https://www.artprice.com/artprice-news/6827/keith-haring-art-is-for-everyone-",
+        "https://www.artprice.com/artprice-news/7724/Capital%2Bgains%2Band%2Blosses%2Bin%2Bthe%2BContemporary%2Bart%2Bfield"
+      ]
+    },
+    {
+      "name": "Brice Marden",
+      "url": "https://www.artprice.com/artist/18776/brice-marden/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/18776/brice-marden",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/artist/36375/368/minimal-art-in-its-purest-form-at-the-heart-of-the-bourse-de-commerce-in-paris"
+      ]
+    },
+    {
+      "name": "Bridget Riley",
+      "url": "https://www.artprice.com/artist/24462/bridget-riley/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/24462/bridget-riley",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/12320/bridget-riley-at-the-musee-d-orsay-a-hypnotic-plunge-into-point-de-depart-"
+      ]
+    },
+    {
+      "name": "Cindy Sherman",
+      "url": "https://www.artprice.com/artist/26554/cindy-sherman/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/26554/cindy-sherman",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/14492/richard-prince-a-l-albertina-museum-de-vienne-une-grande-retrospective-de-la-photographie-d-appropriation",
+        "https://www.artprice.com/artprice-news/8222/flash-news-wols-the-mysterious-at-sotheby-s-cindy-sherman-in-london"
+      ]
+    },
+    {
+      "name": "Cy Twombly",
+      "url": "https://www.artprice.com/artist/28957/cy-twombly/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/28957/cy-twombly",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/artprice-news/9152/latest-new-york-summits",
+        "https://www.artprice.com/artprice-news/7640/the-top-selling-american-artists-in-2021",
+        "https://www.artprice.com/artprice-news/artist/28957"
+      ]
+    },
+    {
+      "name": "David Shrigley",
+      "url": "https://www.artprice.com/artist/188291/david-shrigley/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/188291/david-shrigley",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/773/Contemporary%2BArt%3A%2BYoshitomo%2BNara%2BJoins%2BDavid%2BZwirner%2BGallery"
+      ]
+    },
+    {
+      "name": "Ed Ruscha",
+      "url": "https://www.artprice.com/artist/25274/ed-ruscha/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/25274/ed-ruscha",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/6905/",
+        "https://www.artprice.com/artprice-news/6905/2024%E2%80%99s%2Btop%2Bten%2Bart%2Bauction%2Bresults",
+        "https://www.artprice.com/artprice-news/8108/our-blue-chip-artists-index-outperforms-the-s-p-500"
+      ]
+    },
+    {
+      "name": "El Anatsui",
+      "url": "https://www.artprice.com/artist/180927/el-anatsui/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/180927/el-anatsui",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://fr.artprice.com/check_browser?from=%252Fartiste%252F180927%252Fel-anatsui",
+        "https://www.artprice.com/artprice-news/artist/46986/3368/le-top-du-lion-d-or"
+      ]
+    },
+    {
+      "name": "Etel Adnan",
+      "url": "https://www.artprice.com/artist/316149/etel-adnan/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/316149/etel-adnan",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/13559/3-artistes-libanaises-a-connaitre-absolument",
+        "https://www.artprice.com/artprice-news/7658/etel-adnan-and-the-success-of-lebanese-artists",
+        "https://www.artprice.com/artprice-news/8495/Flash%2BNews%3A%2BNicolas%2BDe%2BStael%2B-%2BEtel%2BAdnan%2B-%2BPhilippe%2BPasqua"
+      ]
+    },
+    {
+      "name": "Francis Bacon",
+      "url": "https://www.artprice.com/artist/1148/francis-bacon/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/1148/francis-bacon",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/artprice-news/9152/latest-new-york-summits",
+        "https://www.artprice.com/artprice-news/8222/flash-news-wols-the-mysterious-at-sotheby-s-cindy-sherman-in-london"
+      ]
+    },
+    {
+      "name": "George Condo",
+      "url": "https://www.artprice.com/artist/6166/george-condo/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/6166/george-condo",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/artprice-news/275/george-condo-in-paris-vertigo-of-the-figure-and-subversions-of-the-gaze-at-the-musee-d-art-moderne",
+        "https://www.artprice.com/check_browser?from=%252Fartist%252F6166%252Fgeorge-condo"
+      ]
+    },
+    {
+      "name": "Gerhard Richter",
+      "url": "https://www.artprice.com/artist/24376/gerhard-richter/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/24376/gerhard-richter",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/1832/richter-atteindra-t-il-les-50-millions-en-mars-",
+        "https://www.artprice.com/artprice-news/9215/top-10-german-artists"
+      ]
+    },
+    {
+      "name": "HARING, KEITH",
+      "url": "https://www.artprice.com/artist/12810/keith-haring/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/12810/keith-haring",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/check_browser?from=%252Fartist%252F12810%252Fkeith-haring",
+        "https://es.artprice.com/check_browser?from=%252Fartista%252F12810%252Fkeith-haring",
+        "https://www.artprice.com/artprice-news/590/kaws-illuminates-manar-abu-dhabi-2025-a-monumental-sculpture-under-the-sign-of-light-and-the-desert",
+        "https://www.artprice.com/artprice-news/6800/have-prints-become-fashionable-",
+        "https://www.artprice.com/artprice-news/6827/keith-haring-art-is-for-everyone-"
+      ]
+    },
+    {
+      "name": "Henri de Toulouse-Lautrec",
+      "url": "https://www.artprice.com/artist/28638/henri-de-toulouse-lautrec/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/28638/henri-de-toulouse-lautrec",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/artprice-news/13043/toulouse-lautrec-in-aix-en-provence-the-landmark-2026-exhibition-at-the-caumont-centre-d-art",
+        "https://www.artprice.com/artprice-news/12431/henri-gabriel-ibels-un-nabi-engage-le-musee-maurice-denis-saint-germain-en-laye-remet-a-l-honneur-un-artiste-oublie",
+        "https://www.artprice.com/artprice-news/13313/exhibition-from-monet-to-warhol-in-athens-83-masterpieces-from-impressionism-to-pop-art",
+        "https://www.artprice.com/artprice-news/15560/lacma-village-square-brings-together-van-gogh-manet-and-modern-masters-until-july-19-2026"
+      ]
+    },
+    {
+      "name": "Jasper Johns",
+      "url": "https://www.artprice.com/artist/14751/jasper-johns/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/14751/jasper-johns",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/15023/jasper-johns-night-driver-au-guggenheim-bilbao-la-grande-retrospective-a-ne-pas-manquer",
+        "https://www.artprice.com/artprice-news/15032/jasper-johns-night-driver-at-the-guggenheim-bilbao-the-unmissable-major-retrospective",
+        "https://www.artprice.com/artprice-news/15398/hammer-museum-five-centuries-of-works-on-paper-for-the-70th-anniversary-of-the-grunwald-center"
+      ]
+    },
+    {
+      "name": "Jean-Michel Basquiat",
+      "url": "https://www.artprice.com/artist/1608/jean-michel-basquiat/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/1608/jean-michel-basquiat",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/artprice-news/9152/latest-new-york-summits",
+        "https://fr.artprice.com/check_browser?from=%252Fartiste%252F1608%252Fjean-michel-basquiat",
+        "https://www.artprice.com/artprice-news/590/kaws-illuminates-manar-abu-dhabi-2025-a-monumental-sculpture-under-the-sign-of-light-and-the-desert",
+        "https://www.artprice.com/artprice-news/6905/",
+        "https://www.artprice.com/artprice-news/6905/2024%E2%80%99s%2Btop%2Bten%2Bart%2Bauction%2Bresults",
+        "https://www.artprice.com/artprice-news/7640/the-top-selling-american-artists-in-2021",
+        "https://www.artprice.com/artprice-news/7724/Capital%2Bgains%2Band%2Blosses%2Bin%2Bthe%2BContemporary%2Bart%2Bfield",
+        "https://www.artprice.com/artprice-news/8522/top-results-in-contemporary-drawing"
+      ]
+    },
+    {
+      "name": "Jeff Koons",
+      "url": "https://www.artprice.com/artist/43452/jeff-koons/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/43452/jeff-koons",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/15311/anish-kapoor-at-the-lehmbruck-museum-an-immersive-retrospective-questions-the-limits-of-contemporary-sculpture",
+        "https://www.artprice.com/artprice-news/392/jeff-koons-the-mirror-of-america-shines-once-again-at-gagosian",
+        "https://www.artprice.com/artprice-news/590/kaws-illuminates-manar-abu-dhabi-2025-a-monumental-sculpture-under-the-sign-of-light-and-the-desert",
+        "https://www.artprice.com/artprice-news/artist/605886/9086/the-top-ten-contemporary-sculptures?idnewstype=2"
+      ]
+    },
+    {
+      "name": "Joan Mitchell",
+      "url": "https://www.artprice.com/artist/19945/joan-mitchell/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/19945/joan-mitchell",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/7565/women-artists-collectively-cross-the-billion-dollar-line-in-2021-"
+      ]
+    },
+    {
+      "name": "John Baldessari",
+      "url": "https://www.artprice.com/artist/8589/john-baldessari/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/8589/john-baldessari",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/artist/46986/3368/le-top-du-lion-d-or"
+      ]
+    },
+    {
+      "name": "Julie Mehretu",
+      "url": "https://www.artprice.com/artist/242404/julie-mehretu/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/242404/julie-mehretu",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/check_browser?from=%252Fartist%252F242404%252Fjulie-mehretu",
+        "https://www.artprice.com/artprice-news/15398/hammer-museum-five-centuries-of-works-on-paper-for-the-70th-anniversary-of-the-grunwald-center",
+        "https://www.artprice.com/artprice-news/8522/top-results-in-contemporary-drawing",
+        "https://www.artprice.com/artprice-news/860/reopening-of-the-studio-museum-in-harlem-rediscover-the-leading-artists-in-the-collection"
+      ]
+    },
+    {
+      "name": "Kara Walker",
+      "url": "https://www.artprice.com/artist/145335/kara-walker/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/145335/kara-walker",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/15398/hammer-museum-five-centuries-of-works-on-paper-for-the-70th-anniversary-of-the-grunwald-center",
+        "https://www.artprice.com/artprice-news/2375/focus-sur-kara-walker"
+      ]
+    },
+    {
+      "name": "Katherine Bernhardt",
+      "url": "https://www.artprice.com/artist/265892/katherine-bernhardt/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/265892/katherine-bernhardt",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/check_browser?from=%252Fartist%252F265892%252Fkatherine-bernhardt"
+      ]
+    },
+    {
+      "name": "KAWS",
+      "url": "https://www.artprice.com/artist/294388/kaws/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/294388/kaws",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/590/kaws-illuminates-manar-abu-dhabi-2025-a-monumental-sculpture-under-the-sign-of-light-and-the-desert",
+        "https://www.artprice.com/artprice-news/6827/keith-haring-art-is-for-everyone-",
+        "https://www.artprice.com/artprice-news/artist/294388/1"
+      ]
+    },
+    {
+      "name": "Kiki Smith",
+      "url": "https://www.artprice.com/artist/74815/kiki-smith/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/74815/kiki-smith",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/665/witches-exhibition-at-the-pont-aven-museum-major-works-and-the-female-figure-in-art-1860-1920-"
+      ]
+    },
+    {
+      "name": "Leonora Carrington",
+      "url": "https://www.artprice.com/artist/4928/leonora-carrington/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/4928/leonora-carrington",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/509/fetish-the-erotic-in-surrealism-in-london-a-century-of-surrealist-desire-at-richard-saltoun-gallery"
+      ]
+    },
+    {
+      "name": "Louise Bourgeois",
+      "url": "https://www.artprice.com/artist/3547/louise-bourgeois/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/3547/louise-bourgeois",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/14369/louise-bourgeois-a-la-bnf-a-l-automne-l-extreme-tension-de-ses-dessins-et-gravures-enfin-revelee",
+        "https://www.artprice.com/artprice-news/578/louise-bourgeois-au-hoam-museum-of-art-coree-une-retrospective-majeure-pour-l-automne-2025",
+        "https://www.artprice.com/artprice-news/7565/women-artists-collectively-cross-the-billion-dollar-line-in-2021-",
+        "https://www.artprice.com/artprice-news/9248/top-10-french-works"
+      ]
+    },
+    {
+      "name": "Louise Nevelson",
+      "url": "https://www.artprice.com/artist/21043/louise-nevelson/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/21043/louise-nevelson",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://fr.artprice.com/artprice-news/artist/706122/8765/a-strong-start-to-the-new-season-in-new-york-and-hong-kong",
+        "https://www.artprice.com/artprice-news/13820/louise-nevelson-at-centre-pompidou-metz-mrs-n-s-palace-the-european-retrospective-that-reinvents-environmental-sculpture"
+      ]
+    },
+    {
+      "name": "MAGRITTE, RENE",
+      "url": "https://www.artprice.com/artist/18384/rene-magritte/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/18384/rene-magritte",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://fr.artprice.com/artprice-news/14138/l-indice-artprice100-en-hausse-de-11-2-en-2025",
+        "https://fr.artprice.com/artprice-news/14141/the-artprice100-index-rose-112-in-2025",
+        "https://it.artprice.com/check_browser?from=%252Fartista%252F18384%252Frene-magritte",
+        "https://www.artprice.com/artprice-news/6905/",
+        "https://www.artprice.com/artprice-news/6905/2024%E2%80%99s%2Btop%2Bten%2Bart%2Bauction%2Bresults",
+        "https://www.artprice.com/artprice-news/7487/rene-magritte-currently-the-top-selling-modern-artist",
+        "https://www.artprice.com/artprice-news/8564/top-of-surrealism-in-2018",
+        "https://www.artprice.com/artprice-news/artist/18384/398/ghosts-at-the-kunstmuseum-basel-exploring-the-supernatural-in-art-from-william-blake-to-today"
+      ]
+    },
+    {
+      "name": "Manolo Valdés",
+      "url": "https://www.artprice.com/artist/29122/manolo-valdes/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/29122/manolo-valdes",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/check_browser?from=%252Fartist%252F29122%252Fmanolo-valdes"
+      ]
+    },
+    {
+      "name": "Max Beckmann",
+      "url": "https://www.artprice.com/artist/1856/max-beckmann/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/1856/max-beckmann",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/13157/modern-art-and-politics-in-germany-1910-1945-au-minneapolis-institute-of-art-chefs-d-uvre-de-la-neue-nationalgalerie-de-berlin",
+        "https://www.artprice.com/artprice-news/14792/new-era-for-german-art-in-new-york-neue-galerie-to-merge-with-the-met-in-2028",
+        "https://www.artprice.com/artprice-news/3185/le-top-de-londres",
+        "https://www.artprice.com/artprice-news/artist/1856/1"
+      ]
+    },
+    {
+      "name": "Michelangelo Pistoletto",
+      "url": "https://www.artprice.com/artist/23018/michelangelo-pistoletto/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/23018/michelangelo-pistoletto",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/artist/46986/3368/le-top-du-lion-d-or"
+      ]
+    },
+    {
+      "name": "Mickalene Thomas",
+      "url": "https://www.artprice.com/artist/311104/mickalene-thomas/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/311104/mickalene-thomas",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/7724/Capital%2Bgains%2Band%2Blosses%2Bin%2Bthe%2BContemporary%2Bart%2Bfield"
+      ]
+    },
+    {
+      "name": "Nicolas Party",
+      "url": "https://www.artprice.com/artist/614591/nicolas-party/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/614591/nicolas-party",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://fr.artprice.com/check_browser?from=%252Fartiste%252F614591%252Fnicolas-party"
+      ]
+    },
+    {
+      "name": "Paul Gauguin",
+      "url": "https://www.artprice.com/artist/10904/paul-gauguin/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/10904/paul-gauguin",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/12188/discover-the-artprice-selection-of-the-most-beautiful-snow-landscapes-in-classical-painting",
+        "https://www.artprice.com/artprice-news/15560/lacma-village-square-brings-together-van-gogh-manet-and-modern-masters-until-july-19-2026",
+        "https://www.artprice.com/artprice-news/3185/le-top-de-londres",
+        "https://www.artprice.com/artprice-news/9248/top-10-french-works"
+      ]
+    },
+    {
+      "name": "Philip Guston",
+      "url": "https://www.artprice.com/artist/12389/philip-guston/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/12389/philip-guston",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/15125/manoucher-yektai-at-ica-miami-the-journey-of-an-iranian-american-abstract-painter-between-tehran-paris-and-new-york"
+      ]
+    },
+    {
+      "name": "Pierre Soulages",
+      "url": "https://www.artprice.com/artist/27103/pierre-soulages/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/27103/pierre-soulages",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/check_browser?from=%252Fartist%252F27103%252Fpierre-soulages"
+      ]
+    },
+    {
+      "name": "Richard Prince",
+      "url": "https://www.artprice.com/artist/29334/richard-prince/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/29334/richard-prince",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://de.artprice.com/artprice-news/9152/latest-new-york-summits",
+        "https://www.artprice.com/artprice-news/14492/richard-prince-a-l-albertina-museum-de-vienne-une-grande-retrospective-de-la-photographie-d-appropriation",
+        "https://www.artprice.com/artprice-news/artist/605886/9086/the-top-ten-contemporary-sculptures?idnewstype=2"
+      ]
+    },
+    {
+      "name": "Robert Gober",
+      "url": "https://www.artprice.com/artist/42743/robert-gober/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/42743/robert-gober",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/artist/605886/9086/the-top-ten-contemporary-sculptures?idnewstype=2"
+      ]
+    },
+    {
+      "name": "Robert Ryman",
+      "url": "https://www.artprice.com/artist/25333/robert-ryman/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/25333/robert-ryman",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/8342/flash-news-robert-ryman-a-female-old-master-worth-7-million-george-michael-s-collection"
+      ]
+    },
+    {
+      "name": "Salvador Dalí",
+      "url": "https://www.artprice.com/artist/6866/salvador-dali/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/6866/salvador-dali",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/13157/modern-art-and-politics-in-germany-1910-1945-au-minneapolis-institute-of-art-chefs-d-uvre-de-la-neue-nationalgalerie-de-berlin",
+        "https://www.artprice.com/artprice-news/8564/top-of-surrealism-in-2018"
+      ]
+    },
+    {
+      "name": "Shepard Fairey",
+      "url": "https://www.artprice.com/artist/301242/shepard-fairey/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/301242/shepard-fairey",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/12419/buying-a-work-by-a-recognized-artist-for-under-500-on-the-artprice-marketplace",
+        "https://www.artprice.com/artprice-news/6800/have-prints-become-fashionable-"
+      ]
+    },
+    {
+      "name": "Tamara de Lempicka",
+      "url": "https://www.artprice.com/artist/17163/tamara-lempicka-de/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/17163/tamara-lempicka-de",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/12131/oscar-ghez-collection-in-aix-en-provence-france-impressionist-modern-and-fauvist-masterpieces-on-display-at-the-hotel-de-caumont",
+        "https://www.artprice.com/artprice-news/7565/women-artists-collectively-cross-the-billion-dollar-line-in-2021-"
+      ]
+    },
+    {
+      "name": "Terry Winters",
+      "url": "https://www.artprice.com/artist/14891/terry-winters/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/14891/terry-winters",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/check_browser?from=%252Fartist%252F14891%252Fterry-winters"
+      ]
+    },
+    {
+      "name": "Titus Kaphar",
+      "url": "https://www.artprice.com/artist/444858/titus-kaphar/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/444858/titus-kaphar",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/13427/titus-kaphar-at-gagosian-paris-the-fire-this-time-a-powerful-first-exhibition-on-the-erased-history-of-the-united-states"
+      ]
+    },
+    {
+      "name": "William Blake",
+      "url": "https://www.artprice.com/artist/2771/william-blake/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/2771/william-blake",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artprice-news/artist/18384/398/ghosts-at-the-kunstmuseum-basel-exploring-the-supernatural-in-art-from-william-blake-to-today"
+      ]
+    },
+    {
+      "name": "Yoshitomo Nara",
+      "url": "https://www.artprice.com/artist/171599/yoshitomo-nara/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/171599/yoshitomo-nara",
+      "source": "supplied-public-url",
+      "resolved_at": "2026-10-19T10:46:54+00:00",
+      "evidence_urls": [
+        "https://it.artprice.com/artprice-news/7577/banksy-and-21st-century-editions",
+        "https://it.artprice.com/artprice-news/artist/171599",
+        "https://www.artprice.com/artprice-news/7133/yoshitomo-nara-asia-s-most-expensive-contemporary-artist",
+        "https://www.artprice.com/artprice-news/773/Contemporary%2BArt%3A%2BYoshitomo%2BNara%2BJoins%2BDavid%2BZwirner%2BGallery"
+      ]
+    }
+  ]
+}

@@ -758,7 +758,7 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual(selected_day[linked_lot.pk]["artist_artprice_url"], artist_url)
         self.assertEqual(selected_day[linked_lot.pk]["images"], [image_url])
         self.assertEqual(selected_day[second_house_lot.pk]["auction_house"], "Chiswick Auctions")
-        self.assertEqual(selected_day[second_house_lot.pk]["artist_artprice_url"], "")
+        self.assertIn("/artist/13619/david-hockney/", selected_day[second_house_lot.pk]["artist_artprice_url"])
         self.assertEqual(selected_day[second_house_lot.pk]["images"], [])
         self.assertEqual([lot["id"] for lot in rendered_days["2026-07-26"]], [next_day_lot.pk])
 

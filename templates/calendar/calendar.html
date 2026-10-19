@@ -594,6 +594,9 @@
   };
 
   const appendArtpriceEditor = (item, lot, actionLinks, options = {}) => {
+    if (lot.artist_invaluable_url) {
+      actionLinks.appendChild(externalLink(lot.artist_invaluable_url, "lot-artist-invaluable-link", "Invaluable prints ↗"));
+    }
     if (!lot.artist_artprice_url && lot.artist_artprice_search_url) {
       const artistSearch = externalLink(lot.artist_artprice_search_url, "lot-artprice-artist-search", "Search Artprice artist ↗");
       artistSearch.setAttribute("aria-label", `Search Artprice for ${lot.artist || "this artist"} (opens in a new tab)`);
@@ -2983,6 +2986,7 @@
     quickLook.addEventListener("click", () => openResearchWorkspace(index));
     actions.appendChild(quickLook);
     if (lot.url) actions.appendChild(externalLink(lot.url, "day-gallery-auction-link", "Auction ↗"));
+    if (lot.artist_invaluable_url) actions.appendChild(externalLink(lot.artist_invaluable_url, "day-gallery-auction-link", "Invaluable ↗"));
     caption.appendChild(actions);
     card.append(visual, caption);
     return card;

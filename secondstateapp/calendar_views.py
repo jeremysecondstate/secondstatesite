@@ -35,6 +35,7 @@ from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
 
 from .artprice_max_bid import ArtpriceAnalysisError, _artprice_lot_url, analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity, merge_artprice_sources
 from .artprice_research_links import artprice_research_links
+from .artist_research_registry import artist_research_urls
 from .auction_email import (
     AuctionEmailConfigurationError,
     compose_auction_email,
@@ -228,7 +229,7 @@ def _sale_json(group: dict) -> dict:
 def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None) -> dict:
     selected_lot_ids = selected_lot_ids or set()
     image_url = _calendar_image_url(lot.image_url)
-    artist_artprice_url = ""
+    artist_artprice_url, artist_invaluable_url = artist_research_urls(_artist_label(lot))
     if lot.watchlist_artist_id and lot.watchlist_artist.artprice_url:
         try:
             artist_artprice_url = _validated_artist_artprice_url(lot.watchlist_artist.artprice_url)
@@ -259,6 +260,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "sold_currency": lot.sold_currency or (lot.currency if lot.sold_price else ""),
         "won_by_us": lot.won_by_us,
         "artist_artprice_url": artist_artprice_url,
+        "artist_invaluable_url": artist_invaluable_url,
         **artprice_research_links(lot.artist_watchlist_name or lot.artist, lot.title, artist_artprice_url),
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
