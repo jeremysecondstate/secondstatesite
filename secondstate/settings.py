@@ -98,6 +98,8 @@ COORDINATE_WORKER_TOKEN = os.environ.get("COORDINATE_WORKER_TOKEN", "")
 # development can read the original, ignored Markdown files instead.
 COORDINATE_SHIPPING_PLAYBOOK = os.environ.get("COORDINATE_SHIPPING_PLAYBOOK", "")
 COORDINATE_PACKING_PLAYBOOK = os.environ.get("COORDINATE_PACKING_PLAYBOOK", "")
+COORDINATE_DRAFT_WORKFLOW_ENABLED = os.environ.get("COORDINATE_DRAFT_WORKFLOW_ENABLED", "false").lower() == "true"
+COORDINATE_PRICE_REVIEWER_USERNAME = os.environ.get("COORDINATE_PRICE_REVIEWER_USERNAME", "")
 AUCTION_EMAIL_SENDING_ENABLED = os.environ.get("AUCTION_EMAIL_SENDING_ENABLED", "false").strip().lower() in {
     "1",
     "true",

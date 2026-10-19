@@ -1,6 +1,7 @@
-"""Staff conversations and a deliberately text-only, authenticated worker boundary."""
+"""Staff conversations and an authenticated research/draft worker boundary."""
 
 import json
+import hashlib
 import secrets
 import uuid
 from datetime import timedelta
@@ -10,7 +11,7 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Exists, F, OuterRef, Q
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -19,6 +20,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import CoordinateActivity, CoordinateCase, CoordinateJob, CoordinateMessage, CoordinateWorkerState
+from .coordinate_shipping import coordination_state, enabled, enqueue_due_reviews, research_state, save_worker_artifacts, validate_worker_artifacts
 
 MAX_MESSAGE_LENGTH = 12000
 LEASE_SECONDS = 900
@@ -41,37 +43,49 @@ def _job_status(job):
     return "processing" if job.status == "processing" else "waiting"
 
 
-def _message_json(message):
+def _message_json(message, case_deleted_at=None):
+    deleted_at = message.deleted_at or case_deleted_at
     return {
         "id": message.pk,
         "role": message.role,
-        "body": message.body,
-        "author": message.author.get_username() if message.author else "Codex",
+        "body": "" if deleted_at else message.body,
+        "author": message.author.get_username() if message.author else ("Coordinate" if message.role == "system" else "Codex"),
         "created_at": _iso(message.created_at),
-        "status": _job_status(getattr(message, "job", None)),
+        "status": "deleted" if deleted_at else _job_status(getattr(message, "job", None)),
+        "deleted": bool(deleted_at), "deleted_at": _iso(deleted_at),
+        "individually_deleted": bool(message.deleted_at),
+        "delete_url": reverse("coordinate_delete_message", args=[message.case_id, message.pk]),
+        "restore_url": reverse("coordinate_restore_message", args=[message.case_id, message.pk]),
     }
 
 
 def _state(selected=None):
     cases = []
+    trash_cases = []
     # Fetch pending jobs together, rather than querying separately for every case.
-    pending = CoordinateJob.objects.exclude(status="completed").select_related("message").order_by("message_id")
+    pending = CoordinateJob.objects.filter(message__deleted_at__isnull=True, message__case__deleted_at__isnull=True).exclude(status__in=["completed", "cancelled"]).select_related("message").order_by("message_id")
     statuses = {}
     for job in pending:
         statuses.setdefault(job.message.case_id, _job_status(job))
     for case in CoordinateCase.objects.all():
-        cases.append({
+        item = {
             "id": str(case.pk), "title": case.title,
             "url": reverse("coordinate_case", args=[case.pk]),
-            "status": statuses.get(case.pk, "replied"),
+            "status": "deleted" if case.deleted_at else statuses.get(case.pk, "replied"),
             "updated_at": _iso(case.updated_at), "coordinator": case.coordinator,
-        })
+            "deleted": bool(case.deleted_at), "deleted_at": _iso(case.deleted_at),
+            "delete_url": reverse("coordinate_delete_case", args=[case.pk]),
+            "restore_url": reverse("coordinate_restore_case", args=[case.pk]),
+        }
+        (trash_cases if case.deleted_at else cases).append(item)
     worker = CoordinateWorkerState.objects.filter(pk=1).first()
     return {
         "cases": cases,
-        "selected_case": next((case for case in cases if selected and case["id"] == str(selected.pk)), None),
-        "messages": [_message_json(message) for message in selected.messages.select_related("author", "job").all()] if selected else [],
-        "worker": {"last_successful_check": _iso(worker.last_successful_check) if worker else None, "test_mode": True},
+        "trash_cases": trash_cases,
+        "selected_case": next((case for case in cases + trash_cases if selected and case["id"] == str(selected.pk)), None),
+        "messages": [_message_json(message, selected.deleted_at) for message in selected.messages.select_related("author", "job").all()] if selected else [],
+        "worker": {"last_successful_check": _iso(worker.last_successful_check) if worker else None, "test_mode": not enabled(), "draft_only": enabled()},
+        "coordination": coordination_state(selected),
         "new_case_token": str(uuid.uuid4()), "message_token": str(uuid.uuid4()),
     }
 
@@ -82,7 +96,7 @@ def _state(selected=None):
 def coordinate(request, case_id=None):
     case = get_object_or_404(CoordinateCase, pk=case_id) if case_id else None
     if case is None and request.GET.get("new") != "1":
-        case = CoordinateCase.objects.first()
+        case = CoordinateCase.objects.filter(deleted_at__isnull=True).first()
     return render(request, "coordinate/index.html", _state(case))
 
 
@@ -135,7 +149,44 @@ def _duplicate(request, token, body, case_id=None):
         return None
     if message.author_id != request.user.pk or message.body != body or (case_id and message.case_id != case_id):
         return _error("This message identifier was already used for a different submission.", 409)
+    if message.deleted_at or message.case.deleted_at:
+        return _error("This submission was deleted. Restore it before continuing.", 409)
     return _saved_response(request, message)
+
+
+def _locked_case(case_id):
+    """Call inside atomic(): serialize case/history/job writes on PostgreSQL and SQLite."""
+    if not CoordinateCase.objects.filter(pk=case_id).update(updated_at=F("updated_at")):
+        raise Http404("Case not found.")
+    return CoordinateCase.objects.get(pk=case_id)
+
+
+def _database_retry(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        try:
+            return view(*args, **kwargs)
+        except OperationalError as exc:
+            if "locked" not in str(exc).lower() and "deadlock" not in str(exc).lower():
+                raise
+            response = _error("Database is busy; retry this request.", 503)
+            response["Retry-After"] = "1"
+            return response
+    return wrapped
+
+
+def _invalidate_processing(case, now):
+    # A removed/restored historical message changes the context of later work too.
+    return CoordinateJob.objects.filter(message__case=case, status="processing").update(
+        status="retry", claim_token=None, lease_expires_at=None, available_at=now,
+        last_error="Conversation changed; waiting for a fresh worker check.",
+    )
+
+
+def _case_response(request, case):
+    if request.headers.get("Accept") == "application/json":
+        return JsonResponse(_state(case))
+    return redirect("coordinate_case", case_id=case.pk)
 
 
 def _save_message(case, body, token, author):
@@ -175,6 +226,7 @@ def create_case(request):
 @never_cache
 @staff_member_required
 @require_POST
+@_database_retry
 def add_message(request, case_id):
     case = get_object_or_404(CoordinateCase, pk=case_id)
     try:
@@ -186,8 +238,9 @@ def add_message(request, case_id):
         return duplicate
     try:
         with transaction.atomic():
-            # Serializes submissions on PostgreSQL; also establishes SQLite's write lock.
-            CoordinateCase.objects.filter(pk=case.pk).update(updated_at=timezone.now())
+            case = _locked_case(case_id)
+            if case.deleted_at:
+                return _error("Restore this case before adding messages.", 409)
             message = _save_message(case, body, token, request.user)
     except IntegrityError:
         duplicate = _duplicate(request, token, body, case_id)
@@ -195,6 +248,103 @@ def add_message(request, case_id):
             return duplicate
         raise
     return _saved_response(request, message)
+
+
+@never_cache
+@staff_member_required
+@require_POST
+@_database_retry
+def delete_message(request, case_id, message_id):
+    with transaction.atomic():
+        case = _locked_case(case_id)
+        if case.deleted_at:
+            return _error("Restore this case before changing messages.", 409)
+        message = get_object_or_404(CoordinateMessage, case=case, pk=message_id)
+        if message.deleted_at is None:
+            now = timezone.now()
+            CoordinateMessage.objects.filter(pk=message.pk).update(deleted_at=now, deleted_by=request.user)
+            invalidated = _invalidate_processing(case, now)
+            jobs = CoordinateJob.objects.filter(message=message)
+            jobs.exclude(status="completed").update(status="cancelled")
+            jobs.update(claim_token=None, lease_expires_at=None)
+            if message.in_reply_to_id:
+                CoordinateJob.objects.filter(message_id=message.in_reply_to_id).update(claim_token=None)
+            details = {"message_id": message.pk, "actor_id": request.user.pk, "invalidated_jobs": invalidated}
+            if message.role == "staff" and case.title == message.body.splitlines()[0][:160]:
+                details["previous_title"] = case.title
+                case.title = "Untitled case"
+            case.updated_at = now
+            case.save(update_fields=["title", "updated_at"])
+            CoordinateActivity.objects.create(case=case, event="message_deleted", details=details)
+    return _case_response(request, case)
+
+
+@never_cache
+@staff_member_required
+@require_POST
+@_database_retry
+def restore_message(request, case_id, message_id):
+    with transaction.atomic():
+        case = _locked_case(case_id)
+        if case.deleted_at:
+            return _error("Restore this case before changing messages.", 409)
+        message = get_object_or_404(CoordinateMessage, case=case, pk=message_id)
+        if message.deleted_at is not None:
+            now = timezone.now()
+            CoordinateMessage.objects.filter(pk=message.pk).update(deleted_at=None, deleted_by=None)
+            invalidated = _invalidate_processing(case, now)
+            CoordinateJob.objects.filter(message=message).exclude(status="completed").update(
+                status="queued", claim_token=None, lease_expires_at=None, available_at=now, last_error="",
+            )
+            deletion = case.activity.filter(event="message_deleted", details__message_id=message.pk).order_by("-id").first()
+            if deletion and case.title == "Untitled case" and deletion.details.get("previous_title"):
+                case.title = deletion.details["previous_title"]
+            case.updated_at = now
+            case.save(update_fields=["title", "updated_at"])
+            CoordinateActivity.objects.create(case=case, event="message_restored", details={
+                "message_id": message.pk, "actor_id": request.user.pk, "invalidated_jobs": invalidated,
+            })
+    return _case_response(request, case)
+
+
+@never_cache
+@staff_member_required
+@require_POST
+@_database_retry
+def delete_case(request, case_id):
+    with transaction.atomic():
+        case = _locked_case(case_id)
+        if case.deleted_at is None:
+            now = timezone.now()
+            case.deleted_at, case.deleted_by, case.updated_at = now, request.user, now
+            case.save(update_fields=["deleted_at", "deleted_by", "updated_at"])
+            jobs = CoordinateJob.objects.filter(message__case=case)
+            cancelled = jobs.exclude(status="completed").update(status="cancelled")
+            jobs.update(claim_token=None, lease_expires_at=None)
+            CoordinateActivity.objects.create(case=case, event="case_deleted", details={
+                "actor_id": request.user.pk, "cancelled_jobs": cancelled,
+            })
+    return _case_response(request, case)
+
+
+@never_cache
+@staff_member_required
+@require_POST
+@_database_retry
+def restore_case(request, case_id):
+    with transaction.atomic():
+        case = _locked_case(case_id)
+        if case.deleted_at is not None:
+            now = timezone.now()
+            case.deleted_at, case.deleted_by, case.updated_at = None, None, now
+            case.save(update_fields=["deleted_at", "deleted_by", "updated_at"])
+            requeued = CoordinateJob.objects.filter(message__case=case, message__deleted_at__isnull=True).exclude(status="completed").update(
+                status="queued", claim_token=None, lease_expires_at=None, available_at=now, last_error="",
+            )
+            CoordinateActivity.objects.create(case=case, event="case_restored", details={
+                "actor_id": request.user.pk, "requeued_jobs": requeued,
+            })
+    return _case_response(request, case)
 
 
 def _worker_endpoint(view):
@@ -210,7 +360,7 @@ def _worker_endpoint(view):
             return _error("Worker authentication required.", 401)
         if request.method != "POST":
             return _error("POST required.", 405)
-        if len(request.body) > 64000:
+        if len(request.body) > 128000:
             return _error("Request is too large.", 413)
         try:
             data = json.loads(request.body)
@@ -249,19 +399,28 @@ def claim(request, data):
         playbook = _playbook()
     except (OSError, UnicodeError):
         return _error("The shipping playbook or original packing source is unavailable.", 503)
+    enqueue_due_reviews()
     now = timezone.now()
     # Only the first unfinished message in each case can be claimed. The conditional
     # UPDATE below is the arbiter, on both PostgreSQL and SQLite (no lock assumptions).
     earlier = CoordinateJob.objects.filter(
         message__case_id=OuterRef("message__case_id"), message_id__lt=OuterRef("message_id"),
-    ).exclude(status="completed")
+        message__deleted_at__isnull=True,
+    ).exclude(status__in=["completed", "cancelled"])
     candidates = CoordinateJob.objects.filter(
         _eligible(now), message__case__coordinator=data["worker_id"],
-    ).annotate(earlier_pending=Exists(earlier)).filter(earlier_pending=False).order_by("message_id")
-    claimed = None
+        message__deleted_at__isnull=True, message__case__deleted_at__isnull=True,
+    ).annotate(earlier_pending=Exists(earlier)).filter(earlier_pending=False).select_related("message").order_by("message_id")
     for candidate in candidates[:50]:
         token = uuid.uuid4()
         with transaction.atomic():
+            case = _locked_case(candidate.message.case_id)
+            if case.deleted_at or case.coordinator != data["worker_id"]:
+                continue
+            # A restored older message may have become pending since candidate selection.
+            if CoordinateJob.objects.filter(message__case=case, message__deleted_at__isnull=True,
+                                            message_id__lt=candidate.message_id).exclude(status__in=["completed", "cancelled"]).exists():
+                continue
             updated = CoordinateJob.objects.filter(pk=candidate.pk, attempts=candidate.attempts).filter(_eligible(now)).update(
                 status="processing", attempts=F("attempts") + 1, claim_token=token,
                 lease_expires_at=now + timedelta(seconds=LEASE_SECONDS), worker_id=data["worker_id"], last_error="",
@@ -270,23 +429,22 @@ def claim(request, data):
                 claimed = CoordinateJob.objects.select_related("message__case").get(pk=candidate.pk)
                 CoordinateActivity.objects.create(case=claimed.message.case, job=claimed, event="job_claimed", details={"attempt": claimed.attempts})
                 CoordinateWorkerState.objects.update_or_create(pk=1, defaults={"last_successful_check": now})
-        if claimed:
-            break
-    if not claimed:
-        CoordinateWorkerState.objects.update_or_create(pk=1, defaults={"last_successful_check": now})
-        return JsonResponse({"job": None, "test_mode": True})
-    case = claimed.message.case
-    # Include earlier replies even when the user queued a follow-up before they arrived.
-    history = case.messages.filter(
-        Q(role="staff", pk__lte=claimed.message_id) | Q(role="assistant", in_reply_to_id__lt=claimed.message_id)
-    ).select_related("author", "job")
-    return JsonResponse({
-        "job": {"id": str(claimed.pk), "case_id": str(case.pk), "message_id": claimed.message_id,
-                "claim_token": str(claimed.claim_token), "lease_expires_at": _iso(claimed.lease_expires_at), "attempt": claimed.attempts},
-        "case": {"id": str(case.pk), "title": case.title, "coordinator": case.coordinator},
-        "messages": [_message_json(message) for message in history],
-        "playbook": playbook, "test_mode": True,
-    })
+                # Materialize the context while holding the same case lock as deletions.
+                history = case.messages.filter(
+                    Q(role__in=["staff", "system"], pk__lte=claimed.message_id)
+                    | Q(role="assistant", in_reply_to_id__lt=claimed.message_id, in_reply_to__deleted_at__isnull=True),
+                    deleted_at__isnull=True,
+                ).select_related("author", "job")
+                return JsonResponse({
+                    "job": {"id": str(claimed.pk), "case_id": str(case.pk), "message_id": claimed.message_id,
+                            "claim_token": str(claimed.claim_token), "lease_expires_at": _iso(claimed.lease_expires_at), "attempt": claimed.attempts},
+                    "case": {"id": str(case.pk), "title": case.title, "coordinator": case.coordinator},
+                    "messages": [_message_json(message) for message in history],
+                    "playbook": playbook, "test_mode": not enabled(), "draft_only": enabled(), "research_enabled": enabled(),
+                    "coordination": coordination_state(case), "research": research_state(case) if enabled() else [],
+                })
+    CoordinateWorkerState.objects.update_or_create(pk=1, defaults={"last_successful_check": now})
+    return JsonResponse({"job": None, "test_mode": not enabled(), "draft_only": enabled()})
 
 
 def _claim_matches(job, data):
@@ -308,33 +466,53 @@ def complete(request, data, job_id):
     if not isinstance(body, str) or not body.strip() or len(body) > MAX_MESSAGE_LENGTH:
         return _error("Reply must contain between 1 and 12,000 characters.")
     body = body.strip()
+    try:
+        artifacts = validate_worker_artifacts(data)
+    except ValueError as exc:
+        return _error(str(exc))
+    digest = hashlib.sha256(json.dumps({"body": body, "artifacts": artifacts}, sort_keys=True, default=str).encode()).hexdigest()
+    identity = get_object_or_404(CoordinateJob.objects.select_related("message"), pk=job_id)
     with transaction.atomic():
+        case = _locked_case(identity.message.case_id)
         job = get_object_or_404(CoordinateJob.objects.select_related("message__case"), pk=job_id)
+        if case.deleted_at or job.message.deleted_at:
+            return _error("This case or message was deleted.", 409)
         if not _claim_matches(job, data):
             return _error("Claim does not match this case, message, or worker.", 409)
         if job.status == "completed":
             reply = CoordinateMessage.objects.get(in_reply_to=job.message)
-            if reply.body != body:
+            if reply.deleted_at:
+                return _error("This reply was deleted; restore it through the case.", 409)
+            if reply.body != body or (job.completion_digest and job.completion_digest != digest):
                 return _error("This claim already completed with a different reply.", 409)
             return JsonResponse({"reply_id": reply.pk, "already_completed": True})
         now = timezone.now()
         if not _live_claim(job, now):
             return _error("Claim expired or is no longer active; retrieve pending work again.", 409)
         updated = CoordinateJob.objects.filter(pk=job.pk, status="processing", claim_token=job.claim_token, lease_expires_at__gt=now).update(
-            status="completed", completed_at=now, last_error="",
+            status="completed", completed_at=now, last_error="", completion_digest=digest,
         )
         if not updated:
             return _error("Claim changed; retry this completion to check its result.", 409)
+        try:
+            save_worker_artifacts(job, artifacts)
+        except ValueError as exc:
+            transaction.set_rollback(True)
+            return _error(str(exc))
         reply = CoordinateMessage.objects.create(case=job.message.case, role="assistant", body=body, in_reply_to=job.message)
         CoordinateCase.objects.filter(pk=job.message.case_id).update(updated_at=now)
-        CoordinateActivity.objects.create(case=job.message.case, job=job, event="reply_saved", details={"reply_id": reply.pk, "message_id": job.message_id, "test_mode": True})
+        CoordinateActivity.objects.create(case=job.message.case, job=job, event="reply_saved", details={"reply_id": reply.pk, "message_id": job.message_id, "test_mode": not enabled(), "draft_only": enabled()})
     return JsonResponse({"reply_id": reply.pk, "already_completed": False})
 
 
 @_worker_endpoint
 def fail(request, data, job_id):
+    identity = get_object_or_404(CoordinateJob.objects.select_related("message"), pk=job_id)
     with transaction.atomic():
+        case = _locked_case(identity.message.case_id)
         job = get_object_or_404(CoordinateJob.objects.select_related("message__case"), pk=job_id)
+        if case.deleted_at or job.message.deleted_at:
+            return _error("This case or message was deleted.", 409)
         if not _claim_matches(job, data):
             return _error("Claim does not match this case, message, or worker.", 409)
         if job.status == "retry":

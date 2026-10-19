@@ -511,6 +511,8 @@ class CoordinateCase(models.Model):
     coordinator = models.CharField(max_length=80, default="manual-codex")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(default=timezone.now)
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    deleted_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
 
     class Meta:
         ordering = ["-updated_at", "id"]
@@ -518,12 +520,14 @@ class CoordinateCase(models.Model):
 
 class CoordinateMessage(models.Model):
     case = models.ForeignKey(CoordinateCase, on_delete=models.PROTECT, related_name="messages")
-    role = models.CharField(max_length=12, choices=[("staff", "Staff"), ("assistant", "Codex")])
+    role = models.CharField(max_length=12, choices=[("staff", "Staff"), ("assistant", "Codex"), ("system", "System")])
     body = models.TextField()
     author = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     client_message_id = models.UUIDField(null=True, blank=True, unique=True)
     in_reply_to = models.OneToOneField("self", null=True, blank=True, on_delete=models.PROTECT, related_name="worker_reply")
     created_at = models.DateTimeField(auto_now_add=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
 
     class Meta:
         ordering = ["id"]
@@ -534,6 +538,7 @@ class CoordinateJob(models.Model):
     message = models.OneToOneField(CoordinateMessage, on_delete=models.PROTECT, related_name="job")
     status = models.CharField(max_length=12, default="queued", choices=[
         ("queued", "Queued"), ("processing", "Processing"), ("completed", "Completed"), ("retry", "Retry"),
+        ("cancelled", "Cancelled"),
     ])
     attempts = models.PositiveIntegerField(default=0)
     claim_token = models.UUIDField(null=True, blank=True)
@@ -543,6 +548,7 @@ class CoordinateJob(models.Model):
     worker_id = models.CharField(max_length=80, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    completion_digest = models.CharField(max_length=64, blank=True)
 
     class Meta:
         indexes = [models.Index(fields=["status", "available_at"], name="coordinate_pending_idx")]
@@ -562,3 +568,7 @@ class CoordinateActivity(models.Model):
 
     class Meta:
         ordering = ["id"]
+
+
+# Imported after the conversation models so Django registers the draft workflow.
+from .coordinate_models import CoordinateDraft, CoordinatePlan, CoordinateQuote, CoordinateResearch  # noqa: E402,F401

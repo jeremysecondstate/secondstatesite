@@ -6,6 +6,8 @@ from io import BytesIO, StringIO
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 from subprocess import CompletedProcess
 from threading import Thread
 from unittest import TestCase
@@ -29,6 +31,19 @@ def claim_payload():
 
 
 class CoordinateWorkerTests(TestCase):
+    def test_manual_and_scheduled_runpy_entrypoints_import_sources_without_credentials(self):
+        repository = Path(__file__).resolve().parents[1]
+        commands = [
+            [sys.executable, "scripts/coordinate_worker.py", "--help"],
+            [sys.executable, "-c", "import runpy,sys; sys.argv=['scripts/coordinate_worker.py','--help']; "
+             "runpy.run_path('scripts/coordinate_worker.py', run_name='__main__')"],
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                result = subprocess.run(command, cwd=repository, capture_output=True, text=True, timeout=15)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("--reasoning-effort", result.stdout)
+
     def test_origin_requires_https_except_loopback_and_forbids_credentials(self):
         for value in ("http://example.com", "https://secret@example.com", "https://example.com/path",
                       "https://example.com?q=secret", "https://example.com/#token", "file:///tmp"):
@@ -130,13 +145,14 @@ class CoordinateWorkerTests(TestCase):
         def fake_process(command, **kwargs):
             captured.update(command=command, **kwargs)
             (Path(kwargs["cwd"]) / "response.json").write_text(
-                json.dumps({"body": "What is lot 17's pickup deadline?"}), encoding="utf-8"
+                json.dumps({"body": "What is lot 17's pickup deadline?", "drafts": []}), encoding="utf-8"
             )
             return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
 
         with patch.object(worker.subprocess, "run", side_effect=fake_process):
             reply = worker.generate_reply(payload, "codex")
-        self.assertIn("pickup deadline", reply)
+        self.assertIn("pickup deadline", reply["body"])
+        self.assertEqual(reply["drafts"], [])
         self.assertIn("Retain the mat", captured["input"])
         self.assertIn("We won lot 17", captured["input"])
         self.assertNotIn(payload["job"]["claim_token"], captured["input"])
@@ -159,7 +175,7 @@ class CoordinateWorkerTests(TestCase):
         def fake_process(command, **kwargs):
             captured.update(command=command, **kwargs)
             (Path(kwargs["cwd"]) / "response.json").write_text(
-                json.dumps({"body": "Test response generated with the requested model."}), encoding="utf-8"
+                json.dumps({"body": "Test response generated with the requested model.", "drafts": []}), encoding="utf-8"
             )
             return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
 
@@ -203,6 +219,120 @@ class CoordinateWorkerTests(TestCase):
         with self.assertRaises(worker.WorkerError):
             worker.codex_command("codex", Path("temporary"), "gpt-6-astra", 'ultra"\nmalicious=true')
 
+    def test_production_requires_draft_only_and_accepts_server_created_review_message(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True)
+        payload["messages"][0]["role"] = "system"
+        self.assertEqual(worker.validate_claim(payload), payload["job"])
+        payload["draft_only"] = False
+        with self.assertRaisesRegex(worker.WorkerError, "draft-only"):
+            worker.validate_claim(payload)
+
+    @patch.object(worker, "generate_reply", return_value={"body": "Prepared for review.", "drafts": []})
+    @patch.object(worker, "research_messages")
+    def test_research_requires_all_explicit_capability_flags(self, research, generate):
+        for mode in ({}, {"test_mode": False, "draft_only": True},
+                     {"test_mode": True, "draft_only": True, "research_enabled": True}):
+            with self.subTest(mode=mode):
+                payload = claim_payload()
+                payload.update(mode)
+                api = Mock()
+                api.post.side_effect = [payload, {"reply_id": 42}]
+                worker.run_once(api, "codex", "manual-codex")
+                self.assertEqual(api.post.call_args_list[1].args[1]["research"], [])
+        research.assert_not_called()
+
+    @patch.object(worker, "generate_reply", return_value={"body": "The listing says 10 inches.", "drafts": []})
+    @patch.object(worker, "research_messages")
+    def test_public_evidence_reaches_generation_and_same_completion(self, research, generate):
+        evidence = [{"source_url": "https://example.com/lot", "final_url": "https://example.com/lot",
+                     "title": "Lot 17", "text": "Width 10 inches.", "error": "", "fetched_at": "2026-10-19T00:00:00Z"}]
+        research.return_value = evidence
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True, research_enabled=True, coordination={"plan": {"stage": "research"}})
+        api = Mock()
+        api.post.side_effect = [payload, {"reply_id": 42}]
+        result = worker.run_once(api, "codex", "manual-codex")
+        research.assert_called_once_with(payload["messages"])
+        self.assertEqual(generate.call_args.args[0]["source_evidence"], evidence)
+        self.assertEqual(api.post.call_args_list[1].args[1]["research"], evidence)
+        self.assertEqual(result["research_count"], 1)
+        self.assertFalse(result["test_mode"])
+        self.assertTrue(result["draft_only"])
+
+    def test_generated_drafts_use_saved_contacts_and_coordination_context(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True,
+                       coordination={"plan": {"provider_email": "packer@example.com", "stage": "research"}})
+        draft = {"recipient": "packer@example.com", "subject": "packing inquiry!",
+                 "body": "hello! could you help with packing?", "purpose": "Request a quote after approval."}
+        captured = {}
+
+        def fake_process(command, **kwargs):
+            captured.update(kwargs)
+            (Path(kwargs["cwd"]) / "response.json").write_text(
+                json.dumps({"body": "A draft is ready for website approval.", "drafts": [draft]}), encoding="utf-8"
+            )
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+
+        with patch.object(worker.subprocess, "run", side_effect=fake_process):
+            result = worker.generate_reply(payload, "codex")
+        self.assertEqual(result["drafts"], [draft])
+        self.assertIn('"coordination": {"plan":', captured["input"])
+        self.assertIn('"test_mode": false', captured["input"])
+        self.assertIn("No external\naction is enabled", captured["input"])
+
+    def test_draft_recipient_requires_staff_contact_or_successfully_fetched_evidence(self):
+        draft = {"recipient": "packer@example.com", "subject": "inquiry", "body": "hello!", "purpose": "quote request"}
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True)
+        payload["messages"].append({"role": "assistant", "body": "Maybe packer@example.com"})
+        with self.assertRaisesRegex(worker.WorkerError, "unverified"):
+            worker.validate_drafts([draft], payload)
+        payload["source_evidence"] = [{"text": "packer@example.com", "error": "not retrieved"}]
+        with self.assertRaisesRegex(worker.WorkerError, "unverified"):
+            worker.validate_drafts([draft], payload)
+        payload["source_evidence"][0]["error"] = ""
+        self.assertEqual(worker.validate_drafts([draft], payload), [draft])
+        payload["source_evidence"] = []
+        payload["messages"][0]["body"] = "Use packer@example.com"
+        self.assertEqual(worker.validate_drafts([draft], payload), [draft])
+        payload["test_mode"] = True
+        with self.assertRaisesRegex(worker.WorkerError, "Test-mode"):
+            worker.validate_drafts([draft], payload)
+
+    def test_quote_provider_contacts_and_pause_flags_match_backend_contract(self):
+        draft = {"recipient": "packer@example.com", "subject": "inquiry", "body": "hello!", "purpose": "quote request"}
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True, coordination={"quotes": [
+            {"id": 8, "provider_email": "PACKER@example.com", "provider_name": "Packer",
+             "amount": "100.00", "latest_amount": "140.00", "accepted": True,
+             "accepted_amount": "100.00", "paused": False, "change_amount": "40.00"},
+        ]})
+        self.assertEqual(worker.validate_drafts([draft], payload), [draft])
+        payload["coordination"]["quotes"][0].update(paused=True, latest_amount="150.00", change_amount="50.00")
+        with self.assertRaisesRegex(worker.WorkerError, "paused provider"):
+            worker.validate_drafts([draft], payload)
+
+    def test_legacy_test_mode_with_null_coordination_retains_empty_drafts(self):
+        payload = claim_payload()
+        payload["coordination"] = None
+        self.assertEqual(worker.validate_drafts([], payload), [])
+
+    def test_completion_bounds_multilingual_research_without_losing_generated_drafts(self):
+        generated = {"body": "😀" * 12000, "drafts": [
+            {"recipient": "packer@example.com", "subject": "😀" * 200,
+             "body": "😀" * 3000, "purpose": "😀" * 300} for _ in range(3)
+        ]}
+        evidence = [{"source_url": "https://example.com/" + str(i), "final_url": "https://example.com/" + str(i),
+                     "title": "😀" * 300, "text": "😀" * 6000, "error": "", "fetched_at": "2026-10-19T00:00:00Z"}
+                    for i in range(8)]
+        result = worker.completion_payload({"claim_token": "unchanged"}, generated, evidence)
+        self.assertLessEqual(len(json.dumps(result, ensure_ascii=False).encode("utf-8")), worker.MAX_COMPLETION_BYTES)
+        self.assertEqual(result["drafts"], generated["drafts"])
+        self.assertEqual(result["body"], generated["body"])
+        self.assertEqual(evidence[0]["text"], "😀" * 6000)
+
     @patch.object(worker.subprocess, "run")
     def test_tool_operation_is_rejected(self, run):
         run.return_value = CompletedProcess([], 0, '\n'.join([
@@ -212,7 +342,7 @@ class CoordinateWorkerTests(TestCase):
         with self.assertRaisesRegex(worker.WorkerError, "tool operation"):
             worker.generate_reply(claim_payload(), "codex")
 
-    @patch.object(worker, "generate_reply", return_value="Model response")
+    @patch.object(worker, "generate_reply", return_value={"body": "Model response", "drafts": []})
     def test_one_claim_one_generation_completion_uses_claim_identity(self, generate):
         payload = claim_payload()
         api = Mock()

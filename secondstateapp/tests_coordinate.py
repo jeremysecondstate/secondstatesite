@@ -91,6 +91,10 @@ class CoordinateTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         return response
 
+    def mutate(self, name, case, message=None):
+        args = (case.pk, message.pk) if message else (case.pk,)
+        return self.client.post(reverse(name, args=args), HTTP_ACCEPT="application/json")
+
     def test_all_browser_endpoints_require_active_staff(self):
         case, message = self.create_case(body="private case contents")
         inactive = get_user_model().objects.create_user("coordinate-inactive", is_staff=True, is_active=False)
@@ -473,6 +477,211 @@ class CoordinateTests(TestCase):
         after = CoordinateWorkerState.objects.filter(pk=1).values_list("last_successful_check", flat=True).first()
         self.assertEqual(before, after)
 
+    def test_deletion_and_restore_endpoints_require_staff_post_and_csrf(self):
+        case, message = self.create_case()
+        endpoints = [
+            reverse("coordinate_delete_case", args=(case.pk,)),
+            reverse("coordinate_restore_case", args=(case.pk,)),
+            reverse("coordinate_delete_message", args=(case.pk, message.pk)),
+            reverse("coordinate_restore_message", args=(case.pk, message.pk)),
+        ]
+        for user in (None, self.ordinary):
+            browser = Client()
+            if user:
+                browser.force_login(user)
+            for endpoint in endpoints:
+                with self.subTest(endpoint=endpoint, user=user):
+                    self.assertIn(browser.post(endpoint).status_code, (302, 403))
+        protected = Client(enforce_csrf_checks=True)
+        protected.force_login(self.staff)
+        for endpoint in endpoints:
+            self.assertEqual(self.client.get(endpoint).status_code, 405)
+            self.assertEqual(protected.post(endpoint, HTTP_AUTHORIZATION=self.authorization).status_code, 403)
+        message.refresh_from_db()
+        case.refresh_from_db()
+        self.assertIsNone(message.deleted_at)
+        self.assertIsNone(case.deleted_at)
+
+    def test_message_delete_is_reversible_tombstone_with_audit_and_no_worker_reply(self):
+        body = "private text to remove from visible context"
+        case, message = self.create_case(body)
+        claimed = self.claim()
+        response = self.mutate("coordinate_delete_message", case, message)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("no-store", response.headers["Cache-Control"])
+        row = response.json()["messages"][0]
+        self.assertTrue(row["deleted"])
+        self.assertEqual(row["body"], "")
+        self.assertEqual(row["status"], "deleted")
+        self.assertNotIn(body, response.content.decode())
+        self.assertEqual(row["restore_url"], reverse("coordinate_restore_message", args=(case.pk, message.pk)))
+        message.refresh_from_db()
+        self.assertEqual(message.body, body)
+        self.assertEqual(message.deleted_by, self.staff)
+        job = CoordinateJob.objects.get(message=message)
+        self.assertEqual(job.status, "cancelled")
+        self.assertIsNone(job.claim_token)
+        self.assertIsNone(job.lease_expires_at)
+        self.assertEqual(self.complete(claimed).status_code, 409)
+        self.assertIsNone(self.claim()["job"])
+        self.assertEqual(self.mutate("coordinate_delete_message", case, message).status_code, 200)
+        self.assertEqual(CoordinateActivity.objects.filter(event="message_deleted").count(), 1)
+        self.assertEqual(CoordinateMessage.objects.count(), 1)
+
+    def test_deleted_message_restore_requeues_with_new_claim_and_rejects_old_claim(self):
+        case, message = self.create_case()
+        old_claim = self.claim()
+        self.mutate("coordinate_delete_message", case, message)
+        restored = self.mutate("coordinate_restore_message", case, message)
+        self.assertEqual(restored.status_code, 200)
+        self.assertFalse(restored.json()["messages"][0]["deleted"])
+        self.assertEqual(restored.json()["messages"][0]["body"], message.body)
+        message.refresh_from_db()
+        self.assertIsNone(message.deleted_at)
+        self.assertIsNone(message.deleted_by)
+        self.assertEqual(self.complete(old_claim).status_code, 409)
+        new_claim = self.claim()
+        self.assertEqual(new_claim["job"]["id"], old_claim["job"]["id"])
+        self.assertNotEqual(new_claim["job"]["claim_token"], old_claim["job"]["claim_token"])
+        self.assertEqual(self.complete(new_claim).status_code, 200)
+        self.assertEqual(self.mutate("coordinate_restore_message", case, message).status_code, 200)
+        self.assertEqual(CoordinateActivity.objects.filter(event="message_restored").count(), 1)
+        self.assertEqual(CoordinateMessage.objects.filter(in_reply_to=message).count(), 1)
+
+    def test_message_mutations_are_bound_to_the_selected_case(self):
+        case_a, message_a = self.create_case("case A")
+        case_b, message_b = self.create_case("case B")
+        for name in ("coordinate_delete_message", "coordinate_restore_message"):
+            self.assertEqual(self.mutate(name, case_b, message_a).status_code, 404)
+        self.assertEqual(CoordinateMessage.objects.filter(deleted_at__isnull=False).count(), 0)
+        self.assertEqual(CoordinateMessage.objects.filter(case=case_a).get().pk, message_a.pk)
+        self.assertEqual(CoordinateMessage.objects.filter(case=case_b).get().pk, message_b.pk)
+
+    def test_deleting_history_invalidates_later_claim_and_excludes_deleted_exchange(self):
+        case, first = self.create_case("old context to remove")
+        self.assertEqual(self.complete(self.claim(), body="old generated reply").status_code, 200)
+        followup = self.post_message(case, "current request")
+        stale = self.claim()
+        self.mutate("coordinate_delete_message", case, first)
+        self.assertEqual(self.complete(stale).status_code, 409)
+        fresh = self.claim()
+        self.assertEqual(fresh["job"]["message_id"], followup.pk)
+        self.assertNotEqual(fresh["job"]["claim_token"], stale["job"]["claim_token"])
+        self.assertEqual([item["body"] for item in fresh["messages"]], [followup.body])
+        self.assertEqual(CoordinateMessage.objects.get(in_reply_to=first).body, "old generated reply")
+        self.mutate("coordinate_restore_message", case, first)
+        self.assertEqual(self.complete(fresh).status_code, 409)
+        restored_context = self.claim()
+        self.assertEqual([item["body"] for item in restored_context["messages"]], [first.body, "old generated reply", followup.body])
+
+    def test_deleted_oldest_message_does_not_block_later_live_message(self):
+        case, first = self.create_case("delete oldest pending input")
+        later = self.post_message(case, "keep this input")
+        self.mutate("coordinate_delete_message", case, first)
+        claimed = self.claim()
+        self.assertEqual(claimed["job"]["message_id"], later.pk)
+        self.assertEqual([item["body"] for item in claimed["messages"]], [later.body])
+        self.mutate("coordinate_restore_message", case, first)
+        self.assertEqual(self.complete(claimed).status_code, 409)
+        self.assertEqual(self.claim()["job"]["message_id"], first.pk)
+
+    def test_deleting_and_restoring_completed_reply_never_regenerates_it(self):
+        case, message = self.create_case()
+        claim = self.claim()
+        self.assertEqual(self.complete(claim).status_code, 200)
+        reply = CoordinateMessage.objects.get(in_reply_to=message)
+        self.mutate("coordinate_delete_message", case, reply)
+        self.assertTrue(self.state(case).json()["messages"][1]["deleted"])
+        self.assertEqual(self.complete(claim).status_code, 409)
+        self.assertIsNone(self.claim()["job"])
+        self.mutate("coordinate_restore_message", case, reply)
+        self.assertFalse(self.state(case).json()["messages"][1]["deleted"])
+        self.assertIsNone(self.claim()["job"])
+        self.assertEqual(CoordinateMessage.objects.filter(in_reply_to=message).count(), 1)
+        self.assertEqual(CoordinateJob.objects.get(message=message).status, "completed")
+
+    def test_deleted_input_is_not_exposed_through_an_automatically_derived_case_title(self):
+        case, message = self.create_case("sensitive first line\nmore details", title="")
+        self.assertEqual(case.title, "sensitive first line")
+        response = self.mutate("coordinate_delete_message", case, message)
+        self.assertNotIn("sensitive first line", response.content.decode())
+        self.assertEqual(response.json()["selected_case"]["title"], "Untitled case")
+        self.post_message(case, "remaining active input")
+        self.assertNotIn("sensitive first line", json.dumps(self.claim()))
+        self.mutate("coordinate_restore_message", case, message)
+        case.refresh_from_db()
+        self.assertEqual(case.title, "sensitive first line")
+
+    def test_case_trash_redacts_conversation_cancels_work_and_is_idempotent(self):
+        case, first = self.create_case("case contents must disappear")
+        self.post_message(case, "another message in trashed case")
+        old_claim = self.claim()
+        response = self.mutate("coordinate_delete_case", case)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["cases"], [])
+        self.assertEqual(data["trash_cases"][0]["id"], str(case.pk))
+        self.assertTrue(data["selected_case"]["deleted"])
+        self.assertTrue(all(row["deleted"] and row["body"] == "" for row in data["messages"]))
+        self.assertEqual(self.client.get(reverse("coordinate_case", args=(case.pk,))).status_code, 200)
+        self.assertNotIn(first.body, self.state(case).content.decode())
+        self.assertIsNone(self.claim()["job"])
+        self.assertEqual(self.complete(old_claim).status_code, 409)
+        self.assertEqual(set(CoordinateJob.objects.values_list("status", flat=True)), {"cancelled"})
+        case.refresh_from_db()
+        self.assertEqual(case.deleted_by, self.staff)
+        self.assertEqual(self.mutate("coordinate_delete_case", case).status_code, 200)
+        self.assertEqual(CoordinateActivity.objects.filter(event="case_deleted").count(), 1)
+        self.assertEqual(CoordinateMessage.objects.count(), 2)
+
+    def test_case_restore_preserves_individual_deletions_and_historical_replies(self):
+        case, completed = self.create_case("already answered")
+        self.assertEqual(self.complete(self.claim()).status_code, 200)
+        removed = self.post_message(case, "keep individually deleted")
+        self.mutate("coordinate_delete_message", case, removed)
+        pending = self.post_message(case, "resume this input after restoring case")
+        old_claim = self.claim()
+        self.mutate("coordinate_delete_case", case)
+        restored = self.mutate("coordinate_restore_case", case)
+        self.assertEqual(restored.status_code, 200)
+        self.assertFalse(restored.json()["selected_case"]["deleted"])
+        self.assertEqual(restored.json()["trash_cases"], [])
+        removed.refresh_from_db()
+        self.assertIsNotNone(removed.deleted_at)
+        self.assertEqual(CoordinateJob.objects.get(message=removed).status, "cancelled")
+        self.assertEqual(CoordinateJob.objects.get(message=completed).status, "completed")
+        self.assertEqual(self.complete(old_claim).status_code, 409)
+        new_claim = self.claim()
+        self.assertEqual(new_claim["job"]["message_id"], pending.pk)
+        self.assertNotEqual(new_claim["job"]["claim_token"], old_claim["job"]["claim_token"])
+        self.assertNotIn(removed.body, json.dumps(new_claim))
+        self.assertEqual(self.mutate("coordinate_restore_case", case).status_code, 200)
+        self.assertEqual(CoordinateActivity.objects.filter(event="case_restored").count(), 1)
+
+    def test_trashed_case_rejects_message_writes_and_individual_restore(self):
+        case, message = self.create_case()
+        self.mutate("coordinate_delete_message", case, message)
+        self.mutate("coordinate_delete_case", case)
+        for name in ("coordinate_delete_message", "coordinate_restore_message"):
+            self.assertEqual(self.mutate(name, case, message).status_code, 409)
+        response = self.client.post(reverse("coordinate_message", args=(case.pk,)), {
+            "body": "cannot add to trash", "client_message_id": str(uuid4()),
+        })
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(CoordinateMessage.objects.count(), 1)
+
+    def test_duplicate_submission_cannot_resurrect_deleted_message_or_case(self):
+        case, message = self.create_case()
+        self.mutate("coordinate_delete_message", case, message)
+        payload = {"body": message.body, "client_message_id": str(message.client_message_id)}
+        self.assertEqual(self.client.post(reverse("coordinate_create"), payload).status_code, 409)
+        self.assertEqual(self.client.post(reverse("coordinate_message", args=(case.pk,)), payload).status_code, 409)
+        self.mutate("coordinate_restore_message", case, message)
+        self.mutate("coordinate_delete_case", case)
+        self.assertEqual(self.client.post(reverse("coordinate_create"), payload).status_code, 409)
+        self.assertEqual(CoordinateCase.objects.count(), 1)
+        self.assertEqual(CoordinateMessage.objects.count(), 1)
+
 
 @override_settings(
     COORDINATE_WORKER_TOKEN="coordinate-test-token-not-a-real-secret",
@@ -492,19 +701,24 @@ class CoordinateConcurrencyTests(TransactionTestCase):
         self.assertIn(response.status_code, (200, 201, 302))
         self.message = CoordinateMessage.objects.get(body="one pending message")
 
-    def concurrent_posts(self, url, payload):
+    def concurrent_posts(self, url, payload, *, other_staff_url=None, retry_conflicts=True):
         barrier = Barrier(2)
 
         def post(index):
             close_old_connections()
-            client = Client(enforce_csrf_checks=True)
+            staff_request = index == 1 and other_staff_url is not None
+            client = Client(enforce_csrf_checks=not staff_request)
+            if staff_request:
+                client.cookies = self.client.cookies.copy()
+            request_url = other_staff_url if staff_request else url
             barrier.wait(timeout=10)
             try:
                 for attempt in range(20):
                     try:
                         response = client.post(
-                            url, json.dumps(payload), content_type="application/json",
+                            request_url, json.dumps(payload), content_type="application/json",
                             HTTP_AUTHORIZATION="Bearer coordinate-test-token-not-a-real-secret",
+                            HTTP_ACCEPT="application/json",
                         )
                     except OperationalError as exc:
                         # SQLite shared-memory test databases cannot wait on locks.
@@ -514,7 +728,7 @@ class CoordinateConcurrencyTests(TransactionTestCase):
                             raise
                         time.sleep(0.01 * (index + 1) * (attempt + 1))
                         continue
-                    if response.status_code in (409, 503):
+                    if response.status_code == 503 or (retry_conflicts and response.status_code == 409):
                         time.sleep(0.01 * (index + 1))
                         continue
                     return response.status_code, response.json()
@@ -552,3 +766,58 @@ class CoordinateConcurrencyTests(TransactionTestCase):
         self.assertEqual(responses[0][1]["reply_id"], responses[1][1]["reply_id"])
         self.assertEqual(CoordinateMessage.objects.filter(in_reply_to=self.message).count(), 1)
         self.assertEqual(CoordinateActivity.objects.filter(event="reply_saved", job_id=job["id"]).count(), 1)
+
+    def test_message_deletion_racing_claim_cannot_leave_claimed_deleted_work(self):
+        responses = self.concurrent_posts(
+            reverse("coordinate_worker_claim"), {"worker_id": "manual-codex"},
+            other_staff_url=reverse("coordinate_delete_message", args=(self.message.case_id, self.message.pk)),
+            retry_conflicts=False,
+        )
+        self.assertEqual([status for status, _ in responses], [200, 200])
+        self.message.refresh_from_db()
+        self.assertIsNotNone(self.message.deleted_at)
+        job = CoordinateJob.objects.get(message=self.message)
+        self.assertEqual(job.status, "cancelled")
+        self.assertIsNone(job.claim_token)
+        self.assertFalse(CoordinateMessage.objects.filter(in_reply_to=self.message).exists())
+        claim = responses[0][1]["job"]
+        if claim:
+            response = self.client.post(
+                reverse("coordinate_worker_complete", args=(claim["id"],)),
+                json.dumps({**claim, "worker_id": "manual-codex", "body": "must not save after deletion"}),
+                content_type="application/json", HTTP_AUTHORIZATION="Bearer coordinate-test-token-not-a-real-secret",
+            )
+            self.assertEqual(response.status_code, 409)
+
+    def test_case_deletion_racing_completion_never_saves_a_reply_after_deletion(self):
+        response = self.client.post(
+            reverse("coordinate_worker_claim"), json.dumps({"worker_id": "manual-codex"}),
+            content_type="application/json", HTTP_AUTHORIZATION="Bearer coordinate-test-token-not-a-real-secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        job = response.json()["job"]
+        payload = {
+            "claim_token": job["claim_token"], "case_id": job["case_id"],
+            "message_id": job["message_id"], "worker_id": "manual-codex", "body": "racing response",
+        }
+        responses = self.concurrent_posts(
+            reverse("coordinate_worker_complete", args=(job["id"],)), payload,
+            other_staff_url=reverse("coordinate_delete_case", args=(self.message.case_id,)),
+            retry_conflicts=False,
+        )
+        self.assertIn(responses[0][0], (200, 409), responses)
+        self.assertEqual(responses[1][0], 200, responses)
+        case = CoordinateCase.objects.get(pk=self.message.case_id)
+        self.assertIsNotNone(case.deleted_at)
+        replies = CoordinateMessage.objects.filter(in_reply_to=self.message)
+        self.assertLessEqual(replies.count(), 1)
+        if replies.exists():
+            self.assertLessEqual(replies.get().created_at, case.deleted_at)
+        saved_job = CoordinateJob.objects.get(pk=job["id"])
+        self.assertIn(saved_job.status, ("cancelled", "completed"))
+        self.assertIsNone(saved_job.claim_token)
+        retry = self.client.post(
+            reverse("coordinate_worker_complete", args=(job["id"],)), json.dumps(payload),
+            content_type="application/json", HTTP_AUTHORIZATION="Bearer coordinate-test-token-not-a-real-secret",
+        )
+        self.assertEqual(retry.status_code, 409)

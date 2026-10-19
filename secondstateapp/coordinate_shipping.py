@@ -1,0 +1,215 @@
+"""Shipping context, draft persistence and deadline checks. No sending capability."""
+from datetime import timedelta
+from decimal import Decimal
+import re
+import uuid
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.db import transaction
+from django.db.models import Q
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
+from .models import (
+    CoordinateActivity, CoordinateCase, CoordinateDraft, CoordinateJob,
+    CoordinateMessage, CoordinatePlan, CoordinateQuote, CoordinateResearch,
+)
+
+EMAIL_PATTERN = re.compile(r"[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9.-]*[A-Z0-9])?\.[A-Z]{2,}", re.I)
+
+
+def enabled():
+    return settings.COORDINATE_DRAFT_WORKFLOW_ENABLED
+
+
+def quote_paused(quote):
+    return bool(quote.accepted_amount is not None
+                and quote.latest_amount - quote.accepted_amount >= Decimal("50")
+                and (quote.increase_reviewed_amount is None or quote.latest_amount > quote.increase_reviewed_amount))
+
+
+def draft_blocked(draft, quotes=None):
+    quotes = quotes if quotes is not None else draft.case.shipping_quotes.all()
+    return any(quote_paused(quote) and (draft.quote_id == quote.pk or draft.recipient.casefold() == quote.provider_email.casefold()) for quote in quotes)
+
+
+def visible_artifacts(query):
+    # Deleted conversation inputs must not re-enter the model through derived artifacts.
+    return query.filter(Q(job__isnull=True) | Q(job__message__deleted_at__isnull=True, job__message__worker_reply__deleted_at__isnull=True))
+
+
+def research_state(case):
+    result, seen = [], set()
+    for item in visible_artifacts(case.research.all())[:40]:
+        if item.source_url in seen:
+            continue
+        seen.add(item.source_url)
+        result.append({"source_url": item.source_url, "final_url": item.final_url, "title": item.title,
+                       "text": item.text, "fetched_at": item.fetched_at.isoformat(), "error": item.error})
+        if len(result) == 8:
+            break
+    return result
+
+
+def coordination_state(case):
+    if not case or case.deleted_at or not enabled():
+        return None
+    plan = CoordinatePlan.objects.filter(case=case).first() or CoordinatePlan(case=case)
+    quotes = list(case.shipping_quotes.all())
+    drafts = list(visible_artifacts(case.email_drafts.select_related("quote")))
+    return {
+        "draft_only": True,
+        "plan": {"stage": plan.stage, "destination": plan.destination, "handling": plan.handling,
+                 "pickup_deadline": plan.pickup_deadline.astimezone(ZoneInfo("America/New_York")).isoformat() if plan.pickup_deadline else "",
+                 "notes": plan.notes, "tracking_number": plan.tracking_number, "tracking_url": plan.tracking_url,
+                 "update_url": reverse("coordinate_plan", args=[case.pk])},
+        "quotes": [{"id": str(q.pk), "provider_name": q.provider_name, "provider_email": q.provider_email,
+                    "amount": str(q.amount), "currency": q.currency, "latest_amount": str(q.latest_amount),
+                    "accepted": q.accepted, "accepted_amount": str(q.accepted_amount) if q.accepted_amount is not None else None,
+                    "accepted_destination": q.accepted_destination, "accepted_handling": q.accepted_handling,
+                    "paused": quote_paused(q), "change_amount": str(q.latest_amount - q.accepted_amount) if q.accepted_amount is not None else "0.00",
+                    "update_url": reverse("coordinate_quote_update", args=[case.pk, q.pk]),
+                    "accept_url": reverse("coordinate_quote_accept", args=[case.pk, q.pk]),
+                    "resolve_url": reverse("coordinate_quote_resolve", args=[case.pk, q.pk])} for q in quotes],
+        "drafts": [{"id": str(d.pk), "recipient": d.recipient, "subject": d.subject, "body": d.body,
+                    "purpose": d.purpose, "status": d.status, "blocked": draft_blocked(d, quotes),
+                    "quote_id": str(d.quote_id) if d.quote_id else "",
+                    "save_url": reverse("coordinate_draft_update", args=[case.pk, d.pk]),
+                    "review_url": reverse("coordinate_draft_review", args=[case.pk, d.pk])} for d in drafts],
+        "research": research_state(case),
+        "urls": {"add_quote": reverse("coordinate_quote_add", args=[case.pk]),
+                 "add_draft": reverse("coordinate_draft_add", args=[case.pk])},
+    }
+
+
+def _bounded_string(value, maximum, required=False):
+    if not isinstance(value, str) or len(value) > maximum or (required and not value.strip()):
+        raise ValueError("Invalid worker artifact text.")
+    return value.strip()
+
+
+def _research_url(value, required=True, allow_http=False):
+    value = _bounded_string(value, 2048, required)
+    if not value and not required:
+        return value
+    try:
+        parsed = urlsplit(value)
+        allowed_ports = {"https": 443, **({"http": 80} if allow_http else {})}
+        if (parsed.scheme not in allowed_ports or not parsed.hostname
+                or parsed.username is not None or parsed.password is not None
+                or parsed.port not in (None, allowed_ports[parsed.scheme])):
+            raise ValueError
+    except ValueError:
+        raise ValueError("Research URLs must use HTTPS, or standard HTTP for a failed fetch, without credentials.")
+    return value
+
+
+def validate_worker_artifacts(data):
+    research, drafts = data.get("research", []), data.get("drafts", [])
+    if not isinstance(research, list) or len(research) > 8 or not isinstance(drafts, list) or len(drafts) > 3:
+        raise ValueError("Too many worker artifacts.")
+    cleaned_research, cleaned_drafts = [], []
+    seen = set()
+    for item in research:
+        if not isinstance(item, dict):
+            raise ValueError("Invalid research record.")
+        error = _bounded_string(item.get("error", ""), 200)
+        source_url = _research_url(item.get("source_url"), allow_http=bool(error))
+        if source_url in seen:
+            raise ValueError("Duplicate research source.")
+        seen.add(source_url)
+        fetched = parse_datetime(_bounded_string(item.get("fetched_at"), 64, True))
+        if not fetched or timezone.is_naive(fetched) or fetched > timezone.now() + timedelta(minutes=5):
+            raise ValueError("Invalid research timestamp.")
+        cleaned_research.append({"source_url": source_url, "final_url": _research_url(item.get("final_url", ""), False, allow_http=bool(error)),
+                                 "title": _bounded_string(item.get("title", ""), 300), "text": _bounded_string(item.get("text", ""), 6000),
+                                 "error": error, "fetched_at": fetched})
+    for item in drafts:
+        if not isinstance(item, dict):
+            raise ValueError("Invalid draft record.")
+        recipient = _bounded_string(item.get("recipient"), 254, True)
+        subject = _bounded_string(item.get("subject"), 200, True)
+        try:
+            validate_email(recipient)
+        except ValidationError:
+            raise ValueError("Invalid draft recipient.")
+        if any(c in recipient + subject for c in "\r\n"):
+            raise ValueError("Invalid draft header.")
+        cleaned_drafts.append({"recipient": recipient, "subject": subject,
+                               "body": _bounded_string(item.get("body"), 12000, True),
+                               "purpose": _bounded_string(item.get("purpose", ""), 300)})
+    if not enabled() and (cleaned_research or cleaned_drafts):
+        raise ValueError("Shipping research and drafts are not enabled.")
+    return cleaned_research, cleaned_drafts
+
+
+def save_worker_artifacts(job, artifacts):
+    research, drafts = artifacts
+    case = job.message.case
+    # Recipients must have been provided in case context or public source evidence.
+    quotes = list(case.shipping_quotes.order_by("-accepted", "created_at"))
+    known = {quote.provider_email.casefold() for quote in quotes}
+    staff_text = "\n".join(case.messages.filter(role="staff", deleted_at__isnull=True, pk__lte=job.message_id).values_list("body", flat=True))
+    plan_notes = CoordinatePlan.objects.filter(case=case).values_list("notes", flat=True).first() or ""
+    successful_sources = [r["text"] for r in [*research, *research_state(case)] if not r["error"]]
+    for source in [staff_text, plan_notes, *successful_sources]:
+        known.update(match.casefold() for match in EMAIL_PATTERN.findall(source))
+    for draft in drafts:
+        if draft["recipient"].casefold() not in known:
+            raise ValueError("Draft recipient has no supporting case evidence.")
+    for item in research:
+        CoordinateResearch.objects.create(case=case, job=job, **item)
+    saved_drafts = 0
+    for item in drafts:
+        provider_quotes = [quote for quote in quotes if quote.provider_email.casefold() == item["recipient"].casefold()]
+        # A paused provider thread must receive no newly prepared response.
+        if any(quote_paused(quote) for quote in provider_quotes):
+            continue
+        quote = provider_quotes[0] if provider_quotes else None
+        CoordinateDraft.objects.create(case=case, job=job, quote=quote, **item)
+        saved_drafts += 1
+    if research or drafts:
+        CoordinateActivity.objects.create(case=case, job=job, event="research_and_drafts_saved",
+                                          details={"research_count": len(research), "draft_count": saved_drafts, "sent": False})
+
+
+def invalidate_context(case):
+    """A saved staff decision invalidates work generated from its earlier version."""
+    CoordinateJob.objects.filter(message__case=case, status="processing").update(
+        status="retry", claim_token=None, lease_expires_at=None, available_at=timezone.now(),
+        last_error="Case details changed; pending a fresh worker check.")
+
+
+def enqueue_due_reviews():
+    """One durable reminder per recorded pickup deadline, even without new messages."""
+    if not enabled():
+        return
+    from .coordinate_views import _locked_case
+    now = timezone.now()
+    due = CoordinatePlan.objects.filter(
+        case__deleted_at__isnull=True, pickup_deadline__lte=now + timedelta(hours=48),
+        deadline_reminded_at__isnull=True, stage__in=["gathering", "quotes", "ready"],
+    ).values_list("case_id", flat=True)[:20]
+    for case_id in list(due):
+        with transaction.atomic():
+            case = _locked_case(case_id)
+            if case.deleted_at:
+                continue
+            plan = CoordinatePlan.objects.get(case=case)
+            if plan.deadline_reminded_at or plan.stage not in ("gathering", "quotes", "ready") or not plan.pickup_deadline or plan.pickup_deadline > now + timedelta(hours=48):
+                continue
+            plan.deadline_reminded_at = now
+            plan.save(update_fields=["deadline_reminded_at"])
+            message = CoordinateMessage.objects.create(
+                case=case, role="system", client_message_id=uuid.uuid4(),
+                body=f"Pickup deadline check: the recorded deadline is {plan.pickup_deadline.isoformat()}. Review the saved case plan and identify any decision or missing information needed. No external action is authorized.",
+            )
+            job = CoordinateJob.objects.create(message=message)
+            CoordinateCase.objects.filter(pk=case.pk).update(updated_at=now)
+            CoordinateActivity.objects.create(case=case, job=job, event="pickup_deadline_review_queued",
+                                              details={"deadline": plan.pickup_deadline.isoformat()})
