@@ -18,6 +18,8 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from .coordinate_shipping import draft_blocked, enabled, invalidate_context, quote_paused
+from .coordinate_mail import draft_digest, require_current_digest, require_draft_editable, validate_draft_thread
+from .coordinate_mail_models import CoordinateMailThread
 from .models import CoordinateActivity, CoordinateCase, CoordinateDraft, CoordinatePlan, CoordinateQuote
 
 
@@ -101,7 +103,7 @@ def update_plan(request, case):
     handling = field(request, "handling", 2000)
     if plan.destination != destination or plan.handling != handling:
         case.shipping_quotes.filter(accepted=True).update(accepted=False)
-        case.email_drafts.filter(status="reviewed").update(status="draft", reviewed_at=None, reviewed_by=None)
+        case.email_drafts.filter(status="reviewed", mail_delivery__isnull=True).update(status="draft", reviewed_at=None, reviewed_by=None, reviewed_digest="")
     if plan.pickup_deadline != deadline:
         plan.deadline_reminded_at = None
     plan.stage, plan.destination, plan.handling = stage, destination, handling
@@ -130,7 +132,7 @@ def update_quote(request, case, quote_id):
     quote.latest_amount = money(field(request, "latest_amount", 40, True))
     quote.save(update_fields=["latest_amount"])
     if quote_paused(quote):
-        case.email_drafts.filter(recipient__iexact=quote.provider_email).update(status="draft", reviewed_at=None, reviewed_by=None)
+        case.email_drafts.filter(recipient__iexact=quote.provider_email, mail_delivery__isnull=True).update(status="draft", reviewed_at=None, reviewed_by=None, reviewed_digest="")
         CoordinateActivity.objects.create(case=case, event="provider_thread_paused", details={
             "quote_id": str(quote.pk), "accepted_baseline": str(quote.accepted_amount),
             "latest_amount": str(quote.latest_amount), "notify": "Jeremy", "payment_authorized": False,
@@ -181,8 +183,15 @@ def draft_fields(request, case):
         except ValueError:
             raise ValueError("Choose a valid provider quote.")
     quote = get_object_or_404(CoordinateQuote, pk=quote_id, case=case) if quote_id else None
+    thread_id = field(request, "thread_id", 36)
+    try:
+        thread = CoordinateMailThread.objects.get(pk=uuid.UUID(thread_id), case=case) if thread_id else None
+    except (ValueError, CoordinateMailThread.DoesNotExist):
+        raise ValueError("Choose a valid email thread from this case.") from None
+    candidate = CoordinateDraft(case=case, recipient=recipient, subject=subject, mail_thread=thread)
+    validate_draft_thread(candidate)
     return {"recipient": recipient, "subject": subject, "body": field(request, "body", 12000, True),
-            "purpose": field(request, "purpose", 300), "quote": quote}
+            "purpose": field(request, "purpose", 300), "quote": quote, "mail_thread": thread}
 
 
 @staff_action("email_draft_added")
@@ -194,9 +203,11 @@ def add_draft(request, case):
 @staff_action("email_draft_edited")
 def update_draft(request, case, draft_id):
     draft = get_object_or_404(CoordinateDraft, pk=draft_id, case=case)
+    require_draft_editable(draft)
+    require_current_digest(draft, request.POST.get("content_digest"))
     for name, value in draft_fields(request, case).items():
         setattr(draft, name, value)
-    draft.status, draft.reviewed_at, draft.reviewed_by = "draft", None, None
+    draft.status, draft.reviewed_at, draft.reviewed_by, draft.reviewed_digest = "draft", None, None, ""
     draft.save()
     return {"draft_id": str(draft.pk), "sent": False}
 
@@ -204,8 +215,12 @@ def update_draft(request, case, draft_id):
 @staff_action("email_draft_reviewed")
 def review_draft(request, case, draft_id):
     draft = get_object_or_404(CoordinateDraft, pk=draft_id, case=case)
+    require_draft_editable(draft)
+    require_current_digest(draft, request.POST.get("content_digest"))
+    validate_draft_thread(draft)
     if draft_blocked(draft):
         raise ValueError("This provider thread is paused for Jeremy's price review. Even acknowledgment must wait.")
     draft.status, draft.reviewed_at, draft.reviewed_by = "reviewed", timezone.now(), request.user
-    draft.save(update_fields=["status", "reviewed_at", "reviewed_by"])
+    draft.reviewed_digest = draft_digest(draft)
+    draft.save(update_fields=["status", "reviewed_at", "reviewed_by", "reviewed_digest"])
     return {"draft_id": str(draft.pk), "sent": False}

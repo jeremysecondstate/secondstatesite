@@ -47,7 +47,11 @@ class CoordinateShippingTests(TestCase):
         args = [str((case or self.case).pk)]
         if record:
             args.append(str(record.pk))
-        return self.client.post(reverse(name, args=args), data or {}, HTTP_ACCEPT="application/json")
+        data = dict(data or {})
+        if record and name in ("coordinate_draft_review", "coordinate_draft_update"):
+            from .coordinate_mail import draft_digest
+            data.setdefault("content_digest", draft_digest(CoordinateDraft.objects.get(pk=record.pk)))
+        return self.client.post(reverse(name, args=args), data, HTTP_ACCEPT="application/json")
 
     def plan(self, **changes):
         response = self.post("coordinate_plan", {

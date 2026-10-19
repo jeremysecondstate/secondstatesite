@@ -29,13 +29,14 @@
   let panelsInFlight = false;
   let actionInFlight = false;
   let mutationVersion = 0;
+  const uncertainEmailSends = new Set();
   let initialPlanning = {};
   const initialPlanningScript = document.getElementById("coordinate-initial-planning");
   if (initialPlanningScript) {
     try { initialPlanning = JSON.parse(initialPlanningScript.textContent) || {}; } catch (_) { /* Native forms remain available. */ }
     initialPlanningScript.remove();
   }
-  const panelKeys = { briefing: "brief", intake: "intake", plan: "plan", quotes: "quotes", drafts: "drafts", research: "research" };
+  const panelKeys = { briefing: "brief", intake: "intake", plan: "plan", quotes: "quotes", drafts: "drafts", mail: "mail", research: "research" };
   const panelSignatures = Object.fromEntries(Object.keys(panelKeys).map((key) => [key, panelSignature(initialPlanning, key)]));
   initialPlanning = null;
 
@@ -46,6 +47,7 @@
       const { submission_token, ...content } = value;
       return JSON.stringify(content);
     }
+    if (key === "drafts") return JSON.stringify({ drafts: value, mail: coordination?.mail });
     return JSON.stringify(value);
   }
 
@@ -67,7 +69,7 @@
 
   root.querySelectorAll("time[datetime]").forEach((element) => formatTime(element, element.dateTime));
   formatDeadlineInputs(root);
-  root.querySelectorAll(".coordinate-message-body").forEach((element) => messageBody(element, element.textContent));
+  root.querySelectorAll(".coordinate-message-body, .coordinate-email-body").forEach((element) => messageBody(element, element.textContent));
   prepareSourceLinks(root);
   if (messageList) messageList.scrollTop = messageList.scrollHeight;
 
@@ -90,7 +92,7 @@
   function prepareSourceLinks(container) {
     container.querySelectorAll("[data-source-link], [data-private-download]").forEach((link) => {
       const value = link.getAttribute("href") || "";
-      const anchor = /^#coordinate-(?:message-\d+|document-[0-9a-f-]{36})$/i.test(value);
+      const anchor = /^#coordinate-(?:message-\d+|document-[0-9a-f-]{36}|email-[0-9a-f-]{36}|mail-thread-[0-9a-f-]{36})$/i.test(value);
       const privatePath = value.startsWith("/") && safePath(value);
       if (anchor || privatePath) return;
       if (link.hasAttribute("data-private-download") || !httpLink(value)) {
@@ -399,10 +401,37 @@
       if (!draft) { card.remove(); return; }
       const warning = card.querySelector("[data-draft-blocked]");
       if (warning) warning.hidden = !draft.blocked;
+      const locked = draft.editable === false || ["queued", "sending", "sent", "unknown"].includes(draft.send_status);
+      const dirty = Boolean(card.querySelector("form[data-dirty='true']"));
+      card.dataset.sendStatus = draft.send_status || "";
+      const fields = card.querySelector(".coordinate-draft-fields");
+      if (fields) fields.disabled = locked;
+      text(card.querySelector("[data-delivery-status]"), draft.send_status || draft.status || "Draft");
+      const deliveryNote = card.querySelector("[data-delivery-note]");
+      if (deliveryNote) {
+        deliveryNote.hidden = !locked;
+        if (locked) text(deliveryNote, draft.send_status === "sent"
+          ? "Sent. This message is read-only. The sent version appears in its linked email thread. Start a reply draft to continue."
+          : draft.send_status === "unknown"
+          ? "Delivery has not been confirmed. This message is locked while its status is checked. Do not resend it or create a duplicate."
+          : "Sending is in progress. This message is locked while delivery is checked.");
+      }
+      if (locked) uncertainEmailSends.delete(String(draft.id));
       const review = card.querySelector(".coordinate-draft-review button[type='submit']");
       if (review && !actionInFlight) {
-        review.disabled = Boolean(draft.blocked) || draft.status === "reviewed";
-        text(review, draft.status === "reviewed" ? "Reviewed" : "Mark reviewed");
+        const reviewed = draft.status === "reviewed" && draft.reviewed_digest && draft.reviewed_digest === draft.current_digest;
+        review.disabled = Boolean(draft.blocked) || Boolean(reviewed) || locked || dirty;
+        text(review, reviewed ? "Reviewed" : draft.status === "reviewed" ? "Review current draft" : "Mark reviewed");
+      }
+      const sendForm = card.querySelector(".coordinate-draft-send");
+      const send = sendForm?.querySelector("button[type='submit']");
+      if (send) {
+        const current = sendForm.elements.content_digest?.value;
+        const valid = Boolean(coordination.mail?.enabled && coordination.mail?.ready && draft.can_send
+          && draft.status === "reviewed" && draft.reviewed_digest && draft.reviewed_digest === draft.current_digest
+          && current === draft.reviewed_digest && !draft.blocked && !locked);
+        sendForm.hidden = !valid;
+        send.disabled = !valid || dirty || actionInFlight || uncertainEmailSends.has(String(draft.id));
       }
     });
   }
@@ -447,8 +476,10 @@
         replacement.querySelectorAll("time[datetime]").forEach((element) => formatTime(element, element.dateTime));
         formatDeadlineInputs(replacement);
         prepareSourceLinks(replacement);
+        replacement.querySelectorAll(".coordinate-email-body").forEach((element) => messageBody(element, element.textContent));
         panelSignatures[key] = panelSignature(state.coordination, key);
       }
+      updatePlanningRestrictions(latestState?.coordination || state.coordination);
     } catch (_) {
       // Conversation polling continues; changed panels are retried on the next check.
     } finally {
@@ -507,23 +538,25 @@
     const form = event.target.closest(".coordinate-planning .coordinate-action-form");
     if (form) { form.dataset.dirty = "true"; form.dataset.editVersion = String(Number(form.dataset.editVersion || 0) + 1); }
     if (form?.matches(".coordinate-intake-form")) clearIntakeValidity(form);
+    disableDirtyDraftActions(form);
   });
   root.addEventListener("change", (event) => {
     const form = event.target.closest(".coordinate-planning .coordinate-action-form");
     if (form) { form.dataset.dirty = "true"; form.dataset.editVersion = String(Number(form.dataset.editVersion || 0) + 1); }
     if (form?.matches(".coordinate-intake-form")) clearIntakeValidity(form);
+    disableDirtyDraftActions(form);
   });
   root.addEventListener("reset", (event) => {
     if (!event.target.matches(".coordinate-action-form")) return;
     delete event.target.dataset.dirty;
     event.target.dataset.editVersion = String(Number(event.target.dataset.editVersion || 0) + 1);
     if (event.target.matches(".coordinate-intake-form")) clearIntakeValidity(event.target);
-    setTimeout(() => { if (latestState) refreshPanels(latestState); }, 0);
+    setTimeout(() => { if (latestState) { updatePlanningRestrictions(latestState.coordination); refreshPanels(latestState); } }, 0);
   });
   root.addEventListener("click", async (event) => {
     const source = event.target.closest("[data-source-link]");
     const reference = source?.getAttribute("href") || "";
-    if (/^#coordinate-(?:message-\d+|document-[0-9a-f-]{36})$/i.test(reference)) {
+    if (/^#coordinate-(?:message-\d+|document-[0-9a-f-]{36}|email-[0-9a-f-]{36}|mail-thread-[0-9a-f-]{36})$/i.test(reference)) {
       const target = document.getElementById(reference.slice(1));
       if (!target) {
         event.preventDefault();
@@ -595,6 +628,38 @@
     [form.elements.title, form.elements.pdf, form.elements.text].forEach((input) => input?.setCustomValidity(""));
   }
 
+  function disableDirtyDraftActions(form) {
+    if (!form?.matches(".coordinate-draft-edit")) return;
+    form.closest(".coordinate-draft")?.querySelectorAll(".coordinate-draft-review button[type='submit'], .coordinate-draft-send button[type='submit']")
+      .forEach((button) => { button.disabled = true; });
+  }
+
+  function validateEmailSend(form) {
+    const card = form.closest(".coordinate-draft");
+    const digest = form.elements.content_digest?.value;
+    if (caseDeleted || !card || ["queued", "sending", "sent", "unknown"].includes(card.dataset.sendStatus)) {
+      notice("This message cannot be sent from its current delivery state.", true); return false;
+    }
+    if (card.querySelector("form[data-dirty='true']")) {
+      notice("Save and review the draft’s changes before sending.", true); return false;
+    }
+    if (uncertainEmailSends.has(card.dataset.draftId)) {
+      notice("The previous send has not been confirmed. Check its delivery status before taking another email action.", true); return false;
+    }
+    if (!digest || digest !== form.dataset.reviewedDigest || !form.elements.request_id?.value) {
+      notice("Review the current saved draft before sending.", true); return false;
+    }
+    const state = latestState?.coordination;
+    if (state) {
+      const draft = (state.drafts || []).find((item) => String(item.id) === card.dataset.draftId);
+      if (!state.mail?.ready || !state.mail?.enabled || !draft?.can_send || draft.blocked || draft.editable === false
+          || draft.status !== "reviewed" || draft.reviewed_digest !== digest || draft.current_digest !== digest) {
+        notice("Email readiness or this draft’s review changed. Refresh the case and review its current state.", true); return false;
+      }
+    }
+    return true;
+  }
+
   function validateIntake(form) {
     clearIntakeValidity(form);
     const title = form.elements.title;
@@ -627,7 +692,9 @@
     event.preventDefault();
     if (actionInFlight) { notice("Please wait for the current change to finish."); return; }
     const intake = form.matches(".coordinate-intake-form");
+    const emailSend = form.matches(".coordinate-draft-send");
     if (intake && !validateIntake(form)) return;
+    if (emailSend && !validateEmailSend(form)) return;
     if (form.matches(".coordinate-draft-review") && form.closest(".coordinate-draft")?.querySelector("form[data-dirty='true']")) {
       notice("Save the draft’s changes before marking it reviewed.", true);
       return;
@@ -638,9 +705,11 @@
     const label = button?.textContent || "";
     const payload = new FormData(form);
     const submittedVersion = form.dataset.editVersion || "0";
+    const draftId = emailSend ? form.closest(".coordinate-draft").dataset.draftId : "";
+    let sendOutcomeKnown = false;
     actionInFlight = true;
     mutationVersion += 1;
-    if (button) { button.disabled = true; button.textContent = "Saving…"; }
+    if (button) { button.disabled = true; button.textContent = emailSend ? "Requesting send…" : "Saving…"; }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), intake ? 60000 : 20000);
     try {
@@ -650,8 +719,10 @@
       });
       const isJson = response.headers.get("content-type")?.includes("application/json");
       const result = isJson ? await response.json() : null;
+      if (emailSend && response.status >= 400 && response.status < 500 && result?.error) sendOutcomeKnown = true;
       if (!response.ok) throw new Error(result?.error || "This change could not be saved. Reload and check your staff session.");
       if (!result?.selected_case) throw new Error("The server did not confirm the change. Reload to check before trying again.");
+      if (emailSend) sendOutcomeKnown = true;
       const editedDuringSave = (form.dataset.editVersion || "0") !== submittedVersion;
       if (intake) {
         if (!editedDuringSave) form.reset();
@@ -666,14 +737,18 @@
       else delete form.dataset.dirty;
       mutationVersion += 1;
       updateState(result);
-      notice(intake ? "Document added. The coordinator will review it on the next worker check."
+      notice(emailSend ? "Send request recorded. Check the message’s delivery status below; do not create a duplicate."
+        : intake ? "Document added. The coordinator will review it on the next worker check."
         : label.includes("Delete") ? "Message deleted. You can restore it in this conversation."
         : label.includes("Move to trash") ? "Case moved to trash. You can restore it at any time."
         : label.includes("Restore") ? "Restored."
         : label.includes("reviewed") || label.includes("review") ? "Review saved. No email was sent or payment authorized."
         : "Saved.");
     } catch (error) {
-      notice(intake && (error.name === "AbortError" || error instanceof TypeError)
+      if (emailSend && !sendOutcomeKnown) uncertainEmailSends.add(draftId);
+      notice(emailSend && !sendOutcomeKnown
+        ? "The send has not been confirmed. Do not resend or create a duplicate. Check the message’s delivery status; this control stays locked until its status is known."
+        : intake && (error.name === "AbortError" || error instanceof TypeError)
         ? "The upload has not been confirmed. Your document is still selected; retrying will use the same submission to avoid duplicates."
         : error.name === "AbortError"
         ? "The server has not confirmed this change yet. Reload to check before trying again."
@@ -682,7 +757,7 @@
     } finally {
       clearTimeout(timeout);
       actionInFlight = false;
-      if (button?.isConnected) { button.disabled = false; button.textContent = label; }
+      if (button?.isConnected) { button.disabled = emailSend && uncertainEmailSends.has(draftId); button.textContent = label; }
       if (latestState) updatePlanningRestrictions(latestState.coordination);
     }
   });

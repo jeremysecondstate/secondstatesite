@@ -201,7 +201,7 @@ def _matches_price_identity(price, lot, source):
         return (status == "exact" and bool(match.get("auction_date")) and bool(match.get("lot_number"))
                 and all(not lot.get(key) or _same_identity(key, lot[key], match.get(key, ""))
                         for key in ("artist", "title", "auction_house", "auction_date", "lot_number")))
-    return source["kind"] in ("message", "document")
+    return source["kind"] in ("message", "document", "email")
 
 
 def _price_supported(price, lot, evidence):
@@ -279,7 +279,7 @@ def validate_price_evidence(brief, evidence):
         if any(lot.get(key) for key in facts):
             current_support = []
             for source in lot_observations:
-                if source["kind"] in ("public", "browser", "message", "document"):
+                if source["kind"] in ("public", "browser", "message", "document", "email"):
                     current_support.append(source)
                 elif source["kind"] in ("public_fetch", "public_browser", "authenticated_browser"):
                     match = source.get("identity_match", {})

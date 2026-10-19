@@ -61,11 +61,24 @@ def _message_json(message, case_deleted_at=None):
     }
 
 
+def _mail_visible(prefix=""):
+    """Mail and derived replies cannot outlive their visible case origin."""
+    root = prefix + "mail_message__thread__originating_message__"
+    return (Q(**{prefix + "mail_message__isnull": True})
+            | Q(**{prefix + "mail_message__thread__originating_message__isnull": False,
+                   root + "deleted_at__isnull": True,
+                   root + "worker_reply__deleted_at__isnull": True}))
+
+
+def _conversation_visible():
+    return _mail_visible() & _mail_visible("in_reply_to__")
+
+
 def _state(selected=None):
     cases = []
     trash_cases = []
     # Fetch pending jobs together, rather than querying separately for every case.
-    pending = CoordinateJob.objects.filter(message__deleted_at__isnull=True, message__case__deleted_at__isnull=True).exclude(status__in=["completed", "cancelled"]).select_related("message").order_by("message_id")
+    pending = CoordinateJob.objects.filter(_mail_visible("message__"), message__deleted_at__isnull=True, message__case__deleted_at__isnull=True).exclude(status__in=["completed", "cancelled"]).select_related("message").order_by("message_id")
     statuses = {}
     for job in pending:
         statuses.setdefault(job.message.case_id, _job_status(job))
@@ -85,7 +98,7 @@ def _state(selected=None):
         "cases": cases,
         "trash_cases": trash_cases,
         "selected_case": next((case for case in cases + trash_cases if selected and case["id"] == str(selected.pk)), None),
-        "messages": [_message_json(message, selected.deleted_at) for message in selected.messages.select_related("author", "job").all()] if selected else [],
+        "messages": [_message_json(message, selected.deleted_at) for message in selected.messages.filter(_conversation_visible()).select_related("author", "job")] if selected else [],
         "worker": {"last_successful_check": _iso(worker.last_successful_check) if worker else None, "test_mode": not enabled(), "draft_only": enabled()},
         "coordination": coordination_state(selected),
         "new_case_token": str(uuid.uuid4()), "message_token": str(uuid.uuid4()),
@@ -458,11 +471,12 @@ def claim(request, data):
     # Only the first unfinished message in each case can be claimed. The conditional
     # UPDATE below is the arbiter, on both PostgreSQL and SQLite (no lock assumptions).
     earlier = CoordinateJob.objects.filter(
+        _mail_visible("message__"),
         message__case_id=OuterRef("message__case_id"), message_id__lt=OuterRef("message_id"),
         message__deleted_at__isnull=True,
     ).exclude(status__in=["completed", "cancelled"])
     candidates = CoordinateJob.objects.filter(
-        _eligible(now), message__case__coordinator=data["worker_id"],
+        _eligible(now), _mail_visible("message__"), message__case__coordinator=data["worker_id"],
         message__deleted_at__isnull=True, message__case__deleted_at__isnull=True,
     ).annotate(earlier_pending=Exists(earlier)).filter(earlier_pending=False).select_related("message").order_by("message_id")
     for candidate in candidates[:50]:
@@ -472,10 +486,15 @@ def claim(request, data):
             if case.deleted_at or case.coordinator != data["worker_id"]:
                 continue
             # A restored older message may have become pending since candidate selection.
-            if CoordinateJob.objects.filter(message__case=case, message__deleted_at__isnull=True,
+            if CoordinateJob.objects.filter(_mail_visible("message__"), message__case=case, message__deleted_at__isnull=True,
                                             message_id__lt=candidate.message_id).exclude(status__in=["completed", "cancelled"]).exists():
                 continue
-            updated = CoordinateJob.objects.filter(pk=candidate.pk, attempts=candidate.attempts).filter(_eligible(now)).update(
+            # Recheck ancestry after obtaining the case lock: deleting a thread's
+            # root can hide a queued mail job without changing that job's status.
+            updated = CoordinateJob.objects.filter(
+                _mail_visible("message__"), pk=candidate.pk, attempts=candidate.attempts,
+                message__deleted_at__isnull=True, message__case__deleted_at__isnull=True,
+            ).filter(_eligible(now)).update(
                 status="processing", attempts=F("attempts") + 1, claim_token=token,
                 lease_expires_at=now + timedelta(seconds=LEASE_SECONDS), worker_id=data["worker_id"], last_error="",
             )
@@ -488,7 +507,8 @@ def claim(request, data):
                     Q(role__in=["staff", "system"], pk__lte=claimed.message_id)
                     | Q(role="assistant", in_reply_to_id__lt=claimed.message_id, in_reply_to__deleted_at__isnull=True),
                     deleted_at__isnull=True,
-                ).select_related("author", "job")
+                ).filter(_conversation_visible()).select_related("author", "job")
+                from .coordinate_mail_sync import mail_context
                 return JsonResponse({
                     "job": {"id": str(claimed.pk), "case_id": str(case.pk), "message_id": claimed.message_id,
                             "claim_token": str(claimed.claim_token), "lease_expires_at": _iso(claimed.lease_expires_at), "attempt": claimed.attempts},
@@ -499,6 +519,7 @@ def claim(request, data):
                     "research": research_state(case, claimed.message_id) if enabled() else [],
                     "brief_enabled": enabled(),
                     "documents": intake_context(case, claimed.message_id) if enabled() else [],
+                    "mail": mail_context(case, claimed.message_id) if enabled() else [],
                 })
     CoordinateWorkerState.objects.update_or_create(pk=1, defaults={"last_successful_check": now})
     return JsonResponse({"job": None, "test_mode": not enabled(), "draft_only": enabled()})
@@ -538,8 +559,9 @@ def complete(request, data, job_id):
     with transaction.atomic():
         case = _locked_case(identity.message.case_id)
         job = get_object_or_404(CoordinateJob.objects.select_related("message__case"), pk=job_id)
-        if case.deleted_at or job.message.deleted_at:
-            return _error("This case or message was deleted.", 409)
+        if (case.deleted_at or job.message.deleted_at
+                or not CoordinateJob.objects.filter(_mail_visible("message__"), pk=job.pk).exists()):
+            return _error("This case, message, or supporting email conversation is no longer visible.", 409)
         if not _claim_matches(job, data):
             return _error("Claim does not match this case, message, or worker.", 409)
         if job.status == "completed":
@@ -589,8 +611,9 @@ def fail(request, data, job_id):
     with transaction.atomic():
         case = _locked_case(identity.message.case_id)
         job = get_object_or_404(CoordinateJob.objects.select_related("message__case"), pk=job_id)
-        if case.deleted_at or job.message.deleted_at:
-            return _error("This case or message was deleted.", 409)
+        if (case.deleted_at or job.message.deleted_at
+                or not CoordinateJob.objects.filter(_mail_visible("message__"), pk=job.pk).exists()):
+            return _error("This case, message, or supporting email conversation is no longer visible.", 409)
         if not _claim_matches(job, data):
             return _error("Claim does not match this case, message, or worker.", 409)
         if job.status == "retry":

@@ -46,7 +46,10 @@ def draft_blocked(draft, quotes=None):
 
 def visible_artifacts(query):
     # Deleted conversation inputs must not re-enter the model through derived artifacts.
-    return query.filter(Q(job__isnull=True) | Q(job__message__deleted_at__isnull=True, job__message__worker_reply__deleted_at__isnull=True))
+    from .coordinate_views import _mail_visible
+    return query.filter(_mail_visible("job__message__")).filter(
+        Q(job__isnull=True) | Q(job__message__deleted_at__isnull=True,
+                              job__message__worker_reply__deleted_at__isnull=True))
 
 
 def research_state(case, max_message_id=None):
@@ -81,8 +84,10 @@ def coordination_state(case, max_message_id=None):
     drafts = list(visible_artifacts(draft_query))
     from .coordinate_brief import brief_state
     from .coordinate_intake import intake_state
+    from .coordinate_mail import mail_state, draft_mail_state
     return {
         "draft_only": True,
+        "mail": mail_state(case, max_message_id=max_message_id),
         "brief": brief_state(case, max_message_id=max_message_id),
         **({"intake": intake_state(case)} if max_message_id is None else {}),
         "plan": {"stage": plan.stage, "destination": plan.destination, "handling": plan.handling,
@@ -100,6 +105,7 @@ def coordination_state(case, max_message_id=None):
                     "accept_url": reverse("coordinate_quote_accept", args=[case.pk, q.pk]),
                     "resolve_url": reverse("coordinate_quote_resolve", args=[case.pk, q.pk])} for q in quotes],
         "drafts": [{"id": str(d.pk), "recipient": d.recipient, "subject": d.subject, "body": d.body,
+                    **draft_mail_state(d),
                     "purpose": d.purpose, "status": d.status, "blocked": draft_blocked(d, quotes),
                     "quote_id": str(d.quote_id) if d.quote_id else "",
                     "save_url": reverse("coordinate_draft_update", args=[case.pk, d.pk]),
@@ -212,6 +218,10 @@ def save_worker_artifacts(job, artifacts):
     # Recipients must have been provided in case context or successful source evidence.
     quotes = list(case.shipping_quotes.order_by("-accepted", "created_at"))
     known = {quote.provider_email.casefold() for quote in quotes}
+    from .coordinate_mail_sync import mail_context
+    case_mail = mail_context(case, job.message_id)
+    known.update(item["from_address"].casefold() for item in case_mail
+                 if item["direction"] == "inbound")
     staff_messages = list(case.messages.filter(role="staff", deleted_at__isnull=True,
                                                pk__lte=job.message_id).values("role", "body"))
     staff_text = "\n".join(message["body"] for message in staff_messages)
@@ -243,13 +253,26 @@ def save_worker_artifacts(job, artifacts):
     for item in research:
         CoordinateResearch.objects.create(case=case, job=job, **item)
     saved_drafts = 0
+    current_email = next((item for item in case_mail
+                          if item["message_id"] == job.message_id and item["direction"] == "inbound"), None)
+    reply_thread = None
+    if current_email:
+        from .coordinate_mail_models import CoordinateMailThread
+        reply_thread = CoordinateMailThread.objects.filter(pk=current_email["thread_id"], case=case).first()
     for item in drafts:
         provider_quotes = [quote for quote in quotes if quote.provider_email.casefold() == item["recipient"].casefold()]
         # A paused provider thread must receive no newly prepared response.
         if any(quote_paused(quote) for quote in provider_quotes):
             continue
         quote = provider_quotes[0] if provider_quotes else None
-        CoordinateDraft.objects.create(case=case, job=job, quote=quote, **item)
+        proposal = dict(item)
+        if reply_thread and reply_thread.provider_email.casefold() == item["recipient"].casefold():
+            proposal["mail_thread"] = reply_thread
+            # This is still an unsent proposal. Preserve the actual conversation's
+            # subject so the later explicitly reviewed send can retain its thread.
+            subject = reply_thread.subject
+            proposal["subject"] = ("Re: " + subject) if len(subject) <= 196 else subject
+        CoordinateDraft.objects.create(case=case, job=job, quote=quote, **proposal)
         saved_drafts += 1
     if research or drafts:
         CoordinateActivity.objects.create(case=case, job=job, event="research_and_drafts_saved",

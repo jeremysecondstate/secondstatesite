@@ -574,3 +574,4 @@ class CoordinateActivity(models.Model):
 from .coordinate_models import CoordinateDraft, CoordinatePlan, CoordinateQuote, CoordinateResearch  # noqa: E402,F401
 from .coordinate_brief_models import CoordinateBrief  # noqa: E402,F401
 from .coordinate_intake_models import CoordinateDocument  # noqa: E402,F401
+from .coordinate_mail_models import CoordinateMailDelivery, CoordinateMailMessage, CoordinateMailThread  # noqa: E402,F401

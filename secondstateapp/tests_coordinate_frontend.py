@@ -9,6 +9,63 @@ from django.test import SimpleTestCase
 
 
 class CoordinateFrontendTests(SimpleTestCase):
+    def mail_fixture(self, **draft_changes):
+        return {"drafts": [{"id": "draft-1", "subject": "collection details", "recipient": "packer@example.test",
+                            "body": "hello! could you confirm pickup?", "status": "reviewed", "current_digest": "current-version",
+                            "reviewed_digest": "current-version", "can_send": True, "editable": True,
+                            "send_url": "/coordinate/case/drafts/draft-1/send/", "send_request_id": "send-once",
+                            "review_url": "/coordinate/case/drafts/draft-1/review/", **draft_changes}],
+                "mail": {"enabled": True, "ready": True, "sender": "jeremy@secondstate.art", "threads": []},
+                "quotes": [], "urls": {"add_draft": "/coordinate/case/drafts/"}}
+
+    def test_send_is_explicit_digest_bound_and_legacy_review_never_becomes_sendable(self):
+        state = self.mail_fixture()
+        html = render_to_string("coordinate/mail.html", {"coordination": state})
+        self.assertIn('class="coordinate-action-form coordinate-draft-send"', html)
+        self.assertIn('name="content_digest" value="current-version"', html)
+        self.assertIn('name="request_id" value="send-once"', html)
+        self.assertIn("Send reviewed email", html)
+        self.assertIn("Marking a draft reviewed never sends it", html)
+        for changes in ({"status": "draft"}, {"reviewed_digest": ""}, {"reviewed_digest": "old-version"},
+                        {"can_send": False}, {"editable": False, "send_status": "sent"}):
+            html = render_to_string("coordinate/mail.html", {"coordination": self.mail_fixture(**changes)})
+            self.assertNotIn('class="coordinate-action-form coordinate-draft-send"', html)
+        html = render_to_string("coordinate/mail.html", {"coordination": self.mail_fixture(reviewed_digest="")})
+        self.assertIn("Review current draft", html)
+        self.assertIn("older review needs to be renewed", html)
+        for changes in ({"ready": False}, {"enabled": False}):
+            state = self.mail_fixture()
+            state["mail"].update(changes)
+            html = render_to_string("coordinate/mail.html", {"coordination": state})
+            self.assertNotIn('class="coordinate-action-form coordinate-draft-send"', html)
+
+    def test_pending_unknown_and_sent_messages_are_immutable_without_retry_controls(self):
+        for status, expected in (("sending", "Sending is in progress"), ("unknown", "Do not resend it or create a duplicate"),
+                                 ("sent", "Start a reply draft to continue")):
+            html = render_to_string("coordinate/mail.html", {"coordination": self.mail_fixture(editable=False, send_status=status)})
+            self.assertIn('class="coordinate-draft-fields coordinate-grid-form" disabled', html)
+            self.assertIn(expected, html)
+            self.assertNotIn('class="coordinate-action-form coordinate-draft-send"', html)
+            self.assertNotIn('class="coordinate-action-form coordinate-draft-review"', html)
+            self.assertNotIn("Retry send", html)
+
+    def test_linked_thread_messages_are_escaped_and_reply_options_are_case_scoped(self):
+        state = self.mail_fixture(thread_id="thread-case")
+        state["mail"]["threads"] = [{"id": "thread-case", "subject": "Collection <details>", "participants": ["jeremy@secondstate.art", "packer@example.test"], "provider_email": "packer@example.test",
+            "url": "https://mail.google.com/mail/u/0/#all/thread-case", "last_synced_at": "2026-10-19T18:00:00Z",
+            "messages": [{"id": "email-case", "direction": "inbound", "sender": "packer@example.test", "recipient": "jeremy@secondstate.art",
+                          "body": "<img src=x onerror=alert(1)> Collection is ready.", "sent_at": "2026-10-19T17:59:00Z",
+                          "source_ref": "message:17", "source_url": "https://mail.google.com/mail/u/0/#all/message-case"}]}]
+        html = render_to_string("coordinate/mail.html", {"coordination": state})
+        self.assertIn('value="thread-case" selected', html)
+        self.assertIn('data-panel="mail"', html)
+        self.assertIn('id="coordinate-email-email-case"', html)
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
+        self.assertNotIn("<img src=x", html)
+        self.assertIn("message:17", html)
+        self.assertIn('datetime="2026-10-19T17:59:00Z"', html)
+        self.assertNotIn("contenteditable", html)
+
     def test_price_cards_keep_estimate_sold_unknown_basis_and_history_distinct(self):
         ref = "https://market.example/sale/17"
         prices = [

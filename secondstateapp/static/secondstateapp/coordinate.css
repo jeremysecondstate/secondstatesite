@@ -151,6 +151,29 @@
 .coordinate-add-record > form { margin-top: 19px; }
 .coordinate-draft-review { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--coordinate-line); }
 .coordinate-draft-review p { color: #a4a0a8; font-size: 10px; line-height: 1.7; margin: 0; }
+.coordinate-draft-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.coordinate-draft-fields:disabled input, .coordinate-draft-fields:disabled textarea, .coordinate-draft-fields:disabled select { opacity: .85; cursor: default; }
+.coordinate-draft-fields:disabled .coordinate-form-footer { display: none; }
+.coordinate-draft-send { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px 0 0; margin-top: 16px; border-top: 1px solid #655235; }
+.coordinate-draft-send p { margin: 0; color: #d3c4aa; font-size: 11px; line-height: 1.8; }
+.coordinate-mail-readiness, .coordinate-mail-delivery-note { padding: 12px 14px; margin: 0 0 18px; background: rgba(156,179,148,.07); border-left: 2px solid #7e9377; color: #c6d3bd; font-size: 11px; line-height: 1.75; overflow-wrap: anywhere; }
+.coordinate-mail-readiness.is-unavailable, .coordinate-mail-delivery-note { background: rgba(217,184,120,.04); border-color: #957c50; color: #cdbc9d; }
+.coordinate-field-note { margin: 8px 0 0; color: #aaa3a1; font-size: 10px; line-height: 1.7; }
+.coordinate-mail-thread { margin-top: 16px; padding: 18px; border: 1px solid #464037; border-radius: 3px; }
+.coordinate-mail-thread > header, .coordinate-email-message > header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.coordinate-mail-thread h3 { margin: 0 0 12px; font-size: 14px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
+.coordinate-mail-thread a { color: #d8bf8f; text-underline-offset: 3px; font-size: 11px; }
+.coordinate-email-message { margin-top: 15px; padding: 16px; border-left: 2px solid #69604d; background: rgba(255,255,255,.025); scroll-margin-top: 24px; }
+.coordinate-email-message[data-email-direction="outbound"] { border-left-color: #92723d; }
+.coordinate-email-message > header { color: #bcb3a4; font-size: 10px; }
+.coordinate-email-message dl { margin: 12px 0; font-size: 11px; line-height: 1.7; }
+.coordinate-email-message dl > div { display: grid; grid-template-columns: 55px minmax(0,1fr); gap: 8px; }
+.coordinate-email-message dt { color: #99939a; }
+.coordinate-email-message dd { margin: 0; overflow-wrap: anywhere; }
+.coordinate-email-body { color: #d3cdd0; font-size: 12px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 420px; overflow: auto; }
+.coordinate-email-citation { margin: 14px 0 0; color: #a99d87; font-size: 10px; overflow-wrap: anywhere; }
+.coordinate-email-message:target, .coordinate-mail-thread:target { outline: 1px solid #a18550; outline-offset: 5px; }
+@media (max-width: 560px) { .coordinate-draft-send { align-items: flex-start; flex-direction: column; } .coordinate-mail-thread, .coordinate-email-message { padding: 13px; } }
 .coordinate-source h3 a { color: #dcc18d; text-decoration-color: #5d513b; text-underline-offset: 3px; }
 .coordinate-source-text { font-size: 12px; line-height: 1.8; color: #c3bec6; max-height: 270px; overflow: auto; overflow-wrap: anywhere; }
 .coordinate-brief-summary { margin: 0 0 12px; color: #e0d8c8; font-size: 13px; line-height: 1.8; white-space: pre-wrap; }

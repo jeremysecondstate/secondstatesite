@@ -56,7 +56,10 @@ const finalPoll = source.lastIndexOf("  poll();");
 assert.ok(finalPoll > 0);
 source = source.slice(0, finalPoll) + `
   globalThis.testHooks = { messageBody, httpLink, newYorkDatetime, useSuggestion,
-    validateIntake, panelSignature, setActionInFlight(value) { actionInFlight = value; } };
+    validateIntake, validateEmailSend, panelSignature,
+    setEmailUncertain(id, value) { value ? uncertainEmailSends.add(id) : uncertainEmailSends.delete(id); },
+    setLatestState(value) { latestState = value; },
+    setActionInFlight(value) { actionInFlight = value; } };
 ` + source.slice(finalPoll + "  poll();".length);
 vm.runInContext(source, context);
 const hooks = context.testHooks;
@@ -142,6 +145,32 @@ assert.equal(hooks.panelSignature({ intake: { documents: [], submission_token: "
   hooks.panelSignature({ intake: { documents: [], submission_token: "new" } }, "intake"));
 assert.notEqual(hooks.panelSignature({ brief: { summary: "old" } }, "briefing"),
   hooks.panelSignature({ brief: { summary: "new" } }, "briefing"));
+assert.notEqual(hooks.panelSignature({ drafts: [], mail: { ready: false } }, "drafts"),
+  hooks.panelSignature({ drafts: [], mail: { ready: true } }, "drafts"));
+
+function sendFixture(changes = {}) {
+  const card = new Element();
+  card.dataset = { draftId: "draft-1", sendStatus: "reviewed", ...changes };
+  card.querySelector = () => changes.dirty ? {} : null;
+  const form = new Element("form");
+  form.dataset = { reviewedDigest: "reviewed-version" };
+  form.elements = { content_digest: new Element("input", "reviewed-version"), request_id: new Element("input", "same-send-request") };
+  form.closest = () => card;
+  return { form, card };
+}
+let send = sendFixture();
+assert.equal(hooks.validateEmailSend(send.form), true);
+for (const sendStatus of ["queued", "sending", "sent", "unknown"]) {
+  assert.equal(hooks.validateEmailSend(sendFixture({ sendStatus }).form), false);
+}
+assert.equal(hooks.validateEmailSend(sendFixture({ dirty: true }).form), false);
+send.form.elements.content_digest.value = "changed-version";
+assert.equal(hooks.validateEmailSend(send.form), false);
+send = sendFixture();
+hooks.setEmailUncertain("draft-1", true);
+assert.equal(hooks.validateEmailSend(send.form), false);
+hooks.setEmailUncertain("draft-1", false);
+assert.equal(hooks.validateEmailSend(send.form), true);
 
 async function testSubmission() {
   const form = intakeFixture("Invoice details");
@@ -191,7 +220,33 @@ async function testSubmission() {
   assert.equal(form.dataset.dirty, undefined);
 }
 
-testSubmission().then(() => console.log("Coordinate frontend checks passed.")).catch((error) => {
+async function testAmbiguousEmailSend() {
+  const fixture = sendFixture();
+  const form = fixture.form;
+  form.matches = (selector) => [".coordinate-action-form", ".coordinate-draft-send"].includes(selector);
+  form.getAttribute = () => "/coordinate/case/drafts/draft-1/send/";
+  const button = new Element("button");
+  button.textContent = "Send reviewed email";
+  button.isConnected = true;
+  form.querySelector = () => button;
+  const event = { target: form, submitter: button, preventDefault() {} };
+  hooks.setLatestState({ coordination: { mail: { enabled: true, ready: true }, drafts: [
+    { id: "draft-1", can_send: true, editable: true, status: "reviewed", reviewed_digest: "reviewed-version", current_digest: "reviewed-version" },
+  ] } });
+  context.FormData = class { constructor(input) { this.digest = input.elements.content_digest.value; } };
+  let requests = 0;
+  context.fetch = async () => { requests += 1; throw new Error("Ambiguous connection loss"); };
+  await listeners.submit[0](event);
+  assert.equal(requests, 1);
+  assert.equal(button.disabled, true);
+  assert.ok(notice.textContent.includes("Do not resend or create a duplicate"));
+  await listeners.submit[0](event);
+  assert.equal(requests, 1, "A send with an unknown transport result must never be blindly retried.");
+  hooks.setEmailUncertain("draft-1", false);
+  hooks.setLatestState(undefined);
+}
+
+testSubmission().then(testAmbiguousEmailSend).then(() => console.log("Coordinate frontend checks passed.")).catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });

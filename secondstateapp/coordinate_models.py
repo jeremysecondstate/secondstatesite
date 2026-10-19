@@ -64,6 +64,8 @@ class CoordinateDraft(models.Model):
     status = models.CharField(max_length=12, default="draft", choices=[("draft", "Needs review"), ("reviewed", "Reviewed")])
     reviewed_at = models.DateTimeField(null=True, blank=True)
     reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    reviewed_digest = models.CharField(max_length=64, blank=True)
+    mail_thread = models.ForeignKey("CoordinateMailThread", null=True, blank=True, on_delete=models.PROTECT, related_name="drafts")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

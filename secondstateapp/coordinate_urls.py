@@ -4,6 +4,7 @@ from . import coordinate_views as views
 from . import coordinate_intake as intake
 
 urlpatterns = [
+    path("", include("secondstateapp.coordinate_mail_urls")),
     path("", include("secondstateapp.coordinate_shipping_urls")),
     path("", views.coordinate, name="coordinate"),
     path("state/", views.state, name="coordinate_state"),

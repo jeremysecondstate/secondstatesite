@@ -51,6 +51,13 @@ def _evidence(job, current_research=()):
             "label": "Staff message", "url": f"#coordinate-message-{item.pk}",
             "kind": "message", "text": item.body,
         }
+    from .coordinate_mail_sync import mail_context
+    for item in mail_context(case, job.message_id):
+        evidence[item["source_ref"]] = {
+            "label": "Email from " + item["from_address"],
+            "url": f"#coordinate-email-{item['id']}",
+            "kind": "email", "text": item["text"],
+        }
     try:
         document_model = apps.get_model("secondstateapp", "CoordinateDocument")
     except LookupError:
