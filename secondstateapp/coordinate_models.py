@@ -1,4 +1,6 @@
 """Staff-reviewed shipping records; no external sending or payment capability."""
+import hashlib
+import json
 import uuid
 
 from django.conf import settings
@@ -73,14 +75,34 @@ class CoordinateResearch(models.Model):
     case = models.ForeignKey("CoordinateCase", on_delete=models.PROTECT, related_name="research")
     job = models.ForeignKey("CoordinateJob", on_delete=models.PROTECT, related_name="research")
     source_url = models.URLField(max_length=2048)
-    source_kind = models.CharField(max_length=12, default="public", choices=[("public", "Public source"), ("browser", "Browser source")])
+    source_kind = models.CharField(max_length=24, default="public", choices=[
+        ("public", "Public source"), ("browser", "Browser source"),
+        ("public_fetch", "Public fetch"), ("public_browser", "Public browser"),
+        ("authenticated_browser", "Authenticated browser"), ("search_only", "Search lead (unverified)"),
+    ])
     public_error = models.CharField(max_length=200, blank=True)
     final_url = models.URLField(max_length=2048, blank=True)
     title = models.CharField(max_length=300, blank=True)
     text = models.TextField(blank=True)
     fetched_at = models.DateTimeField()
     error = models.CharField(max_length=200, blank=True)
+    discovery_method = models.CharField(max_length=12, blank=True)
+    discovery_query = models.CharField(max_length=500, blank=True)
+    discovery_url = models.URLField(max_length=2048, blank=True)
+    match_reason = models.CharField(max_length=1200, blank=True)
+    identity_match = models.JSONField(default=dict, blank=True)
+    attempts = models.JSONField(default=list, blank=True)
+    observation_key = models.CharField(max_length=64, editable=False)
+
+    def save(self, *args, **kwargs):
+        # A fixed-size key avoids a PostgreSQL btree index over two 2,048-char URLs.
+        self.observation_key = hashlib.sha256(json.dumps(
+            [self.source_url, self.final_url, self.source_kind], ensure_ascii=True,
+        ).encode()).hexdigest()
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = {*kwargs["update_fields"], "observation_key"}
+        return super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["-fetched_at", "id"]
-        constraints = [models.UniqueConstraint(fields=["job", "source_url"], name="coordinate_source_per_job")]
+        constraints = [models.UniqueConstraint(fields=["job", "observation_key"], name="coordinate_observation_per_job")]

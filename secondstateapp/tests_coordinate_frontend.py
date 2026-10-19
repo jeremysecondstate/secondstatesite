@@ -9,6 +9,29 @@ from django.test import SimpleTestCase
 
 
 class CoordinateFrontendTests(SimpleTestCase):
+    def test_price_cards_keep_estimate_sold_unknown_basis_and_history_distinct(self):
+        ref = "https://market.example/sale/17"
+        prices = [
+            {"kind": "sold", "label": "Sold", "amount": "500.00", "currency": "", "basis": "unknown",
+             "evidence_quote": "Sold: $500.00 <untrusted>", "source_refs": [ref]},
+            {"kind": "estimate", "label": "Estimate", "amount": "800", "amount_high": "1200", "currency": "USD", "basis": "estimate",
+             "evidence_quote": "Estimate: USD 800–1,200", "source_refs": [ref]},
+            {"kind": "historical_comparison", "label": "Sold", "amount": "450", "currency": "USD", "basis": "premium_inclusive",
+             "evidence_quote": "Sold: USD 450 including buyer's premium", "source_refs": [ref]},
+        ]
+        html = render_to_string("coordinate/briefing.html", {"coordination": {"brief": {
+            "lots": [{"label": "Example artwork", "auction_date": "2026-10-17", "prices": prices,
+                      "storage_terms": "Storage begins after 30 days.", "shipping_contacts": "Published Packer: packing@example.test",
+                      "price_notes": "The earlier sale is a comparison, separate from this purchase.", "source_refs": [ref]}],
+            "sources": {ref: {"label": "Verified corresponding listing", "url": ref}},
+        }}})
+        for text in ("Sold 500.00", "Currency not stated", "Price basis not stated", "Estimate 800–1200 USD",
+                     "Auction estimate.", "Historical comparison — a different sale", "Includes buyer’s premium",
+                     "Storage begins after 30 days.", "packing@example.test", "2026-10-17", "&lt;untrusted&gt;"):
+            self.assertIn(text, html)
+        self.assertNotIn("<untrusted>", html)
+        self.assertIn(f'href="{ref}"', html)
+
     def test_case_brief_escapes_source_text_and_distinguishes_missing_details(self):
         html = render_to_string("coordinate/briefing.html", {"coordination": {"brief": {
             "summary": "<img src=x onerror=alert(1)>",

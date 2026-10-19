@@ -40,6 +40,50 @@ def address_record(address):
 
 
 class CoordinateSourceTests(TestCase):
+    def test_discovery_queries_use_public_identity_and_omit_query_tokens_or_private_context(self):
+        record = {"source_url": "https://auction.example/auction-lot/francisco-zuniga-mujer_90220ae2a1?token=private-token",
+                  "text": "Artist: Francisco Zúñiga\nTitle: Mujer con pescados\nAuction date: October 17, 2026\nLot 177\n",
+                  "error": "", "private_invoice": "Invoice total private value"}
+        queries = sources.discovery_queries(record)
+        joined = " ".join(queries)
+        self.assertNotIn("private", joined)
+        self.assertNotIn("90220ae2a1", joined)
+        self.assertIn("Zúñiga", joined)
+        self.assertIn("Zuniga", joined)
+        self.assertIn("2026-10-17", joined)
+        self.assertIn("lot 177", joined)
+        self.assertLessEqual(len(queries), 6)
+        self.assertTrue(all(len(query) <= 500 for query in queries))
+
+    def test_artwork_year_in_title_does_not_become_expected_auction_date(self):
+        record = {"source_url": "https://auction.example/auction-lot/artist-gallo-1996_15018a0cfe",
+                  "text": "Gallo, 1996. Artist A.\nLot 191\n", "error": ""}
+        self.assertEqual(sources.public_identity(record)["auction_date"], "")
+        self.assertEqual(sources.public_identity(record)["lot_number"], "191")
+        record["error"] = "Page unavailable"
+        self.assertFalse(any(sources.public_identity(record).values()))
+
+    def test_private_document_filenames_and_share_tokens_never_become_public_queries(self):
+        for url in ("https://auction.example/uploads/Invoice-Jeremy-Smith-2026.pdf?token=private-token",
+                    "https://docs.google.com/document/d/PrivateSharingToken/edit",
+                    "https://drive.google.com/file/d/PrivateSharingToken/view"):
+            with self.subTest(url=url):
+                queries = " ".join(sources.discovery_queries({"source_url": url, "error": "Unavailable",
+                                                              "title": "Invoice Jeremy Smith", "text": ""}))
+                for private in ("Jeremy", "Smith", "Invoice", "PrivateSharingToken", "private-token", "2026.pdf"):
+                    self.assertNotIn(private.casefold(), queries.casefold())
+                self.assertTrue(all(query.startswith("site:") for query in sources.discovery_queries({"source_url": url})))
+
+    def test_explicit_sale_date_with_unsupported_time_suffix_stays_unconstrained(self):
+        record = {"text": "Auction date: October 17, 2026 10AM\n", "error": ""}
+        self.assertEqual(sources.public_identity(record)["auction_date"], "")
+
+    def test_completeness_does_not_treat_estimate_or_hidden_price_as_sold(self):
+        for text in ("Estimate: USD 800-1200.", "Sold: Sign in to see price.", "Price realized: hidden"):
+            with self.subTest(text=text):
+                self.assertIn("sold_price", sources.missing_fields({"text": text}))
+        self.assertNotIn("sold_price", sources.missing_fields({"text": "Sold: $100.00"}))
+
     def test_only_staff_links_latest_first_deduplicated_and_bounded(self):
         messages = [
             {"role": "staff", "body": "earlier https://example.com/old"},

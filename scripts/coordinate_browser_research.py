@@ -17,24 +17,26 @@ from uuid import UUID, uuid4
 
 if __package__:
     from . import coordinate_sources as sources
+    from . import coordinate_evidence as provenance
 else:
     import coordinate_sources as sources
+    import coordinate_evidence as provenance
 
 
-BROWSER_SECONDS = 180
+BROWSER_SECONDS = 420
 BROWSER_HANDOFF_SECONDS = 20
 # Completion has four 20-second attempts plus 1/2/4-second backoff. Reserve a
-# little more than that after the generator's full ten-minute timeout.
+# little more than that after the generator's bounded five-minute timeout.
 TRANSPORT_MARGIN_SECONDS = 100
 MAX_STATE_BYTES = 3_000_000
-MAX_EVIDENCE_BYTES = 240_000
+MAX_EVIDENCE_BYTES = 750_000
 DEFAULT_STATE_DIR = Path(__file__).resolve().parents[1] / "private_data" / "coordinate-browser-runs"
 UNAVAILABLE_REASONS = {
-    "unavailable": "The signed-in browser was unavailable.",
+    "unavailable": "The supported browser tool could not be opened; website availability was not established.",
     "login_required": "The browser requires the user's sign-in.",
     "challenge": "The browser requires a human verification step.",
     "timeout": "The browser research time budget expired.",
-    "unsupported_browser": "The supported browser tools could not access the page.",
+    "unsupported_browser": "The supported browser tools were unavailable; website availability was not established.",
 }
 SHELL_MARKERS = (
     "verify you are human", "checking your browser", "enable javascript",
@@ -142,6 +144,7 @@ def _browser_stage(directory, session_id, worker, *, expires_at=None, release=Fa
 
 def _safe_url(value, *, allow_http=False):
     try:
+        provenance.public_evidence_url(value, allow_http=allow_http)
         host, _ = sources._destination(value, allow_http=allow_http)
         if "." not in host or host.endswith((".localhost", ".local", ".internal")):
             return None
@@ -154,12 +157,12 @@ def _safe_url(value, *, allow_http=False):
         # Match the server's observed hostname contract exactly. Do not silently
         # canonicalize Unicode or trailing-dot hosts into a different source.
         return urlsplit(value).hostname.lower().removeprefix("www.")
-    except (sources.SourceError, TypeError):
+    except (sources.SourceError, TypeError, ValueError):
         return None
 
 
 def browser_requests(records):
-    """Only submitted public URLs enter the UI handoff, never unsafe fetch errors."""
+    """Public discovery requests include incomplete successful listings too."""
     result = []
     for record in records[:sources.MAX_URLS]:
         if not _safe_url(record.get("source_url"), allow_http=True):
@@ -172,8 +175,18 @@ def browser_requests(records):
             error = "The public page contains a sign-in, verification, or JavaScript shell."
         if not error and len(record.get("text", "").strip()) < 200:
             error = "The public page did not provide a usable listing excerpt."
-        if error:
-            result.append({"source_url": record["source_url"], "public_error": error[:200]})
+        missing = sources.missing_fields(record)
+        expected_identity = sources.public_identity(record)
+        if (not error and "sold_price" not in missing
+                and record.get("identity_match", {}).get("status") != "exact"):
+            missing.append("verified_sale_identity")
+        if error or missing:
+            result.append({"source_url": record["source_url"], "public_error": error[:200],
+                           "missing_fields": missing, "expected_identity": expected_identity,
+                           "queries": sources.discovery_queries(record),
+                           "max_additional_sources": provenance.MAX_PER_SOURCE - int(
+                               not record.get("error") and bool(record.get("text", "").strip())
+                               and not any(marker in content[:2500] for marker in SHELL_MARKERS))})
     return result
 
 
@@ -200,16 +213,6 @@ def _post_completion(api, payload, completion, worker):
             "reply_id": completed["reply_id"], "already_completed": completed.get("already_completed", False),
             "reply_sha256": hashlib.sha256(completion["body"].encode("utf-8")).hexdigest(),
             "research_count": len(completion["research"]), "draft_count": len(completion["drafts"])}
-
-
-def _generate_and_complete(api, payload, executable, worker_id, model, reasoning_effort, worker):
-    try:
-        generated = worker.generate_reply(payload, executable, model, reasoning_effort)
-        completion = worker.completion_payload(_identity(payload, worker_id), generated, payload["source_evidence"])
-    except worker.WorkerError:
-        _fail(api, payload, worker_id, worker)
-        raise
-    return _post_completion(api, payload, completion, worker)
 
 
 def _resume_generated(directory, api, executable, worker_id, worker):
@@ -267,7 +270,16 @@ def prepare(api, executable, worker_id, model=None, reasoning_effort=None, *, st
         if not requests:
             _browser_stage(directory, session_id, worker, release=True)
             finish_started = True
-            return _generate_and_complete(api, payload, executable, worker_id, model, reasoning_effort, worker)
+            # Even direct-fetch-only work gets a durable completion before POST:
+            # a restart after an ambiguous response must replay, not regenerate.
+            prepared_at = _now()
+            state_path = directory / (session_id + ".json")
+            _write_json(state_path, {"version": 2, "session_id": session_id, "job_id": job["id"],
+                "base_url": api.base_url, "worker_id": worker_id, "model": model,
+                "reasoning_effort": reasoning_effort, "prepared_at": prepared_at.isoformat(),
+                "browser_deadline": prepared_at.isoformat(), "requests": [], "payload": payload,
+                "status": "prepared"}, worker)
+            return complete(api, executable, state_path, unavailable="unavailable", worker=worker)
         prepared_at = _now()
         lease = _timestamp(job.get("lease_expires_at"), worker)
         deadline = min(prepared_at + timedelta(seconds=BROWSER_SECONDS),
@@ -276,7 +288,7 @@ def prepare(api, executable, worker_id, model=None, reasoning_effort=None, *, st
             raise worker.WorkerError("Not enough claim time remains for browser research; retry required.")
         state_path = directory / (session_id + ".json")
         evidence_path = directory / (session_id + ".evidence.json")
-        state = {"version": 1, "session_id": session_id, "job_id": job["id"], "base_url": api.base_url,
+        state = {"version": 2, "session_id": session_id, "job_id": job["id"], "base_url": api.base_url,
                  "worker_id": worker_id, "model": model, "reasoning_effort": reasoning_effort,
                  "prepared_at": prepared_at.isoformat(), "browser_deadline": deadline.isoformat(),
                  "requests": requests, "payload": payload, "status": "prepared"}
@@ -285,7 +297,16 @@ def prepare(api, executable, worker_id, model=None, reasoning_effort=None, *, st
         handed_off = True
         return {"status": "browser_research_required", "session_id": session_id, "job_id": job["id"],
                 "state_path": str(state_path), "evidence_path": str(evidence_path),
-                "browser_deadline": deadline.isoformat(), "requests": requests}
+                "browser_deadline": deadline.isoformat(), "requests": requests,
+                "research_contract_version": 2,
+                "tool_requirements": {"search": ["web__run", "mcp__codex_apps__search_service_web_run"],
+                                      "browser": "supported Computer Use; create/reacquire a public tab if needed",
+                                      "authentication": "Only if required: jeremy@secondstate.art Chrome Profile 9; never Profile 15"},
+                "budget": {"research_seconds": max(0, int((deadline-prepared_at).total_seconds())),
+                           "max_queries": 24, "max_sources": 24, "max_sources_per_lot": 6,
+                           "max_attempts": 64, "max_excerpt_chars": 6000},
+                "stop_when": "All useful fields supported or reasonable alternate queries/sources exhausted; preserve partial findings.",
+                "privacy": "Search only public lot facts and the provided queries. Never search private invoice/email/message contents."}
     except OSError:
         if payload and payload.get("job") and not finish_started:
             _fail(api, payload, worker_id, worker)
@@ -304,7 +325,7 @@ def _load_state(path, api, worker):
     try:
         session_id = str(UUID(state["session_id"]))
         job = worker.validate_claim(state["payload"])
-        if (state.get("version") != 1 or path.name != session_id + ".json" or job is None
+        if (state.get("version") not in (1, 2) or path.name != session_id + ".json" or job is None
                 or job["id"] != state.get("job_id") or state.get("base_url") != api.base_url
                 or state.get("worker_id") != "manual-codex"
                 or state.get("status") not in ("prepared", "generated", "completed", "failed")
@@ -312,8 +333,12 @@ def _load_state(path, api, worker):
                 or (state.get("model") is not None and not isinstance(state["model"], str))):
             raise ValueError
         requests = state["requests"]
-        if (not isinstance(requests, list) or not 1 <= len(requests) <= sources.MAX_URLS
-                or requests != browser_requests(state["payload"]["source_evidence"])):
+        expected_requests = browser_requests(state["payload"]["source_evidence"])
+        if state.get("version") == 1:
+            expected_requests = [{key: item[key] for key in ("source_url", "public_error")}
+                                 for item in expected_requests if item["public_error"]]
+        if (not isinstance(requests, list) or not 0 <= len(requests) <= sources.MAX_URLS
+                or requests != expected_requests):
             raise ValueError
         _timestamp(state["prepared_at"], worker)
         _timestamp(state["browser_deadline"], worker)
@@ -341,16 +366,18 @@ def merge_evidence(state, evidence, worker, *, unavailable=None):
                                  or evidence.get("job_id") != state["job_id"]):
         raise worker.WorkerError("Browser evidence belongs to another session or job.")
     records = evidence.get("records", []) if evidence is not None else []
-    if not isinstance(records, list) or len(records) > len(state["requests"]):
-        raise worker.WorkerError("Browser evidence has an invalid record collection.")
+    try:
+        provenance.validate_research_bounds(records)
+    except (ValueError, TypeError, KeyError):
+        raise worker.WorkerError("Browser evidence has an invalid record collection.") from None
     wanted = {item["source_url"]: item for item in state["requests"]}
     verified = {}
     prepared = _timestamp(state["prepared_at"], worker)
     deadline = _timestamp(state["browser_deadline"], worker)
     for item in records:
         if (not isinstance(item, dict) or not isinstance(item.get("source_url"), str)
-                or item["source_url"] not in wanted or item["source_url"] in verified):
-            raise worker.WorkerError("Browser evidence contains an unrequested or duplicate URL.")
+                or item["source_url"] not in wanted):
+            raise worker.WorkerError("Browser evidence contains an unrequested URL.")
         for key, limit in (("title", 300), ("text", 6000), ("error", 200), ("final_url", 2048)):
             if not isinstance(item.get(key, ""), str) or len(item.get(key, "")) > limit:
                 raise worker.WorkerError("Browser evidence contains an invalid or oversized excerpt.")
@@ -362,37 +389,105 @@ def merge_evidence(state, evidence, worker, *, unavailable=None):
         text = item.get("text", "").strip()
         title = item.get("title", "").strip()
         host = _safe_url(final_url)
-        if final_url and host not in {_safe_url(item["source_url"], allow_http=True), "invaluable.com"}:
+        kind = item.get("source_kind", "browser")
+        extra = {}
+        if kind in provenance.NEW_SOURCE_KINDS:
+            try:
+                extra = provenance.validate_evidence_provenance(
+                    item, expected_identity=wanted[item["source_url"]].get("expected_identity"))
+                for attempt in extra["attempts"]:
+                    stamp = _timestamp(attempt["observed_at"], worker)
+                    if not prepared <= stamp <= min(deadline, _now() + timedelta(seconds=5)):
+                        raise ValueError
+            except (ValueError, TypeError):
+                raise worker.WorkerError("Research evidence has invalid discovery, identity or attempt provenance.") from None
+        elif kind != "browser" or final_url and host not in {_safe_url(item["source_url"], allow_http=True), "invaluable.com"}:
             raise worker.WorkerError("Browser evidence has an unrelated or unsafe final URL.")
         if error:
             if text or title:
                 raise worker.WorkerError("Unavailable browser records must not contain listing facts.")
         elif not text or not final_url or not host:
             raise worker.WorkerError("Successful browser evidence needs visible text and an HTTPS final URL.")
-        verified[item["source_url"]] = {"source_url": item["source_url"], "final_url": final_url,
+        verified.setdefault(item["source_url"], []).append({"source_url": item["source_url"], "final_url": final_url,
             "title": title, "text": text, "fetched_at": fetched.isoformat(), "error": error,
-            "source_kind": "browser", "public_error": wanted[item["source_url"]]["public_error"]}
+            "source_kind": kind, "public_error": wanted[item["source_url"]]["public_error"], **extra})
     result = []
     for original in state["payload"]["source_evidence"]:
         source_url = original["source_url"]
         if source_url in verified:
             recovered = verified[source_url]
         elif source_url in wanted:
-            recovered = {"source_url": source_url, "final_url": "", "title": "", "text": "",
-                         "fetched_at": _now().isoformat(), "source_kind": "browser",
+            reason = UNAVAILABLE_REASONS.get(unavailable, "The research tools did not return evidence for this source.")
+            tool_failure = unavailable in ("unavailable", "unsupported_browser")
+            attempt_method = "browser_launch" if tool_failure else "public_browser" if unavailable else "validation"
+            recovered = [{"source_url": source_url, "final_url": "", "title": "", "text": "",
+                         "fetched_at": _now().isoformat(), "source_kind": "public_browser",
                          "public_error": wanted[source_url]["public_error"],
-                         "error": UNAVAILABLE_REASONS.get(unavailable, "The browser did not return evidence for this source.")}
+                         "error": reason, "discovery_method": "direct", "discovery_query": "", "discovery_url": "",
+                         "match_reason": "", "identity_match": {"status": "unverified"},
+                         "attempts": [{"method": attempt_method,
+                                       "query": "", "url": source_url, "status": "tool_unavailable" if tool_failure else unavailable or "unavailable",
+                                       "detail": reason, "observed_at": _now().isoformat()}]}]
         else:
             result.append(dict(original))
             continue
         content = (original.get("title", "") + "\n" + original.get("text", "")).casefold()
-        if (recovered["error"] and not original.get("error") and original.get("text", "").strip()
-                and not any(marker in content[:2500] for marker in SHELL_MARKERS)):
+        original_useful = (not original.get("error") and original.get("text", "").strip()
+                           and not any(marker in content[:2500] for marker in SHELL_MARKERS))
+        if original_useful:
             # A short public excerpt can still be useful. Preserve its facts and
             # separately tell the generator that browser supplementation failed.
-            result.append({**original, "browser_error": recovered["error"]})
-        else:
-            result.append(recovered)
+            failures = [record["error"] for record in recovered if record["error"]]
+            result.append({**original, **({"browser_error": "; ".join(failures)[:400]} if failures else {})})
+        # Keep each opened alternate source. A failed second source must never
+        # replace a useful direct fetch or another lot's successful evidence.
+        result.extend(record for record in recovered if not original_useful or not record["error"]
+                      or record.get("source_kind") in provenance.NEW_SOURCE_KINDS)
+    result = _bounded_merge(result, deadline)
+    try:
+        provenance.validate_research_bounds(result)
+    except (ValueError, TypeError):
+        raise worker.WorkerError("Merged research exceeded the bounded per-lot evidence budget.") from None
+    return result
+
+
+def _bounded_merge(records, deadline):
+    """Retain useful findings fairly when enrichment fills the source budget.
+
+    Original excerpts and exact opened matches rank ahead of context, historical
+    comparisons, search leads and failures. Select across lots before adding a
+    second/third observation, so one prolific lot cannot crowd out another.
+    """
+    groups = {}
+    def rank(record):
+        if record.get("error"):
+            return 0
+        kind = record.get("source_kind", "public")
+        if kind in ("public", "browser"):
+            return 4
+        return {"exact": 4, "context": 3, "historical": 2, "unverified": 1}.get(
+            record.get("identity_match", {}).get("status"), 1)
+    for record in records:
+        groups.setdefault(record["source_url"], []).append(record)
+    selected = []
+    ranked = {key: sorted(group, key=rank, reverse=True)[:provenance.MAX_PER_SOURCE]
+              for key, group in groups.items()}
+    for position in range(provenance.MAX_PER_SOURCE):
+        for group in ranked.values():
+            if position < len(group) and len(selected) < provenance.MAX_RESEARCH:
+                selected.append(group[position])
+    # Preserve the familiar per-lot reading order after fair selection.
+    selected_ids = {id(record) for record in selected}
+    result = [record for group in ranked.values() for record in group if id(record) in selected_ids]
+    omitted = len(records) - len(result)
+    if omitted:
+        diagnostic = next((record for record in result
+                           if record.get("source_kind") in provenance.NEW_SOURCE_KINDS
+                           and len(record.get("attempts", [])) < 16), None)
+        if diagnostic is not None and sum(len(record.get("attempts", [])) for record in result) < provenance.MAX_ATTEMPTS:
+            diagnostic.setdefault("attempts", []).append({"method": "validation", "query": "", "url": "",
+                "status": "partial", "detail": f"Retained {len(result)} observations; omitted {omitted} lower-priority observations under the source budget.",
+                "observed_at": min(_now(), deadline).isoformat()})
     return result
 
 
@@ -417,6 +512,12 @@ def complete(api, executable, state_path, *, evidence_path=None, unavailable=Non
                 merged = merge_evidence(state, evidence, worker, unavailable=unavailable)
                 browser_notes = [{"source_url": item["source_url"], "error": item.pop("browser_error")}
                                  for item in merged if "browser_error" in item]
+                # A malformed generator response must not erase expensive,
+                # validated observations. Keep them in the private session even
+                # if no website reply can be accepted on this attempt.
+                state["observations"] = merged
+                state["research_notes"] = browser_notes
+                _write_json(path, state, worker)
                 _browser_stage(path.parent, state["session_id"], worker, release=True)
                 # Keep the original prepared evidence in state for manifest validation.
                 generation_payload = {**payload, "source_evidence": merged, "browser_research_notes": browser_notes}

@@ -17,6 +17,7 @@ urlpatterns = [
     path("<uuid:case_id>/messages/<int:message_id>/delete/", views.delete_message, name="coordinate_delete_message"),
     path("<uuid:case_id>/messages/<int:message_id>/restore/", views.restore_message, name="coordinate_restore_message"),
     path("api/claim/", views.claim, name="coordinate_worker_claim"),
+    path("api/cases/<uuid:case_id>/research-review/", views.research_review, name="coordinate_worker_research_review"),
     path("api/jobs/<uuid:job_id>/complete/", views.complete, name="coordinate_worker_complete"),
     path("api/jobs/<uuid:job_id>/fail/", views.fail, name="coordinate_worker_fail"),
 ]

@@ -366,7 +366,7 @@ def _worker_endpoint(view):
             return _error("Worker authentication required.", 401)
         if request.method != "POST":
             return _error("POST required.", 405)
-        if len(request.body) > 128000:
+        if len(request.body) > 768000:
             return _error("Request is too large.", 413)
         try:
             data = json.loads(request.body)
@@ -397,6 +397,54 @@ def _playbook():
 
 def _eligible(now):
     return Q(status__in=["queued", "retry"], available_at__lte=now) | Q(status="processing", lease_expires_at__lte=now)
+
+
+@_worker_endpoint
+def research_review(request, data, case_id):
+    """Explicit operator recovery: queue a fresh review without editing old jobs."""
+    if not enabled():
+        return _error("Research reviews require the shipping workspace.")
+    try:
+        request_id = uuid.UUID(data.get("request_id", ""))
+    except (ValueError, TypeError, AttributeError):
+        return _error("A valid research review request ID is required.")
+    expected_message_id = data.get("expected_message_id")
+    if not isinstance(expected_message_id, int) or isinstance(expected_message_id, bool):
+        return _error("The last visible message ID is required.")
+    with transaction.atomic():
+        case = _locked_case(case_id)
+        if case.deleted_at or case.coordinator != data["worker_id"]:
+            return _error("This case is unavailable for research.", 409)
+        existing = CoordinateMessage.objects.filter(client_message_id=request_id).first()
+        if existing:
+            event = CoordinateActivity.objects.filter(case=case, job__message=existing,
+                                                       event="research_review_queued").first()
+            if (existing.case_id != case.pk or existing.deleted_at or not event
+                    or event.details.get("expected_message_id") != expected_message_id):
+                return _error("This request ID belongs to a different or deleted review.", 409)
+            return JsonResponse({"job_id": str(event.job_id), "message_id": existing.pk, "already_queued": True})
+        latest = case.messages.filter(deleted_at__isnull=True).order_by("-pk").first()
+        if not latest or latest.pk != expected_message_id:
+            return _error("The case changed; inspect its current messages before requesting research.", 409)
+        if CoordinateJob.objects.filter(message__case=case, message__deleted_at__isnull=True).exclude(
+                status__in=["completed", "cancelled"]).exists():
+            return _error("This case already has pending work.", 409)
+        from scripts.coordinate_sources import staff_urls
+        context = list(case.messages.filter(role="staff", deleted_at__isnull=True,
+                                            pk__lte=expected_message_id).values("role", "body"))
+        if not staff_urls(context):
+            return _error("No visible submitted public lot links are available for research.")
+        message = CoordinateMessage.objects.create(
+            case=case, role="system", client_message_id=request_id,
+            body=("Research review requested: revisit the visible submitted lot links using current public sources. "
+                  "Search alternate sources and fill missing listing facts; verify the exact sale and preserve citations. "
+                  "Update the brief and suggest a shipping plan from supported facts. No external action is authorized."),
+        )
+        job = CoordinateJob.objects.create(message=message)
+        CoordinateCase.objects.filter(pk=case.pk).update(updated_at=timezone.now())
+        CoordinateActivity.objects.create(case=case, job=job, event="research_review_queued",
+                                          details={"expected_message_id": expected_message_id})
+    return JsonResponse({"job_id": str(job.pk), "message_id": message.pk, "already_queued": False})
 
 
 @_worker_endpoint

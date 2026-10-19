@@ -1,4 +1,5 @@
 """Shipping context, draft persistence and deadline checks. No sending capability."""
+from collections import Counter
 from datetime import timedelta
 from decimal import Decimal
 import re
@@ -14,6 +15,11 @@ from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+
+from scripts.coordinate_evidence import (
+    NEW_SOURCE_KINDS, PROVENANCE_FIELDS, research_identity_key,
+    validate_evidence_provenance, validate_research_bounds,
+)
 
 from .models import (
     CoordinateActivity, CoordinateCase, CoordinateDraft, CoordinateJob,
@@ -44,18 +50,22 @@ def visible_artifacts(query):
 
 
 def research_state(case, max_message_id=None):
-    result, seen = [], set()
+    result, seen, per_source = [], set(), Counter()
     query = case.research.all()
     if max_message_id is not None:
         query = query.filter(job__message_id__lte=max_message_id)
-    for item in visible_artifacts(query)[:40]:
-        if item.source_url in seen:
+    for item in visible_artifacts(query)[:120]:
+        key = (item.source_url, item.final_url, item.source_kind)
+        if key in seen or per_source[item.source_url] >= 6:
             continue
-        seen.add(item.source_url)
+        seen.add(key)
+        per_source[item.source_url] += 1
         result.append({"source_url": item.source_url, "final_url": item.final_url, "title": item.title,
                        "text": item.text, "fetched_at": item.fetched_at.isoformat(), "error": item.error,
-                       "source_kind": item.source_kind, "public_error": item.public_error})
-        if len(result) == 8:
+                       "source_kind": item.source_kind, "public_error": item.public_error,
+                       **({field: getattr(item, field) for field in PROVENANCE_FIELDS}
+                          if item.source_kind in NEW_SOURCE_KINDS else {})})
+        if len(result) == 24:
             break
     return result
 
@@ -124,24 +134,31 @@ def _research_url(value, required=True, allow_http=False):
 
 def validate_worker_artifacts(data):
     research, drafts = data.get("research", []), data.get("drafts", [])
-    if not isinstance(research, list) or len(research) > 8 or not isinstance(drafts, list) or len(drafts) > 3:
+    if not isinstance(research, list) or len(research) > 24 or not isinstance(drafts, list) or len(drafts) > 3:
         raise ValueError("Too many worker artifacts.")
+    if len(research) > 8 and all(isinstance(item, dict) and item.get("source_kind", "public") not in NEW_SOURCE_KINDS for item in research):
+        raise ValueError("Too many legacy research records.")
     cleaned_research, cleaned_drafts = [], []
     seen = set()
     for item in research:
         if not isinstance(item, dict):
             raise ValueError("Invalid research record.")
         source_kind = item.get("source_kind", "public")
-        if source_kind not in ("public", "browser"):
+        if source_kind not in ("public", "browser", *NEW_SOURCE_KINDS):
             raise ValueError("Invalid research source kind.")
+        if source_kind not in NEW_SOURCE_KINDS and any(field in item for field in PROVENANCE_FIELDS):
+            raise ValueError("Discovery provenance requires an explicit research observation kind.")
         error = _bounded_string(item.get("error", ""), 200)
         public_error = _bounded_string(item.get("public_error", ""), 200)
-        browser_source = source_kind == "browser"
-        source_url = _research_url(item.get("source_url"), allow_http=bool(error) or browser_source)
+        browser_source = source_kind in ("browser", "public_browser", "authenticated_browser")
+        source_url = _research_url(item.get("source_url"), allow_http=bool(error) or browser_source or source_kind == "search_only")
         final_url = _research_url(item.get("final_url", ""), False, allow_http=bool(error) and not browser_source)
         title = _bounded_string(item.get("title", ""), 300)
         text = _bounded_string(item.get("text", ""), 6000)
-        if browser_source:
+        provenance = {}
+        if source_kind in NEW_SOURCE_KINDS:
+            provenance = validate_evidence_provenance(item)
+        elif browser_source:
             if not public_error:
                 raise ValueError("Browser sources must preserve the public fetch failure.")
             if any(character.isspace() or ord(character) < 32 or character == "\\" for character in source_url + final_url):
@@ -159,15 +176,17 @@ def validate_worker_artifacts(data):
                 raise ValueError("Successful browser sources require observed text and a final URL.")
         elif public_error:
             raise ValueError("Only browser sources may include a prior public fetch failure.")
-        if source_url in seen:
+        key = research_identity_key({**item, "source_url": source_url, "final_url": final_url})
+        if key in seen:
             raise ValueError("Duplicate research source.")
-        seen.add(source_url)
+        seen.add(key)
         fetched = parse_datetime(_bounded_string(item.get("fetched_at"), 64, True))
         if not fetched or timezone.is_naive(fetched) or fetched > timezone.now() + timedelta(minutes=5):
             raise ValueError("Invalid research timestamp.")
         cleaned_research.append({"source_url": source_url, "final_url": final_url, "title": title, "text": text,
                                  "error": error, "fetched_at": fetched, "source_kind": source_kind,
-                                 "public_error": public_error})
+                                 "public_error": public_error, **provenance})
+    validate_research_bounds(cleaned_research)
     for item in drafts:
         if not isinstance(item, dict):
             raise ValueError("Invalid draft record.")
@@ -193,9 +212,27 @@ def save_worker_artifacts(job, artifacts):
     # Recipients must have been provided in case context or successful source evidence.
     quotes = list(case.shipping_quotes.order_by("-accepted", "created_at"))
     known = {quote.provider_email.casefold() for quote in quotes}
-    staff_text = "\n".join(case.messages.filter(role="staff", deleted_at__isnull=True, pk__lte=job.message_id).values_list("body", flat=True))
+    staff_messages = list(case.messages.filter(role="staff", deleted_at__isnull=True,
+                                               pk__lte=job.message_id).values("role", "body"))
+    staff_text = "\n".join(message["body"] for message in staff_messages)
+    from scripts.coordinate_sources import public_identity, staff_urls
+    requested_urls = set(staff_urls(staff_messages))
+    expected_identities = {}
+    for item in research:
+        if (not item["error"] and item["source_kind"] in ("public", "public_fetch")
+                and item.get("discovery_method", "direct") == "direct"):
+            expected_identities[item["source_url"]] = public_identity(item)
+    for item in research:
+        if item["source_kind"] in NEW_SOURCE_KINDS:
+            if item["source_url"] not in requested_urls:
+                raise ValueError("Research must retain an original visible submitted URL from this job's context.")
+            if item["fetched_at"] < timezone.now() - timedelta(hours=24):
+                raise ValueError("New research observations must be fresh within 24 hours.")
+            validate_evidence_provenance(item, expected_identity=expected_identities.get(item["source_url"]))
     plan_notes = CoordinatePlan.objects.filter(case=case).values_list("notes", flat=True).first() or ""
-    successful_sources = [r["text"] for r in [*research, *research_state(case, job.message_id)] if not r["error"]]
+    successful_sources = [r["text"] for r in [*research, *research_state(case, job.message_id)]
+                          if not r["error"] and r.get("source_kind") != "search_only"
+                          and r.get("identity_match", {}).get("status") not in ("historical", "unverified")]
     from .coordinate_intake import intake_context
     successful_sources.extend(item.get("text", "") for item in intake_context(case, job.message_id))
     for source in [staff_text, plan_notes, *successful_sources]:

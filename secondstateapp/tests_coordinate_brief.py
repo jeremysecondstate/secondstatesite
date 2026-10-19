@@ -32,6 +32,12 @@ def fixture_brief(ref, **changes):
     }
 
 
+def fixture_price(ref, **changes):
+    return {"kind": "sold", "basis": "unknown", "label": "Sold", "amount": "500.00",
+            "amount_high": "", "currency": "", "evidence_quote": "Sold: $500.00",
+            "source_refs": [ref], **changes}
+
+
 class BriefContractTests(SimpleTestCase):
     def test_schema_and_validator_require_the_same_explicit_fields_and_preserve_dimension_scope(self):
         brief = fixture_brief("https://auction.example/lot/17")
@@ -55,7 +61,7 @@ class BriefContractTests(SimpleTestCase):
             {**valid, "lots": [{**valid["lots"][0], "dimensions": "x" * 301}]},
             {**valid, "lots": [{**valid["lots"][0], "source_refs": []}]},
             {**valid, "lots": [{**valid["lots"][0], "source_refs": ["message:1"] * 2}]},
-            {**valid, "lots": [{**valid["lots"][0], "source_refs": [f"message:{i}" for i in range(5)]}]},
+            {**valid, "lots": [{**valid["lots"][0], "source_refs": [f"message:{i}" for i in range(9)]}]},
             {**valid, "lots": [{**valid["lots"][0], "source_refs": [" message:1"]}]},
             {**valid, "lots": [{**valid["lots"][0], "source_refs": [[]]}]},
             {**valid, "plan": {**valid["plan"], "handling": "Remove the frame"}},
@@ -85,6 +91,26 @@ class BriefContractTests(SimpleTestCase):
         date_only = fixture_brief("message:1")
         date_only["lots"][0]["deadline_text"] = "Collect by October 30; time and zone are unstated."
         self.assertEqual(validate_brief(date_only)["plan"]["pickup_deadline"], "")
+
+    def test_prices_preserve_unknown_currency_and_basis_and_accept_legacy_payloads(self):
+        legacy = fixture_brief("message:1")
+        self.assertEqual(validate_brief(legacy), legacy)
+        brief = deepcopy(legacy)
+        brief["lots"][0].update(prices=[fixture_price("message:1")], auction_date="2026-10-17",
+                                shipping_contacts="", storage_terms="", price_notes="")
+        self.assertEqual(validate_brief(brief), brief)
+        self.assertIn("prices", BRIEF_SCHEMA["properties"]["lots"]["items"]["required"])
+        for changes in ({"amount": "$500"}, {"amount": "NaN"}, {"amount": "-1"}, {"currency": "$"},
+                        {"basis": "estimate"}, {"amount_high": "600"}, {"source_refs": ["message:2"]},
+                        {"kind": "estimate", "basis": "unknown"}, {"evidence_quote": ""}):
+            invalid = deepcopy(brief)
+            invalid["lots"][0]["prices"][0].update(changes)
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                validate_brief(invalid)
+        brief["lots"][0]["prices"] = [fixture_price("message:1", kind="estimate", basis="estimate",
+                                                    label="Estimate", amount="800", amount_high="1200",
+                                                    evidence_quote="Estimate: $800–$1,200")]
+        self.assertEqual(validate_brief(brief), brief)
 
 
 @override_settings(
@@ -139,6 +165,116 @@ class BriefEvidenceTests(TestCase):
             "claim_token": claim["claim_token"], "case_id": claim["case_id"], "message_id": claim["message_id"],
             "worker_id": "manual-codex", "body": "The brief is ready for staff review.", "brief": brief, **changes,
         }, job_id=claim["id"])
+
+    def price_source(self, **changes):
+        return {"source_url": "https://auction.example/lot/17", "final_url": "https://market.example/sale/17",
+                "source_kind": "public_browser", "title": "Example artist, Example artwork",
+                "text": "Example artist. Example artwork. Lot 17. Auction House. October 17, 2026. Sold: $500.00",
+                "error": "", "identity_match": {"artist": "Example artist", "title": "Example artwork",
+                    "auction_house": "Auction House", "lot_number": "17", "auction_date": "2026-10-17", "status": "exact"},
+                **changes}
+
+    def price_brief(self, source=None, **price_changes):
+        source = source or self.price_source()
+        ref = source["final_url"]
+        brief = fixture_brief(ref)
+        brief["lots"][0].update(artist="Example artist", title="Example artwork", auction_house="Auction House",
+                                lot_number="17", auction_date="2026-10-17", prices=[fixture_price(ref, **price_changes)], price_notes="")
+        return brief
+
+    def test_discovered_price_uses_opened_url_unknown_currency_and_preserves_other_failed_lot(self):
+        source = self.price_source()
+        brief = self.price_brief(source)
+        failed = {"source_url": "https://auction.example/lot/18", "final_url": "", "text": "", "error": "Timed out."}
+        saved = save_brief(self.job, brief, [source, failed])
+        self.assertEqual(saved.payload["lots"][0]["prices"][0]["basis"], "unknown")
+        self.assertEqual(saved.payload["lots"][0]["prices"][0]["currency"], "")
+        self.assertEqual(saved.payload["lots"][0]["source_refs"], [source["final_url"]])
+
+    def test_price_rejects_snippet_wrong_sale_wrong_lot_and_incomplete_identity(self):
+        source = self.price_source()
+        for kind, changes in (("search_only", {"status": "unverified"}), ("public_fetch", {"auction_date": "2024-10-17"}),
+                              ("public_browser", {"lot_number": "99"}), ("public_browser", {"status": "historical"}),
+                              ("public_browser", {"auction_date": ""}), ("public_browser", {"lot_number": ""}),
+                              ("public", {"status": "unverified"}), ("browser", {"auction_date": ""})):
+            candidate = {**source, "source_kind": kind, "identity_match": {**source["identity_match"], **changes}}
+            with self.subTest(kind=kind, changes=changes), self.assertRaises(ValueError):
+                save_brief(self.job, self.price_brief(), [candidate])
+        self.assertFalse(CoordinateBrief.objects.exists())
+
+    def test_price_amount_label_currency_and_basis_need_exact_evidence(self):
+        source = self.price_source()
+        for changes in ({"currency": "USD"}, {"amount": "450.00"}, {"basis": "hammer"},
+                        {"basis": "premium_inclusive"}, {"evidence_quote": "Sold: $450.00"},
+                        {"label": "Hammer price"}, {"label": "Estimate"},
+                        {"kind": "invoice_total", "basis": "invoice_total"}, {"kind": "tax", "basis": "tax"},
+                        {"kind": "shipping", "basis": "shipping"}, {"kind": "insurance", "basis": "insurance"}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                save_brief(self.job, self.price_brief(**changes), [source])
+        for kind, basis, label, quote in (
+                ("sold", "hammer", "Hammer price", "Hammer price: USD 500.00"),
+                ("sold", "premium_inclusive", "Sold", "Sold: USD 500.00 including buyer's premium"),
+                ("estimate", "estimate", "Estimate", "Estimate: USD 500.00")):
+            valid = self.price_brief(kind=kind, basis=basis, label=label, currency="USD", evidence_quote=quote)
+            saved = save_brief(self.job, valid, [{**source, "text": source["text"] + "\n" + quote}])
+            self.assertEqual(saved.payload["lots"][0]["prices"][0]["basis"], basis)
+            CoordinateBrief.objects.all().delete()
+
+    def test_explicit_premium_exclusion_cannot_support_premium_inclusive_price(self):
+        for phrase in ("not including buyer's premium", "including buyer's premium; premium is additional"):
+            quote = "Sold: USD 500.00 " + phrase
+            with self.subTest(phrase=phrase), self.assertRaises(ValueError):
+                save_brief(self.job, self.price_brief(basis="premium_inclusive", currency="USD", evidence_quote=quote),
+                           [self.price_source(text=quote)])
+
+    def test_estimate_amount_cannot_be_presented_as_sold_and_conflicts_require_note(self):
+        source = self.price_source(text="Sold: USD 500.00. Estimate: USD 800–1,200.")
+        with self.assertRaises(ValueError):
+            save_brief(self.job, self.price_brief(amount="800", currency="USD",
+                       evidence_quote=source["text"]), [source])
+        other = self.price_source(final_url="https://other.example/sale/17", text="Sold: USD 450.00")
+        brief = self.price_brief(source, currency="USD", evidence_quote="Sold: USD 500.00")
+        brief["lots"][0]["source_refs"].append(other["final_url"])
+        brief["lots"][0]["prices"].append(fixture_price(other["final_url"], amount="450.00", currency="USD",
+                                                       evidence_quote=other["text"]))
+        with self.assertRaises(ValueError):
+            save_brief(self.job, brief, [source, other])
+        brief["lots"][0]["price_notes"] = "Sources disagree: one says USD 500 sold and the other USD 450. Confirm before using either as the purchase amount."
+        self.assertIsNotNone(save_brief(self.job, brief, [source, other]))
+
+    def test_historical_comparison_is_separate_and_opened_enrichment_can_supply_missing_price(self):
+        source = self.price_source()
+        incomplete = {**source, "source_kind": "public_fetch", "text": "Artist and title only. " * 100}
+        self.assertIsNotNone(save_brief(self.job, self.price_brief(), [incomplete, source]))
+        CoordinateBrief.objects.all().delete()
+        history = {**source, "final_url": "https://market.example/older-sale/17",
+                   "identity_match": {**source["identity_match"], "auction_date": "2024-10-17", "status": "historical"}}
+        brief = self.price_brief(kind="historical_comparison")
+        brief["lots"][0]["prices"][0]["source_refs"] = [history["final_url"]]
+        brief["lots"][0]["source_refs"].append(history["final_url"])
+        self.assertIsNotNone(save_brief(self.job, brief, [incomplete, history]))
+
+    def test_historical_unverified_and_context_pages_do_not_supply_current_artwork_facts(self):
+        source = self.price_source()
+        for status in ("historical", "unverified", "context"):
+            record = {**source, "identity_match": {**source["identity_match"], "status": status}}
+            brief = self.price_brief()
+            brief["lots"][0]["prices"] = []
+            with self.subTest(status=status), self.assertRaises(ValueError):
+                save_brief(self.job, brief, [record])
+        context = {**source, "identity_match": {"status": "context"}, "text": "Shipping contact: packer@example.test"}
+        brief = fixture_brief(source["final_url"])
+        brief["lots"][0].update(label="Collection information", shipping_contacts="packer@example.test")
+        self.assertIsNotNone(save_brief(self.job, brief, [context]))
+
+    def test_same_url_conflicting_observations_cannot_silently_select_old_price(self):
+        source = self.price_source()
+        changed = {**source, "source_kind": "public_fetch", "text": "Sold: $450.00"}
+        brief = self.price_brief()
+        with self.assertRaises(ValueError):
+            save_brief(self.job, brief, [changed, source])
+        brief["lots"][0]["price_notes"] = "The two observations of this page disagree: $450 and $500. The purchase amount remains unresolved."
+        self.assertIsNotNone(save_brief(self.job, brief, [changed, source]))
 
     def test_current_and_previous_successful_sources_are_resolved_with_browser_provenance(self):
         source = self.research(source_kind="browser", public_error="Public fetch failed.",

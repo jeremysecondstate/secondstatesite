@@ -17,6 +17,55 @@ def empty_brief():
 
 
 class BriefWorkerTests(TestCase):
+    def test_one_corrective_generation_uses_only_remaining_shared_timeout(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True, brief_enabled=True)
+        invalid = empty_brief()
+        invalid["plan"]["source_refs"] = ["https://unobserved.example/lot"]
+        responses = [invalid, empty_brief()]
+        captured, clock = [], [1000.0]
+        def process(command, **kwargs):
+            captured.append(kwargs)
+            response = {"body": "Prepared for review.", "drafts": [], "brief": responses[len(captured) - 1]}
+            (Path(kwargs["cwd"]) / "response.json").write_text(json.dumps(response), encoding="utf-8")
+            clock[0] += 200 if len(captured) == 1 else 50
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+        with patch.object(worker.subprocess, "run", side_effect=process), \
+                patch.object(worker.time, "monotonic", side_effect=lambda: clock[0]):
+            generated = worker.generate_reply(payload, "codex")
+        self.assertEqual(generated["brief"], responses[1])
+        self.assertEqual(len(captured), 2)
+        self.assertEqual(captured[0]["timeout"], 300)
+        self.assertEqual(captured[1]["timeout"], 100)
+        self.assertIn("VALIDATION CORRECTION", captured[1]["input"])
+
+    def test_exhausted_generation_budget_does_not_restart_a_fresh_timeout(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True, brief_enabled=True)
+        clock, calls = [0.0], []
+        def process(command, **kwargs):
+            calls.append(kwargs)
+            (Path(kwargs["cwd"]) / "response.json").write_text(
+                json.dumps({"body": "Invalid brief", "drafts": [], "brief": {"lots": "invalid"}}), encoding="utf-8")
+            clock[0] = 299.0
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+        with patch.object(worker.subprocess, "run", side_effect=process), \
+                patch.object(worker.time, "monotonic", side_effect=lambda: clock[0]), self.assertRaises(worker.WorkerError):
+            worker.generate_reply(payload, "codex")
+        self.assertEqual(len(calls), 1)
+
+    def test_discovered_refs_are_specific_and_search_only_is_not_citable(self):
+        payload = {"source_evidence": [
+            {"source_url": "https://original.example/lot", "final_url": "https://market.example/lot",
+             "source_kind": "public_fetch", "text": "Opened listing", "error": ""},
+            {"source_url": "https://original.example/lot", "final_url": "https://snippet.example/lot",
+             "source_kind": "search_only", "text": "Search snippet", "error": ""},
+        ]}
+        evidence = worker.brief_evidence(payload)
+        self.assertIn("https://market.example/lot", evidence)
+        self.assertNotIn("https://original.example/lot", evidence)
+        self.assertNotIn("https://snippet.example/lot", evidence)
+
     def generate(self, payload, result):
         captured = {}
         def process(command, **kwargs):

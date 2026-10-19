@@ -15,6 +15,13 @@ from scripts import coordinate_worker as worker
 from .tests_coordinate_worker import claim_payload
 
 
+COMPLETE_PUBLIC_TEXT = ("Artist: Artist A\nTitle: Work B\nAuction house: Auction Example\nAuction date: October 17, 2026\nLot 17\n"
+                       "Oil on canvas. Dimensions 8 x 10 inches. Framed dimensions 12 x 14 inches. "
+                       "Condition: good. Sold: USD 100. Auction date: October 17, 2026. "
+                       "Location: Auction Example. Pickup within seven days, release after payment. "
+                       "Shipping contact shipping@example.com. ")
+
+
 class CoordinateBrowserWorkerTests(TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -67,8 +74,13 @@ class CoordinateBrowserWorkerTests(TestCase):
         with patch.dict("os.environ", {"COORDINATE_WORKER_TOKEN": "website-secret"}):
             manifest = self.prepare()
         self.assertEqual(manifest["status"], "browser_research_required")
-        self.assertEqual(manifest["requests"], [{"source_url": self.url, "public_error": self.public["error"]}])
-        self.assertEqual(manifest["browser_deadline"], (self.now + timedelta(seconds=180)).isoformat())
+        request = manifest["requests"][0]
+        self.assertEqual(request["source_url"], self.url)
+        self.assertEqual(request["public_error"], self.public["error"])
+        self.assertIn("sold_price", request["missing_fields"])
+        self.assertGreaterEqual(len(request["queries"]), 4)
+        self.assertEqual(manifest["browser_deadline"], (self.now + timedelta(seconds=420)).isoformat())
+        self.assertIn("search", manifest["tool_requirements"])
         serialized = json.dumps(manifest)
         for value in (self.payload["job"]["claim_token"], "Retain the mat", "website-secret", "Please research"):
             self.assertNotIn(value, serialized)
@@ -98,7 +110,7 @@ class CoordinateBrowserWorkerTests(TestCase):
         self.assertEqual(self.api.post.call_count, 2)
 
     def test_no_candidate_keeps_public_flow_and_research_flags(self):
-        self.research.return_value = [{**self.public, "error": "", "text": "A complete listing. " * 25}]
+        self.research.return_value = []
         self.assertEqual(self.prepare()["status"], "completed")
         self.assertEqual(self.generate.call_args.args[0]["source_evidence"], self.research.return_value)
         self.payload["test_mode"] = True
@@ -119,7 +131,7 @@ class CoordinateBrowserWorkerTests(TestCase):
         self.assertEqual(self.prepare()["status"], "browser_busy")
         self.assertEqual(self.api.post.call_count, 1)
         self.generate.assert_not_called()
-        self.clock += timedelta(minutes=4)
+        self.clock += timedelta(minutes=8)
         self.payload["job"] = None
         self.assertEqual(self.prepare()["status"], "idle")
         self.generate.assert_not_called()
@@ -130,7 +142,9 @@ class CoordinateBrowserWorkerTests(TestCase):
                 result = browser.browser_requests([{**self.public, "error": "", "text": text}])
                 self.assertEqual(len(result), 1)
                 self.assertTrue(result[0]["public_error"])
-        self.assertEqual(browser.browser_requests([{**self.public, "error": "", "text": "Valid lot details. " * 30}]), [])
+        request = browser.browser_requests([{**self.public, "error": "", "text": COMPLETE_PUBLIC_TEXT}])[0]
+        self.assertEqual(request["public_error"], "")
+        self.assertEqual(request["missing_fields"], ["verified_sale_identity"])
 
     def test_unsafe_sources_never_enter_browser_manifest(self):
         for url in ("http://localhost/lot", "http://127.0.0.1/lot", "https://auction.internal/lot",
@@ -144,7 +158,7 @@ class CoordinateBrowserWorkerTests(TestCase):
         manifest = self.prepare()
         self.complete(manifest, unavailable="login_required")
         source = self.generate.call_args.args[0]["source_evidence"][0]
-        self.assertEqual(source["source_kind"], "browser")
+        self.assertEqual(source["source_kind"], "public_browser")
         self.assertEqual(source["public_error"], self.public["error"])
         self.assertEqual(source["text"], "")
         self.assertIn("sign-in", source["error"])
@@ -162,16 +176,17 @@ class CoordinateBrowserWorkerTests(TestCase):
         manifest = self.prepare()
         self.complete(manifest, unavailable="login_required")
         generated_payload = self.generate.call_args.args[0]
-        self.assertEqual(generated_payload["source_evidence"], [self.public])
+        self.assertEqual(generated_payload["source_evidence"][0], self.public)
+        self.assertEqual(generated_payload["source_evidence"][1]["attempts"][0]["status"], "login_required")
         self.assertIn("sign-in", generated_payload["browser_research_notes"][0]["error"])
-        self.assertEqual(self.api.post.call_args.args[1]["research"], [self.public])
+        self.assertEqual(self.api.post.call_args.args[1]["research"][0], self.public)
 
     def test_browser_failure_does_not_preserve_challenge_shell_as_facts(self):
         self.public.update(error="", title="Just a moment", text="Checking your browser. Verify you are human.")
         manifest = self.prepare()
         self.complete(manifest, unavailable="challenge")
         record = self.generate.call_args.args[0]["source_evidence"][0]
-        self.assertEqual(record["source_kind"], "browser")
+        self.assertEqual(record["source_kind"], "public_browser")
         self.assertEqual(record["text"], "")
 
     def test_standard_http_original_can_recover_via_same_https_host(self):
@@ -192,7 +207,7 @@ class CoordinateBrowserWorkerTests(TestCase):
             {"final_url": "https://invaluable.com:444/lot"}, {"final_url": ""},
             {"text": ""}, {"text": "x" * 6001}, {"error": "Blocked", "title": "", "text": "Claimed facts"},
             {"fetched_at": (self.now - timedelta(seconds=1)).isoformat()},
-            {"fetched_at": (self.now + timedelta(seconds=181)).isoformat()},
+            {"fetched_at": (self.now + timedelta(seconds=421)).isoformat()},
             {"fetched_at": self.now.replace(tzinfo=None).isoformat()},
         ]
         for change in changes:
@@ -312,8 +327,8 @@ class CoordinateBrowserWorkerTests(TestCase):
     def test_browser_deadline_reserves_assembly_generation_and_full_api_retry_budget(self):
         self.payload["job"]["lease_expires_at"] = (self.now + timedelta(seconds=820)).isoformat()
         manifest = self.prepare()
-        self.assertEqual(manifest["browser_deadline"], (self.now + timedelta(seconds=100)).isoformat())
-        self.clock += timedelta(seconds=110)
+        self.assertEqual(manifest["browser_deadline"], (self.now + timedelta(seconds=400)).isoformat())
+        self.clock += timedelta(seconds=410)
         self.assertEqual(self.complete(manifest, unavailable="timeout")["status"], "completed")
 
     def test_generation_failure_reports_failure_and_releases_browser(self):
@@ -323,6 +338,9 @@ class CoordinateBrowserWorkerTests(TestCase):
             self.complete(manifest, unavailable="unavailable")
         self.assertTrue(self.api.post.call_args.args[0].endswith("/fail/"))
         self.assertFalse((self.directory / ".browser-stage.json").exists())
+        state = json.loads(Path(manifest["state_path"]).read_text())
+        self.assertIn("observations", state)
+        self.assertEqual(state["status"], "failed")
 
     def test_completion_size_preserves_browser_contract_and_draft_contact_evidence(self):
         draft = {"recipient": "packer@example.com", "subject": "😀" * 200,
@@ -361,3 +379,140 @@ class CoordinateBrowserWorkerTests(TestCase):
         self.assertIn("browser_use", command)
         self.assertIn("mcp_servers={}", command)
         self.assertIn("--ignore-user-config", command)
+
+    def discovered(self, final="https://market.example/auction-lot/larsen-17", **changes):
+        return {"source_url": self.url, "final_url": final, "source_kind": "public_fetch",
+                "title": "Artist A, Work B, Lot 17", "text": "Auction Example. Lot 17. Artist A, Work B. Sold: USD 100.",
+                "fetched_at": self.now.isoformat(), "error": "", "discovery_method": "search",
+                "discovery_query": "Artist A Work B Auction Example October 17 2026 lot 17",
+                "discovery_url": "", "match_reason": "Artist, title, house, sale date and lot number match the opened listing.",
+                "identity_match": {"artist": "Artist A", "title": "Work B", "auction_house": "Auction Example",
+                                   "auction_date": "2026-10-17", "lot_number": "17", "status": "exact"},
+                "attempts": [{"method": "search", "query": "Artist A Work B Auction Example lot 17",
+                              "url": "", "status": "success", "detail": "Opened a result discovered by web__run.",
+                              "observed_at": self.now.isoformat()}], **changes}
+
+    def test_closed_browser_is_not_a_research_dependency_or_website_failure(self):
+        manifest = self.prepare()
+        self.assertGreater(len(manifest["requests"][0]["queries"]), 1)
+        state = browser._load_state(Path(manifest["state_path"]), self.api, worker)
+        evidence = {"session_id": manifest["session_id"], "job_id": manifest["job_id"],
+                    "records": [self.discovered()]}
+        merged = browser.merge_evidence(state, evidence, worker)
+        self.assertEqual(merged[0]["source_kind"], "public_fetch")
+        self.assertEqual(merged[0]["error"], "")
+        failed = browser.merge_evidence(state, None, worker, unavailable="unsupported_browser")[0]
+        self.assertIn("website availability was not established", failed["error"])
+        self.assertEqual(failed["attempts"][0]["method"], "browser_launch")
+        self.assertEqual(failed["attempts"][0]["status"], "tool_unavailable")
+
+    def test_long_successful_excerpt_missing_sold_price_requires_enrichment(self):
+        self.public.update(error="", text=COMPLETE_PUBLIC_TEXT.replace("Sold: USD 100.", "Estimate: USD 80-120.") * 8)
+        manifest = self.prepare()
+        self.assertEqual(manifest["status"], "browser_research_required")
+        self.assertEqual(manifest["requests"][0]["public_error"], "")
+        self.assertIn("sold_price", manifest["requests"][0]["missing_fields"])
+        self.public["text"] = COMPLETE_PUBLIC_TEXT.replace("Sold: USD 100.", "Sold: Sign in to view price.")
+        self.assertIn("sold_price", browser.browser_requests([self.public])[0]["missing_fields"])
+
+    def test_complete_price_without_sale_identity_still_requires_outer_verification(self):
+        record = {**self.public, "error": "", "text": COMPLETE_PUBLIC_TEXT.replace("Lot 17\n", "")}
+        request = browser.browser_requests([record])[0]
+        self.assertIn("verified_sale_identity", request["missing_fields"])
+        self.assertEqual(request["max_additional_sources"], 5)
+
+    def test_all_parsed_identity_fields_still_require_verified_observation(self):
+        self.public.update(error="", text=COMPLETE_PUBLIC_TEXT)
+        manifest = self.prepare()
+        self.assertEqual(manifest["status"], "browser_research_required")
+        request = manifest["requests"][0]
+        self.assertTrue(all(request["expected_identity"].values()))
+        self.assertEqual(request["missing_fields"], ["verified_sale_identity"])
+        self.generate.assert_not_called()
+
+    def test_multiple_alternate_sources_preserve_direct_facts_and_specific_provenance(self):
+        self.public.update(error="", text="Dimensions: 8 x 10 inches. Condition: good. " * 8)
+        manifest = self.prepare()
+        state = browser._load_state(Path(manifest["state_path"]), self.api, worker)
+        record = self.discovered()
+        shipping = self.discovered("https://auction.example/shipping", discovery_method="link", discovery_query="",
+                                   discovery_url=record["final_url"], text="Pickup within seven days; shipping@auction.example.",
+                                   identity_match={"status": "context", "auction_house": "Auction Example"},
+                                   match_reason="Published shipping terms linked from the exact listing.")
+        merged = browser.merge_evidence(state, {"session_id": manifest["session_id"], "job_id": manifest["job_id"],
+                                               "records": [record, shipping]}, worker)
+        self.assertEqual(len(merged), 3)
+        self.assertEqual(merged[0]["text"], self.public["text"])
+        self.assertEqual(merged[1]["discovery_query"], record["discovery_query"])
+        self.assertEqual(merged[2]["discovery_url"], record["final_url"])
+
+    def test_wrong_year_and_lot_rejected_but_historical_label_can_be_retained(self):
+        self.public.update(error="", text="Artist: Artist A\nTitle: Work B\nAuction house: Auction Example\nAuction date: October 17, 2026\nLot 17\n")
+        manifest = self.prepare()
+        state = browser._load_state(Path(manifest["state_path"]), self.api, worker)
+        for field, wrong in (("auction_date", "2025-10-17"), ("lot_number", "18"), ("title", "Unrelated Work")):
+            record = self.discovered()
+            record["identity_match"][field] = wrong
+            evidence = {"session_id": manifest["session_id"], "job_id": manifest["job_id"], "records": [record]}
+            with self.subTest(field=field), self.assertRaises(worker.WorkerError):
+                browser.merge_evidence(state, evidence, worker)
+            record["identity_match"]["status"] = "historical"
+            self.assertEqual(browser.merge_evidence(state, evidence, worker)[1]["identity_match"]["status"], "historical")
+
+    def test_one_of_two_lots_succeeds_without_discarding_partial_evidence(self):
+        second_url = "https://auction.example/lot/18"
+        self.research.return_value = [self.public, {**self.public, "source_url": second_url, "final_url": second_url}]
+        manifest = self.prepare()
+        state = browser._load_state(Path(manifest["state_path"]), self.api, worker)
+        merged = browser.merge_evidence(state, {"session_id": manifest["session_id"], "job_id": manifest["job_id"],
+                                               "records": [self.discovered()]}, worker)
+        self.assertEqual(len(merged), 2)
+        self.assertTrue(merged[0]["text"])
+        self.assertFalse(merged[0]["error"])
+        self.assertEqual(merged[1]["source_url"], second_url)
+        self.assertTrue(merged[1]["error"])
+
+    def test_search_only_and_historical_contacts_cannot_authorize_draft_recipients(self):
+        draft = {"recipient": "packer@example.com", "subject": "packing", "body": "hello", "purpose": "quote"}
+        for kind, status in (("search_only", "unverified"), ("public_fetch", "historical")):
+            self.payload["source_evidence"] = [self.discovered(source_kind=kind, text="packer@example.com",
+                                                               identity_match={"status": status})]
+            with self.subTest(kind=kind), self.assertRaisesRegex(worker.WorkerError, "unverified"):
+                worker.validate_drafts([draft], self.payload)
+
+    def test_no_research_completion_is_durable_before_post_and_replayed_after_restart(self):
+        self.research.return_value = []
+        calls = []
+        def post(path, payload, **kwargs):
+            calls.append(path)
+            if path.endswith("/claim/"):
+                return deepcopy(self.payload)
+            if path.endswith("/complete/"):
+                raise worker.APIError(503)
+            return {"status": "retrying"}
+        self.api.post.side_effect = post
+        with self.assertRaises(worker.APIError):
+            self.prepare()
+        saved = [json.loads(path.read_text()) for path in self.directory.glob("*.json")]
+        self.assertEqual(saved[0]["status"], "generated")
+        self.api.post.side_effect = self.api_post
+        self.assertEqual(self.prepare()["status"], "completed")
+        self.assertEqual(self.generate.call_count, 1)
+        self.assertEqual(sum(path.endswith("/claim/") for path in calls), 1)
+
+    def test_attempts_are_session_fresh_and_per_lot_budget_includes_direct_excerpt(self):
+        self.public.update(error="", text="Condition: good. Dimensions: 8 x 10 inches.")
+        manifest = self.prepare()
+        state = browser._load_state(Path(manifest["state_path"]), self.api, worker)
+        record = self.discovered()
+        record["attempts"][0]["observed_at"] = (self.now - timedelta(seconds=1)).isoformat()
+        evidence = {"session_id": manifest["session_id"], "job_id": manifest["job_id"], "records": [record]}
+        with self.assertRaisesRegex(worker.WorkerError, "provenance"):
+            browser.merge_evidence(state, evidence, worker)
+        evidence["records"] = [self.discovered(f"https://market.example/lot/{i}") for i in range(6)]
+        merged = browser.merge_evidence(state, evidence, worker)
+        self.assertEqual(len(merged), 6)
+        self.assertEqual(merged[0]["text"], self.public["text"])
+        self.assertTrue(any("omitted 1" in attempt["detail"] for item in merged for attempt in item.get("attempts", [])))
+        evidence["records"].pop()
+        self.assertEqual(len(browser.merge_evidence(state, evidence, worker)), 6)

@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from django.apps import apps
 
-from scripts.coordinate_brief_contract import BRIEF_SCHEMA, validate_brief  # noqa: F401
+from scripts.coordinate_brief_contract import BRIEF_SCHEMA, validate_brief, validate_price_evidence  # noqa: F401
 
 from .coordinate_brief_models import CoordinateBrief
 
@@ -18,23 +18,33 @@ def _evidence(job, current_research=()):
 
     case = job.message.case
     evidence = {}
-    # The first successful, visible source supplies each exact original URL.
-    # A later failed fetch does not erase an earlier supported observation.
+
+    def remember(ref, value):
+        if ref not in evidence:
+            evidence[ref] = {**value, "observations": []}
+        evidence[ref]["observations"].append(value)
+
+    def observation(item):
+        get = item.get if isinstance(item, dict) else lambda key, default=None: getattr(item, key, default)
+        if get("error") or not get("text", "").strip() or get("source_kind") == "search_only":
+            return
+        original, opened = get("source_url"), get("final_url") or get("source_url")
+        value = {"label": get("title") or opened, "url": opened,
+                 "kind": get("source_kind", "public"), "text": get("text"),
+                 "identity_match": get("identity_match", {}) or {}}
+        # A discovered page is cited by its actual opened URL. The original
+        # URL alias remains for old briefs and direct-page observations.
+        remember(opened, value)
+        if original != opened and get("source_kind") in ("public", "browser"):
+            remember(original, value)
+
+    # First observation wins, so current records precede previously saved
+    # observations; later failed fetches never erase useful evidence.
+    for item in current_research:
+        observation(item)
     saved = visible_artifacts(case.research.filter(job__message_id__lte=job.message_id, error="")).order_by("-fetched_at", "-id")
     for item in saved:
-        if item.text.strip() and item.source_url not in evidence:
-            evidence[item.source_url] = {
-                "label": item.title or item.source_url,
-                "url": item.final_url if item.source_kind == "browser" else item.source_url,
-                "kind": item.source_kind, "text": item.text,
-            }
-    for item in current_research:
-        if not item.get("error") and item.get("text", "").strip():
-            evidence[item["source_url"]] = {
-                "label": item.get("title") or item["source_url"],
-                "url": item.get("final_url") if item.get("source_kind") == "browser" else item["source_url"],
-                "kind": item.get("source_kind", "public"), "text": item["text"],
-            }
+        observation(item)
     messages = case.messages.filter(role="staff", deleted_at__isnull=True, pk__lte=job.message_id)
     for item in messages:
         evidence[f"message:{item.pk}"] = {
@@ -60,14 +70,7 @@ def _evidence(job, current_research=()):
 
 
 def _supported(brief, evidence):
-    refs = _refs(brief)
-    if not refs <= evidence.keys():
-        raise ValueError("Briefing cites unavailable or unrelated case evidence.")
-    plan = brief["plan"]
-    if plan["pickup_deadline"]:
-        basis = " ".join(plan["deadline_basis"].split())
-        if not any(basis in " ".join(evidence[ref]["text"].split()) for ref in plan["source_refs"]):
-            raise ValueError("The suggested pickup deadline wording is absent from its cited evidence.")
+    validate_price_evidence(brief, evidence)
 
 
 def save_brief(job, brief, current_research=()):

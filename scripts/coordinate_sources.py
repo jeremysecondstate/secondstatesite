@@ -15,7 +15,8 @@ import socket
 import ssl
 import threading
 import time
-from urllib.parse import quote, urljoin, urlsplit
+import unicodedata
+from urllib.parse import quote, unquote, urljoin, urlsplit
 
 
 MAX_URLS = 8
@@ -28,6 +29,90 @@ PAGE_SECONDS = 10
 DNS_SECONDS = 4
 REDIRECT_STATUSES = (301, 302, 303, 307, 308)
 URL_PATTERN = re.compile(r"https?://[^\s<>\"`]+", re.IGNORECASE)
+
+# These are completeness signals, not extracted facts. A long auction page can
+# contain navigation and estimates without the fields needed to coordinate it.
+FIELD_SIGNALS = {
+    "sold_price": r"\b(?:sold\s*(?:for\b|:|price\b)|hammer\s*(?:price\b|:)|price\s*realized\b|winning\s*bid\b)\s*:?[\s$€£A-Z]{0,12}\d",
+    "medium_edition": r"\b(?:lithograph|serigraph|screenprint|etching|oil on|acrylic|bronze|edition|watercolo[u]?r|medium)\b",
+    "artwork_dimensions": r"\b(?:dimensions|image size|sheet size|size|measurements)\b|\d\s*(?:x|×)\s*\d",
+    "framed_dimensions": r"\bfram(?:e|ed)\s*(?:dimensions|size|measures)|\bframed\s*[:\-]?\s*\d",
+    "condition": r"\bcondition\b",
+    "auction_date": r"\b(?:auction|sale)\s*(?:date|ended|closed|held)|\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+20\d{2}\b",
+    "location": r"\b(?:location|address|collection address|pickup address)\b",
+    "pickup_release_storage": r"\b(?:pick.?up|collection|storage|release|removal)\b",
+    "shipping_contacts": r"\b(?:shipping|shipper|packing|transport)\b.{0,180}(?:@|\bcontact\b|\d{3}[-. )])",
+}
+
+
+def missing_fields(record):
+    text = record.get("title", "") + "\n" + record.get("text", "")
+    return [field for field, pattern in FIELD_SIGNALS.items()
+            if not re.search(pattern, text, re.IGNORECASE | re.DOTALL)]
+
+
+def public_identity(record):
+    """Only explicitly labelled facts from public evidence become constraints.
+
+    URL slugs are discovery hints, never proof of an artist, lot or sale date.
+    Artwork dates are intentionally not interpreted as auction dates.
+    """
+    text = record.get("text", "") if not record.get("error") else ""
+    identity = {key: "" for key in ("artist", "title", "auction_house", "auction_date", "lot_number")}
+    for field, pattern in {
+        "artist": r"(?im)^artist\s*:\s*([^\n]{1,150})",
+        "title": r"(?im)^title\s*:\s*([^\n]{1,200})",
+        "auction_house": r"(?im)^auction house\s*:\s*([^\n]{1,150})",
+        "auction_date": r"(?im)^(?:auction|sale) date\s*:\s*([^\n]{1,100})",
+        "lot_number": r"(?im)^lot\s*(?:number|no\.?|#)?\s*[:#]?\s*(\d+[A-Za-z]?)\b",
+    }.items():
+        match = re.search(pattern, text)
+        if match:
+            identity[field] = match.group(1).strip()
+    if identity["auction_date"]:
+        value = identity["auction_date"]
+        identity["auction_date"] = ""
+        for pattern in ("%Y-%m-%d", "%B %d, %Y", "%b %d, %Y", "%B %d %Y", "%m/%d/%Y"):
+            try:
+                identity["auction_date"] = datetime.strptime(value, pattern).date().isoformat()
+                break
+            except ValueError:
+                continue
+    return identity
+
+
+def discovery_queries(record):
+    """A bounded initial search queue built without private message/doc contents.
+
+    The operator augments these using *public* identifying facts it discovers.
+    Query parameters are omitted: they may carry private tracking information.
+    """
+    parts = urlsplit(record["source_url"])
+    # A submitted HTTPS link can be a private invoice/share link. Do not publish
+    # arbitrary filenames, sharing IDs or path tokens to a search engine.
+    lot_route = bool(re.search(r"/(?:auction-lot|lots?|auction_lot)/", parts.path, re.IGNORECASE))
+    slug = unquote(parts.path.rstrip("/").rsplit("/", 1)[-1]) if lot_route else ""
+    slug = re.sub(r"[_-][a-f0-9]{8,}$", "", slug, flags=re.IGNORECASE)
+    slug = re.sub(r"[_-]+", " ", slug)
+    slug = re.sub(r"[^\w\s'’]", " ", slug, flags=re.UNICODE)
+    seed = " ".join(slug.split())[:220]
+    host = parts.hostname.lower().removeprefix("www.")
+    identity = public_identity(record)
+    if identity["artist"] and identity["title"]:
+        seed = " ".join((identity["artist"], identity["title"]))[:220]
+    elif not lot_route:
+        return [f"site:{host} auction catalog results", f"site:{host} shipping pickup storage contact"]
+    # Opaque identifiers are not meaningful public identifying facts. This also
+    # avoids publishing incidental tokens from an otherwise public-looking URL.
+    if not re.search(r"[a-zA-Z]{3}", seed) or re.fullmatch(r"[a-fA-F0-9\s]{12,}", seed):
+        seed = "auction catalog results"
+    constraints = " ".join(value for value in (identity["auction_date"],
+                          "lot " + identity["lot_number"] if identity["lot_number"] else "") if value)
+    ascii_seed = "".join(char for char in unicodedata.normalize("NFKD", seed) if not unicodedata.combining(char))
+    candidates = [f"site:{host} {seed}", f"{seed} {host} sold {constraints}",
+                  f"{ascii_seed} auction {constraints}", f"site:invaluable.com {seed} {constraints}",
+                  f"site:{host} {seed} condition dimensions", f"site:{host} shipping pickup storage contact"]
+    return list(dict.fromkeys(" ".join(query.split())[:500] for query in candidates))[:6]
 
 
 class SourceError(Exception):

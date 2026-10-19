@@ -17,13 +17,28 @@
                 <div><dt>Artwork dimensions</dt><dd>{{ lot.dimensions|default:"Not provided" }}</dd></div>
                 <div><dt>Framed dimensions</dt><dd>{{ lot.framed_dimensions|default:"Not provided" }}</dd></div>
                 <div><dt>Framing</dt><dd>{{ lot.framing|default:"Not provided" }}</dd></div>
-                <div><dt>Condition</dt><dd>{{ lot.condition|default:"Not provided" }}</dd></div>
+                <div><dt>Seller-stated condition</dt><dd>{{ lot.condition|default:"Not provided" }}</dd></div>
                 <div><dt>Auction house</dt><dd>{{ lot.auction_house|default:"Not provided" }}</dd></div>
+                <div><dt>Auction date</dt><dd>{{ lot.auction_date|default:"Not provided" }}</dd></div>
                 <div><dt>Pickup location</dt><dd>{{ lot.pickup_location|default:"Not provided" }}</dd></div>
                 <div><dt>Pickup deadline</dt><dd>{{ lot.deadline_text|default:"Not provided" }}</dd></div>
                 <div><dt>Release requirements</dt><dd>{{ lot.release_requirements|default:"Not provided" }}</dd></div>
+                <div><dt>Storage terms</dt><dd>{{ lot.storage_terms|default:"Not provided" }}</dd></div>
+                <div><dt>Published shipping contacts</dt><dd>{{ lot.shipping_contacts|default:"Not provided" }}</dd></div>
               </dl>
               <p class="coordinate-measurement-note">Measurements and units are shown as stated by the source.</p>
+              <section class="coordinate-lot-prices" aria-label="Price evidence">
+                <h4>Price evidence</h4>
+                {% for price in lot.prices %}
+                  <div class="coordinate-price-observation">
+                    {% if price.kind == "historical_comparison" %}<p class="coordinate-panel-note"><strong>Historical comparison — a different sale</strong></p>{% endif %}
+                    <p><strong>{{ price.label }} {{ price.amount }}{% if price.amount_high %}–{{ price.amount_high }}{% endif %}{% if price.currency %} {{ price.currency }}{% endif %}</strong></p>
+                    <p class="coordinate-panel-note">{% if not price.currency %}Currency not stated. {% endif %}{% if price.basis == "unknown" %}Price basis not stated; buyer’s premium inclusion is unknown.{% elif price.basis == "hammer" %}Hammer price; buyer’s premium is separate.{% elif price.basis == "premium_inclusive" %}Includes buyer’s premium; taxes and shipping are not established by this figure.{% elif price.basis == "estimate" %}Auction estimate.{% elif price.basis == "invoice_total" %}Invoice total.{% elif price.basis == "tax" %}Tax amount.{% elif price.basis == "shipping" %}Shipping amount.{% elif price.basis == "insurance" %}Insurance value.{% else %}See the source wording for the stated basis.{% endif %}</p>
+                    <details><summary>Source wording &amp; citations</summary><blockquote>{{ price.evidence_quote }}</blockquote><div class="coordinate-brief-sources">{% for ref, source in brief.sources.items %}{% if ref in price.source_refs %}<a href="{{ source.url }}" data-source-link>{{ source.label|default:"View source" }}</a>{% endif %}{% endfor %}</div></details>
+                  </div>
+                {% empty %}<p class="coordinate-panel-note">No verified price is available yet.</p>{% endfor %}
+                {% if lot.price_notes %}<p class="coordinate-price-notes">{{ lot.price_notes }}</p>{% endif %}
+              </section>
               <div class="coordinate-brief-sources" aria-label="Sources for this lot">
                 {% for ref, source in brief.sources.items %}{% if ref in lot.source_refs %}<a href="{{ source.url }}" data-source-link>{{ source.label|default:"View source" }}</a>{% endif %}{% endfor %}
                 {% if not lot.source_refs %}<span>No source linked yet.</span>{% endif %}
