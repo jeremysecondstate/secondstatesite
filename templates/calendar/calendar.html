@@ -2939,7 +2939,7 @@
 
   const galleryCard = (lot, index) => {
     const card = document.createElement("article");
-    card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}`;
+    card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}`;
     const visual = document.createElement("div");
     visual.className = "day-gallery-visual";
     const open = document.createElement("button");
@@ -2959,6 +2959,7 @@
     visual.appendChild(emailButton);
     const caption = document.createElement("div");
     caption.className = "day-gallery-caption";
+    if (lot.won_by_us) appendText(caption, "span", "lot-won-badge", "✓ Won by SECONDSTATE");
     const artist = document.createElement("div");
     artist.className = "day-gallery-artist";
     appendArtistLabel(artist, lot);
@@ -3378,6 +3379,7 @@
       researchCount.textContent = "0 lots";
       researchRenderedKey = "";
       researchLotCard.replaceChildren();
+      researchLotCard.classList.remove("is-won", "is-ended");
       appendText(researchLotCard, "p", "research-empty", "No watched lots on this date. Choose another day in the Calendar or Gallery Catalog.");
       renderResearchRail();
       return;
@@ -3395,6 +3397,7 @@
     researchRenderedKey = key;
     researchLotCard.replaceChildren();
     researchLotCard.classList.toggle("is-ended", Boolean(lot.ended));
+    researchLotCard.classList.toggle("is-won", Boolean(lot.won_by_us));
     if (researchLotCache.has(String(lot.id))) {
       researchLotCard.appendChild(researchLotCache.get(String(lot.id)));
       activateArchiveStage();
@@ -3408,6 +3411,7 @@
     content.appendChild(appendArchiveGallery(lot));
     const overview = document.createElement("section");
     overview.className = "research-lot-overview";
+    if (lot.won_by_us) appendText(overview, "span", "lot-won-badge", "✓ Won by SECONDSTATE");
     appendArtistLabel(overview, lot);
     const heading = document.createElement("h3");
     heading.className = "lot-title";
@@ -3481,10 +3485,12 @@
 
     lotBrowserCard.replaceChildren();
     lotBrowserCard.classList.toggle("is-ended", Boolean(lot.ended));
+    lotBrowserCard.classList.toggle("is-won", Boolean(lot.won_by_us));
     lotBrowserCard.appendChild(appendLotBrowserMedia(lot));
 
     const copy = document.createElement("div");
     copy.className = "lot-browser-copy has-workflow";
+    if (lot.won_by_us) appendText(copy, "span", "lot-won-badge", "✓ Won by SECONDSTATE");
     appendArtistLabel(copy, lot);
     appendText(copy, "h3", "lot-title", lot.title);
     appendText(copy, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
@@ -3794,7 +3800,8 @@
 
     lots.forEach((lot) => {
       const item = document.createElement("article");
-      item.className = `day-lot${lot.ended ? " is-ended" : ""}`;
+      item.className = `day-lot${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}`;
+      if (lot.won_by_us) appendText(item, "span", "lot-won-badge", "✓ Won by SECONDSTATE");
       appendArtistLabel(item, lot);
       appendText(item, "h3", "lot-title", lot.title);
       appendText(item, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));

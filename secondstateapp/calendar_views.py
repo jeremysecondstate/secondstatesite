@@ -257,6 +257,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "bid_count": lot.bid_count,
         "sold_price": _decimal_json(lot.sold_price),
         "sold_currency": lot.sold_currency or (lot.currency if lot.sold_price else ""),
+        "won_by_us": lot.won_by_us,
         "artist_artprice_url": artist_artprice_url,
         **artprice_research_links(lot.artist_watchlist_name or lot.artist, lot.title, artist_artprice_url),
         "artprice_url": lot.artprice_url,
