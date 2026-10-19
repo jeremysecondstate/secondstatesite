@@ -91,6 +91,13 @@ USE_I18N = True
 USE_TZ = True
 CALENDAR_TIME_ZONE = os.environ.get("CALENDAR_TIME_ZONE", "America/Los_Angeles")
 SECONDSTATE_PUBLIC_URL = os.environ.get("SECONDSTATE_PUBLIC_URL", "https://secondstate.art").rstrip("/")
+# Coordinate has no shipping-action or schedule switch in this milestone.
+# A dedicated secret only grants access to the limited text-worker endpoints.
+COORDINATE_WORKER_TOKEN = os.environ.get("COORDINATE_WORKER_TOKEN", "")
+# Private staff references are supplied as multiline deployment secrets. Local
+# development can read the original, ignored Markdown files instead.
+COORDINATE_SHIPPING_PLAYBOOK = os.environ.get("COORDINATE_SHIPPING_PLAYBOOK", "")
+COORDINATE_PACKING_PLAYBOOK = os.environ.get("COORDINATE_PACKING_PLAYBOOK", "")
 AUCTION_EMAIL_SENDING_ENABLED = os.environ.get("AUCTION_EMAIL_SENDING_ENABLED", "false").strip().lower() in {
     "1",
     "true",

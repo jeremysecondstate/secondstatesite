@@ -5,6 +5,8 @@ from PIL import Image
 from io import BytesIO
 from django.core.files.base import ContentFile
 import os
+import uuid
+from django.utils import timezone
 
 
 class SoldPiece(models.Model):
@@ -498,3 +500,65 @@ class AuctionEmailBatchItem(models.Model):
 
     def __str__(self):
         return f"{self.lot} in batch {self.batch_id}"
+
+
+class CoordinateCase(models.Model):
+    """Shared staff conversation; the website is the coordination system of record."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=160)
+    created_by = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
+    coordinator = models.CharField(max_length=80, default="manual-codex")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-updated_at", "id"]
+
+
+class CoordinateMessage(models.Model):
+    case = models.ForeignKey(CoordinateCase, on_delete=models.PROTECT, related_name="messages")
+    role = models.CharField(max_length=12, choices=[("staff", "Staff"), ("assistant", "Codex")])
+    body = models.TextField()
+    author = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    client_message_id = models.UUIDField(null=True, blank=True, unique=True)
+    in_reply_to = models.OneToOneField("self", null=True, blank=True, on_delete=models.PROTECT, related_name="worker_reply")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+
+class CoordinateJob(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    message = models.OneToOneField(CoordinateMessage, on_delete=models.PROTECT, related_name="job")
+    status = models.CharField(max_length=12, default="queued", choices=[
+        ("queued", "Queued"), ("processing", "Processing"), ("completed", "Completed"), ("retry", "Retry"),
+    ])
+    attempts = models.PositiveIntegerField(default=0)
+    claim_token = models.UUIDField(null=True, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    available_at = models.DateTimeField(default=timezone.now)
+    last_error = models.CharField(max_length=300, blank=True)
+    worker_id = models.CharField(max_length=80, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "available_at"], name="coordinate_pending_idx")]
+
+
+class CoordinateWorkerState(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    last_successful_check = models.DateTimeField(null=True, blank=True)
+
+
+class CoordinateActivity(models.Model):
+    case = models.ForeignKey(CoordinateCase, on_delete=models.PROTECT, related_name="activity")
+    job = models.ForeignKey(CoordinateJob, null=True, blank=True, on_delete=models.PROTECT, related_name="activity")
+    event = models.CharField(max_length=40)
+    details = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]

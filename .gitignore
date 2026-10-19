@@ -12,6 +12,12 @@ __pycache__/
 staticfiles/
 media/
 private_data/
+# Coordinate staff references and local proof contain private receiving details.
+docs/cardboardsandwich.md
+docs/coordinate-playbook.md
+docs/coordinate-verification.md
+docs/coordinate-page.png
+docs/coordinate-roundtrip.png
 
 # Env / secrets
 env

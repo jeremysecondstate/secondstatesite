@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 
 from . import (
     bid_board_views,
@@ -12,6 +12,7 @@ from . import (
 )
 
 urlpatterns = [
+    path("coordinate/", include("secondstateapp.coordinate_urls")),
     path("", views.home, name="home"),
     path("about/", views.about, name="about"),
     path("contact/", views.contact, name="contact"),
