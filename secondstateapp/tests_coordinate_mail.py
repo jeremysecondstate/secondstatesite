@@ -100,7 +100,7 @@ class CoordinateMailTests(TestCase):
         self.assertEqual(self.send(token).status_code, 200)
         self.assertEqual(transport.call_count, 1)
         delivery = CoordinateMailDelivery.objects.get()
-        self.assertEqual(delivery.error_code, "receipt_not_confirmed")
+        self.assertEqual(delivery.error_code, "transport_error")
         self.assertFalse(mail.draft_mail_state(CoordinateDraft.objects.get(pk=self.draft.pk))["editable"])
         receipt = mail.record_delivery_success(delivery.pk, "reconciled-17", "thread-17")
         self.assertEqual(receipt.status, "sent")
@@ -262,3 +262,214 @@ class CoordinateMailTests(TestCase):
         self.assertEqual(message.get_content().strip(), delivery.body)
         self.assertEqual(credentials.call_args.kwargs["scopes"], [mail.GMAIL_SEND_SCOPE])
         sender.return_value.execute.assert_called_once_with(num_retries=0)
+
+    @override_settings(GOOGLE_GMAIL_CLIENT_ID=" synthetic-client \n", GOOGLE_GMAIL_CLIENT_SECRET=" synthetic-secret ",
+                       GOOGLE_GMAIL_REFRESH_TOKEN="\tsynthetic-refresh\n")
+    @patch("google.oauth2.credentials.Credentials")
+    def test_credentials_normalize_outer_whitespace_without_broadening_scope(self, credentials):
+        mail._credentials()
+        self.assertEqual(credentials.call_args.kwargs["client_id"], "synthetic-client")
+        self.assertEqual(credentials.call_args.kwargs["client_secret"], "synthetic-secret")
+        self.assertEqual(credentials.call_args.kwargs["refresh_token"], "synthetic-refresh")
+        self.assertEqual(credentials.call_args.kwargs["scopes"], [mail.GMAIL_SEND_SCOPE])
+
+    @patch("secondstateapp.coordinate_mail.check_mail_connection")
+    @patch("secondstateapp.coordinate_mail.send_snapshot")
+    def test_connection_form_requires_explicit_staff_csrf_post(self, send, check):
+        url = reverse("coordinate_mail_check_connection")
+        response = self.client.get(url)
+        self.assertContains(response, "Check email connection")
+        check.assert_not_called()
+        protected = Client(enforce_csrf_checks=True)
+        protected.force_login(self.staff)
+        self.assertEqual(protected.post(url).status_code, 403)
+        check.assert_not_called()
+        check.return_value = {"code": "ready", "status_text": "No email was sent."}
+        self.assertEqual(self.client.post(url, HTTP_ACCEPT="application/json").json()["code"], "ready")
+        self.assertContains(self.client.post(url), "No email was sent.")
+        self.client.logout()
+        self.assertEqual(self.client.post(url).status_code, 302)
+        self.assertEqual(check.call_count, 2)
+        send.assert_not_called()
+
+    @patch("googleapiclient.discovery.build")
+    @patch("google_auth_httplib2.Request")
+    @patch("secondstateapp.coordinate_mail._credentials")
+    def test_connection_check_only_refreshes_once_with_explicit_send_grant(self, factory, request, build):
+        credential = factory.return_value
+        credential.valid = True
+        credential.granted_scopes = [mail.GMAIL_SEND_SCOPE]
+        credential.refresh.side_effect = lambda call: call(mail.OAUTH_TOKEN_URI, method="POST", body=b"synthetic-secret")
+        result = mail.check_mail_connection()
+        self.assertTrue(result["auth_valid"])
+        self.assertTrue(result["send_grant_verified"])
+        self.assertFalse(result["account_identity_verified"])
+        self.assertFalse(result["sent"])
+        self.assertEqual(result["code"], "ready")
+        self.assertEqual(request.call_args.args[0].timeout, 10)
+        request.return_value.assert_called_once()
+        build.assert_not_called()
+        self.assertNotIn("synthetic-secret", str(result))
+
+    @patch("secondstateapp.coordinate_mail._credentials")
+    def test_connection_check_does_not_claim_unconfirmed_or_missing_scope(self, factory):
+        factory.return_value.valid = True
+        for granted, expected in ((None, "send_scope_unconfirmed"), (["openid"], "send_scope_missing")):
+            with self.subTest(granted=granted):
+                factory.return_value.granted_scopes = granted
+                result = mail.check_mail_connection()
+                self.assertTrue(result["auth_valid"])
+                self.assertFalse(result["send_grant_verified"])
+                self.assertEqual(result["code"], expected)
+
+    @patch("google_auth_httplib2.Request")
+    @patch("secondstateapp.coordinate_mail._credentials")
+    def test_connection_refresh_retry_and_redirect_are_bounded_before_second_network_call(self, factory, request):
+        def repeated(call):
+            call(mail.OAUTH_TOKEN_URI)
+            call(mail.OAUTH_TOKEN_URI)
+        factory.return_value.refresh.side_effect = repeated
+        self.assertEqual(mail.check_mail_connection()["code"], "transport_error")
+        request.return_value.assert_called_once()
+        request.reset_mock()
+        factory.return_value.refresh.side_effect = lambda call: call("https://other.example.test/token")
+        self.assertEqual(mail.check_mail_connection()["code"], "transport_error")
+        request.return_value.assert_not_called()
+
+    @override_settings(GOOGLE_GMAIL_REFRESH_TOKEN=" ")
+    @patch("secondstateapp.coordinate_mail._credentials")
+    def test_connection_missing_configuration_never_calls_oauth(self, factory):
+        self.assertEqual(mail.check_mail_connection()["code"], "configuration_missing")
+        factory.assert_not_called()
+
+    @patch("secondstateapp.coordinate_mail._credentials")
+    def test_auth_errors_expose_only_allowlisted_enum_without_provider_text(self, factory):
+        from google.auth.exceptions import RefreshError
+        error = RefreshError("synthetic-secret token private body", {
+            "error": "invalid_grant", "error_description": "synthetic-refresh private body"})
+        factory.return_value.refresh.side_effect = error
+        result = mail.check_mail_connection()
+        self.assertEqual(result["code"], "oauth_invalid_grant")
+        self.assertFalse(result["auth_valid"])
+        for secret in ("synthetic-secret", "synthetic-refresh", "private body"):
+            self.assertNotIn(secret, str(result))
+        self.assertEqual(mail.safe_mail_error(RefreshError("sensitive", {"error": "sensitive"})), "oauth_refresh_failed")
+
+    def test_new_delivery_receipt_uses_postgresql_safe_lock_on_nullable_thread_join(self):
+        from django.db.backends.postgresql.base import DatabaseWrapper
+        from django.db.models.query import QuerySet
+        self.review()
+        delivery, _ = mail.prepare_delivery(self.draft.pk, self.staff, mail.draft_digest(self.draft), uuid4())
+        self.assertIsNone(delivery.thread_id)
+        locked = []
+        original_get = QuerySet.get
+
+        def capture_get(query, *args, **kwargs):
+            if query.model is CoordinateMailDelivery and query.query.select_for_update:
+                locked.append(query.query.clone())
+            return original_get(query, *args, **kwargs)
+
+        with patch.object(QuerySet, "get", capture_get):
+            saved = mail.record_delivery_success(delivery.pk, "postgres-outbound", "postgres-thread")
+        self.assertEqual(saved.status, "sent")
+        self.assertEqual(len(locked), 1)
+        # Compile the actual receipt query using the production database backend,
+        # without connecting to a database. SQLite silently omits row locks.
+        backend = DatabaseWrapper({"ENGINE": "django.db.backends.postgresql", "NAME": "unused"}, alias="compiler-only")
+        with patch.object(backend, "get_autocommit", return_value=False):
+            sql, _ = locked[0].get_compiler(connection=backend).as_sql()
+        self.assertIn("LEFT OUTER JOIN", sql)
+        self.assertIn('FOR UPDATE OF "secondstateapp_coordinatemaildelivery"', sql)
+        self.assertNotIn("coordinatemailthread", sql.split("FOR UPDATE", 1)[1])
+
+    def test_observed_rfc_identity_updates_correspondence_without_changing_delivery_snapshot(self):
+        self.review()
+        delivery, _ = mail.prepare_delivery(self.draft.pk, self.staff, mail.draft_digest(self.draft), uuid4())
+        original = delivery.rfc_message_id
+        receipt = mail.record_delivery_success(delivery.pk, "observed-outbound", "observed-thread",
+            require_visible=True, observed_rfc_message_id="<actual-first@mail.gmail.com>")
+        self.assertEqual(receipt.rfc_message_id, original)
+        self.assertEqual(CoordinateMailMessage.objects.get().rfc_message_id, "<actual-first@mail.gmail.com>")
+        mail.record_delivery_success(delivery.pk, "observed-outbound", "observed-thread",
+            require_visible=True, observed_rfc_message_id="<actual-observed@mail.gmail.com>")
+        self.assertEqual(CoordinateMailMessage.objects.get().rfc_message_id, "<actual-observed@mail.gmail.com>")
+        self.assertEqual(CoordinateMailDelivery.objects.get().rfc_message_id, original)
+        self.assertEqual(CoordinateMailMessage.objects.count(), 1)
+        with self.assertRaises(ValueError):
+            mail.record_delivery_success(delivery.pk, "observed-outbound", "observed-thread",
+                observed_rfc_message_id="<malicious@example.test>\r\nBcc: other@example.test")
+
+    def test_database_failure_taxonomy_never_persists_exception_text(self):
+        from django.db import DatabaseError
+        error = DatabaseError("synthetic-secret private body")
+        cause = Exception("sensitive database statement")
+        cause.sqlstate = "0A000"
+        error.__cause__ = cause
+        self.assertEqual(mail.safe_mail_error(error), "receipt_database_unsupported")
+        cause.sqlstate = "23505"
+        self.assertEqual(mail.safe_mail_error(error), "receipt_duplicate")
+        cause.sqlstate = "unexpected-sensitive-code"
+        self.assertEqual(mail.safe_mail_error(error), "receipt_persistence_error")
+
+    @patch("secondstateapp.coordinate_mail.send_snapshot", return_value={"id": "durable-outbound", "threadId": "durable-thread"})
+    def test_rich_receipt_failure_retains_committed_gmail_ids_and_never_resends(self, transport):
+        from django.db import DatabaseError
+        self.review()
+        request_id = uuid4()
+        with patch("secondstateapp.coordinate_mail.record_delivery_success", side_effect=DatabaseError("private server detail")):
+            response = self.send(request_id)
+        self.assertEqual(response.status_code, 200)
+        saved = CoordinateMailDelivery.objects.get()
+        self.assertEqual(saved.status, "unknown")
+        self.assertEqual(saved.error_code, "receipt_persistence_error")
+        self.assertEqual(saved.gmail_message_id, "durable-outbound")
+        self.assertEqual(saved.gmail_thread_id, "durable-thread")
+        self.assertFalse(CoordinateMailMessage.objects.exists())
+        self.assertEqual(self.send(request_id).status_code, 200)
+        transport.assert_called_once()
+        self.assertNotContains(response, "private server detail")
+        with self.assertRaises(ValueError):
+            mail.record_provider_receipt(saved.pk, "conflicting-outbound", "durable-thread")
+        with self.assertRaises(ValueError):
+            mail.record_delivery_success(saved.pk, "conflicting-outbound", "durable-thread")
+        mail.record_delivery_success(saved.pk, "durable-outbound", "durable-thread")
+        self.assertEqual(CoordinateMailMessage.objects.count(), 1)
+
+    def test_observed_delivery_time_preserves_provider_time_and_rejects_invalid_observation(self):
+        self.review()
+        delivery, _ = mail.prepare_delivery(self.draft.pk, self.staff, mail.draft_digest(self.draft), uuid4())
+        actual = delivery.requested_at - timedelta(seconds=1)
+        mail.record_delivery_success(delivery.pk, "timed-outbound", "timed-thread", observed_received_at=actual)
+        self.assertEqual(CoordinateMailDelivery.objects.get().sent_at, actual)
+        self.assertEqual(CoordinateMailMessage.objects.get().received_at, actual)
+        corrected = delivery.requested_at
+        mail.record_delivery_success(delivery.pk, "timed-outbound", "timed-thread", observed_received_at=corrected)
+        self.assertEqual(CoordinateMailDelivery.objects.get().sent_at, corrected)
+        self.assertEqual(CoordinateMailMessage.objects.get().received_at, corrected)
+        for invalid in (timezone.now() + timedelta(minutes=2), delivery.requested_at - timedelta(minutes=2),
+                        delivery.requested_at.replace(tzinfo=None)):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                mail.record_delivery_success(delivery.pk, "timed-outbound", "timed-thread", observed_received_at=invalid)
+
+    @patch("secondstateapp.coordinate_mail.send_snapshot")
+    def test_immediate_reply_cannot_dispatch_until_actual_parent_rfc_header_is_observed(self, transport):
+        self.review()
+        delivery, _ = mail.prepare_delivery(self.draft.pk, self.staff, mail.draft_digest(self.draft), uuid4())
+        sent = mail.record_delivery_success(delivery.pk, "unobserved-outbound", "unobserved-thread")
+        self.assertEqual(CoordinateMailMessage.objects.get().rfc_message_id, "")
+        self.assertTrue(CoordinateMailDelivery.objects.get().rfc_message_id.startswith("<coordinate-"))
+        self.draft = CoordinateDraft.objects.create(case=self.case, recipient=sent.recipient,
+            subject="Re: " + sent.subject, body="Please confirm the window.", purpose="Follow up", mail_thread=sent.thread)
+        self.review()
+        response = self.send()
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("verified message header", response.json()["error"])
+        transport.assert_not_called()
+        self.assertEqual(CoordinateMailDelivery.objects.count(), 1)
+        mail.record_delivery_success(sent.pk, "unobserved-outbound", "unobserved-thread", require_visible=True,
+            observed_rfc_message_id="<actual-sent@mail.gmail.com>")
+        transport.return_value = {"id": "followup-outbound", "threadId": "unobserved-thread"}
+        self.assertEqual(self.send().status_code, 200)
+        transport.assert_called_once()
+        followup = CoordinateMailDelivery.objects.get(draft=self.draft)
+        self.assertEqual(followup.in_reply_to, "<actual-sent@mail.gmail.com>")

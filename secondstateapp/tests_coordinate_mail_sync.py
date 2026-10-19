@@ -33,6 +33,46 @@ def raw_message(identifier="message001", thread="thread001", *, sender="packer@e
 
 
 class MailMIMETests(UnitTestCase):
+    def test_live_connector_snake_case_mime_shape_preserves_decoded_body(self):
+        now = timezone.now()
+        raw = raw_message(sender=sync.ACCOUNT_EMAIL, text="Line one.\r\n\r\nLine two.", when=now)
+        raw["thread_id"] = raw.pop("threadId")
+        raw["internal_date"] = raw.pop("internalDate")
+        raw["label_ids"] = ["SENT", "INBOX"]
+        raw.pop("labelIds")
+        payload = raw["payload"]
+        payload["mime_type"] = payload.pop("mimeType")
+        payload["part_id"], payload["filename"], payload["parts"] = "", "", None
+        payload["body"] = {"size": 24, "base64_url_content": None,
+                           "content": "Line one.\r\n\r\nLine two.", "attachment_id": None}
+        result = sync.normalize_thread({"id": "thread001", "history_id": "123", "messages": [raw]}, now)
+        self.assertEqual(result["messages"][0]["body_text"], "Line one.\n\nLine two.")
+        self.assertTrue(result["messages"][0]["sent_label"])
+        payload["body"]["base64_url_content"] = base64.urlsafe_b64encode(b"Different body").decode()
+        with self.assertRaises(ValueError):
+            sync.normalize_thread({"id": "thread001", "messages": [raw]}, now)
+
+    def test_connector_alias_conflicts_and_summary_only_are_rejected(self):
+        now = timezone.now()
+        raw = raw_message(when=now)
+        raw["thread_id"] = "different001"
+        with self.assertRaises(ValueError):
+            sync.normalize_message(raw, "thread001", now)
+        with self.assertRaises(ValueError):
+            sync.normalize_message({"id": "message001", "thread_id": "thread001",
+                "internal_date": str(int(now.timestamp() * 1000)), "snippet": "summary only"}, "thread001", now)
+
+    def test_long_subject_is_rejected_and_bcc_is_retained_for_exact_matching(self):
+        now = timezone.now()
+        raw = raw_message(when=now)
+        raw["payload"]["headers"].append({"name": "Bcc", "value": "hidden@example.com"})
+        self.assertTrue(sync.normalize_message(raw, "thread001", now)["has_bcc"])
+        for header in raw["payload"]["headers"]:
+            if header["name"] == "Subject":
+                header["value"] = "A" * 200 + " DIFFERENT"
+        with self.assertRaises(ValueError):
+            sync.normalize_message(raw, "thread001", now)
+
     def test_plain_and_html_decode_without_active_markup_or_remote_requests(self):
         now = timezone.now()
         plain = sync.normalize_message(raw_message(when=now), "thread001", now)
@@ -100,6 +140,35 @@ class MailMIMETests(UnitTestCase):
             self.assertEqual(api.post.call_args_list[0].args, api.post.call_args_list[1].args)
             self.assertEqual(sync.complete(api, state, evidence), result)
             self.assertEqual(api.post.call_count, 2)
+
+    def test_cli_preserves_scoped_snapshot_candidates_and_rejects_incomplete_search(self):
+        now = timezone.now()
+        api = Mock(base_url="https://secondstate.example")
+        api.post.return_value = {"status": "reconciled", "imported": 0, "duplicates": 0}
+        query = "in:sent from:jeremy@secondstate.art to:packer@example.com after:1 before:2"
+        raw = raw_message(sender=sync.ACCOUNT_EMAIL, when=now)
+        raw["labelIds"] = ["SENT"]
+        manifest = {"base_url": api.base_url, "status": "prepared", "sync_token": "signed", "threads": [],
+                    "reconcile": [{"delivery_id": "synthetic-delivery", "rfc_message_id": "<requested@example.com>",
+                                   "fallback_query": query}]}
+        evidence = {"account_email": sync.ACCOUNT_EMAIL, "observed_at": now.isoformat(), "threads": [],
+                    "deliveries": [{"delivery_id": "synthetic-delivery", "candidates": [raw],
+                                    "match_method": "snapshot", "query": query, "search_complete": False}]}
+        with tempfile.TemporaryDirectory() as directory:
+            state, observed = Path(directory) / "state.json", Path(directory) / "observed.json"
+            state.write_text(json.dumps(manifest))
+            observed.write_text(json.dumps(evidence))
+            with self.assertRaises((ValueError, WorkerError)):
+                sync.complete(api, state, observed)
+            api.post.assert_not_called()
+            evidence["deliveries"][0]["search_complete"] = True
+            observed.write_text(json.dumps(evidence))
+            result = sync.complete(api, state, observed)
+            self.assertEqual(result["reconciled"], 1)
+            sent = api.post.call_args.args[1]["reconcile"]
+            self.assertEqual(sent["match_method"], "snapshot")
+            self.assertEqual(sent["query"], query)
+            self.assertEqual(sent["candidates"][0]["rfc_message_id"], "<message001@example.com>")
 
 
 @override_settings(COORDINATE_DRAFT_WORKFLOW_ENABLED=True, COORDINATE_EMAIL_SYNC_ENABLED=True,
@@ -208,6 +277,115 @@ class MailSyncImportTests(TestCase):
             body=draft.body, reviewed_digest="0" * 64, rfc_message_id="<deterministic-send@secondstate.art>",
             approval_snapshot={"originating_message_id": self.origin.pk})
 
+    def observed_outbound(self, delivery, identifier="sent001", *, when=None, rfc=None):
+        raw = raw_message(identifier, when=when or delivery.requested_at, sender=sync.ACCOUNT_EMAIL,
+                          text=delivery.body)
+        raw["labelIds"] = ["SENT"]
+        for header in raw["payload"]["headers"]:
+            if header["name"] == "To":
+                header["value"] = delivery.recipient
+            elif header["name"] == "Subject":
+                header["value"] = delivery.subject
+            elif header["name"] == "Message-ID":
+                header["value"] = rfc or "<provider-rewritten@example.com>"
+        return sync.normalize_message(raw, "thread001", timezone.now())
+
+    def reconcile_data(self, delivery, *, candidates=None, method="snapshot"):
+        manifest = self.manifest()
+        descriptor = next(item for item in manifest["reconcile"] if item["delivery_id"] == str(delivery.pk))
+        return {"sync_token": manifest["sync_token"], "account_email": sync.ACCOUNT_EMAIL,
+                "observed_at": timezone.now().isoformat(), "reconcile": {"delivery_id": str(delivery.pk),
+                    "candidates": candidates or [self.observed_outbound(delivery)], "match_method": method,
+                    "query": descriptor["fallback_query"], "search_complete": True}}
+
+    @patch("secondstateapp.coordinate_mail.send_snapshot")
+    def test_rewritten_rfc_reconciles_only_exact_snapshot_and_preserves_observed_headers(self, send):
+        delivery = self.unknown_delivery()
+        data = self.reconcile_data(delivery)
+        self.assertNotIn(delivery.subject, data["reconcile"]["query"])
+        response = self.post("coordinate_mail_sync_import", data)
+        self.assertEqual(response.status_code, 200, response.content)
+        delivery.refresh_from_db()
+        mail = CoordinateMailMessage.objects.get()
+        self.assertEqual(delivery.rfc_message_id, "<deterministic-send@secondstate.art>")
+        self.assertEqual(mail.rfc_message_id, "<provider-rewritten@example.com>")
+        self.assertEqual(delivery.sent_at, mail.received_at)
+        self.assertEqual(mail.received_at.isoformat(), data["reconcile"]["candidates"][0]["received_at"])
+        self.assertFalse(CoordinateJob.objects.exists())
+        send.assert_not_called()
+
+    def test_snapshot_fallback_rejects_incomplete_query_time_body_and_candidate_ambiguity(self):
+        delivery = self.unknown_delivery()
+        data = self.reconcile_data(delivery)
+        mutations = [lambda value: value["reconcile"].update(search_complete=False),
+                     lambda value: value["reconcile"].update(query="in:sent"),
+                     lambda value: value["reconcile"]["candidates"][0].update(body_text="Different body"),
+                     lambda value: value["reconcile"]["candidates"][0].update(sent_label=False),
+                     lambda value: value["reconcile"]["candidates"][0].update(cc_emails=["other@example.com"]),
+                     lambda value: value["reconcile"]["candidates"][0].update(has_bcc=True),
+                     lambda value: value["reconcile"]["candidates"][0].update(
+                         received_at=(delivery.requested_at - timedelta(seconds=61)).isoformat()),
+                     lambda value: value["reconcile"]["candidates"].append(self.observed_outbound(delivery, "sent002"))]
+        for mutate in mutations:
+            changed = deepcopy(data)
+            mutate(changed)
+            with self.subTest(mutation=mutate):
+                self.assertEqual(self.post("coordinate_mail_sync_import", changed).status_code, 409)
+        self.assertFalse(CoordinateMailMessage.objects.exists())
+
+    def test_snapshot_fallback_rejects_two_saved_identical_deliveries(self):
+        delivery = self.unknown_delivery()
+        other_draft = CoordinateDraft.objects.create(case=self.case, recipient=delivery.recipient,
+            subject=delivery.subject, body=delivery.body)
+        CoordinateMailDelivery.objects.create(draft=other_draft, request_id=uuid4(), status="unknown",
+            sender_email=delivery.sender_email, recipient=delivery.recipient, subject=delivery.subject,
+            body=delivery.body, reviewed_digest="1" * 64, rfc_message_id="<second-intent@secondstate.art>",
+            approval_snapshot={"originating_message_id": self.origin.pk})
+        response = self.post("coordinate_mail_sync_import", self.reconcile_data(delivery))
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(CoordinateMailMessage.objects.exists())
+
+    def test_saved_receipt_id_allows_rewritten_rfc_without_search(self):
+        delivery = self.unknown_delivery()
+        delivery.gmail_message_id, delivery.gmail_thread_id = "sent001", "thread001"
+        delivery.save(update_fields=["gmail_message_id", "gmail_thread_id"])
+        data = self.reconcile_data(delivery, method="receipt")
+        data["reconcile"].pop("query")
+        data["reconcile"].pop("search_complete")
+        response = self.post("coordinate_mail_sync_import", data)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(CoordinateMailMessage.objects.get().rfc_message_id, "<provider-rewritten@example.com>")
+
+    def test_unusual_email_local_part_has_no_fallback_query(self):
+        delivery = self.unknown_delivery()
+        delivery.recipient = '"quoted local"@example.com'
+        delivery.save(update_fields=["recipient"])
+        descriptor = self.manifest()["reconcile"][0]
+        self.assertEqual(descriptor["fallback_query"], "")
+        self.assertIn("rfc822msgid:", descriptor["query"])
+
+    def test_linked_outbound_refreshes_actual_rfc_without_duplicate_or_private_body_change(self):
+        from .coordinate_mail import record_delivery_success
+        delivery = self.unknown_delivery()
+        record_delivery_success(delivery.pk, "sent001", "thread001")
+        mail = CoordinateMailMessage.objects.get()
+        self.assertEqual(mail.rfc_message_id, "")
+        observed = self.observed_outbound(delivery)
+        manifest = self.manifest()
+        data = {"sync_token": manifest["sync_token"], "account_email": sync.ACCOUNT_EMAIL,
+                "observed_at": timezone.now().isoformat(), "thread": {"gmail_thread_id": "thread001", "messages": [observed]}}
+        response = self.post("coordinate_mail_sync_import", data)
+        self.assertEqual(response.status_code, 200, response.content)
+        mail.refresh_from_db()
+        self.assertEqual(mail.rfc_message_id, "<provider-rewritten@example.com>")
+        observed["body_text"] = "Wrong body"
+        observed["rfc_message_id"] = "<wrong@example.com>"
+        self.assertEqual(self.post("coordinate_mail_sync_import", data).status_code, 200)
+        mail.refresh_from_db()
+        self.assertEqual(mail.rfc_message_id, "<provider-rewritten@example.com>")
+        self.assertEqual(CoordinateMailMessage.objects.count(), 1)
+        self.assertFalse(CoordinateJob.objects.exists())
+
     @patch("secondstateapp.coordinate_mail.send_snapshot")
     def test_unknown_delivery_exact_sent_receipt_reconciles_without_resend(self, send):
         delivery = self.unknown_delivery()
@@ -254,6 +432,19 @@ class MailSyncImportTests(TestCase):
         self.thread.refresh_from_db()
         self.assertIsNotNone(self.thread.sync_checked_at)
         self.assertFalse(CoordinateMailMessage.objects.exists())
+
+    def test_delayed_receipt_still_imports_reply_after_authorized_send(self):
+        delivery = self.unknown_delivery()
+        sent_at = timezone.now() - timedelta(minutes=10)
+        CoordinateMailDelivery.objects.filter(pk=delivery.pk).update(thread=self.thread, requested_at=sent_at)
+        reply = raw_message(when=sent_at + timedelta(minutes=2))
+        response = self.post("coordinate_mail_sync_import", self.import_data(raw=reply))
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["imported"], 1)
+        old = raw_message("unrelated001", when=sent_at - timedelta(seconds=1))
+        response = self.post("coordinate_mail_sync_import", self.import_data(raw=old))
+        self.assertEqual(response.json()["skipped"], 1)
+        self.assertEqual(CoordinateMailMessage.objects.count(), 1)
 
     def test_sync_authentication_is_required_and_disabled_mode_is_quiet(self):
         response = Client(enforce_csrf_checks=True).post(reverse("coordinate_mail_sync_manifest"),

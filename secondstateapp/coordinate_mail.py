@@ -1,5 +1,6 @@
 """Case-scoped mail: immutable approvals, explicit dispatch, bounded safe state."""
 import base64
+from datetime import datetime, timedelta
 from email.message import EmailMessage
 from email.policy import SMTP
 from email.utils import format_datetime
@@ -12,7 +13,7 @@ from uuid import UUID, uuid4, uuid5, NAMESPACE_URL
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
@@ -25,6 +26,7 @@ SENDER = "jeremy@secondstate.art"
 GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
 ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,255}\Z")
 RFC_ID_PATTERN = re.compile(r"<[^<>\s\x00-\x1f\x7f]+@[^<>\s\x00-\x1f\x7f]+>\Z")
+OAUTH_TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 
 def mail_readiness():
@@ -41,6 +43,94 @@ def mail_readiness():
             "sender": SENDER, "status_text": status, "configured": configured,
             "dependencies_available": dependencies, "sender_matches": sender_ok,
             "connection_verified": False}
+
+
+def _credentials():
+    from google.oauth2.credentials import Credentials
+    return Credentials(token=None,
+        refresh_token=str(settings.GOOGLE_GMAIL_REFRESH_TOKEN or "").strip(),
+        token_uri=OAUTH_TOKEN_URI,
+        client_id=str(settings.GOOGLE_GMAIL_CLIENT_ID or "").strip(),
+        client_secret=str(settings.GOOGLE_GMAIL_CLIENT_SECRET or "").strip(),
+        scopes=[GMAIL_SEND_SCOPE])
+
+
+def safe_mail_error(error):
+    """Classify by exception type/status and allowlisted OAuth codes, never text."""
+    if isinstance(error, (TimeoutError, ConnectionError, OSError)):
+        return "transport_error"
+    if isinstance(error, ImportError):
+        return "dependency_error"
+    if isinstance(error, DatabaseError):
+        cause = error.__cause__
+        state = getattr(cause, "sqlstate", None) or getattr(cause, "pgcode", None)
+        codes = {"0A000": "receipt_database_unsupported", "22001": "receipt_field_too_long",
+                 "23503": "receipt_relation_conflict", "23505": "receipt_duplicate",
+                 "40001": "receipt_database_busy", "40P01": "receipt_database_busy", "55P03": "receipt_database_busy"}
+        if state in codes:
+            return codes[state]
+        return "receipt_persistence_error"
+    try:
+        from google.auth.exceptions import RefreshError, TransportError
+        from googleapiclient.errors import HttpError
+    except ImportError:
+        return "dependency_error"
+    if isinstance(error, TransportError):
+        return "transport_error"
+    if isinstance(error, RefreshError):
+        for argument in error.args:
+            code = argument.get("error") if isinstance(argument, dict) else None
+            if code in ("invalid_grant", "invalid_client", "invalid_scope", "unauthorized_client"):
+                return "oauth_" + code
+        return "oauth_refresh_failed"
+    if isinstance(error, HttpError):
+        status = getattr(error.resp, "status", None)
+        return {401: "gmail_unauthorized", 403: "gmail_forbidden", 429: "gmail_rate_limited"}.get(
+            status, "gmail_unavailable" if isinstance(status, int) and status >= 500 else "gmail_rejected")
+    if isinstance(error, (ValueError, TypeError, AttributeError)):
+        return "client_error"
+    return "receipt_not_confirmed"
+
+
+def check_mail_connection():
+    """One bounded OAuth refresh only. No Gmail request, sending, or scope change."""
+    readiness = mail_readiness()
+    result = {"checked_at": timezone.now().isoformat(), "sender": SENDER,
+        "auth_valid": False, "send_grant_verified": False, "account_identity_verified": False,
+        "code": "configuration_missing", "status_text": "Email connection needs server configuration.", "sent": False}
+    if not all(readiness["configured"].values()) or not readiness["sender_matches"]:
+        return result
+    if not readiness["dependencies_available"]:
+        return {**result, "code": "dependency_error", "status_text": "Email connection dependencies are unavailable."}
+    try:
+        from google.auth.exceptions import TransportError
+        from google_auth_httplib2 import Request
+        import httplib2
+        credentials = _credentials()
+        request = Request(httplib2.Http(timeout=10))
+        called = False
+
+        def once(url, *args, **kwargs):
+            nonlocal called
+            if called or url != OAUTH_TOKEN_URI:
+                raise TransportError("Bounded credential check ended.")
+            called = True
+            return request(url, *args, **kwargs)
+
+        credentials.refresh(once)
+        result["auth_valid"] = bool(credentials.valid)
+        granted = credentials.granted_scopes
+        result["send_grant_verified"] = result["auth_valid"] and bool(granted and GMAIL_SEND_SCOPE in granted)
+        result["code"] = ("oauth_refresh_failed" if not result["auth_valid"] else
+                          "ready" if result["send_grant_verified"] else
+                          "send_scope_unconfirmed" if granted is None else "send_scope_missing")
+        result["status_text"] = ("OAuth refresh succeeded and the token response confirms Gmail send permission. Account identity is not checked."
+            if result["send_grant_verified"] else
+            "The token response did not confirm a usable Gmail send grant. Account identity is not checked.")
+    except Exception as error:
+        result["code"] = safe_mail_error(error)
+        result["status_text"] = "Email connection check failed. No email was sent."
+    return result
 
 
 def draft_digest(draft):
@@ -189,14 +279,11 @@ def prepare_delivery(draft_id, user, content_digest, request_id):
 
 def send_snapshot(delivery):
     """One Gmail send call; OAuth scopes remain send-only. Never called by research."""
-    from google.oauth2.credentials import Credentials
     from google_auth_httplib2 import AuthorizedHttp
     from googleapiclient.discovery import build
     import httplib2
 
-    credentials = Credentials(token=None, refresh_token=settings.GOOGLE_GMAIL_REFRESH_TOKEN,
-        token_uri="https://oauth2.googleapis.com/token", client_id=settings.GOOGLE_GMAIL_CLIENT_ID,
-        client_secret=settings.GOOGLE_GMAIL_CLIENT_SECRET, scopes=[GMAIL_SEND_SCOPE])
+    credentials = _credentials()
     message = EmailMessage()
     message["From"], message["To"], message["Subject"] = delivery.sender_email, delivery.recipient, delivery.subject
     message["Date"] = format_datetime(delivery.requested_at)
@@ -211,22 +298,63 @@ def send_snapshot(delivery):
     return service.users().messages().send(userId="me", body=payload).execute(num_retries=0)
 
 
-def record_delivery_success(delivery_id, gmail_message_id, gmail_thread_id, *, require_visible=False):
-    """Persist an observed provider receipt, including during exact reconciliation."""
-    from .coordinate_views import _locked_case
+def _validate_provider_ids(gmail_message_id, gmail_thread_id):
     if not isinstance(gmail_message_id, str) or not ID_PATTERN.fullmatch(gmail_message_id) or not isinstance(gmail_thread_id, str) or not ID_PATTERN.fullmatch(gmail_thread_id):
         raise ValueError("Gmail did not return valid delivery identifiers.")
+
+
+def _require_matching_receipt(delivery, gmail_message_id, gmail_thread_id):
+    if ((delivery.gmail_message_id and delivery.gmail_message_id != gmail_message_id)
+            or (delivery.gmail_thread_id and delivery.gmail_thread_id != gmail_thread_id)):
+        raise ValueError("Delivery receipt conflicts with the saved receipt.")
+
+
+def record_provider_receipt(delivery_id, gmail_message_id, gmail_thread_id):
+    """Commit Gmail's IDs before richer persistence, which may fail independently."""
+    _validate_provider_ids(gmail_message_id, gmail_thread_id)
+    with transaction.atomic(durable=True):
+        delivery = CoordinateMailDelivery.objects.select_for_update().get(pk=delivery_id)
+        _require_matching_receipt(delivery, gmail_message_id, gmail_thread_id)
+        delivery.gmail_message_id, delivery.gmail_thread_id = gmail_message_id, gmail_thread_id
+        delivery.save(update_fields=["gmail_message_id", "gmail_thread_id"])
+    return delivery
+
+
+def record_delivery_success(delivery_id, gmail_message_id, gmail_thread_id, *, require_visible=False,
+                            observed_rfc_message_id=None, observed_received_at=None):
+    """Persist an observed provider receipt, including during exact reconciliation."""
+    from .coordinate_views import _locked_case
+    _validate_provider_ids(gmail_message_id, gmail_thread_id)
+    if observed_rfc_message_id is not None and (not isinstance(observed_rfc_message_id, str)
+            or not RFC_ID_PATTERN.fullmatch(observed_rfc_message_id)):
+        raise ValueError("Observed Gmail message has an invalid RFC identifier.")
+    if observed_received_at is not None and (not isinstance(observed_received_at, datetime)
+            or timezone.is_naive(observed_received_at) or observed_received_at > timezone.now() + timedelta(seconds=5)):
+        raise ValueError("Observed Gmail message has an invalid received time.")
     identity = CoordinateMailDelivery.objects.select_related("draft").get(pk=delivery_id)
     with transaction.atomic():
         case = _locked_case(identity.draft.case_id)
-        delivery = CoordinateMailDelivery.objects.select_for_update().select_related("draft", "thread").get(pk=delivery_id)
+        # A new delivery has no thread yet. PostgreSQL cannot lock the nullable
+        # side of that outer join; only the delivery row needs an additional lock.
+        delivery = CoordinateMailDelivery.objects.select_for_update(of=("self",)).select_related("draft", "thread").get(pk=delivery_id)
+        _require_matching_receipt(delivery, gmail_message_id, gmail_thread_id)
+        if observed_received_at is not None and observed_received_at < delivery.requested_at - timedelta(seconds=60):
+            raise ValueError("Observed Gmail message predates this delivery.")
         if require_visible:
             require_draft_visible(delivery.draft)
             if delivery.thread_id and not thread_visible(delivery.thread):
                 raise ValueError("This email thread is no longer visible for reconciliation.")
         if delivery.status == "sent":
-            if delivery.gmail_message_id != gmail_message_id or delivery.gmail_thread_id != gmail_thread_id:
-                raise ValueError("Delivery receipt conflicts with the saved receipt.")
+            observed = {}
+            if observed_rfc_message_id:
+                observed["rfc_message_id"] = observed_rfc_message_id
+            if observed_received_at is not None:
+                observed["received_at"] = observed_received_at
+                delivery.sent_at = observed_received_at
+                delivery.save(update_fields=["sent_at"])
+            if observed:
+                CoordinateMailMessage.objects.filter(thread=delivery.thread, gmail_message_id=gmail_message_id,
+                    direction="outbound").update(**observed)
             return delivery
         thread = delivery.thread
         if thread and thread.gmail_thread_id != gmail_thread_id:
@@ -242,10 +370,12 @@ def record_delivery_success(delivery_id, gmail_message_id, gmail_thread_id, *, r
             body=f"Email sent to {delivery.recipient}: {delivery.subject}",
             client_message_id=uuid5(NAMESPACE_URL, "coordinate-sent:" + str(delivery.pk)))
         CoordinateMailMessage.objects.create(thread=thread, message=message, direction="outbound",
-            gmail_message_id=gmail_message_id, rfc_message_id=delivery.rfc_message_id,
+            # Gmail may rewrite the submitted Message-ID. Do not use that
+            # unobserved value as the parent header for a later reply.
+            gmail_message_id=gmail_message_id, rfc_message_id=observed_rfc_message_id or "",
             in_reply_to=delivery.in_reply_to, references=delivery.references, from_email=delivery.sender_email,
-            to_emails=[delivery.recipient], subject=delivery.subject, body_text=delivery.body, received_at=now)
-        delivery.thread, delivery.status, delivery.sent_at = thread, "sent", now
+            to_emails=[delivery.recipient], subject=delivery.subject, body_text=delivery.body, received_at=observed_received_at or now)
+        delivery.thread, delivery.status, delivery.sent_at = thread, "sent", observed_received_at or now
         delivery.gmail_message_id, delivery.gmail_thread_id, delivery.error_code = gmail_message_id, gmail_thread_id, ""
         delivery.save(update_fields=["thread", "status", "sent_at", "gmail_message_id", "gmail_thread_id", "error_code"])
         thread.save(update_fields=["updated_at"])
@@ -256,9 +386,10 @@ def record_delivery_success(delivery_id, gmail_message_id, gmail_thread_id, *, r
         return delivery
 
 
-def mark_delivery_unknown(delivery_id):
+def mark_delivery_unknown(delivery_id, error=None):
     # Never store provider exception text: it may include tokens or message data.
-    CoordinateMailDelivery.objects.filter(pk=delivery_id, status="sending").update(status="unknown", error_code="receipt_not_confirmed")
+    CoordinateMailDelivery.objects.filter(pk=delivery_id, status="sending").update(
+        status="unknown", error_code=safe_mail_error(error) if error is not None else "receipt_not_confirmed")
 
 
 def draft_mail_state(draft):
@@ -281,6 +412,7 @@ def draft_mail_state(draft):
             "send_request_id": str(uuid5(NAMESPACE_URL, "coordinate-send:" + str(draft.pk) + ":" + digest)),
             "send_status": status, "can_send": ready and current_approval and visible and not delivery and not draft_blocked(draft),
             "editable": not bool(delivery), "reviewed_at": draft.reviewed_at.isoformat() if draft.reviewed_at else "",
+            "send_error_code": delivery.error_code if delivery else "",
             "sent_at": delivery.sent_at.isoformat() if delivery and delivery.sent_at else "", "status_text": text}
 
 

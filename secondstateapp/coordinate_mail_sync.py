@@ -1,6 +1,7 @@
 """Private, case-scoped Gmail observations. This module never sends email."""
 from datetime import timedelta
 import json
+import re
 from uuid import UUID, uuid5, NAMESPACE_URL
 
 from django.conf import settings
@@ -12,7 +13,7 @@ from django.utils import timezone
 
 from scripts.coordinate_mail_sync import (
     ACCOUNT_EMAIL, GMAIL_LINK_ID, MAX_ATTACHMENTS, MAX_BODY, MAX_MESSAGES,
-    MAX_THREADS, SYNC_SECONDS, addresses, aware_time, gmail_id,
+    MAX_THREADS, MAX_RECONCILE_CANDIDATES, SYNC_SECONDS, addresses, aware_time, gmail_id,
 )
 from .coordinate_mail import visible_threads, thread_visible, mail_readiness
 from .coordinate_mail_models import CoordinateMailDelivery, CoordinateMailMessage, CoordinateMailThread
@@ -22,6 +23,17 @@ from .models import CoordinateActivity, CoordinateCase, CoordinateJob, Coordinat
 SYNC_SALT = "coordinate-mail-observation-v1"
 MAX_CONTEXT_BYTES = 240_000
 STALE_SEND_SECONDS = 300  # Longer than the bounded 25-second Gmail send call.
+RECONCILE_WINDOW_SECONDS = 60
+
+
+def reconciliation_query(delivery):
+    # Gmail search syntax is not email syntax. Exotic but valid addresses must
+    # retain exact-ID/RFC reconciliation rather than becoming query operators.
+    if not re.fullmatch(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+", delivery.recipient):
+        return ""
+    stamp = int(delivery.requested_at.timestamp())
+    return (f"in:sent from:{ACCOUNT_EMAIL} to:{delivery.recipient} "
+            f"after:{stamp - RECONCILE_WINDOW_SECONDS - 1} before:{stamp + RECONCILE_WINDOW_SECONDS + 1}")
 
 
 def _sync_enabled():
@@ -57,8 +69,7 @@ def mail_context(case, max_message_id=None):
 
 
 def _visible_reconciliation():
-    # A stalled send is only observed by its exact deterministic Message-ID.
-    # Never treat a timeout as permission to send again.
+    # A stalled send is observed conservatively; a timeout never permits resend.
     from .coordinate_shipping import visible_artifacts
     from .models import CoordinateDraft
     return CoordinateMailDelivery.objects.filter(
@@ -85,7 +96,9 @@ def sync_manifest(request, data):
                      "provider_email": thread.provider_email, "sender_email": thread.sender_email,
                      "originating_message_id": thread.originating_message_id} for thread in threads],
         "reconcile": [{"delivery_id": str(item.pk), "rfc_message_id": item.rfc_message_id,
+                       "gmail_message_id": item.gmail_message_id, "gmail_thread_id": item.gmail_thread_id,
                        "query": "in:sent rfc822msgid:" + item.rfc_message_id.strip("<>"),
+                       "fallback_query": reconciliation_query(item), "max_candidates": MAX_RECONCILE_CANDIDATES,
                        "account_email": ACCOUNT_EMAIL} for item in reconcile]})
 
 
@@ -146,7 +159,7 @@ def _message(value, thread_id, observed):
     body = _field(value.get("body_text"), MAX_BODY)
     if not body.strip() and not attachments:
         raise ValueError("Mail has no readable body or attachment metadata.")
-    if not isinstance(value.get("body_truncated", False), bool) or not isinstance(value.get("sent_label", False), bool):
+    if any(not isinstance(value.get(field, False), bool) for field in ("body_truncated", "sent_label", "has_bcc")):
         raise ValueError("Invalid mail observation flag.")
     return {"gmail_message_id": value["gmail_message_id"], "from_email": sender,
         "to_emails": _participants(value.get("to_emails", [])), "cc_emails": _participants(value.get("cc_emails", [])),
@@ -154,7 +167,8 @@ def _message(value, thread_id, observed):
         "body_truncated": value.get("body_truncated", False), "attachments": cleaned_attachments,
         "rfc_message_id": _field(value.get("rfc_message_id", ""), 998),
         "in_reply_to": _field(value.get("in_reply_to", ""), 998),
-        "references": _field(value.get("references", ""), 8000), "sent_label": value.get("sent_label", False)}
+        "references": _field(value.get("references", ""), 8000), "sent_label": value.get("sent_label", False),
+        "has_bcc": value.get("has_bcc", False)}
 
 
 def _import_thread(data, scope, observed):
@@ -178,13 +192,15 @@ def _import_thread(data, scope, observed):
         if (not thread_visible(thread) or case.coordinator != data["worker_id"]
                 or thread.sender_email.casefold() != ACCOUNT_EMAIL or thread.gmail_thread_id != identifier):
             raise ValueError("This case's email thread is no longer visible or current.")
-        floor = thread.created_at - timedelta(minutes=1)
+        first_send = thread.deliveries.order_by("requested_at").values_list("requested_at", flat=True).first()
+        floor = first_send if first_send is not None else thread.created_at - timedelta(minutes=1)
         for item in sorted(messages, key=lambda row: (row["received_at"], row["gmail_message_id"])):
             existing = CoordinateMailMessage.objects.filter(gmail_message_id=item["gmail_message_id"]).first()
             if existing is not None:
                 if existing.thread_id != thread.pk:
                     raise ValueError("This Gmail message was already recorded on another case thread.")
                 # Deletion hides an anchor, never deletes this identity tombstone.
+                _refresh_outbound(existing, item, thread)
                 duplicates += 1
                 continue
             if item["from_email"] == ACCOUNT_EMAIL or item["sent_label"]:
@@ -196,6 +212,7 @@ def _import_thread(data, scope, observed):
                 skipped += 1
                 continue
             item.pop("sent_label")
+            item.pop("has_bcc")
             anchor = CoordinateMessage.objects.create(case=case, role="system",
                 client_message_id=uuid5(NAMESPACE_URL, "coordinate:gmail:inbound:" + item["gmail_message_id"]),
                 body="Email reply received from " + thread.provider_email + ". See the private correspondence view.")
@@ -213,6 +230,39 @@ def _import_thread(data, scope, observed):
             "duplicates": duplicates, "skipped": skipped}
 
 
+def _normalized_body(body):
+    return body.replace("\r\n", "\n").strip()
+
+
+def _snapshot_matches(delivery, item):
+    return (item["sent_label"] and item["from_email"] == ACCOUNT_EMAIL
+            and (not delivery.gmail_message_id or item["gmail_message_id"] == delivery.gmail_message_id)
+            and item["to_emails"] == [delivery.recipient.casefold()] and not item["cc_emails"] and not item["has_bcc"]
+            and item["subject"] == delivery.subject and not item["body_truncated"] and not item["attachments"]
+            and _normalized_body(item["body_text"]) == _normalized_body(delivery.body)
+            and abs((item["received_at"] - delivery.requested_at).total_seconds()) <= RECONCILE_WINDOW_SECONDS)
+
+
+def _refresh_outbound(existing, item, thread):
+    """Refresh actual reply headers only from the already-linked exact message."""
+    from .coordinate_mail import RFC_ID_PATTERN
+    if (existing.direction != "outbound" or existing.message.deleted_at
+            or not item["sent_label"] or item["from_email"] != existing.from_email.casefold()
+            or item["to_emails"] != [address.casefold() for address in existing.to_emails]
+            or item["cc_emails"] or item["has_bcc"] or item["subject"] != existing.subject
+            or item["body_truncated"] or item["attachments"]
+            or _normalized_body(item["body_text"]) != _normalized_body(existing.body_text)
+            or not RFC_ID_PATTERN.fullmatch(item["rfc_message_id"])):
+        return
+    # ID and thread equality were checked by the caller. No body, participant,
+    # visibility or delivery snapshot is rewritten by this receipt observation.
+    existing.rfc_message_id = item["rfc_message_id"]
+    existing.received_at = item["received_at"]
+    existing.save(update_fields=["rfc_message_id", "received_at"])
+    CoordinateMailDelivery.objects.filter(gmail_message_id=existing.gmail_message_id,
+        gmail_thread_id=thread.gmail_thread_id, status="sent").update(sent_at=item["received_at"])
+
+
 def _reconcile(data, scope, observed):
     from .coordinate_mail import record_delivery_success, require_draft_visible
     raw = data.get("reconcile")
@@ -222,17 +272,41 @@ def _reconcile(data, scope, observed):
     require_draft_visible(delivery.draft)
     if delivery.draft.case.coordinator != data["worker_id"]:
         raise ValueError("Delivery belongs to another coordinator.")
-    value = raw.get("message")
-    thread_id = gmail_id(value.get("gmail_thread_id")) if isinstance(value, dict) else ""
-    item = _message(value, thread_id, observed)
-    if (not item["sent_label"] or item["from_email"] != ACCOUNT_EMAIL
-            or item["to_emails"] != [delivery.recipient.casefold()] or item["cc_emails"]
-            or item["rfc_message_id"] != delivery.rfc_message_id or item["subject"] != delivery.subject
-            or item["body_truncated"] or item["attachments"]
-            or item["body_text"].replace("\r\n", "\n").strip() != delivery.body.replace("\r\n", "\n").strip()
-            or item["received_at"] < delivery.requested_at - timedelta(minutes=1)):
+    values = raw.get("candidates", [raw["message"]] if "message" in raw else [])
+    if not isinstance(values, list) or not 1 <= len(values) <= MAX_RECONCILE_CANDIDATES:
+        raise ValueError("Reconciliation requires a bounded candidate collection.")
+    candidates = []
+    for value in values:
+        identifier = gmail_id(value.get("gmail_thread_id")) if isinstance(value, dict) else ""
+        item = _message(value, identifier, observed)
+        item["gmail_thread_id"] = identifier
+        candidates.append(item)
+    if len({item["gmail_message_id"] for item in candidates}) != len(candidates):
+        raise ValueError("Duplicate reconciliation candidates.")
+    method = raw.get("match_method", "rfc822msgid")
+    if method not in ("rfc822msgid", "snapshot", "receipt"):
+        raise ValueError("Unsupported delivery reconciliation method.")
+    fallback = method == "snapshot"
+    if fallback and (not reconciliation_query(delivery) or raw.get("search_complete") is not True
+                     or raw.get("query") != reconciliation_query(delivery)):
+        raise ValueError("Fallback reconciliation needs the complete precisely scoped search observation.")
+    matches = [item for item in candidates if _snapshot_matches(delivery, item)
+               and (not delivery.gmail_thread_id or item["gmail_thread_id"] == delivery.gmail_thread_id)
+               and (fallback or method == "receipt" and delivery.gmail_message_id == item["gmail_message_id"]
+                    or item["rfc_message_id"] == delivery.rfc_message_id)]
+    if len(matches) != 1:
         raise ValueError("Observed sent message does not match the exact reviewed delivery snapshot.")
-    record_delivery_success(delivery.pk, item["gmail_message_id"], thread_id, require_visible=True)
+    item = matches[0]
+    if fallback:
+        possible = CoordinateMailDelivery.objects.filter(sender_email=ACCOUNT_EMAIL,
+            recipient__iexact=delivery.recipient, subject=delivery.subject,
+            requested_at__gte=item["received_at"] - timedelta(seconds=RECONCILE_WINDOW_SECONDS),
+            requested_at__lte=item["received_at"] + timedelta(seconds=RECONCILE_WINDOW_SECONDS))
+        matching_ids = [candidate.pk for candidate in possible if _snapshot_matches(candidate, item)]
+        if matching_ids != [delivery.pk]:
+            raise ValueError("More than one saved delivery matches this observed message.")
+    record_delivery_success(delivery.pk, item["gmail_message_id"], item["gmail_thread_id"], require_visible=True,
+                            observed_rfc_message_id=item["rfc_message_id"], observed_received_at=item["received_at"])
     return {"status": "reconciled", "delivery_id": str(delivery.pk), "imported": 0, "duplicates": 0}
 
 

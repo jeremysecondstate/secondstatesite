@@ -2,9 +2,9 @@
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .models import CoordinateDraft
 from . import coordinate_mail as mail
@@ -15,6 +15,16 @@ from . import coordinate_mail as mail
 @require_GET
 def readiness(request):
     return JsonResponse(mail.mail_readiness())
+
+
+@never_cache
+@staff_member_required
+@require_http_methods(["GET", "POST"])
+def check_connection(request):
+    result = mail.check_mail_connection() if request.method == "POST" else None
+    if result is not None and request.headers.get("Accept") == "application/json":
+        return JsonResponse(result)
+    return render(request, "coordinate/mail_connection.html", {"result": result})
 
 
 @transaction.non_atomic_requests
@@ -34,11 +44,12 @@ def send_draft(request, case_id, draft_id):
             response = mail.send_snapshot(delivery)
             if not isinstance(response, dict):
                 raise ValueError
+            mail.record_provider_receipt(delivery.pk, response.get("id"), response.get("threadId"))
             delivery = mail.record_delivery_success(delivery.pk, response.get("id"), response.get("threadId"))
-        except Exception:
+        except Exception as error:
             # Once dispatch was attempted, even a timeout may mean Gmail sent it.
             # Preserve the immutable record; neither this endpoint nor retries resend.
-            mail.mark_delivery_unknown(delivery.pk)
+            mail.mark_delivery_unknown(delivery.pk, error)
             delivery.refresh_from_db()
     if request.headers.get("Accept") == "application/json":
         draft.case.refresh_from_db()

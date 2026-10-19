@@ -35,6 +35,7 @@ MAX_PART_BYTES = 150_000
 MAX_RAW_BYTES = 4_000_000
 MAX_IMPORT_BYTES = 700_000
 MAX_ATTACHMENTS = 20
+MAX_RECONCILE_CANDIDATES = 5
 SYNC_SECONDS = 60
 STATE_DIR = Path(__file__).resolve().parents[1] / "private_data" / "coordinate-mail-runs"
 ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
@@ -51,6 +52,13 @@ def gmail_id(value):
     if not isinstance(value, str) or not ID_PATTERN.fullmatch(value):
         raise ValueError("Invalid Gmail identifier.")
     return value
+
+
+def _alias(value, rest_name, connector_name, default=None):
+    """Accept the REST shape and the observed connected Gmail MIME shape."""
+    if rest_name in value and connector_name in value and value[rest_name] != value[connector_name]:
+        raise ValueError("Conflicting Gmail field representations.")
+    return value.get(rest_name, value.get(connector_name, default))
 
 
 def aware_time(value):
@@ -134,7 +142,7 @@ def _headers(payload):
             raise ValueError("Invalid Gmail message headers.")
         name = _text(value.get("name"), 100, True).casefold()
         content = _text(value.get("value", ""), 8000)
-        if name in ("from", "to", "cc", "subject", "message-id", "in-reply-to", "references"):
+        if name in ("from", "to", "cc", "bcc", "subject", "message-id", "in-reply-to", "references"):
             if name in result:
                 raise ValueError("Ambiguous duplicate mail identity header.")
             result[name] = content
@@ -149,12 +157,12 @@ def _body(payload):
         count[0] += 1
         if not isinstance(part, dict) or depth > 10 or count[0] > 100:
             raise ValueError("Mail MIME tree exceeds the bounded import contract.")
-        mime = _text(part.get("mimeType", ""), 100).casefold()
+        mime = _text(_alias(part, "mimeType", "mime_type", ""), 100).casefold()
         filename = _text(part.get("filename", ""), 500)
         body = part.get("body") or {}
         if not isinstance(body, dict):
             raise ValueError("Invalid mail MIME body.")
-        if filename or body.get("attachmentId"):
+        if filename or _alias(body, "attachmentId", "attachment_id"):
             size = body.get("size", 0)
             if not isinstance(size, int) or isinstance(size, bool) or not 0 <= size <= 10_000_000_000:
                 raise ValueError("Invalid mail attachment size.")
@@ -162,16 +170,24 @@ def _body(payload):
                 raise ValueError("Too many mail attachments.")
             attachments.append({"filename": filename[:200], "mime_type": mime, "size": size})
             return  # Attachment IDs/data never leave this parser and are never fetched.
-        if mime in ("text/plain", "text/html") and body.get("data"):
+        encoded = _alias(body, "data", "base64_url_content")
+        decoded = body.get("content")
+        if decoded is not None and (not isinstance(decoded, str) or len(decoded.encode("utf-8")) > MAX_PART_BYTES):
+            raise ValueError("Decoded MIME content exceeded its bound.")
+        if mime in ("text/plain", "text/html") and (encoded or decoded is not None):
             charset = "utf-8"
             for header in part.get("headers", []):
                 if isinstance(header, dict) and str(header.get("name", "")).casefold() == "content-type":
                     match = re.search(r"charset\s*=\s*[\"']?([\w-]+)", str(header.get("value", "")), re.IGNORECASE)
                     if match:
                         charset = match.group(1)
-            value = _decode(body["data"], charset)
+            value = _decode(encoded, charset) if encoded else decoded
+            if encoded and decoded is not None and value != decoded:
+                raise ValueError("Conflicting encoded and decoded MIME body observations.")
             (plain if mime == "text/plain" else html).append(value)
         children = part.get("parts", [])
+        if children is None:
+            children = []
         if not isinstance(children, list):
             raise ValueError("Invalid nested mail MIME parts.")
         for child in children:
@@ -193,10 +209,10 @@ def _body(payload):
 def normalize_message(raw, expected_thread, observed_at, now=None):
     if not isinstance(raw, dict):
         raise ValueError("Invalid Gmail message.")
-    if gmail_id(raw.get("threadId")) != expected_thread:
+    if gmail_id(_alias(raw, "threadId", "thread_id")) != expected_thread:
         raise ValueError("Mail belongs to a different thread.")
     identifier = gmail_id(raw.get("id"))
-    stamp = raw.get("internalDate")
+    stamp = _alias(raw, "internalDate", "internal_date")
     if not isinstance(stamp, (str, int)) or isinstance(stamp, bool) or not re.fullmatch(r"\d{10,16}", str(stamp)):
         raise ValueError("Mail lacks a valid Gmail internal date.")
     try:
@@ -214,20 +230,23 @@ def normalize_message(raw, expected_thread, observed_at, now=None):
         subject = str(make_header(decode_header(headers.get("subject", ""))))
     except (ValueError, LookupError, UnicodeError):
         raise ValueError("Mail subject encoding could not be decoded safely.") from None
+    if len(subject) > 200 or any(len(headers.get(name, "")) > 998 for name in ("message-id", "in-reply-to")):
+        raise ValueError("Mail identity header exceeds the exact-match contract.")
     senders = addresses(headers.get("from", ""))
     if len(senders) != 1:
         raise ValueError("Mail must have exactly one sender.")
     to = addresses(headers.get("to", ""))
     cc = addresses(headers.get("cc", ""))
+    has_bcc = bool(addresses(headers.get("bcc", "")))
     text, attachments, truncated = _body(payload)
     if not text and not attachments:
         raise ValueError("Mail has no readable body or attachment metadata.")
-    labels = raw.get("labelIds", [])
+    labels = _alias(raw, "labelIds", "label_ids", [])
     if not isinstance(labels, list) or len(labels) > 100 or any(not isinstance(label, str) or len(label) > 100 for label in labels):
         raise ValueError("Invalid Gmail message labels.")
     return {"gmail_message_id": identifier, "gmail_thread_id": expected_thread, "sent_label": "SENT" in labels,
-            "from_email": senders[0], "to_emails": to, "cc_emails": cc,
-            "subject": subject[:200], "body_text": text,
+            "from_email": senders[0], "to_emails": to, "cc_emails": cc, "has_bcc": has_bcc,
+            "subject": subject, "body_text": text,
             "body_truncated": truncated, "attachments": attachments,
             "rfc_message_id": headers.get("message-id", "")[:998],
             "in_reply_to": headers.get("in-reply-to", "")[:998],
@@ -329,15 +348,28 @@ def complete(api, manifest_path, observations_path):
             if not isinstance(delivery, dict) or delivery.get("delivery_id") not in requested or delivery["delivery_id"] in seen:
                 raise WorkerError("Delivery reconciliation was not requested.")
             seen.add(delivery["delivery_id"])
-            raw = delivery.get("message")
-            if not isinstance(raw, dict):
-                raise WorkerError("Delivery reconciliation needs exact observed message MIME evidence.")
-            item = normalize_message(raw, gmail_id(raw.get("threadId")), observed, now)
-            if item["rfc_message_id"] != requested[delivery["delivery_id"]]["rfc_message_id"] or not item["sent_label"]:
-                raise WorkerError("Delivery observation is not the exact requested Sent message.")
+            descriptor = requested[delivery["delivery_id"]]
+            raw_candidates = delivery.get("candidates", [delivery["message"]] if "message" in delivery else [])
+            if not isinstance(raw_candidates, list) or not 1 <= len(raw_candidates) <= MAX_RECONCILE_CANDIDATES:
+                raise WorkerError("Delivery reconciliation needs a bounded collection of observed MIME messages.")
+            candidates = [normalize_message(raw, gmail_id(_alias(raw, "threadId", "thread_id")), observed, now)
+                          for raw in raw_candidates if isinstance(raw, dict)]
+            if len(candidates) != len(raw_candidates) or not all(item["sent_label"] for item in candidates):
+                raise WorkerError("Delivery candidates must be actual observed Sent messages.")
+            method = delivery.get("match_method", "rfc822msgid")
+            if method == "snapshot":
+                if delivery.get("search_complete") is not True or delivery.get("query") != descriptor.get("fallback_query"):
+                    raise WorkerError("Fallback reconciliation requires the complete manifest-scoped search results.")
+            elif method == "receipt":
+                if not descriptor.get("gmail_message_id") or any(item["gmail_message_id"] != descriptor["gmail_message_id"] for item in candidates):
+                    raise WorkerError("Delivery candidate does not match the stored Gmail receipt.")
+            elif method != "rfc822msgid" or any(item["rfc_message_id"] != descriptor["rfc_message_id"] for item in candidates):
+                raise WorkerError("Delivery observation is not the exact requested Message-ID.")
             manifest["imports"].append({"worker_id": "manual-codex", "sync_token": manifest["sync_token"],
                 "account_email": ACCOUNT_EMAIL, "observed_at": observed.isoformat(),
-                "reconcile": {"delivery_id": delivery["delivery_id"], "message": item}})
+                "reconcile": {"delivery_id": delivery["delivery_id"], "candidates": candidates,
+                              "match_method": method, "query": delivery.get("query", ""),
+                              "search_complete": delivery.get("search_complete", False)}})
         if any(len(json.dumps(payload, ensure_ascii=False).encode()) > MAX_IMPORT_BYTES for payload in manifest["imports"]):
             raise WorkerError("Normalized mail exceeded its bounded import size.")
         manifest["results"] = []

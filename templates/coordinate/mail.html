@@ -3,7 +3,7 @@
   <div class="coordinate-panel-content">
     <p class="coordinate-panel-note">Save the recipient and wording, mark that version reviewed, then select Send reviewed email. Marking a draft reviewed never sends it. Bookings, charges, and payments remain disabled.</p>
     {% if coordination.mail.enabled %}
-      {% if coordination.mail.ready %}<p class="coordinate-mail-readiness">{{ coordination.mail.status_text|default:"Email credentials are configured." }}{% if coordination.mail.sender %} Sender: {{ coordination.mail.sender }}.{% endif %}{% if not coordination.mail.connection_verified %} Live mailbox authorization has not been verified yet.{% endif %}{% if coordination.mail.sync_enabled %} Tracked replies appear in the linked threads below.{% endif %}</p>
+      {% if coordination.mail.ready %}<p class="coordinate-mail-readiness">{{ coordination.mail.status_text|default:"Email credentials are configured." }}{% if coordination.mail.sender %} Sender: {{ coordination.mail.sender }}.{% endif %} Configuration check only; a Gmail receipt confirms each delivery.{% if coordination.mail.sync_enabled %} Tracked replies appear in the linked threads below.{% endif %}</p>
       {% else %}<p class="coordinate-mail-readiness is-unavailable">{{ coordination.mail.status_text|default:"Email connection is not ready. Drafting and review remain available; sending waits for the connection." }}</p>{% endif %}
     {% else %}<p class="coordinate-mail-readiness is-unavailable">Email sending is not enabled. Drafts and reviews stay saved here.</p>{% endif %}
     {% for draft in coordination.drafts %}
