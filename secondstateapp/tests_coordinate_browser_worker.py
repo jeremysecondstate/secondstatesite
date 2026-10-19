@@ -446,6 +446,53 @@ class CoordinateBrowserWorkerTests(TestCase):
         self.assertEqual(merged[1]["discovery_query"], record["discovery_query"])
         self.assertEqual(merged[2]["discovery_url"], record["final_url"])
 
+    def test_same_page_listing_and_terms_remain_separate_validated_observations(self):
+        manifest = self.prepare()
+        listing = self.discovered(self.url, source_kind="public_browser", discovery_method="direct",
+                                  discovery_query="", text="Artist A. Work B. Lot 17. Dimensions: 8 x 10 inches.")
+        terms = self.discovered(self.url, source_kind="public_browser", title="Full auction terms",
+            text="Contextual comparison only: Sold: $450.00. Pickup within five days.",
+            discovery_query="Auction Example full sale terms", match_reason="Sale terms modal opened on the exact lot page.",
+            identity_match={"status": "context", "auction_house": "Auction Example", "auction_date": "2026-10-17"})
+        evidence = {"session_id": manifest["session_id"], "job_id": manifest["job_id"], "records": [listing, terms]}
+        Path(manifest["evidence_path"]).write_text(json.dumps(evidence), encoding="utf-8")
+        self.assertEqual(self.complete(manifest, evidence_path=manifest["evidence_path"])["status"], "completed")
+        merged = self.generate.call_args.args[0]["source_evidence"]
+        self.assertEqual(len(merged), 2)
+        self.assertEqual([record["text"] for record in merged], [listing["text"], terms["text"]])
+        self.assertEqual([record["identity_match"]["status"] for record in merged], ["exact", "context"])
+        self.assertEqual(merged[1]["discovery_query"], terms["discovery_query"])
+        browser.provenance.validate_research_bounds(merged)
+        from scripts.coordinate_brief_contract import _price_supported
+        price = {"kind": "sold", "basis": "unknown", "label": "Sold", "amount": "450.00",
+                 "amount_high": "", "currency": "", "evidence_quote": "Sold: $450.00", "source_refs": [self.url]}
+        observations = {self.url: {"observations": [{"kind": item["source_kind"], "text": item["text"],
+                        "identity_match": item["identity_match"]} for item in merged]}}
+        with self.assertRaisesRegex(ValueError, "matching this sale"):
+            _price_supported(price, listing["identity_match"], observations)
+        self.assertEqual(self.complete(manifest)["status"], "completed")
+        self.assertEqual(self.generate.call_count, 1)
+
+    def test_same_status_duplicate_stays_strict_and_context_does_not_bypass_validation(self):
+        manifest = self.prepare()
+        state = browser._load_state(Path(manifest["state_path"]), self.api, worker)
+        listing = self.discovered()
+        evidence = {"session_id": manifest["session_id"], "job_id": manifest["job_id"], "records": [listing, deepcopy(listing)]}
+        with self.assertRaises(worker.WorkerError):
+            browser.merge_evidence(state, evidence, worker)
+        with self.assertRaises(ValueError):
+            browser.provenance.validate_research_bounds(evidence["records"])
+        for changes in ({"fetched_at": (self.now - timedelta(seconds=1)).isoformat()},
+                        {"final_url": "https://127.1/terms"},
+                        {"text": "x" * 6001},
+                        {"error": "Blocked but listing facts still present"}):
+            context = self.discovered(identity_match={"status": "context", "auction_house": "Auction Example"})
+            context.update(changes)
+            with self.subTest(changes=list(changes)), self.assertRaises(worker.WorkerError):
+                browser.merge_evidence(state, {**evidence, "records": [listing, context]}, worker)
+        self.assertEqual(browser.provenance.research_identity_key({"source_url": self.url}),
+                         (self.url, "", "public", "unverified"))
+
     def test_wrong_year_and_lot_rejected_but_historical_label_can_be_retained(self):
         self.public.update(error="", text="Artist: Artist A\nTitle: Work B\nAuction house: Auction Example\nAuction date: October 17, 2026\nLot 17\n")
         manifest = self.prepare()

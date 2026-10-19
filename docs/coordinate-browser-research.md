@@ -136,6 +136,12 @@ Write UTF-8 JSON to evidence_path with exact session_id and job_id plus records:
 ```
 
 source_url must be a requested original URL; several records may share it.
+An exact lot listing and contextual terms at the same actual URL remain separate
+records with their own identity status, excerpts and observation provenance.
+Do not combine context text into an exact lot observation: a contextual price
+cannot support that lot's sale price. Duplicate original URL, actual URL, access
+kind and identity-status combinations are rejected; consolidate repeated reads
+within the same status into one bounded excerpt before submitting.
 final_url is the actual opened URL (the discovered lead URL for search_only).
 Kinds: public_fetch, public_browser, authenticated_browser, search_only.
 Discovery: direct, search (query required), link (observed parent discovery_url

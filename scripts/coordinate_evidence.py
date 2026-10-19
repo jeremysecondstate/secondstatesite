@@ -169,7 +169,9 @@ def validate_evidence_provenance(item, *, expected_identity=None):
 
 
 def research_identity_key(item):
-    return item["source_url"], item.get("final_url", ""), item.get("source_kind", "public")
+    identity = item.get("identity_match") or {}
+    status = identity.get("status", "unverified") if isinstance(identity, dict) else None
+    return item["source_url"], item.get("final_url", ""), item.get("source_kind", "public"), status
 
 
 def validate_research_bounds(records):

@@ -5,6 +5,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from scripts.coordinate_evidence import research_identity_key
 
 
 class CoordinatePlan(models.Model):
@@ -99,7 +100,9 @@ class CoordinateResearch(models.Model):
     def save(self, *args, **kwargs):
         # A fixed-size key avoids a PostgreSQL btree index over two 2,048-char URLs.
         self.observation_key = hashlib.sha256(json.dumps(
-            [self.source_url, self.final_url, self.source_kind], ensure_ascii=True,
+            research_identity_key({"source_url": self.source_url, "final_url": self.final_url,
+                                   "source_kind": self.source_kind, "identity_match": self.identity_match}),
+            ensure_ascii=True,
         ).encode()).hexdigest()
         if kwargs.get("update_fields") is not None:
             kwargs["update_fields"] = {*kwargs["update_fields"], "observation_key"}

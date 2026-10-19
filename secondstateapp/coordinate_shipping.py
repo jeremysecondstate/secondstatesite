@@ -58,7 +58,8 @@ def research_state(case, max_message_id=None):
     if max_message_id is not None:
         query = query.filter(job__message_id__lte=max_message_id)
     for item in visible_artifacts(query)[:120]:
-        key = (item.source_url, item.final_url, item.source_kind)
+        key = research_identity_key({"source_url": item.source_url, "final_url": item.final_url,
+                                     "source_kind": item.source_kind, "identity_match": item.identity_match})
         if key in seen or per_source[item.source_url] >= 6:
             continue
         seen.add(key)
@@ -182,7 +183,7 @@ def validate_worker_artifacts(data):
                 raise ValueError("Successful browser sources require observed text and a final URL.")
         elif public_error:
             raise ValueError("Only browser sources may include a prior public fetch failure.")
-        key = research_identity_key({**item, "source_url": source_url, "final_url": final_url})
+        key = research_identity_key({**item, **provenance, "source_url": source_url, "final_url": final_url})
         if key in seen:
             raise ValueError("Duplicate research source.")
         seen.add(key)
