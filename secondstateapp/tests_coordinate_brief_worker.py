@@ -1,0 +1,83 @@
+"""Worker capability negotiation, document isolation, and brief transport tests."""
+import json
+from pathlib import Path
+from subprocess import CompletedProcess
+from unittest import TestCase
+from unittest.mock import patch
+
+from scripts import coordinate_worker as worker
+from .tests_coordinate_worker import claim_payload
+
+
+def empty_brief():
+    return {"summary": "Invoice details for staff review.", "lots": [],
+            "plan": {"notes": "Confirm the collection cutoff.", "pickup_deadline": "",
+                     "deadline_basis": "", "source_refs": []},
+            "open_questions": ["What is the exact pickup cutoff?"]}
+
+
+class BriefWorkerTests(TestCase):
+    def generate(self, payload, result):
+        captured = {}
+        def process(command, **kwargs):
+            directory = Path(kwargs["cwd"])
+            captured.update(kwargs)
+            captured["schema"] = json.loads((directory / "response-schema.json").read_text())
+            (directory / "response.json").write_text(json.dumps(result), encoding="utf-8")
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+        with patch.object(worker.subprocess, "run", side_effect=process):
+            generated = worker.generate_reply(payload, "codex")
+        return generated, captured
+
+    def test_brief_is_negotiated_and_document_text_reaches_model_without_claim_token(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True, brief_enabled=True,
+                       documents=[{"id": "sample-document", "source_ref": "document:sample-document",
+                                   "text": "Lot 17 is framed. Contact packer@example.com."}])
+        generated, captured = self.generate(payload, {"body": "Invoice summarized.", "drafts": [], "brief": empty_brief()})
+        self.assertEqual(generated["brief"], empty_brief())
+        self.assertIn("brief", captured["schema"]["required"])
+        self.assertIn("Lot 17 is framed", captured["input"])
+        self.assertIn("Do not invent midnight", captured["input"])
+        self.assertNotIn(payload["job"]["claim_token"], captured["input"])
+        self.assertNotIn("COORDINATE_WORKER_TOKEN", captured["env"])
+
+    def test_old_server_and_test_mode_keep_legacy_output_contract(self):
+        for flags in ({"test_mode": False, "draft_only": True}, {"brief_enabled": True}):
+            payload = claim_payload()
+            payload.update(flags)
+            generated, captured = self.generate(payload, {"body": "Legacy response.", "drafts": []})
+            self.assertNotIn("brief", captured["schema"]["properties"])
+            self.assertNotIn("brief", generated)
+
+    def test_invalid_brief_cannot_be_published(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True, brief_enabled=True)
+        with self.assertRaises(worker.WorkerError):
+            self.generate(payload, {"body": "Invalid brief", "drafts": [], "brief": {"lots": "invented"}})
+
+    def test_document_contact_can_support_draft_without_inbox_access(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True,
+                       documents=[{"text": "Email packer@example.com for collection details."}])
+        draft = {"recipient": "packer@example.com", "subject": "collection inquiry!",
+                 "body": "hello! could you confirm the collection cutoff?", "purpose": "Ask about pickup."}
+        self.assertEqual(worker.validate_drafts([draft], payload), [draft])
+        payload["documents"] = []
+        with self.assertRaises(worker.WorkerError):
+            worker.validate_drafts([draft], payload)
+
+    def test_completion_does_not_trim_or_drop_evidence_cited_by_brief(self):
+        source = {"source_url": "https://example.com/lot/17", "text": "Relevant source evidence " * 40,
+                  "error": "", "title": "Lot 17"}
+        other = {"source_url": "https://example.com/other", "text": "Uncited background " * 250,
+                 "error": "", "title": "Other"}
+        brief = empty_brief()
+        brief["plan"]["source_refs"] = [source["source_url"]]
+        generated = {"body": "A concise reply.", "drafts": [], "brief": brief}
+        with patch.object(worker, "MAX_COMPLETION_BYTES", 2400):
+            result = worker.completion_payload({"claim_token": "same-claim"}, generated, [source, other])
+        cited = next(item for item in result["research"] if item["source_url"] == source["source_url"])
+        self.assertEqual(cited["text"], source["text"])
+        self.assertEqual(result["brief"], brief)
+        self.assertLessEqual(len(json.dumps(result, ensure_ascii=False).encode()), 2400)

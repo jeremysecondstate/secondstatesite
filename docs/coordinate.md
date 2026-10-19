@@ -18,6 +18,18 @@ Keep the runtime shipping playbook consistent with the enabled workflow: public 
 
 ## Plans, quotes, drafts, and trash
 
+### Case briefs and private documents
+
+The case brief gathers source-backed lot cards, open questions, and suggested shipping notes. Artwork and framed dimensions stay separate, with their original units. Each lot links to the retrieved listing, staff message, or uploaded document that supports it. Deleting a supporting message hides dependent briefs until valid evidence is available again. Replies support safe inline Markdown links as well as plain web URLs.
+
+Staff may add an invoice PDF or paste an auction email or invoice text under **Private documents**. Each submission creates a conversation entry and asks the worker to review the case. Originals are stored in the website database, outside the public media directory; downloads require a staff session and an active case/document message. Removing the document's conversation entry moves it to trash. Restoring it also restores access, subject to the active storage limit.
+
+Each PDF is limited to 5 MiB, with 20 MiB of active documents per case. Extraction runs in a separate process for at most ten seconds and reads up to twenty pages and 24,000 characters. Encrypted or malformed PDFs are rejected. Image-only PDFs are retained with an explicit unreadable-text notice; OCR is not performed. Paste missing details when a document cannot be read or is only partly extracted. Pasted text is limited to 24,000 characters. The worker receives up to eight readable documents, eight unreadable-document notices, and 96,000 characters of document text per case review. It never receives the PDF bytes or access to an email account.
+
+**Use suggestion in plan** adds a labeled suggestion to the unsaved plan notes, preserving existing notes. Staff review and save the result with **Save plan**. It does not choose a destination or handling method, select a provider, or approve spending. An existing deadline is preserved. A suggested deadline can fill an empty field only when cited source wording supplies a clock time and timezone. Date-only or relative removal terms stay in the lot card and open questions; the worker must not invent midnight or assume the auction house's timezone.
+
+### Saved plans and review controls
+
 Save the case's destination, handling instructions, stage, pickup deadline, notes, and any tracking details in the shipping plan. Deadline inputs without an explicit offset use `America/New_York`. Tracking fields are staff-maintained records; saving a tracking link does not enable carrier monitoring.
 
 Provider quotes currently use USD. Choose the destination and handling method before selecting a quote. The first accepted total is retained as an immutable baseline for that provider quote, including when it is selected again. The record also keeps the destination and handling selection. Changing the plan's destination or handling clears the current selection and draft reviews so staff can review the revised plan.

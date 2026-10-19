@@ -32,6 +32,7 @@ pytesseract
 python-dateutil
 python-dotenv
 python-docx
+pypdf>=6.1,<7
 pytweening
 pytz
 requests

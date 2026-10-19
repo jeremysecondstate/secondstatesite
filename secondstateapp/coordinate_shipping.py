@@ -43,9 +43,12 @@ def visible_artifacts(query):
     return query.filter(Q(job__isnull=True) | Q(job__message__deleted_at__isnull=True, job__message__worker_reply__deleted_at__isnull=True))
 
 
-def research_state(case):
+def research_state(case, max_message_id=None):
     result, seen = [], set()
-    for item in visible_artifacts(case.research.all())[:40]:
+    query = case.research.all()
+    if max_message_id is not None:
+        query = query.filter(job__message_id__lte=max_message_id)
+    for item in visible_artifacts(query)[:40]:
         if item.source_url in seen:
             continue
         seen.add(item.source_url)
@@ -57,14 +60,18 @@ def research_state(case):
     return result
 
 
-def coordination_state(case):
+def coordination_state(case, max_message_id=None):
     if not case or case.deleted_at or not enabled():
         return None
     plan = CoordinatePlan.objects.filter(case=case).first() or CoordinatePlan(case=case)
     quotes = list(case.shipping_quotes.all())
     drafts = list(visible_artifacts(case.email_drafts.select_related("quote")))
+    from .coordinate_brief import brief_state
+    from .coordinate_intake import intake_state
     return {
         "draft_only": True,
+        "brief": brief_state(case, max_message_id=max_message_id),
+        **({"intake": intake_state(case)} if max_message_id is None else {}),
         "plan": {"stage": plan.stage, "destination": plan.destination, "handling": plan.handling,
                  "pickup_deadline": plan.pickup_deadline.astimezone(ZoneInfo("America/New_York")).isoformat() if plan.pickup_deadline else "",
                  "notes": plan.notes, "tracking_number": plan.tracking_number, "tracking_url": plan.tracking_url,
@@ -84,7 +91,7 @@ def coordination_state(case):
                     "quote_id": str(d.quote_id) if d.quote_id else "",
                     "save_url": reverse("coordinate_draft_update", args=[case.pk, d.pk]),
                     "review_url": reverse("coordinate_draft_review", args=[case.pk, d.pk])} for d in drafts],
-        "research": research_state(case),
+        "research": research_state(case, max_message_id=max_message_id),
         "urls": {"add_quote": reverse("coordinate_quote_add", args=[case.pk]),
                  "add_draft": reverse("coordinate_draft_add", args=[case.pk])},
     }
@@ -185,7 +192,9 @@ def save_worker_artifacts(job, artifacts):
     known = {quote.provider_email.casefold() for quote in quotes}
     staff_text = "\n".join(case.messages.filter(role="staff", deleted_at__isnull=True, pk__lte=job.message_id).values_list("body", flat=True))
     plan_notes = CoordinatePlan.objects.filter(case=case).values_list("notes", flat=True).first() or ""
-    successful_sources = [r["text"] for r in [*research, *research_state(case)] if not r["error"]]
+    successful_sources = [r["text"] for r in [*research, *research_state(case, job.message_id)] if not r["error"]]
+    from .coordinate_intake import intake_context
+    successful_sources.extend(item.get("text", "") for item in intake_context(case, job.message_id))
     for source in [staff_text, plan_notes, *successful_sources]:
         known.update(match.casefold() for match in EMAIL_PATTERN.findall(source))
     for draft in drafts:

@@ -35,8 +35,19 @@
     try { initialPlanning = JSON.parse(initialPlanningScript.textContent) || {}; } catch (_) { /* Native forms remain available. */ }
     initialPlanningScript.remove();
   }
-  const panelSignatures = Object.fromEntries(["plan", "quotes", "drafts", "research"].map((key) => [key, JSON.stringify(initialPlanning[key])]));
+  const panelKeys = { briefing: "brief", intake: "intake", plan: "plan", quotes: "quotes", drafts: "drafts", research: "research" };
+  const panelSignatures = Object.fromEntries(Object.keys(panelKeys).map((key) => [key, panelSignature(initialPlanning, key)]));
   initialPlanning = null;
+
+  function panelSignature(coordination, key) {
+    const value = coordination?.[panelKeys[key]];
+    // A fresh retry token is not a content update and must not replace an upload form.
+    if (key === "intake" && value) {
+      const { submission_token, ...content } = value;
+      return JSON.stringify(content);
+    }
+    return JSON.stringify(value);
+  }
 
   function text(element, value) {
     if (element && element.textContent !== String(value)) element.textContent = value;
@@ -56,10 +67,8 @@
 
   root.querySelectorAll("time[datetime]").forEach((element) => formatTime(element, element.dateTime));
   formatDeadlineInputs(root);
-  root.querySelectorAll(".coordinate-message-body a").forEach((link) => {
-    link.rel = "noopener noreferrer";
-    link.target = "_blank";
-  });
+  root.querySelectorAll(".coordinate-message-body").forEach((element) => messageBody(element, element.textContent));
+  prepareSourceLinks(root);
   if (messageList) messageList.scrollTop = messageList.scrollHeight;
 
   function safePath(value) {
@@ -70,6 +79,29 @@
     } catch (_) { return null; }
   }
 
+  function httpLink(value) {
+    if (typeof value !== "string" || /[\s\\\u0000-\u001f\u007f]/.test(value)) return null;
+    try {
+      const url = new URL(value);
+      return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password ? value : null;
+    } catch (_) { return null; }
+  }
+
+  function prepareSourceLinks(container) {
+    container.querySelectorAll("[data-source-link], [data-private-download]").forEach((link) => {
+      const value = link.getAttribute("href") || "";
+      const anchor = /^#coordinate-(?:message-\d+|document-[0-9a-f-]{36})$/i.test(value);
+      const privatePath = value.startsWith("/") && safePath(value);
+      if (anchor || privatePath) return;
+      if (link.hasAttribute("data-private-download") || !httpLink(value)) {
+        link.replaceWith(document.createTextNode(link.textContent));
+        return;
+      }
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    });
+  }
+
   function notice(value, error = false) {
     const element = document.getElementById("coordinate-action-notice");
     if (!element) return;
@@ -78,18 +110,23 @@
     text(element, value);
   }
 
+  function newYorkDatetime(value) {
+    // Only explicit ISO timestamps can fill the deadline; prose dates remain questions.
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(date).map((part) => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+  }
+
   function formatDeadlineInputs(container) {
     container.querySelectorAll("[data-new-york-datetime]").forEach((input) => {
-      const value = input.dataset.newYorkDatetime;
-      // Values with an explicit offset are converted to the form's stated timezone.
-      if (!value || !/(Z|[+-]\d\d:\d\d)$/.test(value)) return;
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return;
-      const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-      }).formatToParts(date).map((part) => [part.type, part.value]));
-      input.value = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+      const value = newYorkDatetime(input.dataset.newYorkDatetime);
+      if (!value) return;
+      input.value = value;
       input.defaultValue = input.value;
     });
   }
@@ -119,10 +156,18 @@
     container.replaceChildren(form);
   }
 
-  // Build links as DOM nodes: message content is always text, never injected HTML.
-  function messageBody(element, body) {
-    const fragment = document.createDocumentFragment();
-    const pattern = /https?:\/\/[^\s<>]+/gi;
+  function appendLink(fragment, label, value) {
+    if (!httpLink(value)) { fragment.append(document.createTextNode(label)); return; }
+    const link = document.createElement("a");
+    link.href = value;
+    link.textContent = label;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    fragment.append(link);
+  }
+
+  function appendBareLinks(fragment, body) {
+    const pattern = /https?:\/\/[^\s<>"'`]+/gi;
     let start = 0;
     for (const match of body.matchAll(pattern)) {
       fragment.append(document.createTextNode(body.slice(start, match.index)));
@@ -131,19 +176,46 @@
       value = value.slice(0, value.length - trailing.length);
       // Leave balanced URL parentheses alone, but exclude surrounding prose punctuation.
       let suffix = trailing;
-      while (value.endsWith(")") && (value.match(/\)/g) || []).length > (value.match(/\(/g) || []).length) {
-        value = value.slice(0, -1);
-        suffix = ")" + suffix;
+      for (const [opening, closing] of [["(", ")"], ["[", "]"], ["{", "}"]]) {
+        while (value.endsWith(closing) && value.split(closing).length > value.split(opening).length) {
+          value = value.slice(0, -1);
+          suffix = closing + suffix;
+        }
       }
-      const link = document.createElement("a");
-      link.href = value;
-      link.textContent = value;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      fragment.append(link, document.createTextNode(suffix));
+      appendLink(fragment, value, value);
+      fragment.append(document.createTextNode(suffix));
       start = match.index + match[0].length;
     }
     fragment.append(document.createTextNode(body.slice(start)));
+  }
+
+  // The only Markdown feature is [label](http(s) URL). Everything else remains
+  // literal text, and no message content is ever interpreted as HTML.
+  function messageBody(element, body) {
+    const fragment = document.createDocumentFragment();
+    const pattern = /\[([^\]\n]{1,300})\]\((?=https?:\/\/)/gi;
+    let start = 0;
+    for (const match of body.matchAll(pattern)) {
+      if (match.index < start) continue;
+      const urlStart = match.index + match[0].length;
+      let end = urlStart;
+      let depth = 0;
+      for (; end < body.length; end += 1) {
+        const char = body[end];
+        if (/[\s<>"'`]/.test(char)) break;
+        if (char === "(") depth += 1;
+        else if (char === ")") {
+          if (!depth) break;
+          depth -= 1;
+        }
+      }
+      const value = body.slice(urlStart, end);
+      if (body[end] !== ")" || depth || !httpLink(value)) continue;
+      appendBareLinks(fragment, body.slice(start, match.index));
+      appendLink(fragment, match[1], value);
+      start = end + 1;
+    }
+    appendBareLinks(fragment, body.slice(start));
     element.replaceChildren(fragment);
     element.style.whiteSpace = "pre-wrap";
   }
@@ -215,6 +287,7 @@
         const system = message.role === "system";
         article.className = `coordinate-message coordinate-message--${assistant ? "assistant" : system ? "system" : "staff"}`;
         article.dataset.messageId = id;
+        article.id = `coordinate-message-${id}`;
         const avatar = document.createElement("div");
         avatar.className = "coordinate-message-avatar";
         avatar.setAttribute("aria-hidden", "true");
@@ -340,12 +413,12 @@
       const panel = planning.querySelector(`[data-panel='${key}']`);
       const dirty = panel?.querySelector("form[data-dirty='true']");
       if (dirty) {
-        if (JSON.stringify(state.coordination[key]) !== panelSignatures[key]) panel.dataset.updatesPending = "true";
+        if (panelSignature(state.coordination, key) !== panelSignatures[key]) panel.dataset.updatesPending = "true";
         else delete panel.dataset.updatesPending;
         return false;
       }
       if (panel) delete panel.dataset.updatesPending;
-      return JSON.stringify(state.coordination[key]) !== panelSignatures[key] || !panel;
+      return panelSignature(state.coordination, key) !== panelSignatures[key] || !panel;
     });
     if (!changed.length) return;
     const path = safePath(state.selected_case?.url);
@@ -373,7 +446,8 @@
         } else planning.append(replacement);
         replacement.querySelectorAll("time[datetime]").forEach((element) => formatTime(element, element.dateTime));
         formatDeadlineInputs(replacement);
-        panelSignatures[key] = JSON.stringify(state.coordination[key]);
+        prepareSourceLinks(replacement);
+        panelSignatures[key] = panelSignature(state.coordination, key);
       }
     } catch (_) {
       // Conversation polling continues; changed panels are retried on the next check.
@@ -431,18 +505,42 @@
   });
   root.addEventListener("input", (event) => {
     const form = event.target.closest(".coordinate-planning .coordinate-action-form");
-    if (form) form.dataset.dirty = "true";
+    if (form) { form.dataset.dirty = "true"; form.dataset.editVersion = String(Number(form.dataset.editVersion || 0) + 1); }
+    if (form?.matches(".coordinate-intake-form")) clearIntakeValidity(form);
   });
   root.addEventListener("change", (event) => {
     const form = event.target.closest(".coordinate-planning .coordinate-action-form");
-    if (form) form.dataset.dirty = "true";
+    if (form) { form.dataset.dirty = "true"; form.dataset.editVersion = String(Number(form.dataset.editVersion || 0) + 1); }
+    if (form?.matches(".coordinate-intake-form")) clearIntakeValidity(form);
   });
   root.addEventListener("reset", (event) => {
     if (!event.target.matches(".coordinate-action-form")) return;
     delete event.target.dataset.dirty;
+    event.target.dataset.editVersion = String(Number(event.target.dataset.editVersion || 0) + 1);
+    if (event.target.matches(".coordinate-intake-form")) clearIntakeValidity(event.target);
     setTimeout(() => { if (latestState) refreshPanels(latestState); }, 0);
   });
   root.addEventListener("click", async (event) => {
+    const source = event.target.closest("[data-source-link]");
+    const reference = source?.getAttribute("href") || "";
+    if (/^#coordinate-(?:message-\d+|document-[0-9a-f-]{36})$/i.test(reference)) {
+      const target = document.getElementById(reference.slice(1));
+      if (!target) {
+        event.preventDefault();
+        notice(planning?.querySelector("[data-panel='intake'] form[data-dirty='true']")
+          ? "Finish or clear your document edits, then reopen this source."
+          : "That source is not currently visible in this case.");
+        return;
+      }
+      for (let details = target.closest("details"); details; details = details.parentElement?.closest("details")) {
+        details.open = true;
+      }
+      target.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
+      return;
+    }
+    const suggestion = event.target.closest("[data-use-suggestion]");
+    if (suggestion) { useSuggestion(suggestion); return; }
     const button = event.target.closest(".coordinate-copy-draft");
     if (!button) return;
     const form = button.closest("form");
@@ -456,11 +554,80 @@
       notice("Select and copy the draft text. Clipboard access is unavailable in this browser.");
     }
   });
+
+  function useSuggestion(button) {
+    if (caseDeleted) return;
+    if (actionInFlight) { notice("Wait for the current save to finish before adding a suggestion."); return; }
+    const panel = planning?.querySelector("[data-panel='plan']");
+    const form = panel?.querySelector("form");
+    const data = button.closest(".coordinate-suggestion")?.querySelector("#coordinate-suggested-plan");
+    if (!form || !data) { notice("The shipping plan is unavailable. Reload the case and try again.", true); return; }
+    let suggestion;
+    try { suggestion = JSON.parse(data.textContent); } catch (_) { return; }
+    const notes = form.elements.notes;
+    const deadline = form.elements.pickup_deadline;
+    const suggestedNotes = typeof suggestion.notes === "string" ? suggestion.notes.trim() : "";
+    const block = suggestedNotes ? `Suggested shipping plan — review before saving:\n${suggestedNotes}` : "";
+    const current = notes.value;
+    const addition = block && !current.includes(block) ? `${current ? "\n\n" : ""}${block}` : "";
+    if (current.length + addition.length > (notes.maxLength > 0 ? notes.maxLength : 6000)) {
+      notice("Your plan notes are too long to add the full suggestion. Keep the details you need and try again.", true);
+      notes.focus();
+      return;
+    }
+    const suggestedDeadline = newYorkDatetime(suggestion.pickup_deadline);
+    const addDeadline = !deadline.value && suggestedDeadline;
+    if (!addition && !addDeadline) {
+      notice("The suggestion is already in your notes, or your plan already has a pickup deadline. Review the plan before saving.");
+      panel.open = true;
+      return;
+    }
+    if (addition) notes.value = current + addition;
+    if (addDeadline) deadline.value = suggestedDeadline;
+    form.dataset.dirty = "true";
+    form.dataset.editVersion = String(Number(form.dataset.editVersion || 0) + 1);
+    panel.open = true;
+    (addition ? notes : deadline).focus();
+    notice("Suggestion added to your unsaved plan. Review the details and select Save plan when ready.");
+  }
+
+  function clearIntakeValidity(form) {
+    [form.elements.title, form.elements.pdf, form.elements.text].forEach((input) => input?.setCustomValidity(""));
+  }
+
+  function validateIntake(form) {
+    clearIntakeValidity(form);
+    const title = form.elements.title;
+    const textInput = form.elements.text;
+    const pdf = form.elements.pdf;
+    const file = pdf.files?.[0];
+    let invalid;
+    let error;
+    if (!title.value.trim() || title.value.length > 200) {
+      invalid = title; error = "Add a document title of up to 200 characters.";
+    } else if (Boolean(file) === Boolean(textInput.value.trim())) {
+      invalid = textInput; error = "Choose one PDF or paste text for this document.";
+    } else if (textInput.value.length > 24000) {
+      invalid = textInput; error = "Keep pasted text to 24,000 characters or fewer.";
+    } else if (file && (file.size > 5 * 1024 * 1024 || file.size === 0)) {
+      invalid = pdf; error = "Choose a nonempty PDF no larger than 5 MiB.";
+    } else if (file && file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) {
+      invalid = pdf; error = "Choose a PDF file, or paste the relevant text.";
+    }
+    if (!error) return true;
+    invalid.setCustomValidity(error);
+    invalid.reportValidity();
+    notice(error, true);
+    return false;
+  }
+
   root.addEventListener("submit", async (event) => {
     const form = event.target;
     if (!form.matches(".coordinate-action-form")) return;
     event.preventDefault();
     if (actionInFlight) { notice("Please wait for the current change to finish."); return; }
+    const intake = form.matches(".coordinate-intake-form");
+    if (intake && !validateIntake(form)) return;
     if (form.matches(".coordinate-draft-review") && form.closest(".coordinate-draft")?.querySelector("form[data-dirty='true']")) {
       notice("Save the draft’s changes before marking it reviewed.", true);
       return;
@@ -470,11 +637,12 @@
     const button = event.submitter || form.querySelector("button[type='submit']");
     const label = button?.textContent || "";
     const payload = new FormData(form);
+    const submittedVersion = form.dataset.editVersion || "0";
     actionInFlight = true;
     mutationVersion += 1;
     if (button) { button.disabled = true; button.textContent = "Saving…"; }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), intake ? 60000 : 20000);
     try {
       const response = await fetch(path, {
         method: "POST", body: payload, credentials: "same-origin", redirect: "error",
@@ -484,16 +652,30 @@
       const result = isJson ? await response.json() : null;
       if (!response.ok) throw new Error(result?.error || "This change could not be saved. Reload and check your staff session.");
       if (!result?.selected_case) throw new Error("The server did not confirm the change. Reload to check before trying again.");
-      delete form.dataset.dirty;
+      const editedDuringSave = (form.dataset.editVersion || "0") !== submittedVersion;
+      if (intake) {
+        if (!editedDuringSave) form.reset();
+        // Change the idempotency key only after the server confirms this upload.
+        const token = result.coordination?.intake?.submission_token;
+        if (typeof token === "string" && /^[0-9a-f-]{36}$/i.test(token)) {
+          form.elements.client_message_id.value = token;
+          form.elements.client_message_id.defaultValue = token;
+        }
+      }
+      if (editedDuringSave) form.dataset.dirty = "true";
+      else delete form.dataset.dirty;
       mutationVersion += 1;
       updateState(result);
-      notice(label.includes("Delete") ? "Message deleted. You can restore it in this conversation."
+      notice(intake ? "Document added. The coordinator will review it on the next worker check."
+        : label.includes("Delete") ? "Message deleted. You can restore it in this conversation."
         : label.includes("Move to trash") ? "Case moved to trash. You can restore it at any time."
         : label.includes("Restore") ? "Restored."
         : label.includes("reviewed") || label.includes("review") ? "Review saved. No email was sent or payment authorized."
         : "Saved.");
     } catch (error) {
-      notice(error.name === "AbortError"
+      notice(intake && (error.name === "AbortError" || error instanceof TypeError)
+        ? "The upload has not been confirmed. Your document is still selected; retrying will use the same submission to avoid duplicates."
+        : error.name === "AbortError"
         ? "The server has not confirmed this change yet. Reload to check before trying again."
         : error instanceof TypeError ? "The connection was interrupted. Reload to check whether the change saved before trying again."
         : error.message || "Unable to save. Your edits are still here.", true);

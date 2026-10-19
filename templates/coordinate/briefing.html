@@ -1,0 +1,51 @@
+<details class="coordinate-panel" data-panel="briefing" open>
+  <summary><span>Case brief{% if coordination.brief.lots %} <span class="coordinate-panel-count">{{ coordination.brief.lots|length }} lot{{ coordination.brief.lots|length|pluralize }}</span>{% endif %}</span><span class="coordinate-panel-summary">Lot details &amp; next steps</span></summary>
+  <div class="coordinate-panel-content">
+    {% with brief=coordination.brief %}
+      {% if brief %}
+        {% if brief.summary %}<p class="coordinate-brief-summary">{{ brief.summary }}</p>{% endif %}
+        <p class="coordinate-panel-note">Details below reflect the linked sources. Missing details remain open.{% if brief.created_at %} Updated <time datetime="{{ brief.created_at }}">{{ brief.created_at }}</time>.{% endif %}</p>
+        <div class="coordinate-lot-grid">
+          {% for lot in brief.lots %}
+            <article class="coordinate-lot-card">
+              <header><p class="coordinate-eyebrow">{% if lot.lot_number %}Lot {{ lot.lot_number }}{% else %}Lot number not provided{% endif %}</p><h3>{% if lot.label %}{{ lot.label }}{% elif lot.title %}{{ lot.title }}{% else %}Lot details{% endif %}</h3></header>
+              <dl class="coordinate-lot-facts">
+                <div><dt>Artist</dt><dd>{{ lot.artist|default:"Not provided" }}</dd></div>
+                <div><dt>Title</dt><dd>{{ lot.title|default:"Not provided" }}</dd></div>
+                <div><dt>Medium</dt><dd>{{ lot.medium|default:"Not provided" }}</dd></div>
+                <div><dt>Edition</dt><dd>{{ lot.edition|default:"Not provided" }}</dd></div>
+                <div><dt>Artwork dimensions</dt><dd>{{ lot.dimensions|default:"Not provided" }}</dd></div>
+                <div><dt>Framed dimensions</dt><dd>{{ lot.framed_dimensions|default:"Not provided" }}</dd></div>
+                <div><dt>Framing</dt><dd>{{ lot.framing|default:"Not provided" }}</dd></div>
+                <div><dt>Condition</dt><dd>{{ lot.condition|default:"Not provided" }}</dd></div>
+                <div><dt>Auction house</dt><dd>{{ lot.auction_house|default:"Not provided" }}</dd></div>
+                <div><dt>Pickup location</dt><dd>{{ lot.pickup_location|default:"Not provided" }}</dd></div>
+                <div><dt>Pickup deadline</dt><dd>{{ lot.deadline_text|default:"Not provided" }}</dd></div>
+                <div><dt>Release requirements</dt><dd>{{ lot.release_requirements|default:"Not provided" }}</dd></div>
+              </dl>
+              <p class="coordinate-measurement-note">Measurements and units are shown as stated by the source.</p>
+              <div class="coordinate-brief-sources" aria-label="Sources for this lot">
+                {% for ref, source in brief.sources.items %}{% if ref in lot.source_refs %}<a href="{{ source.url }}" data-source-link>{{ source.label|default:"View source" }}</a>{% endif %}{% endfor %}
+                {% if not lot.source_refs %}<span>No source linked yet.</span>{% endif %}
+              </div>
+            </article>
+          {% empty %}<p class="coordinate-panel-empty">Lot details have not been established yet.</p>{% endfor %}
+        </div>
+        {% if brief.plan.notes or brief.plan.pickup_deadline %}
+          <section class="coordinate-suggestion" aria-labelledby="coordinate-suggestion-title">
+            {{ brief.plan|json_script:"coordinate-suggested-plan" }}
+            <div class="coordinate-suggestion-heading"><h3 id="coordinate-suggestion-title">Suggested shipping plan</h3><span class="coordinate-chip">For your review</span></div>
+            {% if brief.plan.notes %}<p class="coordinate-suggestion-notes">{{ brief.plan.notes }}</p>{% endif %}
+            {% if brief.plan.pickup_deadline %}<p class="coordinate-suggestion-deadline"><strong>Suggested pickup deadline:</strong> <time datetime="{{ brief.plan.pickup_deadline }}">{{ brief.plan.pickup_deadline }}</time></p>{% endif %}
+            {% if brief.plan.deadline_basis %}<p class="coordinate-panel-note">{{ brief.plan.deadline_basis }}</p>{% endif %}
+            <div class="coordinate-brief-sources" aria-label="Sources for this suggestion">{% for ref, source in brief.sources.items %}{% if ref in brief.plan.source_refs %}<a href="{{ source.url }}" data-source-link>{{ source.label|default:"View source" }}</a>{% endif %}{% endfor %}</div>
+            <div class="coordinate-form-footer"><p>Add this suggestion to your plan, then review and save it.</p><button class="coordinate-button coordinate-button-secondary" type="button" data-use-suggestion>Use suggestion in plan</button></div>
+          </section>
+        {% endif %}
+        {% if brief.open_questions %}<section class="coordinate-open-questions" aria-labelledby="coordinate-open-questions-title"><h3 id="coordinate-open-questions-title">Still to confirm</h3><ul>{% for question in brief.open_questions %}<li>{{ question }}</li>{% endfor %}</ul></section>{% endif %}
+      {% else %}
+        <p class="coordinate-panel-empty">Share lot links, an invoice, or the auction house’s email. The coordinator will bring the details and next steps together here.</p>
+      {% endif %}
+    {% endwith %}
+  </div>
+</details>

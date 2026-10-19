@@ -572,3 +572,5 @@ class CoordinateActivity(models.Model):
 
 # Imported after the conversation models so Django registers the draft workflow.
 from .coordinate_models import CoordinateDraft, CoordinatePlan, CoordinateQuote, CoordinateResearch  # noqa: E402,F401
+from .coordinate_brief_models import CoordinateBrief  # noqa: E402,F401
+from .coordinate_intake_models import CoordinateDocument  # noqa: E402,F401

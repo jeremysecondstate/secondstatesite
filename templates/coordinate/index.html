@@ -78,11 +78,11 @@
         <div class="coordinate-conversation-context"><span>Coordinator</span><strong>{% if selected_case.coordinator == 'manual-codex' %}Codex{% else %}{{ selected_case.coordinator|default:"Codex" }}{% endif %}</strong><span class="coordinate-context-divider" aria-hidden="true">/</span><span>Shared with SecondState staff</span></div>
         <div class="coordinate-message-list" id="coordinate-message-list" role="log" aria-label="Case conversation" aria-live="polite" aria-relevant="additions" tabindex="0">
           {% for message in messages %}
-            <article class="coordinate-message coordinate-message--{{ message.role }}{% if message.deleted or selected_case.deleted %} is-deleted{% endif %}" data-message-id="{{ message.id }}" data-deleted="{{ message.deleted|yesno:'true,false' }}" data-case-hidden="{{ selected_case.deleted|yesno:'true,false' }}">
+            <article id="coordinate-message-{{ message.id }}" class="coordinate-message coordinate-message--{{ message.role }}{% if message.deleted or selected_case.deleted %} is-deleted{% endif %}" data-message-id="{{ message.id }}" data-deleted="{{ message.deleted|yesno:'true,false' }}" data-case-hidden="{{ selected_case.deleted|yesno:'true,false' }}">
               <div class="coordinate-message-avatar" aria-hidden="true">{% if message.role == 'assistant' or message.role == 'system' %}C{% else %}S{% endif %}</div>
               <div class="coordinate-message-content">
                 <div class="coordinate-message-heading"><strong>{% if message.role == 'assistant' %}Codex{% elif message.role == 'system' %}Coordinate{% else %}{{ message.author|default:"Staff" }}{% endif %}</strong><time datetime="{{ message.created_at }}">{{ message.created_at }}</time></div>
-                <div class="coordinate-message-body">{% if selected_case.deleted %}Hidden while this case is in trash.{% elif message.deleted %}Message deleted. Restore to show it again.{% else %}{{ message.body|urlize|linebreaksbr }}{% endif %}</div>
+                <div class="coordinate-message-body">{% if selected_case.deleted %}Hidden while this case is in trash.{% elif message.deleted %}Message deleted. Restore to show it again.{% else %}{{ message.body }}{% endif %}</div>
                 <div class="coordinate-message-footer">
                   {% if message.role == 'staff' %}<span class="coordinate-message-status" data-status="{{ message.status }}"{% if message.deleted or selected_case.deleted %} hidden{% endif %}>{% if message.status == 'waiting' %}Saved · Waiting for worker{% elif message.status == 'processing' %}Saved · Worker is responding{% elif message.status == 'retrying' %}Saved · Awaiting retry{% elif message.status == 'replied' %}Saved · Replied{% else %}Saved{% endif %}</span>{% endif %}
                   <div class="coordinate-message-actions">
@@ -109,6 +109,8 @@
         </form>
         <div class="coordinate-planning" id="coordinate-planning"{% if selected_case.deleted or not coordination %} hidden{% endif %}>
           {% if coordination and not selected_case.deleted %}
+            {% include "coordinate/briefing.html" %}
+            {% include "coordinate/intake.html" %}
             <details class="coordinate-panel" data-panel="plan" open>
               <summary><span>Shipping plan</span><span class="coordinate-panel-summary">Destination, handling &amp; progress</span></summary>
               <div class="coordinate-panel-content">

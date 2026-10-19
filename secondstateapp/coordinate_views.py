@@ -21,6 +21,8 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .models import CoordinateActivity, CoordinateCase, CoordinateJob, CoordinateMessage, CoordinateWorkerState
 from .coordinate_shipping import coordination_state, enabled, enqueue_due_reviews, research_state, save_worker_artifacts, validate_worker_artifacts
+from .coordinate_brief import save_brief, validate_brief
+from .coordinate_intake import intake_context, validate_document_restore
 
 MAX_MESSAGE_LENGTH = 12000
 LEASE_SECONDS = 900
@@ -290,6 +292,10 @@ def restore_message(request, case_id, message_id):
             return _error("Restore this case before changing messages.", 409)
         message = get_object_or_404(CoordinateMessage, case=case, pk=message_id)
         if message.deleted_at is not None:
+            try:
+                validate_document_restore(case, message)
+            except ValueError as exc:
+                return _error(str(exc), 409)
             now = timezone.now()
             CoordinateMessage.objects.filter(pk=message.pk).update(deleted_at=None, deleted_by=None)
             invalidated = _invalidate_processing(case, now)
@@ -441,7 +447,10 @@ def claim(request, data):
                     "case": {"id": str(case.pk), "title": case.title, "coordinator": case.coordinator},
                     "messages": [_message_json(message) for message in history],
                     "playbook": playbook, "test_mode": not enabled(), "draft_only": enabled(), "research_enabled": enabled(),
-                    "coordination": coordination_state(case), "research": research_state(case) if enabled() else [],
+                    "coordination": coordination_state(case, claimed.message_id),
+                    "research": research_state(case, claimed.message_id) if enabled() else [],
+                    "brief_enabled": enabled(),
+                    "documents": intake_context(case, claimed.message_id) if enabled() else [],
                 })
     CoordinateWorkerState.objects.update_or_create(pk=1, defaults={"last_successful_check": now})
     return JsonResponse({"job": None, "test_mode": not enabled(), "draft_only": enabled()})
@@ -468,9 +477,15 @@ def complete(request, data, job_id):
     body = body.strip()
     try:
         artifacts = validate_worker_artifacts(data)
+        brief = validate_brief(data.get("brief"))
+        if brief is not None and not enabled():
+            raise ValueError("Case briefs require the shipping workspace.")
     except ValueError as exc:
         return _error(str(exc))
-    digest = hashlib.sha256(json.dumps({"body": body, "artifacts": artifacts}, sort_keys=True, default=str).encode()).hexdigest()
+    completion_content = {"body": body, "artifacts": artifacts}
+    if brief is not None:
+        completion_content["brief"] = brief
+    digest = hashlib.sha256(json.dumps(completion_content, sort_keys=True, default=str).encode()).hexdigest()
     identity = get_object_or_404(CoordinateJob.objects.select_related("message"), pk=job_id)
     with transaction.atomic():
         case = _locked_case(identity.message.case_id)
@@ -484,7 +499,7 @@ def complete(request, data, job_id):
             if reply.deleted_at:
                 return _error("This reply was deleted; restore it through the case.", 409)
             digest_matches = not job.completion_digest or job.completion_digest == digest
-            if (not digest_matches and artifacts[0]
+            if (not digest_matches and artifacts[0] and brief is None
                     and all("source_kind" not in item and "public_error" not in item for item in data.get("research", []))):
                 # A pre-provenance completion may be replayed after deployment if
                 # its response was lost. Only the original public payload shape
@@ -510,6 +525,7 @@ def complete(request, data, job_id):
             return _error("Claim changed; retry this completion to check its result.", 409)
         try:
             save_worker_artifacts(job, artifacts)
+            save_brief(job, brief, artifacts[0])
         except ValueError as exc:
             transaction.set_rollback(True)
             return _error(str(exc))
