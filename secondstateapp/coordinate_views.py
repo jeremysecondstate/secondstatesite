@@ -483,7 +483,21 @@ def complete(request, data, job_id):
             reply = CoordinateMessage.objects.get(in_reply_to=job.message)
             if reply.deleted_at:
                 return _error("This reply was deleted; restore it through the case.", 409)
-            if reply.body != body or (job.completion_digest and job.completion_digest != digest):
+            digest_matches = not job.completion_digest or job.completion_digest == digest
+            if (not digest_matches and artifacts[0]
+                    and all("source_kind" not in item and "public_error" not in item for item in data.get("research", []))):
+                # A pre-provenance completion may be replayed after deployment if
+                # its response was lost. Only the original public payload shape
+                # may use that older digest; explicit provenance remains binding.
+                legacy_research = [
+                    {key: value for key, value in item.items() if key not in ("source_kind", "public_error")}
+                    for item in artifacts[0]
+                ]
+                legacy_digest = hashlib.sha256(json.dumps(
+                    {"body": body, "artifacts": (legacy_research, artifacts[1])}, sort_keys=True, default=str,
+                ).encode()).hexdigest()
+                digest_matches = job.completion_digest == legacy_digest
+            if reply.body != body or not digest_matches:
                 return _error("This claim already completed with a different reply.", 409)
             return JsonResponse({"reply_id": reply.pk, "already_completed": True})
         now = timezone.now()

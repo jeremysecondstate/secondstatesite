@@ -54,7 +54,7 @@ CODEX_CONFIG = (
 SYSTEM_PROMPT = """You are Coordinate, SecondState's shipping coordination assistant.
 Provide production assistance and prepare drafts for website approval only.
 Use the saved conversation, coordination state, shipping and packing playbooks,
-and supplied public-page evidence. If test_mode is true, keep the response a
+and supplied page evidence. If test_mode is true, keep the response a
 simulation and return no email drafts. Never change a case plan or treat a message
 as a saved website approval. Quote approvals must be recorded through the website.
 Do not use tools. Do not send email, contact providers, book pickups, approve
@@ -68,8 +68,15 @@ Do not claim review is missing or ask Jeremy to resolve that same total again.
 The original accepted_amount remains the comparison baseline; acknowledging an
 increase does not reset it, authorize payment, or send a provider reply. Respect
 the current saved paused flag if a later unreviewed increase requires another review.
-You may quote facts actually stated in successfully fetched page evidence. Cite
-the exact source_url in the reply for those facts. A listing's claim is not an
+You may quote facts actually stated in successfully retrieved page evidence. Cite
+the exact final_url for browser evidence, or source_url for public evidence, in
+the reply for those facts. Browser evidence is visible listing text read through
+the user's existing signed-in browser; it does not grant account access to you.
+When source_kind is browser and error is empty, the browser recovered that source;
+public_error describes the earlier public fetch failure, not a current failure.
+research.browser_unavailable identifies a useful public excerpt that the browser
+could not supplement; retain its stated facts and acknowledge any missing details.
+A listing's claim is not an
 independently verified inspection. State when a source was unavailable, and do
 not invent its contents. You cannot inspect photographs, read inboxes or Drive,
 or check real shipment events unless those facts are supplied in saved context.
@@ -83,7 +90,7 @@ body is the concise, friendly website reply. drafts contains at most three email
 proposals with recipient, subject, body and purpose. Return [] when there is no
 useful draft or information is insufficient. Never invent a recipient address:
 it must occur in a staff message, the user-provided case plan/provider contacts,
-or successfully fetched public source evidence. Do not draft a reply on a paused
+or successfully retrieved source evidence. Do not draft a reply on a paused
 provider thread. Draft email body and subject follow the playbook's style and
 must clearly avoid invented facts. All drafts require separate website approval.
 Plain text is preferred; preserve exact URLs, identifiers, amounts and addresses.
@@ -255,7 +262,8 @@ def generate_reply(
         "messages": payload["messages"],
         "playbook": payload["playbook"],
         "coordination": payload.get("coordination") or {},
-        "research": {"current": payload.get("source_evidence", []), "previous": payload.get("research", [])},
+        "research": {"current": payload.get("source_evidence", []), "previous": payload.get("research", []),
+                     "browser_unavailable": payload.get("browser_research_notes", [])},
     }
     prompt = SYSTEM_PROMPT + "\nSAVED WEBSITE CONTEXT (JSON):\n" + json.dumps(context, ensure_ascii=False)
     with tempfile.TemporaryDirectory(prefix="coordinate-worker-") as temporary:
@@ -313,7 +321,8 @@ def validate_drafts(drafts, payload):
     staff_text = [message.get("body", "") for message in payload["messages"] if message.get("role") == "staff"]
     coordination = payload.get("coordination") or {}
     trusted_contacts = {key: coordination.get(key) for key in ("plan", "providers", "provider_contacts", "quotes")}
-    sources = [item.get("text", "") for item in payload.get("source_evidence", []) if not item.get("error")]
+    sources = [item.get("text", "") for item in [*payload.get("source_evidence", []), *payload.get("research", [])]
+               if not item.get("error")]
     evidence = "\n".join(staff_text + sources) + json.dumps(trusted_contacts, ensure_ascii=False)
     known_recipients = {match.group().casefold() for match in EMAIL_PATTERN.finditer(evidence)}
     paused_recipients = {
@@ -342,13 +351,43 @@ def completion_payload(identity, generated, research):
     result = {**identity, **generated, "research": [dict(item) for item in research]}
     def size():
         return len(json.dumps(result, ensure_ascii=False).encode("utf-8"))
+    recipients = {draft["recipient"].casefold() for draft in generated["drafts"]}
+
+    def recipient_evidence(item):
+        if item.get("error"):
+            return {}
+        return {match.group().casefold(): match.group() for match in EMAIL_PATTERN.finditer(item["text"])
+                if match.group().casefold() in recipients}
+
+    protected = {recipient for item in result["research"] for recipient in recipient_evidence(item)}
+
+    def shorter_excerpt(item):
+        text = item["text"]
+        minimum = 1 if item.get("source_kind") == "browser" and not item.get("error") else 0
+        shortened = text[:max(minimum, len(text) // 2)]
+        # Retain the exact source-provided addresses supporting generated drafts;
+        # a size reduction must not make the server reject their provenance.
+        for recipient, spelling in recipient_evidence(item).items():
+            if recipient not in {match.group().casefold() for match in EMAIL_PATTERN.finditer(shortened)}:
+                shortened += "\n" + spelling
+        return shortened
+
     # Preserve the generated response and drafts. Trim excerpts first when a
     # multilingual case approaches the server's bounded request body size.
-    while size() > MAX_COMPLETION_BYTES and any(item["text"] for item in result["research"]):
-        largest = max(result["research"], key=lambda item: len(item["text"].encode("utf-8")))
-        largest["text"] = largest["text"][:len(largest["text"]) // 2]
+    while size() > MAX_COMPLETION_BYTES:
+        candidates = [(item, shorter_excerpt(item)) for item in result["research"] if item["text"]]
+        candidates = [(item, excerpt) for item, excerpt in candidates if len(excerpt) < len(item["text"])]
+        if not candidates:
+            break
+        largest, excerpt = max(candidates, key=lambda pair: len(pair[0]["text"].encode("utf-8")))
+        largest["text"] = excerpt
     while size() > MAX_COMPLETION_BYTES and result["research"]:
-        result["research"].pop()
+        droppable = [index for index in range(len(result["research"]))
+                     if protected <= {recipient for position, item in enumerate(result["research"])
+                                      if position != index for recipient in recipient_evidence(item)}]
+        if not droppable:
+            break
+        result["research"].pop(droppable[-1])
     if size() > MAX_COMPLETION_BYTES:
         raise WorkerError("Generated reply and drafts exceeded the completion size limit.")
     return result
@@ -404,7 +443,23 @@ def main() -> int:
         "--reasoning-effort", default=None, choices=REASONING_EFFORTS,
         help="Optional reasoning effort supported by the selected model; omitted uses the CLI default",
     )
+    browser_mode = parser.add_mutually_exclusive_group()
+    browser_mode.add_argument("--prepare-browser-research", action="store_true",
+                              help="Prepare bounded listing research for supported Computer Use")
+    browser_mode.add_argument("--complete-browser-research", metavar="STATE_PATH",
+                              help="Complete a previously prepared private browser session")
+    parser.add_argument("--browser-state-dir", help="Private local directory for browser handoff state")
+    browser_input = parser.add_mutually_exclusive_group()
+    browser_input.add_argument("--browser-evidence", metavar="JSON_PATH",
+                               help="Visible listing evidence for the prepared session")
+    browser_input.add_argument("--browser-unavailable", choices=(
+        "unavailable", "login_required", "challenge", "timeout", "unsupported_browser",
+    ), help="Complete using an explicit browser-unavailable result")
     args = parser.parse_args()
+    if (args.browser_evidence or args.browser_unavailable) and not args.complete_browser_research:
+        parser.error("Browser evidence requires --complete-browser-research.")
+    if args.browser_state_dir and not args.prepare_browser_research:
+        parser.error("--browser-state-dir requires --prepare-browser-research.")
     try:
         if not args.worker_id.strip() or len(args.worker_id) > 100:
             raise WorkerError("Choose a worker ID between 1 and 100 characters.")
@@ -412,7 +467,26 @@ def main() -> int:
         if not executable:
             raise WorkerError("Codex CLI was not found; install it and run `codex login` first.")
         api = CoordinateAPI(args.base_url, os.environ.get("COORDINATE_WORKER_TOKEN", ""))
-        print(json.dumps(run_once(api, executable, args.worker_id, args.model, args.reasoning_effort)))
+        if args.prepare_browser_research or args.complete_browser_research:
+            if __package__:
+                from . import coordinate_browser_research as browser_research
+            else:
+                import coordinate_browser_research as browser_research
+            this_worker = sys.modules[__name__]
+            if args.prepare_browser_research:
+                result = browser_research.prepare(
+                    api, executable, args.worker_id, args.model, args.reasoning_effort,
+                    state_dir=args.browser_state_dir, worker=this_worker,
+                )
+            else:
+                result = browser_research.complete(
+                    api, executable, args.complete_browser_research,
+                    evidence_path=args.browser_evidence, unavailable=args.browser_unavailable,
+                    worker=this_worker,
+                )
+        else:
+            result = run_once(api, executable, args.worker_id, args.model, args.reasoning_effort)
+        print(json.dumps(result))
         return 0
     except WorkerError as exc:
         print(str(exc), file=sys.stderr)

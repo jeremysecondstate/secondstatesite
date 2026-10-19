@@ -50,7 +50,8 @@ def research_state(case):
             continue
         seen.add(item.source_url)
         result.append({"source_url": item.source_url, "final_url": item.final_url, "title": item.title,
-                       "text": item.text, "fetched_at": item.fetched_at.isoformat(), "error": item.error})
+                       "text": item.text, "fetched_at": item.fetched_at.isoformat(), "error": item.error,
+                       "source_kind": item.source_kind, "public_error": item.public_error})
         if len(result) == 8:
             break
     return result
@@ -120,17 +121,43 @@ def validate_worker_artifacts(data):
     for item in research:
         if not isinstance(item, dict):
             raise ValueError("Invalid research record.")
+        source_kind = item.get("source_kind", "public")
+        if source_kind not in ("public", "browser"):
+            raise ValueError("Invalid research source kind.")
         error = _bounded_string(item.get("error", ""), 200)
-        source_url = _research_url(item.get("source_url"), allow_http=bool(error))
+        public_error = _bounded_string(item.get("public_error", ""), 200)
+        browser_source = source_kind == "browser"
+        source_url = _research_url(item.get("source_url"), allow_http=bool(error) or browser_source)
+        final_url = _research_url(item.get("final_url", ""), False, allow_http=bool(error) and not browser_source)
+        title = _bounded_string(item.get("title", ""), 300)
+        text = _bounded_string(item.get("text", ""), 6000)
+        if browser_source:
+            if not public_error:
+                raise ValueError("Browser sources must preserve the public fetch failure.")
+            if any(character.isspace() or ord(character) < 32 or character == "\\" for character in source_url + final_url):
+                raise ValueError("Invalid browser source URL.")
+            if source_url != item.get("source_url") or final_url != item.get("final_url", ""):
+                raise ValueError("Browser source URLs must match the observed URLs exactly.")
+            if final_url:
+                source_host = urlsplit(source_url).hostname.lower().removeprefix("www.")
+                final_host = urlsplit(final_url).hostname.lower().removeprefix("www.")
+                if final_host not in (source_host, "invaluable.com"):
+                    raise ValueError("Browser sources must remain on the source site or Invaluable.")
+            if error and (text or title):
+                raise ValueError("Failed browser sources cannot contain source evidence.")
+            if not error and (not text or not final_url):
+                raise ValueError("Successful browser sources require observed text and a final URL.")
+        elif public_error:
+            raise ValueError("Only browser sources may include a prior public fetch failure.")
         if source_url in seen:
             raise ValueError("Duplicate research source.")
         seen.add(source_url)
         fetched = parse_datetime(_bounded_string(item.get("fetched_at"), 64, True))
         if not fetched or timezone.is_naive(fetched) or fetched > timezone.now() + timedelta(minutes=5):
             raise ValueError("Invalid research timestamp.")
-        cleaned_research.append({"source_url": source_url, "final_url": _research_url(item.get("final_url", ""), False, allow_http=bool(error)),
-                                 "title": _bounded_string(item.get("title", ""), 300), "text": _bounded_string(item.get("text", ""), 6000),
-                                 "error": error, "fetched_at": fetched})
+        cleaned_research.append({"source_url": source_url, "final_url": final_url, "title": title, "text": text,
+                                 "error": error, "fetched_at": fetched, "source_kind": source_kind,
+                                 "public_error": public_error})
     for item in drafts:
         if not isinstance(item, dict):
             raise ValueError("Invalid draft record.")
@@ -153,7 +180,7 @@ def validate_worker_artifacts(data):
 def save_worker_artifacts(job, artifacts):
     research, drafts = artifacts
     case = job.message.case
-    # Recipients must have been provided in case context or public source evidence.
+    # Recipients must have been provided in case context or successful source evidence.
     quotes = list(case.shipping_quotes.order_by("-accepted", "created_at"))
     known = {quote.provider_email.casefold() for quote in quotes}
     staff_text = "\n".join(case.messages.filter(role="staff", deleted_at__isnull=True, pk__lte=job.message_id).values_list("body", flat=True))

@@ -73,6 +73,8 @@ class CoordinateResearch(models.Model):
     case = models.ForeignKey("CoordinateCase", on_delete=models.PROTECT, related_name="research")
     job = models.ForeignKey("CoordinateJob", on_delete=models.PROTECT, related_name="research")
     source_url = models.URLField(max_length=2048)
+    source_kind = models.CharField(max_length=12, default="public", choices=[("public", "Public source"), ("browser", "Browser source")])
+    public_error = models.CharField(max_length=200, blank=True)
     final_url = models.URLField(max_length=2048, blank=True)
     title = models.CharField(max_length=300, blank=True)
     text = models.TextField(blank=True)

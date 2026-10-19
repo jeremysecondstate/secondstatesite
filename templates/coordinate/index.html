@@ -161,7 +161,16 @@
             </details>
             <details class="coordinate-panel" data-panel="research">
               <summary><span>Source notes <span class="coordinate-panel-count">{{ coordination.research|length }}</span></span><span class="coordinate-panel-summary">Retrieved lot information</span></summary>
-              <div class="coordinate-panel-content">{% for source in coordination.research %}<article class="coordinate-source"><h3><a href="{{ source.source_url }}" rel="noopener noreferrer" target="_blank">{{ source.title|default:source.source_url }}</a></h3>{% if source.fetched_at %}<p class="coordinate-panel-note">Retrieved <time datetime="{{ source.fetched_at }}">{{ source.fetched_at }}</time></p>{% endif %}{% if source.error %}<p class="coordinate-quote-pause">{{ source.error }}</p>{% else %}<div class="coordinate-source-text">{{ source.text|linebreaksbr }}</div>{% endif %}</article>{% empty %}<p class="coordinate-panel-empty">Source notes will appear here when the worker retrieves information from the lot links.</p>{% endfor %}</div>
+              <div class="coordinate-panel-content">
+                {% for source in coordination.research %}
+                  <article class="coordinate-source">
+                    <h3><a href="{{ source.source_url }}" rel="noopener noreferrer" target="_blank">{{ source.title|default:source.source_url }}</a></h3>
+                    <p class="coordinate-panel-note">{% if source.source_kind == "browser" %}Browser source{% else %}Public source{% endif %}{% if source.fetched_at %} · Retrieved <time datetime="{{ source.fetched_at }}">{{ source.fetched_at }}</time>{% endif %}{% if source.final_url and source.final_url != source.source_url %} · <a href="{{ source.final_url }}" rel="noopener noreferrer" target="_blank">Viewed page</a>{% endif %}</p>
+                    {% if source.public_error %}<p class="coordinate-panel-note">Public access: {{ source.public_error }}</p>{% endif %}
+                    {% if source.error %}<p class="coordinate-quote-pause">{{ source.error }}</p>{% else %}<div class="coordinate-source-text">{{ source.text|linebreaksbr }}</div>{% endif %}
+                  </article>
+                {% empty %}<p class="coordinate-panel-empty">Source notes will appear here when the worker retrieves information from the lot links.</p>{% endfor %}
+              </div>
             </details>
           {% endif %}
         </div>
