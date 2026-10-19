@@ -46,7 +46,7 @@ class BriefContractTests(SimpleTestCase):
         clean = validate_brief(brief)
         self.assertEqual(clean, original)
         self.assertEqual(brief, original)
-        self.assertEqual(set(clean), set(BRIEF_SCHEMA["required"]))
+        self.assertEqual(set(clean), set(BRIEF_SCHEMA["required"]) - {"shipping"})
         self.assertEqual(clean["lots"][0]["dimensions"], "Image: 13 x 17 inches")
         self.assertEqual(clean["lots"][0]["framed_dimensions"], "")
         self.assertIsNone(validate_brief(None))

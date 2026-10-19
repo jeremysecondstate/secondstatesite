@@ -1,0 +1,1 @@
+{% if source_refs %}<div class="coordinate-brief-sources" aria-label="Supporting sources">{% for ref, source in brief.sources.items %}{% if ref in source_refs %}<a href="{{ source.url }}" data-source-link>{{ source.label|default:"View source" }}</a>{% endif %}{% endfor %}</div>{% endif %}

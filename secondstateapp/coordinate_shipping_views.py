@@ -82,7 +82,7 @@ def money(value):
 
 @staff_action("shipping_plan_updated")
 def update_plan(request, case):
-    stage = field(request, "stage", 20, True)
+    stage = CoordinatePlan.canonical_stage(field(request, "stage", 20, True))
     destination = field(request, "destination", 20, True)
     if stage not in dict(CoordinatePlan._meta.get_field("stage").choices) or destination not in dict(CoordinatePlan._meta.get_field("destination").choices):
         raise ValueError("Choose a valid stage and destination.")

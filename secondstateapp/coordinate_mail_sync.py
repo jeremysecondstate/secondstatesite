@@ -60,6 +60,9 @@ def mail_context(case, max_message_id=None):
             "received_at": item.received_at.isoformat(), "thread_id": str(item.thread_id),
             "gmail_thread_id": item.thread.gmail_thread_id, "subject": item.subject,
             "attachments": item.attachments, "body_truncated": getattr(item, "body_truncated", False)}
+        pilot = item.thread.deliveries.filter(approval_snapshot__authorization="initial_quote_test").first()
+        if pilot:
+            record.update(quote_test=True, intended_provider=pilot.approval_snapshot.get("intended_recipient", ""))
         encoded_size = len(json.dumps(record, ensure_ascii=False).encode())
         if size + encoded_size > MAX_CONTEXT_BYTES:
             break
@@ -203,7 +206,12 @@ def _import_thread(data, scope, observed):
                 _refresh_outbound(existing, item, thread)
                 duplicates += 1
                 continue
-            if item["from_email"] == ACCOUNT_EMAIL or item["sent_label"]:
+            pilot = thread.deliveries.filter(approval_snapshot__authorization="initial_quote_test").first()
+            # A self-addressed pilot reply must reference an observed linked ID.
+            test_reply = bool(pilot and item["from_email"] == ACCOUNT_EMAIL
+                and ACCOUNT_EMAIL in item["to_emails"] and item["in_reply_to"]
+                and thread.mail_messages.filter(rfc_message_id=item["in_reply_to"]).exists())
+            if (item["from_email"] == ACCOUNT_EMAIL or item["sent_label"]) and not test_reply:
                 skipped += 1
                 continue
             if item["from_email"] != thread.provider_email.casefold() or ACCOUNT_EMAIL not in item["to_emails"] + item["cc_emails"]:
@@ -215,7 +223,8 @@ def _import_thread(data, scope, observed):
             item.pop("has_bcc")
             anchor = CoordinateMessage.objects.create(case=case, role="system",
                 client_message_id=uuid5(NAMESPACE_URL, "coordinate:gmail:inbound:" + item["gmail_message_id"]),
-                body="Email reply received from " + thread.provider_email + ". See the private correspondence view.")
+                body=("Test provider reply received from Jeremy" if test_reply else "Email reply received from " + thread.provider_email)
+                    + ". See the private correspondence view.")
             CoordinateMailMessage.objects.create(thread=thread, message=anchor, direction="inbound", **item)
             CoordinateJob.objects.create(message=anchor)
             imported += 1

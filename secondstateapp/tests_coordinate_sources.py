@@ -40,6 +40,26 @@ def address_record(address):
 
 
 class CoordinateSourceTests(TestCase):
+    def test_shipping_queries_use_only_public_house_and_labelled_pickup_city(self):
+        record = {"source_url": "https://auction.example/auction-lot/artist-work_12345678?invoice=private",
+                  "text": "Auction location: Scottsdale, AZ\nArtist: Artist A\nTitle: Work B\n",
+                  "error": "", "private_destination": "Private Street, Secret City", "invoice": "Private invoice details"}
+        request = sources.shipping_discovery(record)
+        self.assertEqual(request["public_pickup_city"], "Scottsdale, AZ")
+        self.assertIn("site:locations.theupsstore.com Scottsdale, AZ art packing shipping", request["provider_queries"])
+        queries = " ".join(request["house_queries"] + request["provider_queries"])
+        for forbidden in ("Private", "Secret", "invoice", "12345678"):
+            self.assertNotIn(forbidden, queries)
+        record["error"] = "Fetch failed"
+        self.assertEqual(sources.shipping_discovery(record)["provider_queries"], [])
+        self.assertEqual(sources.shipping_discovery({"source_url": record["source_url"], "text": "Scottsdale, AZ"})["provider_queries"], [])
+
+    def test_shipping_discovery_excludes_private_files_and_generic_sharing_routes(self):
+        for url in ("https://house.example/uploads/invoice-private.pdf", "https://house.example/lot/private-invoice.pdf",
+                    "https://docs.google.com/document/d/private-token/edit", "https://drive.google.com/file/d/private-token/view"):
+            with self.subTest(url=url):
+                self.assertIsNone(sources.shipping_discovery({"source_url": url, "text": "Location: Private City, NY"}))
+
     def test_discovery_queries_use_public_identity_and_omit_query_tokens_or_private_context(self):
         record = {"source_url": "https://auction.example/auction-lot/francisco-zuniga-mujer_90220ae2a1?token=private-token",
                   "text": "Artist: Francisco Zúñiga\nTitle: Mujer con pescados\nAuction date: October 17, 2026\nLot 177\n",

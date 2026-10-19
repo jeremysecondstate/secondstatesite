@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="container" style="max-width:760px;margin:3rem auto;padding:1rem">
+  <h1>Initial shipping quote inquiries</h1>
+  <p>{{ case.title }}</p>
+  <p>Coordinator can request up to three initial, non-binding quotes from providers with freshly verified public contacts. Replies are tracked in the case. Booking, packing changes, quote acceptance and payment still need your decision.</p>
+  <p>Test mode sends every inquiry only to <strong>jeremy@secondstate.art</strong>, retaining the intended provider in the message. Real provider outreach is {% if live_enabled %}available only with explicit selection below{% else %}disabled until the test is reviewed and rollout is authorized{% endif %}.</p>
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  <form method="post">{% csrf_token %}
+    <p><label>Mode <select name="mode"><option value="off">Reviewed drafts only</option><option value="test" {% if outreach.mode == "test" %}selected{% endif %}>Test initial inquiries to Jeremy</option>{% if live_enabled %}<option value="live" {% if outreach.mode == "live" %}selected{% endif %}>Authorize initial inquiries to real providers</option>{% endif %}</select></label></p>
+    <p><label>Selected destination <select name="destination">{% for key,label in destinations %}<option value="{{ key }}" {% if outreach.destination == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label></p>
+    <p><label>Delivery address to share with the selected mode<br><textarea name="destination_address" rows="3" cols="65" maxlength="600">{{ outreach.destination_address }}</textarea></label></p>
+    <button type="submit">Save inquiry permission</button>
+  </form>
+  <p><a href="{% url 'coordinate_case' case.id %}">Back to case</a></p>
+</main>
+{% endblock %}

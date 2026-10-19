@@ -1,6 +1,6 @@
 # Coordinate reviewed email and private reply sync
 
-Coordinate sends only after staff reviews the exact recipient, subject and body
+Free-text Coordinate email sends only after staff reviews the exact recipient, subject and body
 and then selects **Send reviewed email** on the website. Review alone does not
 send. Delivery snapshots are immutable. A changed draft needs a new review;
 an accepted send request cannot be used to send a second copy. Provider pauses,
@@ -8,8 +8,11 @@ case visibility and existing quote/plan approval requirements still apply.
 
 The sender is jeremy@secondstate.art. The server uses its existing Gmail send
 OAuth connection; it does not gain inbox access. Reply reading uses the connected
-secondstate Gmail account in the outer app. Neither the scheduler nor the
-isolated reply generator may send email.
+secondstate Gmail account in the outer app. The isolated reply generator cannot
+send. A separate server-owned initial quote dispatcher can use explicitly saved
+case permission under [Initial quote inquiries](coordinate-quote-outreach.md).
+The current rollout routes those tests only to Jeremy; real provider outreach
+remains disabled. The scheduler must never use Gmail send tools.
 
 ## Before claiming a research job
 
@@ -140,8 +143,11 @@ Complete using the same private environment with this argument list:
 The manifest's server-signed scope expires after five minutes. The server
 rechecks the current case, originating conversation and linked provider for each
 import. It accepts only a provider reply addressed to Jeremy in To/Cc on an
-already linked thread. Own outbound messages cannot become incoming replies or
-queue new research. Future timestamps and unrelated senders/threads are rejected.
+already linked thread. Known outbound messages cannot become incoming replies or
+queue new research. In explicitly authorized quote-test threads only, a new self
+reply from Jeremy referencing an observed linked RFC Message-ID can enter as mock
+provider mail. It is marked quote_test, never a real provider offer. Future
+timestamps and unrelated senders/threads are rejected.
 Known outbound observations may correct verified provider RFC headers without
 creating a reply. When receipt persistence was delayed, monitoring starts from
 the earliest linked approved send so intervening provider replies remain eligible.

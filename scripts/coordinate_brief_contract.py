@@ -27,6 +27,10 @@ PRICE_BASES = ("unknown", "hammer", "premium_inclusive", "estimate", "invoice_to
 PRICE_LIMITS = {"label": 160, "amount": 24, "amount_high": 24, "currency": 3, "evidence_quote": 1500}
 PLAN_LIMITS = {"notes": 4000, "pickup_deadline": 64, "deadline_basis": 500}
 MAX_SOURCE_REFS = 8
+SHIPPING_TOPICS = ("pickup", "storage", "third_party_release", "house_recommended", "nearby_ups", "fine_art_packers")
+SHIPPING_SERVICES = ("unknown", "packing", "fine_art_transport", "full_service", "parcel_shipping", "other")
+SHIPPING_CHECK_STATUSES = ("found", "not_found_in_checked_pages", "access_failed", "not_checked")
+OPENED_KINDS = ("public", "browser", "public_fetch", "public_browser", "authenticated_browser")
 
 
 def _string_schema(maximum, *, required=False):
@@ -38,6 +42,32 @@ def _refs_schema(minimum=0):
     # uniqueness in _refs for both generated output and API submissions.
     return {"type": "array", "minItems": minimum, "maxItems": MAX_SOURCE_REFS,
             "items": _string_schema(2048, required=True)}
+
+
+def _record_schema(properties):
+    return {"type": "object", "additionalProperties": False, "properties": properties, "required": list(properties)}
+
+
+SHIPPING_SCHEMA = _record_schema({
+    "working_currency": _record_schema({"code": _string_schema(3),
+        "basis": {"type": "string", "enum": ["unknown", "inferred", "staff", "source"]},
+        "note": _string_schema(500), "source_refs": _refs_schema()}),
+    "quote_readiness": _record_schema({"status": {"type": "string", "enum": [
+        "not_assessed", "conditional_ready", "needs_public_research", "needs_destination"]}, "note": _string_schema(600)}),
+    "actions": {"type": "array", "maxItems": 8, "items": _record_schema({
+        "owner": {"type": "string", "enum": ["provider", "auction_house", "staff"]},
+        "stage": {"type": "string", "enum": ["quote", "release", "booking"]},
+        "text": _string_schema(600, required=True), "source_refs": _refs_schema()})},
+    "providers": {"type": "array", "maxItems": 6, "items": _record_schema({
+        "name": _string_schema(200, required=True), "email": _string_schema(254),
+        "service_type": {"type": "string", "enum": list(SHIPPING_SERVICES)},
+        "published_capability": _string_schema(1000), "contact_quote": _string_schema(1200, required=True),
+        "source_refs": _refs_schema(1)})},
+    "site_checks": {"type": "array", "maxItems": 8, "items": _record_schema({
+        "topic": {"type": "string", "enum": list(SHIPPING_TOPICS)},
+        "status": {"type": "string", "enum": list(SHIPPING_CHECK_STATUSES)},
+        "note": _string_schema(600), "source_refs": _refs_schema()})},
+})
 
 
 BRIEF_SCHEMA = {
@@ -70,8 +100,9 @@ BRIEF_SCHEMA = {
             "required": [*PLAN_LIMITS, "source_refs"],
         },
         "open_questions": {"type": "array", "maxItems": 8, "items": _string_schema(300, required=True)},
+        "shipping": SHIPPING_SCHEMA,
     },
-    "required": ["summary", "lots", "plan", "open_questions"],
+    "required": ["summary", "lots", "plan", "open_questions", "shipping"],
 }
 
 _CLOCK = re.compile(r"(?<![\d:+-])(?:[01]?\d|2[0-3]):[0-5]\d\b|\b(?:0?[1-9]|1[0-2])\s*[ap]\.?m\.?\b|\b(?:noon|midnight)\b", re.I)
@@ -142,11 +173,74 @@ def _prices(value, lot_refs):
     return result
 
 
+def _shipping(value):
+    def clean_record(record, schema):
+        _object(record, schema["required"])
+        cleaned = {}
+        for name, spec in schema["properties"].items():
+            item = record[name]
+            if name == "source_refs":
+                cleaned[name] = _refs(item, required=spec.get("minItems", 0) > 0)
+            elif "enum" in spec:
+                if not isinstance(item, str) or item not in spec["enum"]:
+                    raise ValueError("Invalid shipping brief classification.")
+                cleaned[name] = item
+            elif spec["type"] == "object":
+                cleaned[name] = clean_record(item, spec)
+            elif spec["type"] == "array":
+                if not isinstance(item, list) or len(item) > spec["maxItems"]:
+                    raise ValueError("Too many shipping brief entries.")
+                cleaned[name] = [clean_record(entry, spec["items"]) for entry in item]
+            else:
+                cleaned[name] = _text(item, spec["maxLength"], required=spec.get("minLength", 0) > 0)
+        return cleaned
+
+    result = clean_record(value, SHIPPING_SCHEMA)
+    currency = result["working_currency"]
+    if currency["code"] and not re.fullmatch(r"[A-Z]{3}", currency["code"]):
+        raise ValueError("Working currency must use a three-letter code or remain empty.")
+    if currency["basis"] == "unknown":
+        if currency["code"]:
+            raise ValueError("An unknown working currency cannot contain an assumed code.")
+    elif not currency["code"] or not currency["note"] or not currency["source_refs"]:
+        raise ValueError("Working currency needs a labeled basis and cited context.")
+    if currency["basis"] == "inferred" and currency["code"] != "USD":
+        raise ValueError("Only the supported US-location working currency inference is enabled.")
+    seen = set()
+    for provider in result["providers"]:
+        email = provider["email"]
+        if email and (not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+", email)
+                      or ".." in email or any(c in email for c in "\r\n")):
+            raise ValueError("A provider contact needs one valid published email address.")
+        key = (provider["name"].casefold(), email.casefold())
+        if key in seen:
+            raise ValueError("Duplicate shipping provider.")
+        seen.add(key)
+        if provider["service_type"] != "unknown" and not provider["published_capability"]:
+            raise ValueError("A provider service classification needs published capability wording.")
+    for check in result["site_checks"]:
+        if check["status"] != "not_checked" and (not check["note"] or not check["source_refs"]):
+            raise ValueError("A completed site check needs scoped supporting evidence.")
+        if check["status"] == "not_checked" and check["source_refs"]:
+            raise ValueError("An unchecked topic cannot claim checked sources.")
+    return result
+
+
+def brief_source_refs(brief):
+    records = [*brief["lots"], brief["plan"]]
+    if "shipping" in brief:
+        shipping = brief["shipping"]
+        records += [shipping["working_currency"], *shipping["actions"], *shipping["providers"], *shipping["site_checks"]]
+    return {ref for item in records for ref in item["source_refs"]}
+
+
 def validate_brief(value):
     """Return a clean briefing, or None for clients that omit the optional field."""
     if value is None:
         return None
-    _object(value, BRIEF_SCHEMA["required"])
+    if not isinstance(value, dict) or set(value) not in (
+            set(BRIEF_SCHEMA["required"]), set(BRIEF_SCHEMA["required"]) - {"shipping"}):
+        raise ValueError("Invalid briefing fields.")
     summary = _text(value["summary"], 1200)
     lots = value["lots"]
     questions = value["open_questions"]
@@ -183,15 +277,105 @@ def validate_brief(value):
         if not cleaned_plan["source_refs"] or not basis or not _CLOCK.search(basis) or not _ZONE.search(basis):
             raise ValueError("A suggested pickup deadline needs cited wording with an explicit time and timezone.")
         cleaned_plan["pickup_deadline"] = deadline.isoformat()
-    return {"summary": summary, "lots": cleaned_lots, "plan": cleaned_plan,
-            "open_questions": [_text(item, 300, required=True) for item in questions]}
+    result = {"summary": summary, "lots": cleaned_lots, "plan": cleaned_plan,
+              "open_questions": [_text(item, 300, required=True) for item in questions]}
+    if "shipping" in value:
+        result["shipping"] = _shipping(value["shipping"])
+    return result
 
 
 def _normalized(value):
     return " ".join(value.split()).casefold()
 
 
+def _currency_stated(code, text):
+    aliases = {"USD": r"US\$|U\.?S\.?\s+dollars?|United States dollars?", "GBP": r"£|pounds?\s+sterling",
+               "EUR": r"€|euros?", "CAD": r"CA\$|C\$|Canadian dollars?", "AUD": r"AU\$|A\$|Australian dollars?"}
+    return bool(re.search(rf"\b{re.escape(code)}\b|{aliases.get(code, '(?!)')}", text, re.I))
+
+
+def _observations(refs, evidence):
+    return [source for ref in refs for source in evidence[ref].get("observations", [evidence[ref]])]
+
+
+def _available(source):
+    return (not source.get("error") and bool(source.get("text", "").strip())
+            and source.get("kind") in (*OPENED_KINDS, "message", "document", "email"))
+
+
+def _current_shipping_source(source, *, opened_only=False):
+    if not _available(source):
+        return False
+    kind = source.get("kind")
+    if kind not in OPENED_KINDS:
+        return not opened_only
+    status = source.get("identity_match", {}).get("status")
+    return status in ("exact", "context") or kind in ("public", "browser") and not status
+
+
+def _shipping_evidence(shipping, evidence):
+    def supporting(refs, *, opened_only=False):
+        # Each displayed citation must actually support the relevant source class.
+        if any(not any(_current_shipping_source(source, opened_only=opened_only)
+                       for source in _observations([ref], evidence)) for ref in refs):
+            raise ValueError("Shipping facts need current, visible source evidence; search leads are insufficient.")
+        return [source for source in _observations(refs, evidence)
+                if _current_shipping_source(source, opened_only=opened_only)]
+
+    currency = shipping["working_currency"]
+    sources = supporting(currency["source_refs"])
+    if currency["basis"] == "inferred":
+        # This is a labeled planning assumption, never a sale-price currency fact.
+        us_location = re.compile(r"\b(?:United States|USA|U\.S\.A?\.?|Arizona|California|New York|Scottsdale|Phoenix)\b|\b(?:AZ|CA|NY)\s+\d{5}(?:-\d{4})?\b", re.I)
+        if not any(us_location.search(source["text"]) for source in sources):
+            raise ValueError("A working USD inference needs cited US location context.")
+    elif currency["basis"] in ("source", "staff"):
+        if not any((currency["basis"] != "staff" or source["kind"] == "message")
+                   and _currency_stated(currency["code"], source["text"]) for source in sources):
+            raise ValueError("The stated working currency is absent from its cited basis.")
+    for action in shipping["actions"]:
+        supporting(action["source_refs"])
+    for provider in shipping["providers"]:
+        sources = supporting(provider["source_refs"], opened_only=True)
+        quote = _normalized(provider["contact_quote"])
+        # Bind the name/address together, so a nearby unrelated address cannot
+        # be silently assigned to a provider from another part of a catalog.
+        if (not any(quote in _normalized(source["text"]) for source in sources)
+                or _normalized(provider["name"]) not in quote
+                or provider["email"] and not re.search(
+                    r"(?<![\w.!#$%&'*+/=?^`{|}~@-])" + re.escape(provider["email"].casefold())
+                    + r"(?![\w.@-])", quote)):
+            raise ValueError("A shipping provider needs opened wording tying its name to its published contact.")
+        capability = _normalized(provider["published_capability"])
+        if capability and (_normalized(provider["name"]) not in capability
+                           or not any(capability in _normalized(source["text"]) for source in sources)):
+            raise ValueError("Published provider capabilities need exact source wording naming that provider.")
+        packing = bool(re.search(r"\bpack\w*|\bcrat\w*", capability))
+        transport = bool(re.search(r"\bship\w*|\btransport\w*|\bdeliver\w*|\bmov(?:e|ing)\b", capability))
+        service = provider["service_type"]
+        if ((service == "packing" and not packing)
+                or (service == "full_service" and not (packing and transport))
+                or (service == "fine_art_transport" and not (transport and re.search(r"\bfine art\b|\bartwork\b|\bart transport", capability)))
+                or (service == "parcel_shipping" and not re.search(r"\bparcel\b|\bUPS\b|\bFedEx\b|\bDHL\b", capability, re.I))):
+            raise ValueError("The provider service type is not supported by its published wording.")
+    for check in shipping["site_checks"]:
+        status = check["status"]
+        if status in ("found", "not_found_in_checked_pages"):
+            sources = supporting(check["source_refs"], opened_only=True)
+            if status == "found" and not any(_normalized(check["note"]) in _normalized(source["text"]) for source in sources):
+                raise ValueError("A found site term must preserve the cited source wording.")
+        elif status == "access_failed":
+            for ref in check["source_refs"]:
+                if not any(source.get("error") and any(
+                        attempt.get("method") in ("public_fetch", "public_browser", "authenticated_browser")
+                        and attempt.get("status") in ("unavailable", "timeout", "challenge", "login_required")
+                        for attempt in source.get("attempts", [])) for source in _observations([ref], evidence)):
+                    raise ValueError("An access failure needs a recorded page-access attempt, not a failed browser launch.")
+
+
 def _matches_price_identity(price, lot, source):
+    if source.get("error"):
+        return False
     match = source.get("identity_match", {})
     status = match.get("status")
     if source["kind"] in ("public", "browser", "public_fetch", "public_browser", "authenticated_browser"):
@@ -251,11 +435,8 @@ def _price_supported(price, lot, evidence):
         if not includes or excludes:
             raise ValueError("A premium-inclusive basis must be explicitly and unambiguously stated in the cited wording.")
     currency = price["currency"]
-    if currency:
-        aliases = {"USD": r"US\$|U\.?S\.?\s+dollars?|United States dollars?", "GBP": r"£|pounds?\s+sterling", "EUR": r"€|euros?", "CAD": r"CA\$|C\$|Canadian dollars?", "AUD": r"AU\$|A\$|Australian dollars?"}
-        pattern = rf"\b{re.escape(currency)}\b|{aliases.get(currency, '(?!)')}"
-        if not re.search(pattern, quote, re.I):
-            raise ValueError("A price currency must be explicitly supported; a bare dollar sign is ambiguous.")
+    if currency and not _currency_stated(currency, quote):
+        raise ValueError("A price currency must be explicitly supported; a bare dollar sign is ambiguous.")
 
 
 def validate_price_evidence(brief, evidence):
@@ -268,12 +449,15 @@ def validate_price_evidence(brief, evidence):
     """
     if brief is None:
         return
-    refs = {ref for item in [*brief["lots"], brief["plan"]] for ref in item["source_refs"]}
+    refs = brief_source_refs(brief)
     if not refs <= evidence.keys():
         raise ValueError("Briefing cites unavailable or unrelated case evidence.")
+    for item in [*brief["lots"], brief["plan"]]:
+        if any(not any(_available(source) for source in _observations([ref], evidence)) for ref in item["source_refs"]):
+            raise ValueError("Lot and plan citations require readable evidence, not failed page observations.")
     for lot in brief["lots"]:
         lot_observations = [source for ref in lot["source_refs"]
-                            for source in evidence[ref].get("observations", [evidence[ref]])]
+                            for source in evidence[ref].get("observations", [evidence[ref]]) if _available(source)]
         facts = ("artist", "title", "medium", "edition", "dimensions", "framed_dimensions", "framing",
                  "condition", "auction_date", "lot_number")
         if any(lot.get(key) for key in facts):
@@ -299,5 +483,7 @@ def validate_price_evidence(brief, evidence):
     if plan["pickup_deadline"]:
         basis = " ".join(plan["deadline_basis"].split())
         if not any(basis in " ".join(source["text"].split()) for ref in plan["source_refs"]
-                   for source in evidence[ref].get("observations", [evidence[ref]])):
+                   for source in evidence[ref].get("observations", [evidence[ref]]) if _available(source)):
             raise ValueError("The suggested pickup deadline wording is absent from its cited evidence.")
+    if "shipping" in brief:
+        _shipping_evidence(brief["shipping"], evidence)

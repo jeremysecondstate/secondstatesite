@@ -1,10 +1,14 @@
 # Coordinate: staff coordination, reviewed email and reply tracking
 
+The shipping-first workflow combines research and quote collection as **Preparing shipment**. Every new research run checks public collection policies and provider options even when lot pages are complete. The source-backed brief groups questions by provider, auction house or staff and separates initial quotes from release/booking requirements. A labeled working currency is distinct from verified price currency. See [public research](coordinate-browser-research.md) and [initial quote inquiry permissions and test routing](coordinate-quote-outreach.md).
+
+Migration 0044 adds case-specific inquiry permission and once-per-provider records. The production rollout remains in Jeremy-only test routing; real-provider mode requires both its server flag and explicit case permission. Free-text draft review, immutable delivery receipts, linked-mail visibility and manual plan/quote approvals are preserved. The scheduled task can invoke the permission-bound initial inquiry dispatcher, but cannot send through Gmail tools.
+
 Coordinate is a staff-only conversation area at `/coordinate/`. The website database owns case history, pending work, claim leases, replies, and activity. The page refreshes conversation/status data while open. Browser messages and worker replies use HTTP and database writes; they do not require commits or deployments.
 
 All active staff share the cases. Each case has its own history and bound worker claims; these are not private conversations scoped to one staff account. With the draft workflow enabled, staff can save a shipping plan, compare and select provider quotes, review email drafts, and read retrieved source notes. Sources identify whether they came from a public fetch or the local signed-in browser. The worker receives those saved records on every run. Staff controls change the plan and approvals; model replies do not silently change them.
 
-**Coordinate prepares drafts for website review. With email enabled, a separate staff action sends the exact reviewed email through Jeremy's Gmail account.** Reviewing wording alone does not send anything. The scheduled task reads only case-linked email threads and exact delivery-reconciliation searches; it never sends email. Booking, payments and automatic plan/quote approval remain disabled. The original messaging-only mode remains the default until the draft-workflow flag is enabled. The existing local Codex Scheduled task checks every ten minutes using GPT-6 Astra and Ultra reasoning. The internal auction notification email workflow retains its own recipient restrictions.
+**Coordinate prepares drafts for website review. With email enabled, a separate staff action sends the exact reviewed email through Jeremy's Gmail account.** Reviewing wording alone does not send anything. The scheduled task reads only case-linked email threads and exact delivery-reconciliation searches; it can invoke only separately authorized server-owned initial inquiry dispatch. Booking, payments and automatic plan/quote approval remain disabled. The original messaging-only mode remains the default until the draft-workflow flag is enabled. The existing local Codex Scheduled task checks every ten minutes using GPT-6 Astra and Ultra reasoning. The internal auction notification email workflow retains its own recipient restrictions.
 
 Observed local proof and test results are retained in the private local `docs/coordinate-verification.md` and associated screenshots. These files are ignored by Git and are not part of the public repository or release.
 
@@ -33,6 +37,8 @@ Each PDF is limited to 5 MiB, with 20 MiB of active documents per case. Extracti
 ### Saved plans and review controls
 
 Save the case's destination, handling instructions, stage, pickup deadline, notes, and any tracking details in the shipping plan. Deadline inputs without an explicit offset use `America/New_York`. Tracking fields are staff-maintained records; saving a tracking link does not enable carrier monitoring.
+
+**Preparing shipment** covers gathering lot details and comparing provider quotes together. It replaces the former Gathering details and Collecting quotes stages; existing cases retain their plan details, offers, and review state. Later stages remain Ready for pickup, Pickup, In transit, Received, and On hold. Older open tabs that submit either former stage are saved as Preparing shipment.
 
 Provider quotes currently use USD. Choose the destination and handling method before selecting a quote. The first accepted total is retained as an immutable baseline for that provider quote, including when it is selected again. The record also keeps the destination and handling selection. Changing the plan's destination or handling clears the current selection and draft reviews so staff can review the revised plan.
 
@@ -111,7 +117,7 @@ The separately authorized local Codex Scheduled task `coordinate-messaging-test`
 
 The computer must remain on, the desktop app must remain running, and the local project, CLI login, and private worker configuration must remain available. Review runs and pause the test task from **Scheduled** in the desktop app. This follows the local execution requirements in the [official scheduled-task documentation](https://learn.chatgpt.com/docs/automations).
 
-On a successful worker check, the enabled draft workflow can queue one review for a recorded pickup deadline that is within 48 hours or already overdue. This applies to active cases in the gathering, quotes, or ready stages, even when staff have not posted another message. Each recorded deadline is reviewed once; changing the deadline resets that reminder. The queued review still waits for an available worker and cannot guarantee a particular completion time.
+On a successful worker check, the enabled draft workflow can queue one review for a recorded pickup deadline that is within 48 hours or already overdue. This applies to active cases in the Preparing shipment or Ready for pickup stages, even when staff have not posted another message. Each recorded deadline is reviewed once; changing the deadline resets that reminder. The queued review still waits for an available worker and cannot guarantee a particular completion time.
 
 This deadline check reviews the website's saved deadline. The separate bounded mail stage synchronizes linked provider replies before claiming a research job. Neither stage polls carriers or detects tracking changes. The ten-minute cadence remains the authorized local schedule; the separate weekday/weekend operational cadence below remains disabled.
 

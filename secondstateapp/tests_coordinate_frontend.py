@@ -73,6 +73,23 @@ class CoordinateFrontendTests(SimpleTestCase):
             self.assertNotIn('class="coordinate-action-form coordinate-draft-review"', html)
             self.assertNotIn("Retry send", html)
 
+    def test_quote_test_route_identifies_actual_recipient_without_provider_send_controls(self):
+        state = self.mail_fixture(editable=False, can_send=False, send_status="sent", quote_test=True,
+            actual_recipient="jeremy@secondstate.art", intended_recipient="packer@example.test")
+        state["outreach"] = {"mode": "test", "test_recipient": "jeremy@secondstate.art",
+            "settings_url": "/coordinate/case/quote-inquiries/"}
+        html = render_to_string("coordinate/mail.html", {"coordination": state})
+        for expected in ("Test routing to jeremy@secondstate.art only", "Actual recipient: jeremy@secondstate.art",
+                         "Intended provider: packer@example.test", "The provider was not contacted.",
+                         "Initial quote tests · Other email needs review", "Review inquiry permission and destination"):
+            self.assertIn(expected, html)
+        self.assertNotIn('class="coordinate-action-form coordinate-draft-send"', html)
+        self.assertIn('href="/coordinate/case/quote-inquiries/"', html)
+        for mode, label in (("off", "Off. Correspondence uses reviewed drafts."),
+                            ("live", "Initial provider inquiries authorized for this case.")):
+            state["outreach"]["mode"] = mode
+            self.assertIn(label, render_to_string("coordinate/mail.html", {"coordination": state}))
+
     def test_linked_thread_messages_are_escaped_and_reply_options_are_case_scoped(self):
         state = self.mail_fixture(thread_id="thread-case")
         state["mail"]["threads"] = [{"id": "thread-case", "subject": "Collection <details>", "participants": ["jeremy@secondstate.art", "packer@example.test"], "provider_email": "packer@example.test",

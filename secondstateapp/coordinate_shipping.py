@@ -86,12 +86,14 @@ def coordination_state(case, max_message_id=None):
     from .coordinate_brief import brief_state
     from .coordinate_intake import intake_state
     from .coordinate_mail import mail_state, draft_mail_state
+    from .coordinate_outreach import outreach_state
     return {
         "draft_only": True,
+        "outreach": outreach_state(case, max_message_id=max_message_id),
         "mail": mail_state(case, max_message_id=max_message_id),
         "brief": brief_state(case, max_message_id=max_message_id),
         **({"intake": intake_state(case)} if max_message_id is None else {}),
-        "plan": {"stage": plan.stage, "destination": plan.destination, "handling": plan.handling,
+        "plan": {"stage": CoordinatePlan.canonical_stage(plan.stage), "destination": plan.destination, "handling": plan.handling,
                  "pickup_deadline": plan.pickup_deadline.astimezone(ZoneInfo("America/New_York")).isoformat() if plan.pickup_deadline else "",
                  "notes": plan.notes, "tracking_number": plan.tracking_number, "tracking_url": plan.tracking_url,
                  "update_url": reverse("coordinate_plan", args=[case.pk])},
@@ -295,7 +297,7 @@ def enqueue_due_reviews():
     now = timezone.now()
     due = CoordinatePlan.objects.filter(
         case__deleted_at__isnull=True, pickup_deadline__lte=now + timedelta(hours=48),
-        deadline_reminded_at__isnull=True, stage__in=["gathering", "quotes", "ready"],
+        deadline_reminded_at__isnull=True, stage__in=["preparing", "gathering", "quotes", "ready"],
     ).values_list("case_id", flat=True)[:20]
     for case_id in list(due):
         with transaction.atomic():
@@ -303,7 +305,7 @@ def enqueue_due_reviews():
             if case.deleted_at:
                 continue
             plan = CoordinatePlan.objects.get(case=case)
-            if plan.deadline_reminded_at or plan.stage not in ("gathering", "quotes", "ready") or not plan.pickup_deadline or plan.pickup_deadline > now + timedelta(hours=48):
+            if plan.deadline_reminded_at or CoordinatePlan.canonical_stage(plan.stage) not in ("preparing", "ready") or not plan.pickup_deadline or plan.pickup_deadline > now + timedelta(hours=48):
                 continue
             plan.deadline_reminded_at = now
             plan.save(update_fields=["deadline_reminded_at"])

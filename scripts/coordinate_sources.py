@@ -44,6 +44,54 @@ FIELD_SIGNALS = {
     "shipping_contacts": r"\b(?:shipping|shipper|packing|transport)\b.{0,180}(?:@|\bcontact\b|\d{3}[-. )])",
 }
 
+SHIPPING_CHECK_TOPICS = ("pickup", "storage", "third_party_release", "house_recommended",
+                         "nearby_ups", "fine_art_packers")
+MARKETPLACE_HOSTS = {"invaluable.com", "liveauctioneers.com", "hibid.com", "bidsquare.com"}
+
+
+def public_lot_url(url):
+    """Only recognizable public lot routes may seed shipping discovery."""
+    path = urlsplit(url).path
+    return (not re.search(r"\.(?:pdf|docx?|xlsx?|eml|msg)(?:/|$)", path, re.IGNORECASE)
+            and bool(re.search(r"/(?:auction-lot|lots?|auction_lot)/", path, re.IGNORECASE)))
+
+
+def shipping_discovery(record):
+    """Public house/provider queries independent of artwork-field completeness.
+
+    A private destination, invoice, email, playbook or arbitrary submitted file
+    is never an input. A nearby-city seed must be explicitly labelled on the
+    successfully opened public lot page, otherwise the operator discovers it.
+    """
+    if not public_lot_url(record["source_url"]):
+        return None
+    host = (urlsplit(record["source_url"]).hostname or "").lower().removeprefix("www.")
+    if not host:
+        return None
+    house_name = public_identity(record)["auction_house"]
+    marketplace = any(host == domain or host.endswith("." + domain) for domain in MARKETPLACE_HOSTS)
+    city = ""
+    if not record.get("error"):
+        match = re.search(r"(?im)^(?:(?:auction|sale|pickup|collection)\s+)?(?:location|city)\s*:\s*"
+                          r"([A-Za-zÀ-ÖØ-öø-ÿ .'-]{2,60},\s*[A-Z]{2})(?:\s|$)", record.get("text", ""))
+        if match:
+            city = " ".join(match.group(1).split())
+    nearby = ([f"site:locations.theupsstore.com {city} art packing shipping",
+               f"{city} fine art packing shipping auction collection"] if city else [])
+    house_queries = [f"site:{host} shipping recommended shippers packing",
+                     f"site:{host} pickup collection storage third party release authorization"]
+    if marketplace and house_name:
+        house_queries = [f"{house_name} official shipping recommended shippers",
+                         f"{house_name} official pickup storage third party release authorization"]
+    return {"house_host": host, "public_house_name": house_name, "house_memory_enabled": not marketplace,
+        "source_url": record["source_url"], "public_pickup_city": city, "house_queries": house_queries,
+        "provider_queries": nearby,
+        "provider_followups": ["After opening the official house pickup location, search nearby UPS Store packing and shipping options.",
+                               "Search nearby fine-art packers using only that published city; open each provider's own service/contact page."],
+        "check_topics": list(SHIPPING_CHECK_TOPICS),
+        "lot_handling_checks": ["artwork_dimensions", "framed_dimensions", "medium", "mat", "glazing", "loose_certificate"],
+        "quote_comparison": "Use both known size sets and the private destination in draft quotes only. Ask packers to assess framed/unframed safety, mat/glazing, loose certificate protection and conditional pricing; do not decide removal before their advice."}
+
 
 def missing_fields(record):
     text = record.get("title", "") + "\n" + record.get("text", "")
@@ -90,7 +138,7 @@ def discovery_queries(record):
     parts = urlsplit(record["source_url"])
     # A submitted HTTPS link can be a private invoice/share link. Do not publish
     # arbitrary filenames, sharing IDs or path tokens to a search engine.
-    lot_route = bool(re.search(r"/(?:auction-lot|lots?|auction_lot)/", parts.path, re.IGNORECASE))
+    lot_route = public_lot_url(record["source_url"])
     slug = unquote(parts.path.rstrip("/").rsplit("/", 1)[-1]) if lot_route else ""
     slug = re.sub(r"[_-][a-f0-9]{8,}$", "", slug, flags=re.IGNORECASE)
     slug = re.sub(r"[_-]+", " ", slug)

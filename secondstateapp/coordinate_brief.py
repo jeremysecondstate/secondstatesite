@@ -4,13 +4,13 @@ from copy import deepcopy
 
 from django.apps import apps
 
-from scripts.coordinate_brief_contract import BRIEF_SCHEMA, validate_brief, validate_price_evidence  # noqa: F401
+from scripts.coordinate_brief_contract import BRIEF_SCHEMA, brief_source_refs, validate_brief, validate_price_evidence  # noqa: F401
 
 from .coordinate_brief_models import CoordinateBrief
 
 
 def _refs(brief):
-    return {ref for item in [*brief["lots"], brief["plan"]] for ref in item["source_refs"]}
+    return brief_source_refs(brief)
 
 
 def _evidence(job, current_research=()):
@@ -26,11 +26,12 @@ def _evidence(job, current_research=()):
 
     def observation(item):
         get = item.get if isinstance(item, dict) else lambda key, default=None: getattr(item, key, default)
-        if get("error") or not get("text", "").strip() or get("source_kind") == "search_only":
+        if get("source_kind") == "search_only" or not get("error") and not get("text", "").strip():
             return
         original, opened = get("source_url"), get("final_url") or get("source_url")
         value = {"label": get("title") or opened, "url": opened,
-                 "kind": get("source_kind", "public"), "text": get("text"),
+                 "kind": get("source_kind", "public"), "text": get("text", ""),
+                 "error": get("error", ""), "attempts": get("attempts", []),
                  "identity_match": get("identity_match", {}) or {}}
         # A discovered page is cited by its actual opened URL. The original
         # URL alias remains for old briefs and direct-page observations.
@@ -42,7 +43,7 @@ def _evidence(job, current_research=()):
     # observations; later failed fetches never erase useful evidence.
     for item in current_research:
         observation(item)
-    saved = visible_artifacts(case.research.filter(job__message_id__lte=job.message_id, error="")).order_by("-fetched_at", "-id")
+    saved = visible_artifacts(case.research.filter(job__message_id__lte=job.message_id)).order_by("-fetched_at", "-id")
     for item in saved:
         observation(item)
     messages = case.messages.filter(role="staff", deleted_at__isnull=True, pk__lte=job.message_id)

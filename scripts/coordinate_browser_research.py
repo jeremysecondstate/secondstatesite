@@ -30,6 +30,9 @@ BROWSER_HANDOFF_SECONDS = 20
 TRANSPORT_MARGIN_SECONDS = 100
 MAX_STATE_BYTES = 3_000_000
 MAX_EVIDENCE_BYTES = 750_000
+MAX_SHIPPING_HOUSES = 4
+HOUSE_MEMORY_DAYS = 30
+HOUSE_MEMORY_LIMIT = 40
 DEFAULT_STATE_DIR = Path(__file__).resolve().parents[1] / "private_data" / "coordinate-browser-runs"
 UNAVAILABLE_REASONS = {
     "unavailable": "The supported browser tool could not be opened; website availability was not established.",
@@ -161,7 +164,7 @@ def _safe_url(value, *, allow_http=False):
         return None
 
 
-def browser_requests(records):
+def browser_requests(records, *, include_shipping=True):
     """Public discovery requests include incomplete successful listings too."""
     result = []
     for record in records[:sources.MAX_URLS]:
@@ -180,14 +183,81 @@ def browser_requests(records):
         if (not error and "sold_price" not in missing
                 and record.get("identity_match", {}).get("status") != "exact"):
             missing.append("verified_sale_identity")
-        if error or missing:
+        shipping = sources.shipping_discovery(record) if include_shipping else None
+        if error or missing or shipping:
             result.append({"source_url": record["source_url"], "public_error": error[:200],
                            "missing_fields": missing, "expected_identity": expected_identity,
                            "queries": sources.discovery_queries(record),
                            "max_additional_sources": provenance.MAX_PER_SOURCE - int(
                                not record.get("error") and bool(record.get("text", "").strip())
-                               and not any(marker in content[:2500] for marker in SHELL_MARKERS))})
+                               and not any(marker in content[:2500] for marker in SHELL_MARKERS)),
+                           **({"shipping_research": True} if shipping else {})})
     return result
+
+
+def shipping_requests(records):
+    """One public house pass can serve several lots without repeated searches."""
+    result = {}
+    for record in records[:sources.MAX_URLS]:
+        if not _safe_url(record.get("source_url"), allow_http=True) or "non-public or reserved" in record.get("error", ""):
+            continue
+        request = sources.shipping_discovery(record)
+        if request is None:
+            continue
+        host = request["house_host"]
+        key = host if request["house_memory_enabled"] else (host, request["public_house_name"] or record["source_url"])
+        if key in result:
+            result[key]["related_source_urls"].append(record["source_url"])
+            if not result[key]["public_pickup_city"] and request["public_pickup_city"]:
+                result[key]["public_pickup_city"] = request["public_pickup_city"]
+                result[key]["provider_queries"] = request["provider_queries"]
+        elif len(result) < MAX_SHIPPING_HOUSES:
+            result[key] = {**request, "related_source_urls": [record["source_url"]]}
+    return list(result.values())
+
+
+def _memory_entries(directory, worker):
+    path = directory / ".house-research-memory.json"
+    if not path.exists():
+        return {}
+    try:
+        value = _read_json(path, 150_000, worker)
+        entries = value.get("houses", {})
+        if value.get("version") != 1 or not isinstance(entries, dict) or len(entries) > HOUSE_MEMORY_LIMIT:
+            return {}
+        cleaned = {}
+        for host, entry in entries.items():
+            if not isinstance(host, str) or _safe_url("https://" + host + "/") != host or not isinstance(entry, dict):
+                continue
+            checked = _timestamp(entry.get("checked_at"), worker)
+            if not _now() - timedelta(days=HOUSE_MEMORY_DAYS) <= checked <= _now() + timedelta(seconds=5):
+                continue
+            urls = entry.get("reopen_urls", [])
+            checks = entry.get("checks", {})
+            if (not isinstance(urls, list) or len(urls) > 8 or not isinstance(checks, dict)
+                    or set(checks) - set(sources.SHIPPING_CHECK_TOPICS)
+                    or any(status not in ("found", "not_found", "unavailable", "not_checked") for status in checks.values())):
+                continue
+            safe_urls = [url for url in urls if _cacheable_policy_url(url)]
+            cleaned[host] = {"checked_at": checked.isoformat(), "reopen_urls": safe_urls, "checks": checks}
+        return cleaned
+    except worker.WorkerError:
+        return {}  # Corrupt/stale optional memory cannot block current research.
+
+
+def _cacheable_policy_url(url):
+    if not isinstance(url, str) or not _safe_url(url) or sources.public_lot_url(url):
+        return False
+    parts = urlsplit(url)
+    return (not parts.query and not parts.fragment
+            and not any(marker in parts.path.casefold() for marker in ("invoice", "account", "login", "checkout", "private")))
+
+
+def _shipping_manifest(requests, directory, worker):
+    memory = _memory_entries(directory, worker)
+    return [{**request, "previous_public_checks": memory.get(request["house_host"], {}) if request["house_memory_enabled"] else {},
+             "reuse_policy": "Previous URLs/checks are discovery leads only. Reopen sources; cached findings never satisfy current evidence or prices."}
+            for request in requests]
 
 
 def _identity(payload, worker_id):
@@ -274,10 +344,10 @@ def prepare(api, executable, worker_id, model=None, reasoning_effort=None, *, st
             # a restart after an ambiguous response must replay, not regenerate.
             prepared_at = _now()
             state_path = directory / (session_id + ".json")
-            _write_json(state_path, {"version": 2, "session_id": session_id, "job_id": job["id"],
+            _write_json(state_path, {"version": 3, "session_id": session_id, "job_id": job["id"],
                 "base_url": api.base_url, "worker_id": worker_id, "model": model,
                 "reasoning_effort": reasoning_effort, "prepared_at": prepared_at.isoformat(),
-                "browser_deadline": prepared_at.isoformat(), "requests": [], "payload": payload,
+                "browser_deadline": prepared_at.isoformat(), "requests": [], "shipping_requests": [], "payload": payload,
                 "status": "prepared"}, worker)
             return complete(api, executable, state_path, unavailable="unavailable", worker=worker)
         prepared_at = _now()
@@ -288,24 +358,26 @@ def prepare(api, executable, worker_id, model=None, reasoning_effort=None, *, st
             raise worker.WorkerError("Not enough claim time remains for browser research; retry required.")
         state_path = directory / (session_id + ".json")
         evidence_path = directory / (session_id + ".evidence.json")
-        state = {"version": 2, "session_id": session_id, "job_id": job["id"], "base_url": api.base_url,
+        house_requests = shipping_requests(payload["source_evidence"])
+        state = {"version": 3, "session_id": session_id, "job_id": job["id"], "base_url": api.base_url,
                  "worker_id": worker_id, "model": model, "reasoning_effort": reasoning_effort,
                  "prepared_at": prepared_at.isoformat(), "browser_deadline": deadline.isoformat(),
-                 "requests": requests, "payload": payload, "status": "prepared"}
+                 "requests": requests, "shipping_requests": house_requests, "payload": payload, "status": "prepared"}
         _write_json(state_path, state, worker)
         _browser_stage(directory, session_id, worker, expires_at=deadline)
         handed_off = True
         return {"status": "browser_research_required", "session_id": session_id, "job_id": job["id"],
                 "state_path": str(state_path), "evidence_path": str(evidence_path),
                 "browser_deadline": deadline.isoformat(), "requests": requests,
-                "research_contract_version": 2,
+                "shipping_requests": _shipping_manifest(house_requests, directory, worker),
+                "research_contract_version": 3,
                 "tool_requirements": {"search": ["web__run", "mcp__codex_apps__search_service_web_run"],
                                       "browser": "supported Computer Use; create/reacquire a public tab if needed",
                                       "authentication": "Only if required: jeremy@secondstate.art Chrome Profile 9; never Profile 15"},
                 "budget": {"research_seconds": max(0, int((deadline-prepared_at).total_seconds())),
                            "max_queries": 24, "max_sources": 24, "max_sources_per_lot": 6,
-                           "max_attempts": 64, "max_excerpt_chars": 6000},
-                "stop_when": "All useful fields supported or reasonable alternate queries/sources exhausted; preserve partial findings.",
+                           "max_attempts": 64, "reserved_shipping_attempts": len(house_requests), "max_excerpt_chars": 6000},
+                "stop_when": "Lot facts and practical house/provider shipping checks supported or bounded alternatives exhausted; preserve partial findings and unknown checks.",
                 "privacy": "Search only public lot facts and the provided queries. Never search private invoice/email/message contents."}
     except OSError:
         if payload and payload.get("job") and not finish_started:
@@ -325,7 +397,7 @@ def _load_state(path, api, worker):
     try:
         session_id = str(UUID(state["session_id"]))
         job = worker.validate_claim(state["payload"])
-        if (state.get("version") not in (1, 2) or path.name != session_id + ".json" or job is None
+        if (state.get("version") not in (1, 2, 3) or path.name != session_id + ".json" or job is None
                 or job["id"] != state.get("job_id") or state.get("base_url") != api.base_url
                 or state.get("worker_id") != "manual-codex"
                 or state.get("status") not in ("prepared", "generated", "completed", "failed")
@@ -333,12 +405,14 @@ def _load_state(path, api, worker):
                 or (state.get("model") is not None and not isinstance(state["model"], str))):
             raise ValueError
         requests = state["requests"]
-        expected_requests = browser_requests(state["payload"]["source_evidence"])
+        expected_requests = browser_requests(state["payload"]["source_evidence"], include_shipping=state["version"] >= 3)
         if state.get("version") == 1:
             expected_requests = [{key: item[key] for key in ("source_url", "public_error")}
                                  for item in expected_requests if item["public_error"]]
         if (not isinstance(requests, list) or not 0 <= len(requests) <= sources.MAX_URLS
                 or requests != expected_requests):
+            raise ValueError
+        if state["version"] >= 3 and state.get("shipping_requests") != shipping_requests(state["payload"]["source_evidence"]):
             raise ValueError
         _timestamp(state["prepared_at"], worker)
         _timestamp(state["browser_deadline"], worker)
@@ -491,6 +565,89 @@ def _bounded_merge(records, deadline):
     return result
 
 
+def _shipping_checks(state, evidence, records, worker):
+    """Validate check claims against fresh opened sources; persist a compact log."""
+    requests = {item["source_url"]: item for item in state.get("shipping_requests", [])}
+    raw = evidence.get("shipping_checks", []) if evidence else []
+    if not isinstance(raw, list) or len(raw) > MAX_SHIPPING_HOUSES * len(sources.SHIPPING_CHECK_TOPICS):
+        raise worker.WorkerError("Shipping checks exceed their bounded collection.")
+    supplied = {}
+    prepared, deadline = _timestamp(state["prepared_at"], worker), _timestamp(state["browser_deadline"], worker)
+    for item in raw:
+        if not isinstance(item, dict) or set(item) - {"source_url", "topic", "status", "source_refs", "detail", "observed_at"}:
+            raise worker.WorkerError("Invalid shipping research check.")
+        source, topic, status = item.get("source_url"), item.get("topic"), item.get("status")
+        if (not all(isinstance(value, str) for value in (source, topic, status))
+                or source not in requests or topic not in sources.SHIPPING_CHECK_TOPICS
+                or status not in ("found", "not_found", "unavailable") or (source, topic) in supplied):
+            raise worker.WorkerError("Shipping checks must match this session's house and topics.")
+        stamp = _timestamp(item.get("observed_at"), worker)
+        if not prepared <= stamp <= min(deadline, _now() + timedelta(seconds=5)):
+            raise worker.WorkerError("Shipping check is outside this research session.")
+        refs, detail = item.get("source_refs", []), item.get("detail", "")
+        if (not isinstance(refs, list) or len(refs) > 3 or any(not isinstance(ref, str) for ref in refs)
+                or len(set(refs)) != len(refs) or not isinstance(detail, str) or len(detail) > 200):
+            raise worker.WorkerError("Shipping check references or explanation are invalid.")
+        related = [record for record in records if record["source_url"] in requests[source]["related_source_urls"]]
+        opened = {record.get("final_url") for record in related if not record.get("error")
+                  and record.get("source_kind", "public") != "search_only" and record.get("text")}
+        if any(ref not in opened for ref in refs) or (status == "found" and not refs):
+            raise worker.WorkerError("Found shipping facts need their actual opened sources; snippets are insufficient.")
+        searched = any(attempt.get("method") in ("search", "public_fetch", "public_browser", "authenticated_browser")
+                       for record in related for attempt in record.get("attempts", []))
+        if status == "not_found" and not (opened or searched):
+            raise worker.WorkerError("A not-found shipping check needs an actual bounded research attempt.")
+        supplied[source, topic] = {"source_url": source, "topic": topic, "status": status,
+            "source_refs": refs, "detail": detail, "observed_at": stamp.isoformat()}
+    notes = []
+    for source, request in requests.items():
+        checks = [supplied.get((source, topic), {"source_url": source, "topic": topic, "status": "not_checked",
+                  "source_refs": [], "detail": "No check result supplied in this bounded pass.",
+                  "observed_at": min(_now(), deadline).isoformat()}) for topic in sources.SHIPPING_CHECK_TOPICS]
+        notes.extend(checks)
+        candidates = [record for record in records if record["source_url"] in request["related_source_urls"]
+                      and record.get("source_kind") in provenance.NEW_SOURCE_KINDS and len(record.get("attempts", [])) < 16]
+        if candidates:
+            diagnostic = next((record for record in candidates if record.get("identity_match", {}).get("status") == "context"), candidates[0])
+            diagnostic.setdefault("attempts", []).append({"method": "validation", "query": "", "url": "",
+                "status": "success" if all(check["status"] == "found" for check in checks) else "partial",
+                "detail": "Shipping checks: " + "; ".join(check["topic"] + "=" + check["status"] for check in checks),
+                "observed_at": min(_now(), deadline).isoformat()})
+        elif supplied:
+            raise worker.WorkerError("Shipping checks need a retained source with room for the bounded check history.")
+    try:
+        provenance.validate_research_bounds(records)
+    except ValueError:
+        raise worker.WorkerError("Reserve one attempt per house for the shipping check summary.") from None
+    return notes
+
+
+def _save_house_memory(directory, state, worker):
+    """Reusable public leads only, after the server accepts a visible completion."""
+    if not state.get("shipping_requests"):
+        return
+    try:
+        with _file_lock(directory / ".house-research-memory.lock", worker):
+            memory = _memory_entries(directory, worker)
+            records = state.get("observations", [])
+            for request in state["shipping_requests"]:
+                if not request["house_memory_enabled"]:
+                    continue
+                public = [record for record in records if record["source_url"] in request["related_source_urls"]
+                          and record.get("source_kind") in ("public_fetch", "public_browser") and not record.get("error")]
+                urls = list(dict.fromkeys(record["final_url"] for record in public
+                       if record.get("identity_match", {}).get("status") == "context" and _cacheable_policy_url(record["final_url"])))[:8]
+                public_urls = {record["final_url"] for record in public}
+                checks = {item["topic"]: item["status"] for item in state.get("shipping_research_notes", [])
+                          if item["source_url"] == request["source_url"]
+                          and (item["status"] != "found" or set(item["source_refs"]) <= public_urls)}
+                memory[request["house_host"]] = {"checked_at": _now().isoformat(), "reopen_urls": urls, "checks": checks}
+            memory = dict(sorted(memory.items(), key=lambda pair: pair[1]["checked_at"], reverse=True)[:HOUSE_MEMORY_LIMIT])
+            _write_json(directory / ".house-research-memory.json", {"version": 1, "houses": memory}, worker)
+    except worker.WorkerError:
+        pass  # Optional discovery memory cannot undo an accepted completion.
+
+
 def complete(api, executable, state_path, *, evidence_path=None, unavailable=None, worker):
     path = Path(state_path).resolve()
     state = _load_state(path, api, worker)
@@ -510,6 +667,7 @@ def complete(api, executable, state_path, *, evidence_path=None, unavailable=Non
                     raise worker.WorkerError("Browser research left too little claim time; retry required.")
                 evidence = _read_json(evidence_path, MAX_EVIDENCE_BYTES, worker) if evidence_path else None
                 merged = merge_evidence(state, evidence, worker, unavailable=unavailable)
+                shipping_notes = _shipping_checks(state, evidence, merged, worker)
                 browser_notes = [{"source_url": item["source_url"], "error": item.pop("browser_error")}
                                  for item in merged if "browser_error" in item]
                 # A malformed generator response must not erase expensive,
@@ -517,10 +675,12 @@ def complete(api, executable, state_path, *, evidence_path=None, unavailable=Non
                 # if no website reply can be accepted on this attempt.
                 state["observations"] = merged
                 state["research_notes"] = browser_notes
+                state["shipping_research_notes"] = shipping_notes
                 _write_json(path, state, worker)
                 _browser_stage(path.parent, state["session_id"], worker, release=True)
                 # Keep the original prepared evidence in state for manifest validation.
-                generation_payload = {**payload, "source_evidence": merged, "browser_research_notes": browser_notes}
+                generation_payload = {**payload, "source_evidence": merged, "browser_research_notes": browser_notes,
+                    "shipping_requests": state.get("shipping_requests", []), "shipping_research_notes": shipping_notes}
                 generated = worker.generate_reply(generation_payload, executable, state["model"], state["reasoning_effort"])
                 state["completion"] = worker.completion_payload(_identity(payload, state["worker_id"]), generated, merged)
                 state["status"] = "generated"
@@ -544,4 +704,5 @@ def complete(api, executable, state_path, *, evidence_path=None, unavailable=Non
             raise
         state.update(status="completed", result=result)
         _write_json(path, state, worker)
+        _save_house_memory(path.parent, state, worker)
         return result

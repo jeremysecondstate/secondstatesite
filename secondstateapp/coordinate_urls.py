@@ -2,8 +2,11 @@ from django.urls import include, path
 
 from . import coordinate_views as views
 from . import coordinate_intake as intake
+from . import coordinate_outreach as outreach
 
 urlpatterns = [
+    path("<uuid:case_id>/quote-inquiries/", outreach.configure, name="coordinate_outreach_settings"),
+    path("api/quote-inquiries/dispatch/", outreach.dispatch, name="coordinate_outreach_dispatch"),
     path("", include("secondstateapp.coordinate_mail_urls")),
     path("", include("secondstateapp.coordinate_shipping_urls")),
     path("", views.coordinate, name="coordinate"),

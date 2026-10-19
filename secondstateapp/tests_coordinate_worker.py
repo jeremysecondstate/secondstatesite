@@ -280,7 +280,45 @@ class CoordinateWorkerTests(TestCase):
         self.assertEqual(result["drafts"], [draft])
         self.assertIn('"coordination": {"plan":', captured["input"])
         self.assertIn('"test_mode": false', captured["input"])
-        self.assertIn("No external\naction is enabled", captured["input"])
+        self.assertIn("The isolated\ngenerator cannot act", captured["input"])
+        self.assertIn("Do not use tools. Do not send email", captured["input"])
+
+    def test_shipping_requests_and_check_notes_reach_isolated_generator_as_context(self):
+        payload = claim_payload()
+        payload["shipping_requests"] = [{"source_url": "https://house.example/lot/17",
+            "house_queries": ["site:house.example shipping recommended shippers"]}]
+        payload["shipping_research_notes"] = [{"source_url": "https://house.example/lot/17",
+            "topic": "storage", "status": "not_checked", "source_refs": [], "detail": "Not checked in this pass."}]
+        captured = {}
+        def fake_process(command, **kwargs):
+            captured.update(kwargs)
+            (Path(kwargs["cwd"]) / "response.json").write_text(json.dumps({"body": "Preparing comparable quotes.", "drafts": []}))
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+        with patch.object(worker.subprocess, "run", side_effect=fake_process):
+            worker.generate_reply(payload, "codex")
+        context = json.loads(captured["input"].split("SAVED WEBSITE CONTEXT (JSON):\n", 1)[1])
+        self.assertEqual(context["research"]["shipping_requests"], payload["shipping_requests"])
+        self.assertEqual(context["research"]["shipping_research_notes"], payload["shipping_research_notes"])
+
+    def test_completion_preserves_provider_and_site_check_citations_under_size_pressure(self):
+        provider, terms = "https://packer.example/contact", "https://house.example/shipping"
+        brief = {"lots": [], "plan": {"source_refs": []}, "shipping": {
+            "working_currency": {"source_refs": []}, "actions": [],
+            "providers": [{"source_refs": [provider]}], "site_checks": [{"source_refs": [terms]}]}}
+        generated = {"body": "Conditional inquiries are prepared.", "drafts": [], "brief": brief}
+        evidence = [{"source_url": "https://house.example/lot/17", "final_url": ref,
+                     "title": "Observed", "text": text, "source_kind": "public_browser", "error": "",
+                     "fetched_at": "2026-10-19T00:00:00Z"}
+                    for ref, text in ((provider, "Packer: packer@example.com. Framed-art packing. " + "P" * 500),
+                                      (terms, "Release by written authorization; pickup by appointment. " + "T" * 500),
+                                      ("https://house.example/other", "😀" * 3000))]
+        with patch.object(worker, "MAX_COMPLETION_BYTES", 3000):
+            result = worker.completion_payload({"claim_token": "same"}, generated, evidence)
+        self.assertLessEqual(len(json.dumps(result, ensure_ascii=False).encode()), 3000)
+        retained = {item["final_url"]: item["text"] for item in result["research"]}
+        self.assertEqual(retained[provider], evidence[0]["text"])
+        self.assertEqual(retained[terms], evidence[1]["text"])
+        self.assertEqual(result["brief"], brief)
 
     def test_draft_recipient_requires_staff_contact_or_successfully_fetched_evidence(self):
         draft = {"recipient": "packer@example.com", "subject": "inquiry", "body": "hello!", "purpose": "quote request"}

@@ -11,8 +11,10 @@ screenshots, and prepared tabs are not fresh evidence.
 When mail synchronization is enabled, first follow [the mail operator guide](coordinate-mail.md)
 for a bounded read of the website's linked threads. Complete that separate stage
 before claiming a research job. Mail text and private links never become public
-search queries. The scheduled chat cannot send email; website staff use a separate
-explicit send action for exact reviewed drafts.
+search queries. The research stage cannot send. Website staff use a separate
+explicit send action for exact reviewed drafts; after the research claim is closed,
+the schedule may invoke the server-owned [initial inquiry dispatcher](coordinate-quote-outreach.md)
+using saved case permission. This release tests delivery only to Jeremy.
 
 Use the existing private production environment and installed CLI:
 
@@ -25,6 +27,14 @@ replayed a durable completion. `browser_research_required` supplies session/job
 IDs, private paths, deadline, submitted URLs, missing-field signals, public query
 suggestions and research limits. Never print the state (claim/private context),
 or claim a second job while finishing one.
+
+Version 3 also supplies `shipping_requests`, grouped by public auction-house
+host (up to four houses). This stage runs even when the lot page already has all
+artwork fields. Share each house-policy pass across its `related_source_urls`;
+keep individual artwork/frame facts attached to their own lots.
+Marketplace listings from different explicitly named houses stay separate;
+marketplace domains do not share house memory. Find the actual house's official
+pages before applying its collection policies.
 
 The worker has already attempted safe public fetching. Long successful excerpts
 also need enrichment when important facts appear absent. Completeness signals
@@ -82,12 +92,72 @@ Separate estimate, hammer, premium-inclusive result, tax, shipping, invoice tota
 and insurance value. Do not calculate private totals from a public result.
 Do not use previous screenshots as fresh price evidence.
 
+## Research the practical shipping options
+
+Follow each shipping request's official-house queries first: shipping and
+recommended shippers, pickup location/hours, storage charges or time limits, and
+third-party release/authorization requirements. Open the relevant policy pages
+and recommended providers' own service/contact pages. Record the published
+contacts and actual packing/collection capabilities, not inferred availability,
+insurance coverage, prices or recommendations. Preserve conflicting terms.
+
+Then compare nearby UPS Store options and fine-art packers. Use only the pickup
+city/address verified on a public house page. Initial `provider_queries` are
+provided when the fetched lot explicitly labels a public city; otherwise derive
+them after opening the house's location page. Never substitute a private delivery
+destination, invoice address, email content or playbook location in web queries.
+Being nearby is not proof that a provider handles framed art, glazing, removal
+from a mat, or loose certificates; verify its stated services and leave the
+remainder for the conditional quote request.
+
+Gather both artwork and framed dimensions, medium, and known mat/glazing facts.
+Treat a loose COA/certificate as a separate item to protect and keep with its lot.
+Unknown frame construction or destination details must not trigger a staff
+questionnaire before useful drafts exist. Prepare comparable conditional quote
+inquiries using known facts and destination information already available in the
+private case context. Ask each packer to assess framed versus unframed handling,
+safe removal, glazing, certificate handling and the price implications. The
+provider's demonstrated capability and response inform the handling choice;
+the research worker does not authorize removal, booking or payment.
+
+Report the six bounded check topics in optional top-level `shipping_checks`:
+`pickup`, `storage`, `third_party_release`, `house_recommended`, `nearby_ups`,
+`fine_art_packers`. Each check uses the shipping request's anchor `source_url`:
+
+```json
+{
+  "source_url": "<original anchor URL from shipping_requests>",
+  "topic": "third_party_release",
+  "status": "found",
+  "source_refs": ["<actual opened policy URL>"],
+  "detail": "Published authorization instructions found; exact wording is in the source excerpt.",
+  "observed_at": "<current UTC ISO time>"
+}
+```
+
+`found` requires opened source references, never search snippets. `not_found`
+means this bounded research pass did not find the information; it does not mean
+the house has no policy. Use `unavailable` for a specific access/tool limit.
+Missing check results become `not_checked`, not an invented absence. Each
+topic may appear once per house, with at most three source references and a
+200-character detail. Reserve one attempt slot per house (shown in the budget)
+for the worker's compact persisted check summary.
+
+`previous_public_checks` contains optional public house-memory discovery leads:
+previous policy/provider URLs, check outcomes and the last check time. Reopen
+them before asserting current terms or contacts. The cache never supplies source
+evidence, prices, deadlines or verified contacts by itself. It retains at most
+40 houses for 30 days in ignored local state and stores no source excerpts,
+case IDs, private destinations, invoices, email content or authenticated pages.
+
 ## Budget and partial findings
 
 Stop when useful fields are supported or reasonable alternate sources are
 exhausted. Ceilings: 24 queries, 24 retained sources, six records per submitted URL
 including its original fetch, 64 attempts total and 16 attempts per source.
 Give every lot an initial pass. Keep one lot's findings when another fails.
+Shipping discovery shares those ceilings and the existing research deadline;
+it does not add another research lease or require exhaustive provider searches.
 
 The 900-second lease reserves up to 45 seconds direct fetch, 420 outer research,
 300 generation, 100 completion transport and 20 handoff. The returned deadline
@@ -206,7 +276,9 @@ The computer and desktop app must run for this local schedule. Public research
 does not need Chrome open or an auction login. Authentication-dependent facts
 can still require the intended profile. Research/draft preparation remain enabled.
 This research worker cannot send email or contact providers. Staff may separately
-send an exact reviewed email through the website's explicit control. Bidding,
+send an exact reviewed email through the website's explicit control. Initial quote
+dispatch is a separate bounded stage governed by saved case permission and fixed
+test routing, not a research or generator tool. Bidding,
 bookings, charges/payments and automatic plan/quote approval remain disabled.
 Keep private-document controls, deletion/
 cutoff visibility, freshness, URL/SSRF protections and review requirements intact.

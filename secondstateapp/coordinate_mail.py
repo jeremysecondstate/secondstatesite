@@ -278,12 +278,14 @@ def prepare_delivery(draft_id, user, content_digest, request_id):
 
 
 def send_snapshot(delivery):
-    """One Gmail send call; OAuth scopes remain send-only. Never called by research."""
+    """One Gmail send call; OAuth scopes remain send-only. Routing is server-owned."""
     from google_auth_httplib2 import AuthorizedHttp
     from googleapiclient.discovery import build
     import httplib2
 
     credentials = _credentials()
+    if delivery.approval_snapshot.get("authorization") == "initial_quote_test" and delivery.recipient != SENDER:
+        raise ValueError("Test inquiry routing does not match the fixed test mailbox.")
     message = EmailMessage()
     message["From"], message["To"], message["Subject"] = delivery.sender_email, delivery.recipient, delivery.subject
     message["Date"] = format_datetime(delivery.requested_at)
@@ -365,9 +367,16 @@ def record_delivery_success(delivery_id, gmail_message_id, gmail_thread_id, *, r
                 "provider_email": delivery.recipient, "sender_email": delivery.sender_email, "subject": delivery.subject})
             if not created and (thread.case_id != case.pk or thread.provider_email.casefold() != delivery.recipient.casefold()):
                 raise ValueError("Gmail thread is already linked to a different case or recipient.")
+            if not created and delivery.approval_snapshot.get("authorization") == "initial_quote_test":
+                intended = delivery.approval_snapshot.get("intended_recipient", "").casefold()
+                if any(item.approval_snapshot.get("intended_recipient", "").casefold() != intended
+                       for item in thread.deliveries.all()):
+                    raise ValueError("Gmail grouped quote tests for different intended providers; manual review is required.")
         now = timezone.now()
+        route = (f"Quote test sent to {delivery.recipient} (intended provider: {delivery.approval_snapshot.get('intended_recipient')}): "
+                 if delivery.approval_snapshot.get("authorization") == "initial_quote_test" else f"Email sent to {delivery.recipient}: ")
         message = CoordinateMessage.objects.create(case=case, role="system",
-            body=f"Email sent to {delivery.recipient}: {delivery.subject}",
+            body=route + delivery.subject,
             client_message_id=uuid5(NAMESPACE_URL, "coordinate-sent:" + str(delivery.pk)))
         CoordinateMailMessage.objects.create(thread=thread, message=message, direction="outbound",
             # Gmail may rewrite the submitted Message-ID. Do not use that
@@ -408,6 +417,9 @@ def draft_mail_state(draft):
             "reviewed": "Wording reviewed." if current_approval else "Review the current wording again before sending.",
             "draft": "Review the wording before sending."}[status]
     return {"current_digest": digest, "reviewed_digest": draft.reviewed_digest, "thread_id": str(draft.mail_thread_id or ""),
+            "actual_recipient": delivery.recipient if delivery else "",
+            "intended_recipient": delivery.approval_snapshot.get("intended_recipient", "") if delivery else "",
+            "quote_test": bool(delivery and delivery.approval_snapshot.get("authorization") == "initial_quote_test"),
             "send_url": reverse("coordinate_mail_send", args=[draft.case_id, draft.pk]),
             "send_request_id": str(uuid5(NAMESPACE_URL, "coordinate-send:" + str(draft.pk) + ":" + digest)),
             "send_status": status, "can_send": ready and current_approval and visible and not delivery and not draft_blocked(draft),

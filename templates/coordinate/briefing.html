@@ -5,6 +5,7 @@
       {% if brief %}
         {% if brief.summary %}<p class="coordinate-brief-summary">{{ brief.summary }}</p>{% endif %}
         <p class="coordinate-panel-note">Details below reflect the linked sources. Missing details remain open.{% if brief.created_at %} Updated <time datetime="{{ brief.created_at }}">{{ brief.created_at }}</time>.{% endif %}</p>
+        {% if brief.shipping %}{% include "coordinate/shipping_brief.html" %}{% endif %}
         <div class="coordinate-lot-grid">
           {% for lot in brief.lots %}
             <article class="coordinate-lot-card">
@@ -57,7 +58,7 @@
             <div class="coordinate-form-footer"><p>Add this suggestion to your plan, then review and save it.</p><button class="coordinate-button coordinate-button-secondary" type="button" data-use-suggestion>Use suggestion in plan</button></div>
           </section>
         {% endif %}
-        {% if brief.open_questions %}<section class="coordinate-open-questions" aria-labelledby="coordinate-open-questions-title"><h3 id="coordinate-open-questions-title">Still to confirm</h3><ul>{% for question in brief.open_questions %}<li>{{ question }}</li>{% endfor %}</ul></section>{% endif %}
+        {% if brief.open_questions %}<section class="coordinate-open-questions" aria-labelledby="coordinate-open-questions-title"><h3 id="coordinate-open-questions-title">{% if brief.shipping %}Additional details to resolve{% else %}Still to confirm{% endif %}</h3><ul>{% for question in brief.open_questions %}<li>{{ question }}</li>{% endfor %}</ul></section>{% endif %}
       {% else %}
         <p class="coordinate-panel-empty">Share lot links, an invoice, or the auction house’s email. The coordinator will bring the details and next steps together here.</p>
       {% endif %}

@@ -430,6 +430,104 @@ class CoordinateBrowserWorkerTests(TestCase):
         self.assertEqual(request["missing_fields"], ["verified_sale_identity"])
         self.generate.assert_not_called()
 
+    def test_complete_exact_lot_still_prepares_grouped_shipping_discovery(self):
+        self.public.update(error="", text=COMPLETE_PUBLIC_TEXT, source_kind="public_fetch",
+                           identity_match={"status": "exact"})
+        second = {**self.public, "source_url": "https://auction.example/lot/18", "final_url": "https://auction.example/lot/18"}
+        self.research.return_value = [self.public, second]
+        manifest = self.prepare()
+        self.assertEqual(manifest["status"], "browser_research_required")
+        self.assertEqual(manifest["requests"][0]["missing_fields"], [])
+        self.assertTrue(manifest["requests"][0]["shipping_research"])
+        self.assertEqual(len(manifest["shipping_requests"]), 1)
+        shipping = manifest["shipping_requests"][0]
+        self.assertEqual(shipping["related_source_urls"], [self.url, second["source_url"]])
+        self.assertIn("third_party_release", shipping["check_topics"])
+        self.assertIn("glazing", shipping["lot_handling_checks"])
+        self.assertTrue(shipping["house_queries"])
+        self.assertEqual(manifest["budget"]["reserved_shipping_attempts"], 1)
+        self.assertEqual(manifest["budget"]["research_seconds"], 420)
+        self.generate.assert_not_called()
+
+    def test_marketplace_lots_from_different_houses_do_not_share_house_checks_or_memory(self):
+        records = [{"source_url": f"https://www.invaluable.com/auction-lot/work-{number}", "error": "",
+                    "text": f"Auction house: {house}\nLocation: Scottsdale, AZ\n"}
+                   for number, house in ((1, "First House"), (2, "Second House"))]
+        requests = browser.shipping_requests(records)
+        self.assertEqual(len(requests), 2)
+        self.assertTrue(all(not item["house_memory_enabled"] for item in requests))
+        self.assertIn("First House official", requests[0]["house_queries"][0])
+        self.assertIn("Second House official", requests[1]["house_queries"][0])
+
+    def test_shipping_checks_validate_opened_evidence_and_persist_bounded_history(self):
+        manifest = self.prepare()
+        policy = self.discovered("https://auction.example/shipping", source_kind="public_browser",
+            text="Pickup by appointment. Third-party release requires authorization. shipping@auction.example.",
+            identity_match={"status": "context", "auction_house": "Auction Example"})
+        check = {"source_url": self.url, "topic": "third_party_release", "status": "found",
+                 "source_refs": [policy["final_url"]], "detail": "Published authorization form applies.",
+                 "observed_at": self.now.isoformat()}
+        evidence = {"session_id": manifest["session_id"], "job_id": manifest["job_id"],
+                    "records": [policy], "shipping_checks": [check]}
+        Path(manifest["evidence_path"]).write_text(json.dumps(evidence), encoding="utf-8")
+        self.complete(manifest, evidence_path=manifest["evidence_path"])
+        payload = self.generate.call_args.args[0]
+        checks = {item["topic"]: item for item in payload["shipping_research_notes"]}
+        self.assertEqual(checks["third_party_release"]["status"], "found")
+        self.assertEqual(checks["storage"]["status"], "not_checked")
+        summary = payload["source_evidence"][0]["attempts"][-1]
+        self.assertIn("third_party_release=found", summary["detail"])
+        self.assertIn("storage=not_checked", summary["detail"])
+        self.assertLessEqual(len(summary["detail"]), 300)
+        memory = json.loads((self.directory / ".house-research-memory.json").read_text())
+        self.assertEqual(memory["houses"]["auction.example"]["reopen_urls"], [policy["final_url"]])
+        self.assertNotIn(policy["text"], json.dumps(memory))
+        self.assertNotIn(self.payload["job"]["case_id"], json.dumps(memory))
+
+    def test_shipping_checks_reject_snippets_unopened_refs_stale_and_unsearched_absence(self):
+        manifest = self.prepare()
+        state = browser._load_state(Path(manifest["state_path"]), self.api, worker)
+        record = self.discovered(source_kind="search_only", identity_match={"status": "unverified"})
+        check = {"source_url": self.url, "topic": "pickup", "status": "found",
+                 "source_refs": [record["final_url"]], "detail": "Claimed fact", "observed_at": self.now.isoformat()}
+        with self.assertRaisesRegex(worker.WorkerError, "opened sources"):
+            browser._shipping_checks(state, {"shipping_checks": [check]}, [record], worker)
+        opened = self.discovered()
+        for changes in ({"source_refs": ["https://unopened.example/policy"]},
+                        {"observed_at": (self.now - timedelta(seconds=1)).isoformat()},
+                        {"topic": "private_destination"}, {"source_url": []}):
+            with self.subTest(changes=changes), self.assertRaises(worker.WorkerError):
+                browser._shipping_checks(state, {"shipping_checks": [{**check, **changes}]}, [opened], worker)
+        missing = {**check, "status": "not_found", "source_refs": []}
+        with self.assertRaisesRegex(worker.WorkerError, "actual bounded research"):
+            browser._shipping_checks(state, {"shipping_checks": [missing]}, [self.public], worker)
+
+    def test_house_memory_is_public_reopen_leads_only_and_expires(self):
+        cache = {"version": 1, "houses": {"auction.example": {"checked_at": self.now.isoformat(),
+                 "reopen_urls": ["https://auction.example/shipping", "https://provider.example/contact",
+                                 "https://auction.example/account/invoice", "https://auction.example/shipping?secret=token",
+                                 self.url, "https://127.1/private"], "checks": {"storage": "not_found"}}}}
+        (self.directory / ".house-research-memory.json").write_text(json.dumps(cache))
+        manifest = self.prepare()
+        memory = manifest["shipping_requests"][0]["previous_public_checks"]
+        self.assertEqual(memory["reopen_urls"], ["https://auction.example/shipping", "https://provider.example/contact"])
+        state = browser._load_state(Path(manifest["state_path"]), self.api, worker)
+        self.assertEqual(state["payload"]["source_evidence"], [self.public])
+        self.assertNotIn("previous_public_checks", state["shipping_requests"][0])
+        self.clock += timedelta(days=31)
+        self.assertEqual(browser._memory_entries(self.directory, worker), {})
+
+    def test_v2_prepared_state_remains_valid_after_shipping_manifest_upgrade(self):
+        manifest = self.prepare()
+        path = Path(manifest["state_path"])
+        state = json.loads(path.read_text())
+        state["version"] = 2
+        state.pop("shipping_requests")
+        for request in state["requests"]:
+            request.pop("shipping_research", None)
+        path.write_text(json.dumps(state))
+        self.assertEqual(browser._load_state(path, self.api, worker)["version"], 2)
+
     def test_multiple_alternate_sources_preserve_direct_facts_and_specific_provenance(self):
         self.public.update(error="", text="Dimensions: 8 x 10 inches. Condition: good. " * 8)
         manifest = self.prepare()

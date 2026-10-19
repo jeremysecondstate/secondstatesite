@@ -10,8 +10,8 @@ from scripts.coordinate_evidence import research_identity_key
 
 class CoordinatePlan(models.Model):
     case = models.OneToOneField("CoordinateCase", primary_key=True, on_delete=models.PROTECT, related_name="shipping_plan")
-    stage = models.CharField(max_length=20, default="gathering", choices=[
-        ("gathering", "Gathering details"), ("quotes", "Comparing quotes"), ("ready", "Ready for pickup"),
+    stage = models.CharField(max_length=20, default="preparing", choices=[
+        ("preparing", "Preparing shipment"), ("ready", "Ready for pickup"),
         ("pickup", "Pickup arranged"), ("transit", "In transit"), ("received", "Received"), ("on_hold", "On hold"),
     ])
     destination = models.CharField(max_length=20, default="undecided", choices=[
@@ -25,6 +25,19 @@ class CoordinatePlan(models.Model):
     tracking_number = models.CharField(max_length=200, blank=True)
     tracking_url = models.URLField(max_length=2048, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @staticmethod
+    def canonical_stage(value):
+        # Older open tabs and an overlapping deployment can still submit these.
+        return "preparing" if value in ("gathering", "quotes") else value
+
+    def save(self, *args, **kwargs):
+        canonical = self.canonical_stage(self.stage)
+        if canonical != self.stage:
+            self.stage = canonical
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = {*kwargs["update_fields"], "stage"}
+        return super().save(*args, **kwargs)
 
 
 class CoordinateQuote(models.Model):
