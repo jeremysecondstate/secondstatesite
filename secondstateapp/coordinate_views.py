@@ -99,7 +99,8 @@ def _state(selected=None):
         "trash_cases": trash_cases,
         "selected_case": next((case for case in cases + trash_cases if selected and case["id"] == str(selected.pk)), None),
         "messages": [_message_json(message, selected.deleted_at) for message in selected.messages.filter(_conversation_visible()).select_related("author", "job")] if selected else [],
-        "worker": {"last_successful_check": _iso(worker.last_successful_check) if worker else None, "test_mode": not enabled(), "draft_only": enabled()},
+        "worker": {"last_successful_check": _iso(worker.last_successful_check) if worker else None, "test_mode": not enabled(), "draft_only": enabled(),
+                   "email_sending_enabled": enabled() and bool(getattr(settings, "COORDINATE_EMAIL_SENDING_ENABLED", False))},
         "coordination": coordination_state(selected),
         "new_case_token": str(uuid.uuid4()), "message_token": str(uuid.uuid4()),
     }

@@ -4,8 +4,32 @@ from pathlib import Path
 import shutil
 import subprocess
 
+from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
+
+
+class CoordinateNewCaseFrontendTests(TestCase):
+    @override_settings(COORDINATE_DRAFT_WORKFLOW_ENABLED=True, COORDINATE_EMAIL_SENDING_ENABLED=True)
+    def test_enabled_email_header_is_correct_without_a_selected_case(self):
+        staff = get_user_model().objects.create_user("new-case-staff", is_staff=True)
+        self.client.force_login(staff)
+        response = self.client.get(reverse("coordinate"), {"new": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["selected_case"])
+        self.assertIsNone(response.context["coordination"])
+        self.assertTrue(response.context["worker"]["email_sending_enabled"])
+        self.assertContains(response, "Staff-reviewed email coordination")
+        self.assertContains(response, "Email requires a separate Send reviewed email action.")
+        self.assertNotContains(response, "Email not enabled")
+        self.assertNotContains(response, "Email sending is not enabled.")
+        # Email cannot become globally enabled when the shipping workflow is off.
+        with override_settings(COORDINATE_DRAFT_WORKFLOW_ENABLED=False):
+            response = self.client.get(reverse("coordinate"), {"new": "1"})
+            self.assertFalse(response.context["worker"]["email_sending_enabled"])
+            self.assertContains(response, "Test mode · Messaging only")
+            self.assertContains(response, "Email sending is not enabled.")
 
 
 class CoordinateFrontendTests(SimpleTestCase):
