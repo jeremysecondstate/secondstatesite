@@ -198,31 +198,33 @@ def _shipping(value):
     result = clean_record(value, SHIPPING_SCHEMA)
     currency = result["working_currency"]
     if currency["code"] and not re.fullmatch(r"[A-Z]{3}", currency["code"]):
-        raise ValueError("Working currency must use a three-letter code or remain empty.")
+        raise ValueError("shipping.working_currency.code: Use a three-letter code or remain empty.")
     if currency["basis"] == "unknown":
         if currency["code"]:
-            raise ValueError("An unknown working currency cannot contain an assumed code.")
+            raise ValueError("shipping.working_currency.code: An unknown working currency cannot contain an assumed code.")
     elif not currency["code"] or not currency["note"] or not currency["source_refs"]:
-        raise ValueError("Working currency needs a labeled basis and cited context.")
+        raise ValueError("shipping.working_currency: A known or inferred currency needs code, note and cited context.")
     if currency["basis"] == "inferred" and currency["code"] != "USD":
-        raise ValueError("Only the supported US-location working currency inference is enabled.")
+        raise ValueError("shipping.working_currency.code: Only the supported US-location working currency inference is enabled.")
     seen = set()
-    for provider in result["providers"]:
+    for index, provider in enumerate(result["providers"]):
+        path = f"shipping.providers[{index}]"
         email = provider["email"]
         if email and (not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+", email)
                       or ".." in email or any(c in email for c in "\r\n")):
-            raise ValueError("A provider contact needs one valid published email address.")
+            raise ValueError(f"{path}.email: Use one valid published email address, or leave it empty when unknown.")
         key = (provider["name"].casefold(), email.casefold())
         if key in seen:
-            raise ValueError("Duplicate shipping provider.")
+            raise ValueError(f"{path}: Duplicate shipping provider.")
         seen.add(key)
         if provider["service_type"] != "unknown" and not provider["published_capability"]:
-            raise ValueError("A provider service classification needs published capability wording.")
-    for check in result["site_checks"]:
+            raise ValueError(f"{path}.service_type: A service classification needs published capability wording; use unknown when absent.")
+    for index, check in enumerate(result["site_checks"]):
+        path = f"shipping.site_checks[{index}]"
         if check["status"] != "not_checked" and (not check["note"] or not check["source_refs"]):
-            raise ValueError("A completed site check needs scoped supporting evidence.")
+            raise ValueError(f"{path}: A completed site check needs a note and scoped supporting source_refs; omit an unsupported check.")
         if check["status"] == "not_checked" and check["source_refs"]:
-            raise ValueError("An unchecked topic cannot claim checked sources.")
+            raise ValueError(f"{path}.source_refs: An unchecked topic cannot claim checked sources.")
     return result
 
 
@@ -314,29 +316,29 @@ def _current_shipping_source(source, *, opened_only=False):
 
 
 def _shipping_evidence(shipping, evidence):
-    def supporting(refs, *, opened_only=False):
+    def supporting(refs, *, path, opened_only=False):
         # Each displayed citation must actually support the relevant source class.
-        if any(not any(_current_shipping_source(source, opened_only=opened_only)
-                       for source in _observations([ref], evidence)) for ref in refs):
-            raise ValueError("Shipping facts need current, visible source evidence; search leads are insufficient.")
+        for index, ref in enumerate(refs):
+            if not any(_current_shipping_source(source, opened_only=opened_only)
+                       for source in _observations([ref], evidence)):
+                raise ValueError(f"{path}.source_refs[{index}]: Shipping facts need current, visible source evidence; search leads are insufficient.")
         return [source for source in _observations(refs, evidence)
                 if _current_shipping_source(source, opened_only=opened_only)]
 
-    currency = shipping["working_currency"]
-    sources = supporting(currency["source_refs"])
-    if currency["basis"] == "inferred":
-        # This is a labeled planning assumption, never a sale-price currency fact.
-        us_location = re.compile(r"\b(?:United States|USA|U\.S\.A?\.?|Arizona|California|New York|Scottsdale|Phoenix)\b|\b(?:AZ|CA|NY)\s+\d{5}(?:-\d{4})?\b", re.I)
-        if not any(us_location.search(source["text"]) for source in sources):
-            raise ValueError("A working USD inference needs cited US location context.")
-    elif currency["basis"] in ("source", "staff"):
-        if not any((currency["basis"] != "staff" or source["kind"] == "message")
-                   and _currency_stated(currency["code"], source["text"]) for source in sources):
-            raise ValueError("The stated working currency is absent from its cited basis.")
-    for action in shipping["actions"]:
-        supporting(action["source_refs"])
-    for provider in shipping["providers"]:
-        sources = supporting(provider["source_refs"], opened_only=True)
+    def validate_currency(currency):
+        sources = supporting(currency["source_refs"], path="shipping.working_currency")
+        if currency["basis"] == "inferred":
+            # This is a labeled planning assumption, never a sale-price currency fact.
+            us_location = re.compile(r"\b(?:United States|USA|U\.S\.A?\.?|Arizona|California|New York|Scottsdale|Phoenix)\b|\b(?:AZ|CA|NY)\s+\d{5}(?:-\d{4})?\b", re.I)
+            if not any(us_location.search(source["text"]) for source in sources):
+                raise ValueError("shipping.working_currency.source_refs: A working USD inference needs cited US location context; otherwise keep the currency unknown.")
+        elif currency["basis"] in ("source", "staff"):
+            if not any((currency["basis"] != "staff" or source["kind"] == "message")
+                       and _currency_stated(currency["code"], source["text"]) for source in sources):
+                raise ValueError("shipping.working_currency.source_refs: The stated working currency is absent from its cited basis.")
+
+    def validate_provider(provider, path):
+        sources = supporting(provider["source_refs"], path=path, opened_only=True)
         quote = _normalized(provider["contact_quote"])
         # Bind the name/address together, so a nearby unrelated address cannot
         # be silently assigned to a provider from another part of a catalog.
@@ -345,11 +347,11 @@ def _shipping_evidence(shipping, evidence):
                 or provider["email"] and not re.search(
                     r"(?<![\w.!#$%&'*+/=?^`{|}~@-])" + re.escape(provider["email"].casefold())
                     + r"(?![\w.@-])", quote)):
-            raise ValueError("A shipping provider needs opened wording tying its name to its published contact.")
+            raise ValueError(f"{path}.contact_quote: Use one contiguous opened excerpt containing this exact provider name and its email when supplied; omit this provider if no supported contact quote exists.")
         capability = _normalized(provider["published_capability"])
         if capability and (_normalized(provider["name"]) not in capability
                            or not any(capability in _normalized(source["text"]) for source in sources)):
-            raise ValueError("Published provider capabilities need exact source wording naming that provider.")
+            raise ValueError(f"{path}.published_capability: Use an exact opened excerpt naming this same provider, without combining aliases; otherwise set published_capability=\"\" and service_type=\"unknown\".")
         packing = bool(re.search(r"\bpack\w*|\bcrat\w*", capability))
         transport = bool(re.search(r"\bship\w*|\btransport\w*|\bdeliver\w*|\bmov(?:e|ing)\b", capability))
         service = provider["service_type"]
@@ -357,20 +359,45 @@ def _shipping_evidence(shipping, evidence):
                 or (service == "full_service" and not (packing and transport))
                 or (service == "fine_art_transport" and not (transport and re.search(r"\bfine art\b|\bartwork\b|\bart transport", capability)))
                 or (service == "parcel_shipping" and not re.search(r"\bparcel\b|\bUPS\b|\bFedEx\b|\bDHL\b", capability, re.I))):
-            raise ValueError("The provider service type is not supported by its published wording.")
-    for check in shipping["site_checks"]:
+            raise ValueError(f"{path}.service_type: The service type is not supported by its published wording; use unknown instead of inferring a capability.")
+    def validate_check(check, path):
         status = check["status"]
         if status in ("found", "not_found_in_checked_pages"):
-            sources = supporting(check["source_refs"], opened_only=True)
+            sources = supporting(check["source_refs"], path=path, opened_only=True)
             if status == "found" and not any(_normalized(check["note"]) in _normalized(source["text"]) for source in sources):
-                raise ValueError("A found site term must preserve the cited source wording.")
+                raise ValueError(f"{path}.note: Entire note must be one exact contiguous excerpt from cited opened text, without added quotation marks, prefixes, suffixes, commentary or combined excerpts. shipping_research_notes.detail is a summary, not a quote. Put explanations in actions/summary/plan, or omit this check.")
         elif status == "access_failed":
-            for ref in check["source_refs"]:
+            for ref_index, ref in enumerate(check["source_refs"]):
                 if not any(source.get("error") and any(
                         attempt.get("method") in ("public_fetch", "public_browser", "authenticated_browser")
                         and attempt.get("status") in ("unavailable", "timeout", "challenge", "login_required")
                         for attempt in source.get("attempts", [])) for source in _observations([ref], evidence)):
-                    raise ValueError("An access failure needs a recorded page-access attempt, not a failed browser launch.")
+                    raise ValueError(f"{path}.source_refs[{ref_index}]: An access failure needs a recorded page-access attempt, not a failed browser launch; omit an unsupported failure claim.")
+
+    errors = []
+
+    def collect(validator, *args, **kwargs):
+        try:
+            validator(*args, **kwargs)
+        except ValueError as exc:
+            errors.append(str(exc))
+
+    # A bounded correction sees every independently invalid shipping entry at
+    # once. Keep each predicate intact, and never accept a partially valid brief.
+    collect(validate_currency, shipping["working_currency"])
+    for index, action in enumerate(shipping["actions"]):
+        collect(supporting, action["source_refs"], path=f"shipping.actions[{index}]")
+    for index, provider in enumerate(shipping["providers"]):
+        collect(validate_provider, provider, f"shipping.providers[{index}]")
+    for index, check in enumerate(shipping["site_checks"]):
+        collect(validate_check, check, f"shipping.site_checks[{index}]")
+    if errors:
+        # Preserve every indexed path even at the schema's maximum entry count;
+        # trim only explanatory wording when the combined diagnostic is large.
+        if len("\n".join(errors)) > 4000:
+            limit = (4000 - len(errors) + 1) // len(errors)
+            errors = [error if len(error) <= limit else error[:limit - 3] + "..." for error in errors]
+        raise ValueError("\n".join(errors))
 
 
 def _matches_price_identity(price, lot, source):

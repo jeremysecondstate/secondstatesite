@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 from subprocess import CompletedProcess
 from threading import Thread
 from unittest import TestCase
@@ -32,6 +33,10 @@ def claim_payload():
 
 
 class CoordinateGenerationBudgetTests(TestCase):
+    def setUp(self):
+        self.diagnostics = patch.object(worker, "_save_generation_diagnostics").start()
+        self.addCleanup(patch.stopall)
+
     def payload_with_lease(self, seconds):
         payload = claim_payload()
         payload["job"]["lease_expires_at"] = (
@@ -126,7 +131,252 @@ class CoordinateGenerationBudgetTests(TestCase):
         self.assertEqual(run.call_count, 1)
 
 
+class CoordinateGenerationDiagnosticsTests(TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.directory = Path(self.temporary.name)
+        override = patch.object(worker, "GENERATION_DIAGNOSTIC_DIR", self.directory)
+        override.start()
+        self.addCleanup(override.stop)
+        self.payload = claim_payload()
+        self.payload.update(test_mode=False, brief_enabled=True)
+        self.path = self.directory / (self.payload["job"]["id"] + ".json")
+
+    def response(self, command, kwargs, body):
+        (Path(kwargs["cwd"]) / "response.json").write_text(json.dumps({
+            "body": body, "drafts": [], "brief": None, "unexpected": "UNEXPECTED FIELD",
+        }), encoding="utf-8")
+        return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "PRIVATE STDERR")
+
+    def test_failure_is_retained_before_repair_timeout_without_credentials_or_context_dump(self):
+        calls = []
+        secret = "test-worker-credential-that-must-not-be-persisted"
+        body = "PRIVATE GENERATED BODY " + self.payload["job"]["claim_token"] + " " + secret
+        self.payload["messages"][0]["body"] = "PRIVATE SOURCE MESSAGE THAT MUST NOT BE COPIED"
+        def process(command, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:
+                return self.response(command, kwargs, body)
+            first = json.loads(self.path.read_text(encoding="utf-8"))
+            self.assertEqual(first["attempts"][0]["error"], "Unsupported price evidence.")
+            self.assertEqual(first["response_attempt"], 1)
+            raise subprocess.TimeoutExpired(command, kwargs["timeout"], output="PRIVATE STDOUT", stderr="PRIVATE STDERR")
+        with (patch.dict(os.environ, {"COORDINATE_WORKER_TOKEN": secret}),
+              patch.object(worker.subprocess, "run", side_effect=process),
+              patch.object(worker, "validate_price_evidence", side_effect=ValueError("Unsupported price evidence.")),
+              patch.object(worker.sys, "stdout", new_callable=StringIO) as stdout,
+              patch.object(worker.sys, "stderr", new_callable=StringIO) as stderr):
+            with self.assertRaisesRegex(worker.WorkerError, "bounded claim budget"):
+                worker.generate_reply(self.payload, "codex")
+        saved = self.path.read_text(encoding="utf-8")
+        record = json.loads(saved)
+        self.assertEqual([item["status"] for item in record["attempts"]], ["validation_failed", "timeout"])
+        self.assertEqual(record["response_attempt"], 1)
+        self.assertIn("PRIVATE GENERATED BODY", record["response"]["body"])
+        self.assertEqual(record["response"]["body"].count("[redacted]"), 2)
+        for value in (secret, self.payload["job"]["claim_token"], self.payload["messages"][0]["body"],
+                      "PRIVATE STDOUT", "PRIVATE STDERR", "UNEXPECTED FIELD", "Retain the mat"):
+            self.assertNotIn(value, saved)
+        self.assertEqual(stdout.getvalue() + stderr.getvalue(), "")
+        self.assertTrue(all(item["elapsed_seconds"] >= 0 and item["timeout_seconds"] > 0 for item in record["attempts"]))
+        self.assertFalse(Path(calls[0]["cwd"]).exists())
+
+    def test_latest_failed_response_atomically_replaces_first_and_keeps_both_errors(self):
+        calls = []
+        def process(command, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 2:
+                self.assertEqual(json.loads(self.path.read_text())["response"]["body"], "First attempted reply.")
+            return self.response(command, kwargs, "First attempted reply." if len(calls) == 1 else "Second attempted reply.")
+        with (patch.object(worker.subprocess, "run", side_effect=process),
+              patch.object(worker, "validate_price_evidence", side_effect=[ValueError("First check failed."), ValueError("Second check failed.")])):
+            with self.assertRaisesRegex(worker.WorkerError, "invalid case brief"):
+                worker.generate_reply(self.payload, "codex")
+        record = json.loads(self.path.read_text())
+        self.assertEqual(record["response_attempt"], 2)
+        self.assertEqual(record["response"]["body"], "Second attempted reply.")
+        self.assertEqual([item["error"] for item in record["attempts"]], ["First check failed.", "Second check failed."])
+        self.assertEqual(list(self.directory.iterdir()), [self.path])
+
+    def test_first_pass_success_replaces_stale_failure_with_metadata_only(self):
+        worker._save_generation_diagnostics(self.payload, {
+            "response": {"body": "OLD PRIVATE FAILED RESPONSE"}, "response_attempt": 2,
+            "attempts": [{"number": 2, "status": "validation_failed", "error": "Old failure."}],
+        })
+        with patch.object(worker.subprocess, "run", side_effect=lambda command, **kwargs:
+                          self.response(command, kwargs, "NEW PRIVATE VALID RESPONSE")):
+            generated = worker.generate_reply(self.payload, "codex")
+        self.assertEqual(generated["body"], "NEW PRIVATE VALID RESPONSE")
+        saved = self.path.read_text(encoding="utf-8")
+        record = json.loads(saved)
+        self.assertIsNone(record["response"])
+        self.assertIsNone(record["response_attempt"])
+        self.assertEqual(len(record["attempts"]), 1)
+        self.assertEqual(record["attempts"][0]["status"], "validated")
+        self.assertEqual(record["attempts"][0]["error"], "")
+        self.assertNotIn("PRIVATE", saved)
+        self.assertNotIn("Old failure", saved)
+        self.assertEqual(list(self.directory.iterdir()), [self.path])
+
+    def test_repair_without_fresh_output_cannot_reuse_first_attempt_file(self):
+        calls = []
+        def process(command, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:
+                return self.response(command, kwargs, "Rejected first reply.")
+            self.assertFalse((Path(kwargs["cwd"]) / "response.json").exists())
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+        with (patch.object(worker.subprocess, "run", side_effect=process),
+              patch.object(worker, "validate_price_evidence", side_effect=ValueError("Invalid evidence.")) as validate):
+            with self.assertRaisesRegex(worker.WorkerError, "no valid final reply"):
+                worker.generate_reply(self.payload, "codex")
+        record = json.loads(self.path.read_text())
+        self.assertEqual(record["response_attempt"], 1)
+        self.assertEqual(record["attempts"][-1]["status"], "invalid_response")
+        self.assertEqual(validate.call_count, 1)
+
+    def test_diagnostic_size_is_bounded_and_write_failure_never_changes_worker_outcome(self):
+        diagnostics = {"response": {"body": "PRIVATE " + "😀" * 100_000}, "response_attempt": 1,
+                       "attempts": [{"number": 1, "status": "validation_failed", "error": "Invalid reply."}]}
+        worker._save_generation_diagnostics(self.payload, diagnostics)
+        self.assertLessEqual(self.path.stat().st_size, worker.MAX_GENERATION_DIAGNOSTIC_BYTES)
+        record = json.loads(self.path.read_text(encoding="utf-8"))
+        self.assertTrue(record["response_truncated"])
+        self.assertTrue(record["response_excerpt"])
+        original = self.path.read_bytes()
+        with patch.object(worker.os, "replace", side_effect=OSError("PRIVATE filesystem diagnostic")):
+            worker._save_generation_diagnostics(self.payload, {"response": {"body": "Replacement"}})
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(list(self.directory.iterdir()), [self.path])
+        invalid = deepcopy(self.payload)
+        invalid["job"]["id"] = "../escape"
+        worker._save_generation_diagnostics(invalid, diagnostics)
+        self.assertEqual(list(self.directory.iterdir()), [self.path])
+
+
+class CoordinateShippingRepairTests(TestCase):
+    def setUp(self):
+        self.payload = claim_payload()
+        self.payload.update(test_mode=False, brief_enabled=True)
+        self.lot_url = "https://house.example/lot/17"
+        self.terms_url = "https://house.example/shipping"
+        self.payload["source_evidence"] = [
+            {"source_url": self.lot_url, "final_url": self.lot_url, "source_kind": "public_browser", "error": "",
+             "text": "Artist A. Work B. Lot 17. Sold: USD 120.00",
+             "identity_match": {"status": "exact", "artist": "Artist A", "title": "Work B", "auction_house": "Example House",
+                                "auction_date": "2026-10-17", "lot_number": "17"}},
+            {"source_url": self.lot_url, "final_url": self.terms_url, "source_kind": "public_browser", "error": "",
+             "text": "Collect within seven days. Example Packers: packing@example.test",
+             "identity_match": {"status": "context", "auction_house": "Example House"}},
+        ]
+        lot = {key: "" for key in worker.BRIEF_SCHEMA["properties"]["lots"]["items"]["properties"]
+               if key not in ("source_refs", "prices")}
+        lot.update(label="Synthetic lot 17", artist="Artist A", title="Work B", auction_house="Example House",
+                   auction_date="2026-10-17", lot_number="17", source_refs=[self.lot_url], prices=[{
+                       "kind": "sold", "basis": "unknown", "label": "Sold", "amount": "120.00", "amount_high": "",
+                       "currency": "USD", "evidence_quote": "Sold: USD 120.00", "source_refs": [self.lot_url],
+                   }])
+        self.shipping = {
+            "working_currency": {"code": "", "basis": "unknown", "note": "", "source_refs": []},
+            "quote_readiness": {"status": "conditional_ready", "note": "Request conditional quotes."},
+            "actions": [], "providers": [{"name": "Example Packers", "email": "packing@example.test", "service_type": "unknown",
+                "published_capability": "", "contact_quote": "Example Packers: packing@example.test", "source_refs": [self.terms_url]}],
+            "site_checks": [{"topic": "pickup", "status": "found", "note": "Collect within seven days.", "source_refs": [self.terms_url]}],
+        }
+        self.brief = {
+            "summary": "Verified sale details.", "lots": [lot],
+            "plan": {"notes": "Prepare conditional quote requests.", "pickup_deadline": "", "deadline_basis": "", "source_refs": [self.terms_url]},
+            "open_questions": [], "shipping": deepcopy(self.shipping),
+        }
+        self.invalid = deepcopy(self.brief)
+        self.invalid["shipping"]["site_checks"][0]["note"] += " Arrange prompt collection."
+        self.calls = []
+        self.clock = [1000.0]
+        self.diagnostics = patch.object(worker, "_save_generation_diagnostics").start()
+        patch.object(worker, "generation_budget", return_value=600).start()
+        patch.object(worker.time, "monotonic", side_effect=lambda: self.clock[0]).start()
+        self.addCleanup(patch.stopall)
+
+    def run_responses(self, responses):
+        def process(command, **kwargs):
+            self.calls.append({**kwargs, "schema": json.loads((Path(kwargs["cwd"]) / "response-schema.json").read_text())})
+            response = responses[len(self.calls) - 1]
+            (Path(kwargs["cwd"]) / "response.json").write_text(json.dumps(response), encoding="utf-8")
+            self.clock[0] += 250 if len(self.calls) == 1 else 10
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+        with patch.object(worker.subprocess, "run", side_effect=process):
+            return worker.generate_reply(self.payload, "codex", "gpt-6-astra", "ultra")
+
+    def test_shipping_only_repair_preserves_validated_lots_prices_plan_and_shared_budget(self):
+        draft = {"recipient": "packing@example.test", "subject": "Conditional quote", "body": "Please quote packing and transport.", "purpose": "Comparable quote inquiry."}
+        result = self.run_responses([
+            {"body": "First text with a claim that needs correction.", "drafts": [], "brief": self.invalid},
+            {"body": "Fresh supported conversation text.", "drafts": [draft], "site_checks": self.shipping["site_checks"]},
+        ])
+        self.assertEqual(result["body"], "Fresh supported conversation text.")
+        self.assertEqual(result["drafts"], [draft])
+        self.assertEqual(result["brief"], worker.validate_brief(self.brief))
+        self.assertEqual([call["timeout"] for call in self.calls], [600, 350])
+        self.assertEqual(set(self.calls[0]["schema"]["properties"]), {"body", "drafts", "brief"})
+        self.assertEqual(set(self.calls[1]["schema"]["properties"]), {"body", "drafts", "site_checks"})
+        self.assertEqual(self.calls[1]["schema"]["required"], ["body", "drafts", "site_checks"])
+        self.assertFalse(self.calls[1]["schema"]["additionalProperties"])
+        self.assertIn("Regenerate body and drafts", self.calls[1]["input"])
+        worker.validate_price_evidence(result["brief"], worker.brief_evidence(self.payload))
+
+    def test_invalid_core_price_keeps_whole_response_repair(self):
+        self.invalid["lots"][0]["prices"][0]["amount"] = "999.00"
+        result = self.run_responses([
+            {"body": "Incorrect price and shipping.", "drafts": [], "brief": self.invalid},
+            {"body": "Corrected full findings.", "drafts": [], "brief": self.brief},
+        ])
+        self.assertEqual(set(self.calls[1]["schema"]["properties"]), {"body", "drafts", "brief"})
+        self.assertEqual(result["brief"]["lots"][0]["prices"][0]["amount"], "120.00")
+
+    def test_shipping_shape_failure_keeps_whole_response_repair(self):
+        self.invalid["shipping"]["unexpected"] = "not allowed"
+        result = self.run_responses([
+            {"body": "Malformed shipping.", "drafts": [], "brief": self.invalid},
+            {"body": "Corrected full findings.", "drafts": [], "brief": self.brief},
+        ])
+        self.assertEqual(set(self.calls[1]["schema"]["properties"]), {"body", "drafts", "brief"})
+        self.assertEqual(result["brief"], worker.validate_brief(self.brief))
+
+    def test_mixed_provider_and_site_quote_failures_keep_whole_response_repair(self):
+        self.invalid["shipping"]["providers"][0]["name"] = "Different Packers"
+        result = self.run_responses([
+            {"body": "Incorrect provider attribution and site quote.", "drafts": [], "brief": self.invalid},
+            {"body": "Corrected full findings.", "drafts": [], "brief": self.brief},
+        ])
+        self.assertEqual(set(self.calls[1]["schema"]["properties"]), {"body", "drafts", "brief"})
+        self.assertEqual(result["brief"]["shipping"]["providers"], self.brief["shipping"]["providers"])
+
+    def test_targeted_repair_cannot_replace_core_or_leave_unsupported_shipping(self):
+        for repair, error in (
+            ({"body": "Attempted core replacement.", "drafts": [], "site_checks": self.shipping["site_checks"], "brief": self.brief}, "no valid final reply"),
+            ({"body": "Still unsupported.", "drafts": [], "site_checks": self.invalid["shipping"]["site_checks"]}, "invalid case brief"),
+        ):
+            self.calls.clear()
+            with self.subTest(error=error), self.assertRaisesRegex(worker.WorkerError, error):
+                self.run_responses([{"body": "First response.", "drafts": [], "brief": self.invalid}, repair])
+            self.assertEqual(len(self.calls), 2)
+
+    def test_targeted_repair_revalidates_new_draft_recipients(self):
+        draft = {"recipient": "unverified@example.test", "subject": "Quote", "body": "Please quote.", "purpose": "Inquiry"}
+        with self.assertRaisesRegex(worker.WorkerError, "unverified draft recipient"):
+            self.run_responses([
+                {"body": "First response.", "drafts": [], "brief": self.invalid},
+                {"body": "New response.", "drafts": [draft], "site_checks": self.shipping["site_checks"]},
+            ])
+        self.assertEqual(len(self.calls), 2)
+
+
 class CoordinateWorkerTests(TestCase):
+    def setUp(self):
+        self.diagnostics = patch.object(worker, "_save_generation_diagnostics").start()
+        self.addCleanup(patch.stopall)
+
     def test_manual_and_scheduled_runpy_entrypoints_import_sources_without_credentials(self):
         repository = Path(__file__).resolve().parents[1]
         commands = [

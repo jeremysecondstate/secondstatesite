@@ -135,6 +135,105 @@ class ShippingBriefContractTests(SimpleTestCase):
         with self.assertRaises(ValueError):
             self.validate(brief)
 
+    def test_provider_repair_paths_preserve_valid_contact_without_merging_alias_capability(self):
+        brief = deepcopy(self.brief)
+        alias = deepcopy(brief["shipping"]["providers"][0])
+        alias.update(name="Example Packers #267", contact_quote="Example Packers #267\npacking@example.test")
+        brief["shipping"]["providers"].append(alias)
+        evidence = evidence_for(source_fixture(text=TEXT + "\n" + alias["contact_quote"]))
+        with self.assertRaisesRegex(ValueError, r"shipping\.providers\[1\]\.published_capability") as error:
+            self.validate(brief, evidence)
+        self.assertIn('published_capability="" and service_type="unknown"', str(error.exception))
+        # The verified contact remains useful without borrowing an alias's capability.
+        alias.update(published_capability="", service_type="unknown")
+        self.validate(brief, evidence)
+        alias["contact_quote"] = CONTACT
+        with self.assertRaisesRegex(ValueError, r"shipping\.providers\[1\]\.contact_quote") as error:
+            self.validate(brief, evidence)
+        self.assertIn("omit this provider", str(error.exception))
+        self.assertNotIn(alias["email"], str(error.exception))
+
+    def test_summarized_site_check_has_actionable_path_and_can_be_omitted_independently(self):
+        brief = deepcopy(self.brief)
+        brief["shipping"]["site_checks"][1].update(status="found", note="Collect in seven days.")
+        with self.assertRaisesRegex(ValueError, r"shipping\.site_checks\[1\]\.note") as error:
+            self.validate(brief)
+        self.assertIn("shipping_research_notes.detail is a summary, not a quote", str(error.exception))
+        brief["shipping"]["site_checks"].pop(1)
+        cleaned = self.validate(brief)
+        self.assertEqual(cleaned["lots"], self.brief["lots"])
+        self.assertEqual(cleaned["shipping"]["providers"], self.brief["shipping"]["providers"])
+
+    def test_found_note_must_entirely_match_source_not_contain_a_quote_with_commentary(self):
+        for note in ('"Collect within seven days."',
+                     'Pickup terms: "Collect within seven days."',
+                     "Collect within seven days. Exact pickup time remains to confirm.",
+                     "Collect within seven days. Pickup: Scottsdale, Arizona 85251."):
+            brief = deepcopy(self.brief)
+            brief["shipping"]["site_checks"][0]["note"] = note
+            with self.subTest(note=note), self.assertRaises(ValueError) as error:
+                self.validate(brief)
+            self.assertIn("Entire note must be one exact contiguous excerpt", str(error.exception))
+            self.assertIn("without added quotation marks", str(error.exception))
+        self.validate()
+
+    def test_shipping_reference_repair_identifies_record_and_reference_index(self):
+        historical_url = "https://provider.example/old-services"
+        historical = source_fixture(historical_url, identity_match={"status": "historical"})
+        brief = deepcopy(self.brief)
+        brief["shipping"]["providers"][0]["source_refs"].append(historical_url)
+        with self.assertRaisesRegex(ValueError, r"shipping\.providers\[0\]\.source_refs\[1\]"):
+            self.validate(brief, evidence_for(source_fixture(), historical))
+
+    def test_all_invalid_shipping_entries_are_reported_in_one_bounded_correction(self):
+        brief = deepcopy(self.brief)
+        brief["shipping"]["working_currency"]["basis"] = "source"
+        brief["shipping"]["providers"][0]["contact_quote"] = "Unsupported provider contact."
+        brief["shipping"]["site_checks"] = [
+            {"topic": topic, "status": "found", "note": "A summary that does not quote the source.", "source_refs": [URL]}
+            for topic in ("pickup", "storage", "third_party_release", "house_recommended", "nearby_ups", "fine_art_packers")
+        ]
+        with self.assertRaises(ValueError) as error:
+            self.validate(brief)
+        diagnostic = str(error.exception)
+        self.assertIn("shipping.working_currency.source_refs:", diagnostic)
+        self.assertIn("shipping.providers[0].contact_quote:", diagnostic)
+        for index in range(6):
+            self.assertIn(f"shipping.site_checks[{index}].note:", diagnostic)
+        self.assertLessEqual(len(diagnostic), 4000)
+        # Correcting the first entry alone never accepts the remaining claims.
+        brief["shipping"]["working_currency"]["basis"] = "inferred"
+        with self.assertRaises(ValueError) as error:
+            self.validate(brief)
+        self.assertNotIn("shipping.working_currency", str(error.exception))
+        self.assertIn("shipping.site_checks[5].note:", str(error.exception))
+
+    def test_shipping_diagnostic_bound_retains_every_maximum_entry_path(self):
+        brief = deepcopy(self.brief)
+        historical_url = "https://provider.example/old-services"
+        historical = source_fixture(historical_url, identity_match={"status": "historical"})
+        brief["shipping"]["working_currency"]["source_refs"] = [historical_url]
+        brief["shipping"]["actions"] = [
+            {"owner": "provider", "stage": "quote", "text": "Confirm handling suitability.", "source_refs": [historical_url]}
+            for _ in range(8)
+        ]
+        brief["shipping"]["providers"] = [
+            {**self.brief["shipping"]["providers"][0], "name": f"Unsupported provider {index}"}
+            for index in range(6)
+        ]
+        brief["shipping"]["site_checks"] = [
+            {"topic": "pickup", "status": "found", "note": "Unsupported pickup summary.", "source_refs": [URL]}
+            for _ in range(8)
+        ]
+        with self.assertRaises(ValueError) as error:
+            self.validate(brief, evidence_for(source_fixture(), historical))
+        diagnostic = str(error.exception)
+        self.assertLessEqual(len(diagnostic), 4000)
+        self.assertIn("shipping.working_currency.source_refs[0]:", diagnostic)
+        for field, count, suffix in (("actions", 8, "source_refs[0]"), ("providers", 6, "contact_quote"), ("site_checks", 8, "note")):
+            for index in range(count):
+                self.assertIn(f"shipping.{field}[{index}].{suffix}:", diagnostic)
+
     def test_failed_observations_only_support_scoped_access_checks_not_lots_or_prices(self):
         failed = source_fixture(error="Unavailable", text=TEXT)
         with self.assertRaises(ValueError):

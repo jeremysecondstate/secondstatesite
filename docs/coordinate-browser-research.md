@@ -265,6 +265,22 @@ generation shares the same overall generation deadline, which is bounded by
 the remaining claim lease and capped at 600 seconds; it does not restart the
 allowance or extend the lease. Research observations are saved before generation
 so a model validation failure does not erase the diagnostic evidence.
+When only quoted site-check notes fail and the rest of the brief independently
+validates, the correction regenerates just the site-check array, conversation
+text and drafts. Validated lot details, prices, providers and other brief fields
+are retained, and the assembled result passes the full validation again. Other
+failures require a full-response correction.
+
+Failed generation also keeps a private diagnostic at
+`private_data/coordinate-generation-runs/<job-UUID>.json`. It records the latest
+attempted response, static validation errors and up to two attempt timings, with
+an atomic replacement and a 256 KB file limit. Oversized responses retain a
+marked excerpt. A failed repair preserves the earlier response when no new
+output exists. Repeated diagnostics for the same job overwrite that file; they
+remain local until removed by an operator. These files can contain private
+generated text: never commit, publish or paste them into public search. Claim
+credentials, full input context and process stdout/stderr are not recorded.
+Diagnostic write failure does not change whether a reply is accepted or rejected.
 
 ## Operating boundaries
 

@@ -40,6 +40,8 @@ MAX_REPLY_LENGTH = 12_000
 GENERATION_TIMEOUT = 300  # Minimum generation reserve used by the browser handoff.
 MAX_GENERATION_TIMEOUT = 600
 GENERATION_TRANSPORT_RESERVE = 100
+GENERATION_DIAGNOSTIC_DIR = Path(__file__).resolve().parents[1] / "private_data" / "coordinate-generation-runs"
+MAX_GENERATION_DIAGNOSTIC_BYTES = 256_000
 REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 MAX_COMPLETION_BYTES = 750_000  # Server caps JSON at 768000; supports 24 bounded excerpts + provenance.
 DRAFT_LIMITS = {"recipient": 254, "subject": 200, "body": 3000, "purpose": 300}
@@ -207,14 +209,25 @@ competence. If no attributed capability exists use empty capability and unknown
 service_type. contact_quote
 must be a contiguous opened excerpt containing provider name AND email together.
 Never infer an email. Omit an unsupported contact; keep a source-backed name if useful.
+The provider name must appear exactly in both contact_quote and any capability
+quote. A house directory may name a store differently from its own website. Do
+not combine those aliases: choose one supported source name/contact, or retain
+the verified contact with published_capability empty and service_type unknown.
 site_checks (<=8) have topic pickup|storage|third_party_release|house_recommended|
 nearby_ups|fine_art_packers,status found|not_found_in_checked_pages|access_failed|
-not_checked,note,source_refs. For found, note must quote verbatim opened evidence.
+not_checked,note,source_refs. For found, the ENTIRE note value must be one exact
+contiguous excerpt from one cited opened source. Include no added quotation marks,
+introductory labels, commentary, suffixes, or separately joined excerpts. Put
+interpretation, limitations and practical implications in actions, summary or plan.
 Not-found applies only to successfully checked cited pages, not the whole web.
 Access failure requires recorded page-access failure; browser launch failure is not
 site failure. Consume research.shipping_research_notes honestly; never promote old
-house-memory leads to current evidence without fresh opening. Retain useful partial
-facts and don't repeat questions already resolved in staff messages or selected policy.
+house-memory leads to current evidence without fresh opening. The notes' detail
+fields are research summaries, not quotations: use them to locate topics and
+sources, then extract a contiguous quote from the actual source text for a found
+site check. Omit optional unsupported provider/check entries while retaining the
+supported lots and other shipping findings. Don't repeat questions already resolved
+in staff messages or selected policy.
 """
 
 
@@ -389,10 +402,67 @@ def generation_budget(payload: dict) -> float:
     return min(MAX_GENERATION_TIMEOUT, remaining)
 
 
+def _save_generation_diagnostics(payload: dict, diagnostics: dict) -> None:
+    """Best-effort private diagnostics; never persist the claim or process output."""
+    temporary = None
+    try:
+        job_id = str(UUID(payload["job"]["id"]))
+        response = diagnostics.get("response")
+        if isinstance(response, dict):
+            response = {key: response[key] for key in ("body", "drafts", "brief", "site_checks") if key in response}
+        record = {
+            "version": 1, "job_id": job_id, "saved_at": datetime.now(timezone.utc).isoformat(),
+            "response_attempt": diagnostics.get("response_attempt"), "response": response,
+            "response_truncated": False,
+            "attempts": [{key: item.get(key) for key in (
+                "number", "started_at", "timeout_seconds", "elapsed_seconds", "status", "error",
+            )} for item in diagnostics.get("attempts", [])[-2:]],
+        }
+        # Neither credential is supplied to the model. Redact them defensively
+        # if an invalid output or diagnostic message nevertheless echoes one.
+        secrets = [payload.get("job", {}).get("claim_token"), os.environ.get("COORDINATE_WORKER_TOKEN")]
+        def encode(value):
+            text = json.dumps(value, ensure_ascii=False, indent=2)
+            for secret in secrets:
+                if isinstance(secret, str) and secret:
+                    text = text.replace(json.dumps(secret, ensure_ascii=False)[1:-1], "[redacted]")
+            return text.encode("utf-8")
+        encoded = encode(record)
+        if len(encoded) > MAX_GENERATION_DIAGNOSTIC_BYTES:
+            excerpt = encode(response).decode("utf-8")
+            record.update(response=None, response_truncated=True,
+                          response_sha256=hashlib.sha256(encode(response)).hexdigest())
+            record["response_excerpt"] = excerpt[:64_000]
+            encoded = encode(record)
+            while len(encoded) > MAX_GENERATION_DIAGNOSTIC_BYTES and record["response_excerpt"]:
+                record["response_excerpt"] = record["response_excerpt"][:len(record["response_excerpt"]) // 2]
+                encoded = encode(record)
+        if len(encoded) > MAX_GENERATION_DIAGNOSTIC_BYTES:
+            return
+        directory = Path(GENERATION_DIAGNOSTIC_DIR)
+        directory.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(prefix="." + job_id + ".", suffix=".tmp", dir=directory)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, directory / (job_id + ".json"))
+    except (OSError, ValueError, TypeError, KeyError, RecursionError):
+        pass  # Diagnostics must not replace the safe worker outcome or break completion.
+    finally:
+        if temporary:
+            try:
+                Path(temporary).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def generate_reply(
     payload: dict, executable: str, model: str | None = None, reasoning_effort: str | None = None,
 ) -> dict:
     generation_deadline = time.monotonic() + generation_budget(payload)
+    diagnostics = {"attempts": [], "response": None, "response_attempt": None}
+    preserved_brief = None
     coordination = dict(payload.get("coordination") or {})
     if "research" in payload:
         # The same observations are included below with their full provenance.
@@ -436,18 +506,31 @@ def generate_reply(
             remaining = generation_deadline - time.monotonic()
             if remaining <= 0:
                 raise WorkerError("Codex generation exceeded its bounded claim budget; the case can be retried.")
+            started = time.monotonic()
+            note = {"number": attempt + 1, "started_at": datetime.now(timezone.utc).isoformat(),
+                    "timeout_seconds": round(remaining, 3), "elapsed_seconds": 0, "status": "started", "error": ""}
+            diagnostics["attempts"].append(note)
+            def outcome(status, error="", *, save=True):
+                note.update(status=status, error=error[:4000], elapsed_seconds=round(max(0, time.monotonic() - started), 3))
+                if save:
+                    _save_generation_diagnostics(payload, diagnostics)
             try:
+                # A repair must produce fresh output, not reuse the failed response.
+                (directory / "response.json").unlink(missing_ok=True)
                 result = subprocess.run(
                     codex_command(executable, directory, model, reasoning_effort), input=prompt,
                     capture_output=True, text=True, encoding="utf-8", cwd=directory,
                     env=model_environment(), timeout=remaining,
                 )
             except subprocess.TimeoutExpired as exc:
+                outcome("timeout", "Codex generation exceeded its bounded claim budget.")
                 raise WorkerError("Codex generation exceeded its bounded claim budget; the case can be retried.") from exc
             except OSError as exc:
+                outcome("process_error", "Could not start Codex.")
                 raise WorkerError("Could not start Codex. Check that its CLI is installed.") from exc
             if result.returncode:
                 # stderr may include conversation text or local secrets; never echo it.
+                outcome("process_error", "Codex generation failed.")
                 raise WorkerError("Codex generation failed. Check `codex login status` and CLI compatibility.")
             try:
                 events = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
@@ -458,27 +541,81 @@ def generate_reply(
                 for event in events:
                     item = event.get("item")
                     if item and item.get("type") not in ("agent_message", "reasoning"):
+                        outcome("tool_rejected", "Codex attempted a tool operation.")
                         raise WorkerError("Codex attempted a tool operation; no response was published.")
-                response = json.loads((directory / "response.json").read_text(encoding="utf-8"))
+                with (directory / "response.json").open("rb") as stream:
+                    raw_response = stream.read(MAX_RESPONSE_BYTES + 1)
+                diagnostics.update(response=raw_response[:MAX_RESPONSE_BYTES].decode("utf-8", errors="replace"),
+                                   response_attempt=attempt + 1)
+                if len(raw_response) > MAX_RESPONSE_BYTES:
+                    raise ValueError
+                response = json.loads(raw_response.decode("utf-8"))
+                diagnostics["response"] = response
+                if preserved_brief is not None and (not isinstance(response, dict) or set(response) != {"body", "drafts", "site_checks"}):
+                    raise ValueError
                 body = response["body"]
                 if not isinstance(body, str) or not 1 <= len(body.strip()) <= MAX_REPLY_LENGTH:
                     raise ValueError
-            except (ValueError, KeyError, OSError, TypeError) as exc:
+            except (ValueError, KeyError, OSError, TypeError, RecursionError) as exc:
+                outcome("invalid_response", "Codex returned no valid final reply.")
                 raise WorkerError("Codex returned no valid final reply; the case can be retried.") from exc
-            drafts = validate_drafts(response.get("drafts"), payload)
+            try:
+                drafts = validate_drafts(response.get("drafts"), payload)
+            except WorkerError as exc:
+                outcome("validation_failed", str(exc))
+                raise
             generated = {"body": body.strip(), "drafts": drafts}
             if brief_enabled:
                 try:
-                    generated["brief"] = validate_brief(response.get("brief"))
+                    candidate = ({**preserved_brief, "shipping": {**preserved_brief["shipping"], "site_checks": response["site_checks"]}}
+                                 if preserved_brief is not None else response.get("brief"))
+                    generated["brief"] = validate_brief(candidate)
                     validate_price_evidence(generated["brief"], brief_evidence(payload))
                 except ValueError as exc:
+                    outcome("validation_failed", str(exc))
                     if attempt == 0 and generation_deadline - time.monotonic() > 5:
-                        prompt += ("\nVALIDATION CORRECTION: Your previous response failed the shared brief evidence checks: "
-                                   + str(exc)[:500] + ". Correct the brief using only the supplied evidence; remove unsupported claims. "
-                                   "Return the entire response JSON again. Exact quotes must be contiguous source text.\nPREVIOUS RESPONSE:\n"
+                        # Narrow only quote-format failures in site checks. A
+                        # provider/currency failure may also invalidate prose
+                        # elsewhere in the brief, requiring a full repair.
+                        cleaned = generated.get("brief")
+                        failures = str(exc).splitlines()
+                        notes_only = bool(failures) and all(re.match(r"shipping\.site_checks\[\d+\]\.note:", error) for error in failures)
+                        if notes_only and isinstance(cleaned, dict) and "shipping" in cleaned:
+                            base = {key: value for key, value in cleaned.items() if key != "shipping"}
+                            try:
+                                base = validate_brief(base)
+                                validate_price_evidence(base, brief_evidence(payload))
+                            except ValueError:
+                                pass
+                            else:
+                                preserved_brief = cleaned
+                        correction = ("\nVALIDATION CORRECTION: Your previous response failed the shared brief evidence checks: "
+                                      + str(exc)[:4000] + ". Correct ALL listed fields using only the supplied evidence; remove unsupported claims. ")
+                        if preserved_brief is not None:
+                            repair_schema = {
+                                "type": "object", "additionalProperties": False,
+                                "properties": {"body": schema["properties"]["body"], "drafts": schema["properties"]["drafts"],
+                                               "site_checks": BRIEF_SCHEMA["properties"]["shipping"]["properties"]["site_checks"]},
+                                "required": ["body", "drafts", "site_checks"],
+                            }
+                            (directory / "response-schema.json").write_text(json.dumps(repair_schema), encoding="utf-8")
+                            correction += (
+                                "This correction uses a smaller output schema: return exactly body, drafts and site_checks, with no brief or shipping key. "
+                                "The validated lots, prices, plan, summary, questions, providers, actions and other shipping fields are preserved by the worker; do not return or change them. "
+                                "Return the entire corrected site_checks array. Regenerate body and drafts so they reflect only supported findings; "
+                                "do not repeat unsupported statements from the first response. "
+                            )
+                        else:
+                            correction += "Return the entire response JSON again. "
+                        prompt += (correction + "Exact quotes must be contiguous source text.\nPREVIOUS RESPONSE:\n"
                                    + json.dumps(response, ensure_ascii=False))
                         continue
                     raise WorkerError("Codex returned an invalid case brief; the research is retained for retry.") from exc
+            if attempt == 0:
+                # A later retry of this job must not leave an older failure
+                # looking current. Successful first passes need only metadata.
+                diagnostics.update(response=None, response_attempt=None)
+            outcome("validated")
             return generated
 
 
