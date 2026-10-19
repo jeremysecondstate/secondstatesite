@@ -24,6 +24,7 @@ from uuid import UUID
 MAX_RESPONSE_BYTES = 2_000_000
 MAX_REPLY_LENGTH = 12_000
 GENERATION_TIMEOUT = 600  # Keep below the server's 15-minute claim lease.
+REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 DISABLED_FEATURES = (
     "shell_tool", "apps", "plugins", "hooks", "memories", "multi_agent",
     "browser_use", "computer_use", "image_generation", "workspace_dependencies",
@@ -173,7 +174,11 @@ def model_environment() -> dict[str, str]:
     return env
 
 
-def codex_command(executable: str, directory: Path, model: str | None) -> list[str]:
+def codex_command(
+    executable: str, directory: Path, model: str | None, reasoning_effort: str | None = None,
+) -> list[str]:
+    if reasoning_effort is not None and reasoning_effort not in REASONING_EFFORTS:
+        raise WorkerError("Choose a supported reasoning effort for the selected Codex model.")
     command = [
         executable, "--no-daemon", "exec", "--ignore-user-config", "--ignore-rules",
         "--strict-config", "--ephemeral", "--skip-git-repo-check",
@@ -195,11 +200,15 @@ def codex_command(executable: str, directory: Path, model: str | None) -> list[s
         command.extend(("-c", "skills.config=[" + entries + "]"))
     if model:
         command.extend(("--model", model))
+    if reasoning_effort is not None:
+        command.extend(("-c", "model_reasoning_effort=" + json.dumps(reasoning_effort)))
     command.append("-")
     return command
 
 
-def generate_reply(payload: dict, executable: str, model: str | None = None) -> str:
+def generate_reply(
+    payload: dict, executable: str, model: str | None = None, reasoning_effort: str | None = None,
+) -> str:
     # Credentials and claim tokens are deliberately excluded from model input.
     context = {
         "test_mode": True,
@@ -216,7 +225,7 @@ def generate_reply(payload: dict, executable: str, model: str | None = None) -> 
         (directory / "response-schema.json").write_text(json.dumps(schema), encoding="utf-8")
         try:
             result = subprocess.run(
-                codex_command(executable, directory, model), input=prompt,
+                codex_command(executable, directory, model, reasoning_effort), input=prompt,
                 capture_output=True, text=True, encoding="utf-8", cwd=directory,
                 env=model_environment(), timeout=GENERATION_TIMEOUT,
             )
@@ -246,7 +255,10 @@ def generate_reply(payload: dict, executable: str, model: str | None = None) -> 
         return body.strip()
 
 
-def run_once(api: CoordinateAPI, executable: str, worker_id: str, model: str | None = None) -> dict:
+def run_once(
+    api: CoordinateAPI, executable: str, worker_id: str, model: str | None = None,
+    reasoning_effort: str | None = None,
+) -> dict:
     payload = api.post("/coordinate/api/claim/", {"worker_id": worker_id})
     job = validate_claim(payload)
     if job is None:
@@ -255,7 +267,7 @@ def run_once(api: CoordinateAPI, executable: str, worker_id: str, model: str | N
     identity["worker_id"] = worker_id
     path = "/coordinate/api/jobs/" + str(job["id"])
     try:
-        body = generate_reply(payload, executable, model)
+        body = generate_reply(payload, executable, model, reasoning_effort)
     except WorkerError as exc:
         try:
             api.post(path + "/fail/", {**identity, "error": str(exc)})
@@ -282,6 +294,10 @@ def main() -> int:
     parser.add_argument("--worker-id", default="manual-codex", choices=["manual-codex"])
     parser.add_argument("--codex", default="codex", help="Codex CLI executable (not a shell command)")
     parser.add_argument("--model", default=None, help="Optional model available to the logged-in CLI account")
+    parser.add_argument(
+        "--reasoning-effort", default=None, choices=REASONING_EFFORTS,
+        help="Optional reasoning effort supported by the selected model; omitted uses the CLI default",
+    )
     args = parser.parse_args()
     try:
         if not args.worker_id.strip() or len(args.worker_id) > 100:
@@ -290,7 +306,7 @@ def main() -> int:
         if not executable:
             raise WorkerError("Codex CLI was not found; install it and run `codex login` first.")
         api = CoordinateAPI(args.base_url, os.environ.get("COORDINATE_WORKER_TOKEN", ""))
-        print(json.dumps(run_once(api, executable, args.worker_id, args.model)))
+        print(json.dumps(run_once(api, executable, args.worker_id, args.model, args.reasoning_effort)))
         return 0
     except WorkerError as exc:
         print(str(exc), file=sys.stderr)

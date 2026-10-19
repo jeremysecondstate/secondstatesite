@@ -13,9 +13,9 @@
     retrying: "Saved · Awaiting retry", replied: "Saved · Replied",
   };
   const processingLabels = {
-    waiting: "Your message is saved. It will be picked up on the next manual worker run.",
+    waiting: "Your message is saved. It will be picked up on the next worker check.",
     processing: "The worker is reading this conversation and preparing a reply.",
-    retrying: "Your message is saved. The worker will retry it on a later manual run.",
+    retrying: "Your message is saved. The worker will retry it on a later check.",
     replied: "The conversation is up to date. Add a message whenever you’re ready.",
   };
   let timer;

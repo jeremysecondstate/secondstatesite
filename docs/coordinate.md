@@ -1,10 +1,10 @@
-# Coordinate: local manual worker
+# Coordinate: message worker and scheduled messaging test
 
 Coordinate is a staff-only conversation area at `/coordinate/`. The website database owns case history, pending work, claim leases, replies, and activity. The page refreshes conversation/status data while open. Browser messages and worker replies use HTTP and database writes; they do not require commits or deployments.
 
 All active staff share the cases. Each case has its own history and bound worker claims; these are not private conversations scoped to one staff account. Structured quote/decision controls, attachments, and external correspondence are later milestones. For now, staff decisions are retained as conversation messages and processing events are retained in the activity history.
 
-**This milestone is test mode only. Shipping emails, provider contact, bookings, charge approvals, payments, and recurring schedules remain disabled.** Existing internal auction notification email code is unrelated and is not used by Coordinate.
+**Coordinate remains in test mode. Shipping emails, provider contact, bookings, charge approvals, and payments are disabled.** The original milestone used manual worker runs; a separately authorized Codex Scheduled task now checks website messages every ten minutes for testing. Existing internal auction notification email code is unrelated and is not used by Coordinate.
 
 Observed local proof and test results are retained in the private local `docs/coordinate-verification.md` and associated screenshots. These files are ignored by Git and are not part of the public repository or release.
 
@@ -37,11 +37,27 @@ Use the repository's Python environment and its normal local Django configuratio
    .\.venv\Scripts\python.exe scripts\coordinate_worker.py
    ```
 
-   This uses the local CLI's login; no separate website OpenAI key is needed when that login is available. The CLI uses its default available model unless `--model` is supplied. `--codex` can select an installed executable. The worker runs one claimed message and exits, or prints `status: idle` when there is no eligible work.
+   This uses the existing signed-in CLI account; no separate OpenAI API key is needed. The CLI uses its default available model and reasoning effort unless `--model` and `--reasoning-effort` are supplied. `--codex` can select an installed executable. The worker runs one claimed message and exits, or prints `status: idle` when there is no eligible work.
+
+   To use the same model and reasoning effort as the scheduled messaging test:
+
+   ```powershell
+   .\.venv\Scripts\python.exe scripts\coordinate_worker.py --model gpt-6-astra --reasoning-effort ultra
+   ```
 
 6. Leave the page open and observe the generated response appear in the correct conversation. Reload and verify both messages remain. Reply with a follow-up, invoke the worker again, and confirm it incorporates the saved history. The worker prints saved job, message, reply and case identifiers and a response SHA-256 digest, without printing the token or conversation.
 
 An actual model reply must be observed on the website to claim integration success. Unit tests using a mocked model do not establish a live roundtrip.
+
+## Scheduled messaging test
+
+The standalone Codex Scheduled task `coordinate-messaging-test` was created active with a ten-minute interval, using GPT-6 Astra (`gpt-6-astra`) and Ultra reasoning in the local `secondstatez` project. Each scheduled run starts independently, loads the private worker configuration, and invokes the worker once with those same model and reasoning settings. Each invocation processes at most one eligible website message, retrieves its saved case history and current playbooks, and saves a text reply through the authenticated API. An idle check adds no conversation message and should remain quiet.
+
+The computer must remain on, the desktop app must remain running, and the local project, CLI login, and private worker configuration must remain available. Review runs and pause the test task from **Scheduled** in the desktop app. This follows the local execution requirements in the [official scheduled-task documentation](https://learn.chatgpt.com/docs/automations).
+
+Scheduling this messaging test does not enable shipping actions, inbox access, provider correspondence, or ongoing shipment/deadline monitoring. The original weekday/weekend operational schedule below remains disabled. The ten-minute interval applies only to this authorized messaging test.
+
+The website records the last successful worker check and each message's processing state. It does not receive authoritative scheduler status from Codex, so it does not display an invented next check time or claim that the test task is still active after it has been paused. Use Scheduled to confirm the task's current status and cadence.
 
 ## Connection and recovery
 
@@ -53,7 +69,7 @@ The worker reads `COORDINATE_WORKER_TOKEN` only from its environment. It sends `
 | `/coordinate/api/jobs/<job-id>/complete/` | Save a real generated reply for the current claim, case and message. |
 | `/coordinate/api/jobs/<job-id>/fail/` | Record a safe failure summary and make the claim eligible for a delayed retry. |
 
-Claims use durable job/message identifiers and a 15-minute lease. Only one message in a case is processed at a time. A crashed process leaves the work reclaimable after lease expiry; an explicit generation failure allows retry after a short delay. Invoke the worker manually again when eligible. Repeated completion of the same claim is idempotent. A stale claim or mismatched case/message is rejected. The worker retries transient completion transport failures with exactly the same generated body; it does not regenerate on those retries. If every completion attempt fails, leave the claim intact and check the page before retrying. Across a crash, generation may repeat after expiry, but the database prevents duplicate saved replies.
+Claims use durable job/message identifiers and a 15-minute lease. Only one message in a case is processed at a time. A crashed process leaves the work reclaimable after lease expiry; an explicit generation failure allows retry after a short delay. A later scheduled test run or manual invocation can retrieve the work once eligible. Repeated completion of the same claim is idempotent. A stale claim or mismatched case/message is rejected. The worker retries transient completion transport failures with exactly the same generated body; it does not regenerate on those retries. If every completion attempt fails, leave the claim intact and check the page before retrying. Across a crash, generation may repeat after expiry, but the database prevents duplicate saved replies.
 
 The last successful check means an authenticated claim request successfully loaded the playbooks and checked pending work, including an idle check. It does not mean generation succeeded; message status separately shows waiting, processing, retrying, or replied. A claim request itself is not automatically retried: if its response was lost after committing, its lease recovers the work after 15 minutes. A generation failure becomes eligible after 30 seconds. Neither mechanism starts a worker by itself.
 
@@ -80,7 +96,7 @@ Configure these **two multiline environment values** on the Render web service b
 | `COORDINATE_SHIPPING_PLAYBOOK` | The complete contents of the private local shipping playbook. |
 | `COORDINATE_PACKING_PLAYBOOK` | The complete, unchanged contents of the original user-authored packing markdown. |
 
-Use Render's protected environment settings or the existing secret-management workflow. Preserve actual line breaks and UTF-8 text. Do not put the values in a tracked `.env` file, Blueprint, test fixture, deployment log, or public documentation. These settings belong to the Django server; the manual worker receives their contents over its authenticated claim request and does not need separate copies in its environment.
+Use Render's protected environment settings or the existing secret-management workflow. Preserve actual line breaks and UTF-8 text. Do not put the values in a tracked `.env` file, Blueprint, test fixture, deployment log, or public documentation. These settings belong to the Django server; the worker receives their contents over its authenticated claim request and does not need separate copies in its environment.
 
 Environment values take precedence over the local file fallbacks. A fresh production checkout will not contain the ignored originals, so both values are required on Render. If either effective playbook is unavailable, the worker API refuses to claim work. Update private context through the server's environment configuration and restart/reload the service as required by that configuration mechanism; subsequent claims receive the updated context.
 
@@ -90,4 +106,4 @@ Review the private local evidence, apply the migration to the intended database,
 
 Include migration `0034_coordinate`, application code, templates/static files, and the worker script in the release. Keep the private playbook originals, local verification document, and screenshots out of the commit and release. Run the usual static collection/build. Local roundtrip evidence does not by itself verify production configuration; check the deployed authenticated connection and staff page after rollout while retaining test mode.
 
-No recurring task is installed. The later agreed cadence is weekdays hourly and weekends every three hours in `America/New_York`; before enabling it, verify execution-host availability and add email/deadline follow-through for ongoing cases. Local desktop scheduling requires the computer and app to remain available. Show a next scheduled check only after a real schedule exists. Keep Drive references/exports subordinate to the website database.
+The later operational cadence remains disabled: Monday–Friday hourly and Saturday–Sunday every three hours in `America/New_York`. Before enabling it, verify execution-host availability and implement separately authorized email/deadline follow-through for ongoing cases, including cases without new website messages. The ten-minute Scheduled task above supersedes that cadence only for the messaging test; it does not activate the eventual shipping workflow. Keep Drive references/exports subordinate to the website database, and do not show a next scheduled check without authoritative scheduler data.

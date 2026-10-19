@@ -14,12 +14,12 @@
       <h1 id="coordinate-title">Coordinate<span aria-hidden="true">.</span></h1>
       <p class="coordinate-intro">From won lots to their next home. Keep the conversation together.</p>
     </div>
-    <div class="coordinate-mode"><span aria-hidden="true"></span>Test mode · Manual runs</div>
+    <div class="coordinate-mode"><span aria-hidden="true"></span>Test mode · Messaging only</div>
   </header>
 
   <div class="coordinate-test-note">
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 3 7v6c0 4 9 8 9 8s9-4 9-8V7l-9-4Z" stroke="currentColor" stroke-width="1.4"/><path d="m8 12 3 3 5-6" stroke="currentColor" stroke-width="1.4"/></svg>
-    <p><strong>A space to plan.</strong> The coordinator can discuss and simulate shipping. Shipping emails, bookings, charges, payments, and recurring checks are disabled.</p>
+    <p><strong>A space to plan.</strong> The coordinator can discuss and simulate shipping. Shipping emails, bookings, charges, and payments are disabled.</p>
   </div>
 
   {% if error %}<p class="coordinate-error" role="alert">{{ error }}</p>{% endif %}
@@ -43,7 +43,7 @@
       <div class="coordinate-worker">
         <p class="coordinate-eyebrow">Worker connection</p>
         <dl><dt>Last successful check</dt><dd id="coordinate-last-check">{% if worker.last_successful_check %}<time datetime="{{ worker.last_successful_check }}">{{ worker.last_successful_check }}</time>{% else %}No successful check yet{% endif %}</dd></dl>
-        <p class="coordinate-manual-note">Checks run manually for now.</p>
+        <p class="coordinate-manual-note">Messages are picked up when the worker checks in.</p>
         <p class="coordinate-connection" id="coordinate-connection" role="status">Live updates connecting…</p>
         <noscript><p class="coordinate-manual-note">Turn on JavaScript for live replies, or reload this page to check for updates.</p></noscript>
       </div>
@@ -68,7 +68,7 @@
             </article>
           {% empty %}<p class="coordinate-no-messages">This case is ready for its first message.</p>{% endfor %}
         </div>
-        <p class="coordinate-processing-note" id="coordinate-processing-note" role="status">{% if selected_case.status == 'processing' %}The worker is reading this conversation and preparing a reply.{% elif selected_case.status == 'waiting' %}Your message is saved. It will be picked up on the next manual worker run.{% elif selected_case.status == 'retrying' %}Your message is saved. The worker will retry it on a later manual run.{% else %}The conversation is up to date. Add a message whenever you’re ready.{% endif %}</p>
+        <p class="coordinate-processing-note" id="coordinate-processing-note" role="status">{% if selected_case.status == 'processing' %}The worker is reading this conversation and preparing a reply.{% elif selected_case.status == 'waiting' %}Your message is saved. It will be picked up on the next worker check.{% elif selected_case.status == 'retrying' %}Your message is saved. The worker will retry it on a later check.{% else %}The conversation is up to date. Add a message whenever you’re ready.{% endif %}</p>
         <form class="coordinate-composer" method="post" action="{% url 'coordinate_message' selected_case.id %}">
           {% csrf_token %}
           <input type="hidden" name="client_message_id" value="{{ message_token }}">

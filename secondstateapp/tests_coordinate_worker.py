@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from io import BytesIO
+from io import BytesIO, StringIO
 import json
 import os
 from pathlib import Path
@@ -146,7 +146,62 @@ class CoordinateWorkerTests(TestCase):
         self.assertIn('web_search="disabled"', captured["command"])
         self.assertIn("mcp_servers={}", captured["command"])
         self.assertIn("shell_tool", captured["command"])
+        self.assertNotIn("--model", captured["command"])
+        self.assertFalse(any(arg.startswith("model_reasoning_effort=") for arg in captured["command"]))
         self.assertFalse(Path(captured["cwd"]).exists())
+
+    def test_cli_model_and_reasoning_effort_reach_actual_generation_command(self):
+        payload = claim_payload()
+        api = Mock()
+        api.post.side_effect = [payload, {"reply_id": 42, "already_completed": False}]
+        captured = {}
+
+        def fake_process(command, **kwargs):
+            captured.update(command=command, **kwargs)
+            (Path(kwargs["cwd"]) / "response.json").write_text(
+                json.dumps({"body": "Test response generated with the requested model."}), encoding="utf-8"
+            )
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+
+        with (
+            patch.object(worker.sys, "argv", ["coordinate_worker.py", "--model", "gpt-6-astra",
+                                             "--reasoning-effort", "ultra"]),
+            patch.object(worker.sys, "stdout", new_callable=StringIO),
+            patch.object(worker.shutil, "which", return_value="codex-executable"),
+            patch.object(worker, "CoordinateAPI", return_value=api),
+            patch.object(worker.subprocess, "run", side_effect=fake_process),
+        ):
+            self.assertEqual(worker.main(), 0)
+        command = captured["command"]
+        self.assertEqual(command[command.index("--model") + 1], "gpt-6-astra")
+        effort_index = command.index('model_reasoning_effort="ultra"')
+        self.assertEqual(command[effort_index - 1], "-c")
+        self.assertEqual(command[command.index("--sandbox") + 1], "read-only")
+        self.assertIn("--ignore-user-config", command)
+        self.assertIn("--no-daemon", command)
+        self.assertIn("mcp_servers={}", command)
+        self.assertNotIn("COORDINATE_WORKER_TOKEN", captured["env"])
+        self.assertEqual(api.post.call_args_list[1].args[1]["body"],
+                         "Test response generated with the requested model.")
+
+    def test_reasoning_effort_rejects_unsupported_option_before_claiming_work(self):
+        with (
+            patch.object(worker.sys, "argv", ["coordinate_worker.py", "--reasoning-effort", "unknown"]),
+            patch.object(worker.sys, "stderr", new_callable=StringIO),
+            patch.object(worker, "CoordinateAPI") as api,
+            self.assertRaises(SystemExit) as caught,
+        ):
+            worker.main()
+        self.assertEqual(caught.exception.code, 2)
+        api.assert_not_called()
+
+    def test_reasoning_effort_accepts_advertised_levels_and_rejects_direct_invalid_value(self):
+        for effort in ("low", "medium", "high", "xhigh", "max", "ultra"):
+            with self.subTest(effort=effort):
+                command = worker.codex_command("codex", Path("temporary"), "gpt-6-astra", effort)
+                self.assertIn('model_reasoning_effort="' + effort + '"', command)
+        with self.assertRaises(worker.WorkerError):
+            worker.codex_command("codex", Path("temporary"), "gpt-6-astra", 'ultra"\nmalicious=true')
 
     @patch.object(worker.subprocess, "run")
     def test_tool_operation_is_rejected(self, run):
