@@ -1,6 +1,7 @@
 """Worker transport and process-boundary checks; live proof is documented separately."""
 
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from io import BytesIO, StringIO
 import json
@@ -28,6 +29,101 @@ def claim_payload():
         "playbook": {"shipping": "Test mode. Never send email.", "packing": "Retain the mat."},
         "test_mode": True,
     }
+
+
+class CoordinateGenerationBudgetTests(TestCase):
+    def payload_with_lease(self, seconds):
+        payload = claim_payload()
+        payload["job"]["lease_expires_at"] = (
+            datetime.now(timezone.utc) + timedelta(seconds=seconds)
+        ).isoformat()
+        return payload
+
+    def test_unused_research_time_extends_generation_to_ten_minutes_at_most(self):
+        self.assertEqual(worker.generation_budget(self.payload_with_lease(900)), 600)
+        self.assertEqual(worker.generation_budget(self.payload_with_lease(3600)), 600)
+        self.assertEqual(worker.generation_budget(claim_payload()), 300)
+
+    def test_late_generation_keeps_full_completion_transport_reserve(self):
+        for remaining in (660, 410, 160):
+            with self.subTest(remaining=remaining):
+                budget = worker.generation_budget(self.payload_with_lease(remaining))
+                self.assertLessEqual(budget, remaining - 100)
+                self.assertGreater(budget, remaining - 102)
+
+    def test_explicit_lease_offsets_and_utc_z_use_same_budget(self):
+        now = datetime(2026, 10, 19, 18, 0, tzinfo=timezone.utc)
+        with patch.object(worker, "datetime", wraps=datetime) as worker_datetime:
+            worker_datetime.now.return_value = now
+            for expiry in ("2026-10-19T18:08:20Z", "2026-10-19T14:08:20-04:00"):
+                payload = claim_payload()
+                payload["job"]["lease_expires_at"] = expiry
+                with self.subTest(expiry=expiry):
+                    self.assertEqual(worker.generation_budget(payload), 400)
+
+    def test_malformed_expired_or_transport_only_lease_never_starts_model(self):
+        for lease in ("not-a-timestamp", "2026-10-19T12:00:00", {},
+                      (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
+                      (datetime.now(timezone.utc) + timedelta(seconds=90)).isoformat()):
+            payload = claim_payload()
+            payload["job"]["lease_expires_at"] = lease
+            with self.subTest(lease=lease), patch.object(worker.subprocess, "run") as process:
+                with self.assertRaises(worker.WorkerError):
+                    worker.generate_reply(payload, "codex")
+                process.assert_not_called()
+
+    def test_actual_process_timeout_uses_adaptive_budget(self):
+        payload = self.payload_with_lease(900)
+        with (patch.object(worker.time, "monotonic", return_value=1000),
+              patch.object(worker.subprocess, "run", side_effect=subprocess.TimeoutExpired("codex", 600)) as process):
+            with self.assertRaises(worker.WorkerError):
+                worker.generate_reply(payload, "codex", "gpt-6-astra", "ultra")
+        self.assertEqual(process.call_count, 1)
+        self.assertEqual(process.call_args.kwargs["timeout"], 600)
+
+    def test_validation_repair_shares_one_adaptive_deadline(self):
+        payload = self.payload_with_lease(900)
+        payload.update(test_mode=False, brief_enabled=True)
+        clock = [1000.0]
+        calls = []
+
+        def process(command, **kwargs):
+            calls.append(kwargs)
+            (Path(kwargs["cwd"]) / "response.json").write_text(json.dumps({
+                "body": "Supported findings remain available.", "drafts": [], "brief": None,
+            }), encoding="utf-8")
+            if len(calls) == 1:
+                clock[0] += 425
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+
+        with (patch.object(worker.time, "monotonic", side_effect=lambda: clock[0]),
+              patch.object(worker.subprocess, "run", side_effect=process),
+              patch.object(worker, "generation_budget", wraps=worker.generation_budget) as budget,
+              patch.object(worker, "validate_price_evidence", side_effect=[ValueError("Unsupported price"), None])):
+            result = worker.generate_reply(payload, "codex", "gpt-6-astra", "ultra")
+        self.assertEqual(result["brief"], None)
+        budget.assert_called_once_with(payload)
+        self.assertEqual([call["timeout"] for call in calls], [600, 175])
+        self.assertIn("VALIDATION CORRECTION", calls[1]["input"])
+
+    def test_invalid_output_at_generation_deadline_does_not_start_repair(self):
+        payload = self.payload_with_lease(900)
+        payload.update(test_mode=False, brief_enabled=True)
+        clock = [1000.0]
+
+        def process(command, **kwargs):
+            (Path(kwargs["cwd"]) / "response.json").write_text(json.dumps({
+                "body": "Unsupported brief.", "drafts": [], "brief": None,
+            }), encoding="utf-8")
+            clock[0] += 601
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+
+        with (patch.object(worker.time, "monotonic", side_effect=lambda: clock[0]),
+              patch.object(worker.subprocess, "run", side_effect=process) as run,
+              patch.object(worker, "validate_price_evidence", side_effect=ValueError("Unsupported price"))):
+            with self.assertRaisesRegex(worker.WorkerError, "research is retained"):
+                worker.generate_reply(payload, "codex")
+        self.assertEqual(run.call_count, 1)
 
 
 class CoordinateWorkerTests(TestCase):
@@ -299,6 +395,34 @@ class CoordinateWorkerTests(TestCase):
         context = json.loads(captured["input"].split("SAVED WEBSITE CONTEXT (JSON):\n", 1)[1])
         self.assertEqual(context["research"]["shipping_requests"], payload["shipping_requests"])
         self.assertEqual(context["research"]["shipping_research_notes"], payload["shipping_research_notes"])
+
+    def test_generator_context_deduplicates_current_research_without_mutating_claim(self):
+        record = {"source_url": "https://house.example/lot/17", "text": "Observed listing facts."}
+        for top_level in (None, [], [record]):
+            with self.subTest(top_level=top_level):
+                payload = claim_payload()
+                payload["coordination"] = {"plan": {"stage": "research"}, "research": [record]}
+                if top_level is not None:
+                    payload["research"] = top_level
+                original = deepcopy(payload)
+                contexts = []
+
+                def process(command, **kwargs):
+                    contexts.append(json.loads(kwargs["input"].split("SAVED WEBSITE CONTEXT (JSON):\n", 1)[1]))
+                    (Path(kwargs["cwd"]) / "response.json").write_text(json.dumps({
+                        "body": "Sources are available in the brief.", "drafts": [],
+                    }), encoding="utf-8")
+                    return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+
+                with patch.object(worker.subprocess, "run", side_effect=process):
+                    worker.generate_reply(payload, "codex")
+                self.assertEqual(payload, original)
+                self.assertEqual(contexts[0]["coordination"]["plan"], payload["coordination"]["plan"])
+                if top_level is None:
+                    self.assertEqual(contexts[0]["coordination"]["research"], [record])
+                else:
+                    self.assertNotIn("research", contexts[0]["coordination"])
+                    self.assertEqual(contexts[0]["research"]["previous"], top_level)
 
     def test_completion_preserves_provider_and_site_check_citations_under_size_pressure(self):
         provider, terms = "https://packer.example/contact", "https://house.example/shipping"

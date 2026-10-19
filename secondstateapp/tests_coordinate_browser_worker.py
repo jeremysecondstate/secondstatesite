@@ -329,7 +329,31 @@ class CoordinateBrowserWorkerTests(TestCase):
         manifest = self.prepare()
         self.assertEqual(manifest["browser_deadline"], (self.now + timedelta(seconds=400)).isoformat())
         self.clock += timedelta(seconds=410)
-        self.assertEqual(self.complete(manifest, unavailable="timeout")["status"], "completed")
+        def generate(payload, *args):
+            self.assertEqual(payload["job"]["lease_expires_at"], self.payload["job"]["lease_expires_at"])
+            self.assertEqual(worker.generation_budget(payload), 310)
+            return {"body": "Partial findings with the remaining generation allowance.", "drafts": []}
+        self.generate.side_effect = generate
+        with patch.object(worker, "datetime", wraps=datetime) as worker_datetime:
+            worker_datetime.now.return_value = self.clock
+            self.assertEqual(self.complete(manifest, unavailable="timeout")["status"], "completed")
+
+    def test_early_research_handoff_allows_longer_generation_without_extending_lease(self):
+        manifest = self.prepare()
+        self.assertEqual(manifest["browser_deadline"], (self.now + timedelta(seconds=420)).isoformat())
+        self.evidence(manifest)
+        self.clock += timedelta(seconds=50)
+        def generate(payload, *args):
+            self.assertEqual(payload["job"]["lease_expires_at"], self.payload["job"]["lease_expires_at"])
+            self.assertEqual(worker.generation_budget(payload), 600)
+            return {"body": "Fresh sources support these findings.", "drafts": []}
+        self.generate.side_effect = generate
+        with patch.object(worker, "datetime", wraps=datetime) as worker_datetime:
+            worker_datetime.now.return_value = self.clock
+            result = self.complete(manifest, evidence_path=manifest["evidence_path"])
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(self.generate.call_count, 1)
+        self.assertEqual(sum(call.args[0].endswith("/claim/") for call in self.api.post.call_args_list), 1)
 
     def test_generation_failure_reports_failure_and_releases_browser(self):
         manifest = self.prepare()

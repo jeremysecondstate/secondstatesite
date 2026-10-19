@@ -8,6 +8,7 @@ conversation text and reference playbooks, and has no outbound action tools.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -36,7 +37,9 @@ else:
 
 MAX_RESPONSE_BYTES = 2_000_000
 MAX_REPLY_LENGTH = 12_000
-GENERATION_TIMEOUT = 300  # 45s fetch + 420s research + 20s handoff + 100s transport < 15m lease.
+GENERATION_TIMEOUT = 300  # Minimum generation reserve used by the browser handoff.
+MAX_GENERATION_TIMEOUT = 600
+GENERATION_TRANSPORT_RESERVE = 100
 REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 MAX_COMPLETION_BYTES = 750_000  # Server caps JSON at 768000; supports 24 bounded excerpts + provenance.
 DRAFT_LIMITS = {"recipient": 254, "subject": 200, "body": 3000, "purpose": 300}
@@ -368,10 +371,32 @@ def codex_command(
     return command
 
 
+def generation_budget(payload: dict) -> float:
+    """Spend unused research time on generation without extending the claim."""
+    expiry = (payload.get("job") or {}).get("lease_expires_at")
+    if expiry is None:
+        # Compatibility for older direct callers that do not include a lease.
+        return GENERATION_TIMEOUT
+    try:
+        lease = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+        if lease.tzinfo is None or lease.utcoffset() is None:
+            raise ValueError
+        remaining = (lease - datetime.now(timezone.utc)).total_seconds() - GENERATION_TRANSPORT_RESERVE
+        if remaining <= 0:
+            raise ValueError
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise WorkerError("The claim has no safe generation budget; retry required.") from exc
+    return min(MAX_GENERATION_TIMEOUT, remaining)
+
+
 def generate_reply(
     payload: dict, executable: str, model: str | None = None, reasoning_effort: str | None = None,
 ) -> dict:
-    generation_deadline = time.monotonic() + GENERATION_TIMEOUT
+    generation_deadline = time.monotonic() + generation_budget(payload)
+    coordination = dict(payload.get("coordination") or {})
+    if "research" in payload:
+        # The same observations are included below with their full provenance.
+        coordination.pop("research", None)
     # Credentials and claim tokens are deliberately excluded from model input.
     context = {
         "test_mode": payload["test_mode"],
@@ -380,7 +405,7 @@ def generate_reply(
         "case": payload["case"],
         "messages": payload["messages"],
         "playbook": payload["playbook"],
-        "coordination": payload.get("coordination") or {},
+        "coordination": coordination,
         "documents": payload.get("documents", []),
         "mail": payload.get("mail", []),
         "research": {"current": payload.get("source_evidence", []), "previous": payload.get("research", []),
@@ -410,7 +435,7 @@ def generate_reply(
         for attempt in range(2):
             remaining = generation_deadline - time.monotonic()
             if remaining <= 0:
-                raise WorkerError("Codex generation exceeded five minutes; the case can be retried.")
+                raise WorkerError("Codex generation exceeded its bounded claim budget; the case can be retried.")
             try:
                 result = subprocess.run(
                     codex_command(executable, directory, model, reasoning_effort), input=prompt,
@@ -418,7 +443,7 @@ def generate_reply(
                     env=model_environment(), timeout=remaining,
                 )
             except subprocess.TimeoutExpired as exc:
-                raise WorkerError("Codex generation exceeded five minutes; the case can be retried.") from exc
+                raise WorkerError("Codex generation exceeded its bounded claim budget; the case can be retried.") from exc
             except OSError as exc:
                 raise WorkerError("Could not start Codex. Check that its CLI is installed.") from exc
             if result.returncode:

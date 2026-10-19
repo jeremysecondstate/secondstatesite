@@ -26,7 +26,7 @@ else:
 BROWSER_SECONDS = 420
 BROWSER_HANDOFF_SECONDS = 20
 # Completion has four 20-second attempts plus 1/2/4-second backoff. Reserve a
-# little more than that after the generator's bounded five-minute timeout.
+# little more than that after generation's lease-bounded adaptive deadline.
 TRANSPORT_MARGIN_SECONDS = 100
 MAX_STATE_BYTES = 3_000_000
 MAX_EVIDENCE_BYTES = 750_000

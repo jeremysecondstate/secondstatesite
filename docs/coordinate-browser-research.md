@@ -159,11 +159,15 @@ Give every lot an initial pass. Keep one lot's findings when another fails.
 Shipping discovery shares those ceilings and the existing research deadline;
 it does not add another research lease or require exhaustive provider searches.
 
-The 900-second lease reserves up to 45 seconds direct fetch, 420 outer research,
-300 generation, 100 completion transport and 20 handoff. The returned deadline
-can be earlier. Stop tool work at least 20 seconds before it, save and immediately
-complete. Do not consume all time just because some facts remain unknown; never
-renew claims manually or spend the generation reserve browsing.
+The 900-second lease allows up to 45 seconds direct fetch and 420 outer research,
+while reserving 300 seconds for generation, 100 for completion transport and 20
+for handoff. The returned research deadline can be earlier. Stop tool work at
+least 20 seconds before it, save and immediately complete. Generation can use
+unused research time, up to 600 seconds, but always leaves the 100-second
+transport reserve within the original lease. Missing legacy lease metadata uses
+the 300-second fallback; malformed or expired leases cannot start generation.
+Do not consume all time just because some facts remain unknown; never renew
+claims manually or spend the generation reserve browsing.
 
 ## Evidence file and completion
 
@@ -257,8 +261,9 @@ Later prepare also replays durable completions first. Stale claims and deleted/
 changed context are rejected; never reset jobs or fabricate replies.
 
 The worker and server share brief/price evidence validation. One corrective
-generation is allowed within the same total 300-second generation allowance;
-it does not extend the lease. Research observations are saved before generation
+generation shares the same overall generation deadline, which is bounded by
+the remaining claim lease and capped at 600 seconds; it does not restart the
+allowance or extend the lease. Research observations are saved before generation
 so a model validation failure does not erase the diagnostic evidence.
 
 ## Operating boundaries
