@@ -163,6 +163,34 @@ class CoordinateShippingTests(TestCase):
         self.assertIsNone(self.state()["coordination"])
         self.assertIsNone(self.claim()["job"])
 
+    def test_recorded_price_review_is_in_staff_state_and_worker_claim_context(self):
+        self.plan()
+        quote = self.quote(amount="100")
+        self.assertEqual(self.post("coordinate_quote_accept", record=quote).status_code, 200)
+        self.assertEqual(self.post("coordinate_quote_update", {"latest_amount": "150"}, record=quote).status_code, 200)
+        before = self.state()["coordination"]["quotes"][0]
+        self.assertTrue(before["paused"])
+        self.assertIsNone(before["increase_reviewed_amount"])
+        self.assertEqual(before["increase_review_note"], "")
+
+        self.client.force_login(self.jeremy)
+        note = "Reviewed the current total; this is not payment authorization."
+        self.assertEqual(self.post("coordinate_quote_resolve", {"note": note}, record=quote).status_code, 200)
+        state = self.state()["coordination"]["quotes"][0]
+        claimed = self.claim()["coordination"]["quotes"][0]
+        for context in (state, claimed):
+            self.assertEqual(context["increase_reviewed_amount"], "150.00")
+            self.assertEqual(context["increase_review_note"], note)
+            self.assertEqual(context["accepted_amount"], "100.00")
+            self.assertEqual(context["latest_amount"], "150.00")
+            self.assertFalse(context["paused"])
+
+        self.assertEqual(self.post("coordinate_quote_update", {"latest_amount": "151"}, record=quote).status_code, 200)
+        later = self.state()["coordination"]["quotes"][0]
+        self.assertTrue(later["paused"])
+        self.assertEqual(later["increase_reviewed_amount"], "150.00")
+        self.assertEqual(later["accepted_amount"], "100.00")
+
     @override_settings(COORDINATE_DRAFT_WORKFLOW_ENABLED=False)
     def test_disabled_workspace_refuses_actions_and_worker_artifacts(self):
         response = self.post("coordinate_quote_add", {

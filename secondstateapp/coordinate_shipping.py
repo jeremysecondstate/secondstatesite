@@ -72,6 +72,8 @@ def coordination_state(case):
                     "amount": str(q.amount), "currency": q.currency, "latest_amount": str(q.latest_amount),
                     "accepted": q.accepted, "accepted_amount": str(q.accepted_amount) if q.accepted_amount is not None else None,
                     "accepted_destination": q.accepted_destination, "accepted_handling": q.accepted_handling,
+                    "increase_reviewed_amount": str(q.increase_reviewed_amount) if q.increase_reviewed_amount is not None else None,
+                    "increase_review_note": q.increase_review_note,
                     "paused": quote_paused(q), "change_amount": str(q.latest_amount - q.accepted_amount) if q.accepted_amount is not None else "0.00",
                     "update_url": reverse("coordinate_quote_update", args=[case.pk, q.pk]),
                     "accept_url": reverse("coordinate_quote_accept", args=[case.pk, q.pk]),
