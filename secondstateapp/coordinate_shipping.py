@@ -65,7 +65,10 @@ def coordination_state(case, max_message_id=None):
         return None
     plan = CoordinatePlan.objects.filter(case=case).first() or CoordinatePlan(case=case)
     quotes = list(case.shipping_quotes.all())
-    drafts = list(visible_artifacts(case.email_drafts.select_related("quote")))
+    draft_query = case.email_drafts.select_related("quote")
+    if max_message_id is not None:
+        draft_query = draft_query.filter(Q(job__isnull=True) | Q(job__message_id__lte=max_message_id))
+    drafts = list(visible_artifacts(draft_query))
     from .coordinate_brief import brief_state
     from .coordinate_intake import intake_state
     return {

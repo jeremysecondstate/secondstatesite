@@ -222,11 +222,20 @@ class BriefEvidenceTests(TestCase):
         source = self.research(job=later_job, text="Future research details that are outside this claim.")
         later_brief = fixture_brief(f"document:{document.pk}", summary="Future brief outside this claim.")
         save_brief(later_job, later_brief, [])
+        generated_draft = CoordinateDraft.objects.create(
+            case=self.case, job=later_job, recipient="later@example.test", subject="Later generated draft",
+            body="Future document details copied into a later generated draft.",
+        )
+        manual_draft = CoordinateDraft.objects.create(
+            case=self.case, recipient="staff@example.test", subject="Manual draft",
+            body="Current staff-maintained instructions.",
+        )
         ui = coordination_state(self.case)
         self.assertIn("intake", ui)
         self.assertEqual(ui["intake"]["documents"][0]["id"], str(document.pk))
         self.assertEqual(ui["research"][0]["source_url"], source.source_url)
         self.assertEqual(ui["brief"]["summary"], later_brief["summary"])
+        self.assertEqual({item["id"] for item in ui["drafts"]}, {str(generated_draft.pk), str(manual_draft.pk)})
 
         response = self.worker_post("coordinate_worker_claim", {"worker_id": "manual-codex"})
         self.assertEqual(response.status_code, 200, response.content)
@@ -237,9 +246,11 @@ class BriefEvidenceTests(TestCase):
         self.assertEqual(claimed["coordination"]["research"], [])
         self.assertEqual(claimed["research"], [])
         self.assertIsNone(claimed["coordination"]["brief"])
+        self.assertEqual([item["id"] for item in claimed["coordination"]["drafts"]], [str(manual_draft.pk)])
         self.assertNotIn("Future document details", response.content.decode())
         self.assertNotIn("Future research details", response.content.decode())
         self.assertNotIn("Future brief outside", response.content.decode())
+        self.assertNotIn("Later generated draft", response.content.decode())
 
     def test_deadline_basis_must_match_cited_evidence_and_suggestion_does_not_change_plan_or_approval(self):
         plan = CoordinatePlan.objects.create(case=self.case, destination="duarte", handling="Keep frame", notes="Staff notes")
