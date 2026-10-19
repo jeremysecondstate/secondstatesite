@@ -34,10 +34,11 @@ private manifest/observation paths, an account, deadline, exact thread IDs and a
 most two delivery-reconciliation descriptors. Do not print private state, email
 body text, tokens, invoices or attachments in scheduler commentary.
 
-Use only Gmail link `link_6ad64868bc4c8191a85c62352cb4e3cf` (secondstate,
-jeremy@secondstate.art). When account identity needs verification, use
-`mcp__codex_apps__gmail_get_profile` with that link and check the returned address.
-Do not substitute another connected account.
+Discover the Gmail connection from the current tool schema and select only
+secondstate / `jeremy@secondstate.art`. Connector link IDs can change when the
+signed-in Codex account changes. Verify the selected link with
+`mcp__codex_apps__gmail_get_profile` and check the returned address before reading.
+Never substitute another connected mailbox or reuse a stale account-specific link.
 
 Read only the returned `gmail_thread_id` values with
 `mcp__codex_apps__gmail_batch_read_email_threads` or
