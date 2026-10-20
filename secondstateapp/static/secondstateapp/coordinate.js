@@ -5,6 +5,7 @@
   if (!root) return;
   const selectedId = root.dataset.caseId;
   const messageList = document.getElementById("coordinate-message-list");
+  const replyDrafts = document.getElementById("coordinate-reply-drafts");
   const caseList = document.getElementById("coordinate-case-list");
   const trashList = document.getElementById("coordinate-trash-list");
   const planning = document.getElementById("coordinate-planning");
@@ -36,9 +37,8 @@
     try { initialPlanning = JSON.parse(initialPlanningScript.textContent) || {}; } catch (_) { /* Native forms remain available. */ }
     initialPlanningScript.remove();
   }
-  const panelKeys = { briefing: "brief", intake: "intake", plan: "plan", quotes: "quotes", drafts: "drafts", mail: "mail", research: "research" };
+  const panelKeys = { drafts: "drafts", mail: "mail", briefing: "brief", intake: "intake", plan: "plan", quotes: "quotes", research: "research" };
   const panelSignatures = Object.fromEntries(Object.keys(panelKeys).map((key) => [key, panelSignature(initialPlanning, key)]));
-  initialPlanning = null;
 
   function panelSignature(coordination, key) {
     const value = coordination?.[panelKeys[key]];
@@ -69,7 +69,11 @@
 
   root.querySelectorAll("time[datetime]").forEach((element) => formatTime(element, element.dateTime));
   formatDeadlineInputs(root);
-  root.querySelectorAll(".coordinate-message-body, .coordinate-email-body").forEach((element) => messageBody(element, element.textContent));
+  root.querySelectorAll(".coordinate-message-body").forEach((element) => conversationBody(element, element.textContent,
+    Boolean(element.closest(".coordinate-message--assistant:not(.is-deleted)"))));
+  root.querySelectorAll(".coordinate-email-body").forEach((element) => messageBody(element, element.textContent));
+  updateWorkspaceLinks(initialPlanning);
+  initialPlanning = null;
   prepareSourceLinks(root);
   if (messageList) messageList.scrollTop = messageList.scrollHeight;
 
@@ -222,6 +226,165 @@
     element.style.whiteSpace = "pre-wrap";
   }
 
+  function conversationBody(element, body, assistant) {
+    // Keep older, lengthy replies readable without losing any of their wording.
+    if (!assistant || body.length <= 900) { messageBody(element, body); return; }
+    const firstParagraph = body.split(/\n\s*\n/)[0];
+    const lead = document.createElement("div");
+    lead.className = "coordinate-response-preview";
+    messageBody(lead, firstParagraph);
+    if (lead.textContent.length > 360) {
+      const preview = lead.textContent.slice(0, 360).replace(/\s+\S*$/, "") + "…";
+      lead.replaceChildren(document.createTextNode(preview));
+    }
+    const details = document.createElement("details");
+    details.className = "coordinate-response-details";
+    const summary = document.createElement("summary");
+    summary.textContent = "Read full Coordinator response";
+    const full = document.createElement("div");
+    messageBody(full, body);
+    details.append(summary, full);
+    element.replaceChildren(lead, details);
+    element.style.whiteSpace = "normal";
+  }
+
+  function workspaceItems(coordination) {
+    // The API orders drafts oldest first; the reply should surface recent work.
+    const items = (coordination.drafts || []).slice(-3).reverse().map((draft) => ({
+      panel: "drafts", target: `coordinate-draft-${draft.id}`, label: `Email draft · ${draft.subject || "Untitled draft"}`,
+    }));
+    if (coordination.brief) items.push({ panel: "briefing", label: `Case brief · ${(coordination.brief.lots || []).length} lots` });
+    if (coordination.research?.length) items.push({ panel: "research", label: `Sources · ${coordination.research.length}` });
+    return items;
+  }
+
+  function renderDraftPreview(draft, open = false) {
+    const card = document.createElement("details");
+    card.className = "coordinate-reply-draft";
+    card.id = `coordinate-reply-draft-${draft.id}`;
+    card.dataset.previewDraftId = String(draft.id);
+    card.open = open;
+    const summary = document.createElement("summary");
+    summary.className = "coordinate-record-summary";
+    const subject = document.createElement("span");
+    subject.className = "coordinate-record-heading";
+    subject.textContent = draft.subject || "Untitled draft";
+    const recipient = document.createElement("span");
+    recipient.className = "coordinate-record-preview";
+    recipient.textContent = `${draft.quote_test ? "Intended provider" : "To"}: ${draft.recipient || "Recipient needed"}`;
+    summary.append(subject, recipient);
+    const content = document.createElement("div");
+    content.className = "coordinate-record-content";
+    if (draft.quote_test) {
+      const route = document.createElement("p");
+      route.className = "coordinate-mail-test-route";
+      route.textContent = `Quote test · Actual recipient: ${draft.actual_recipient || "Not confirmed"}. The provider is not contacted by this test.`;
+      content.append(route);
+    }
+    const body = document.createElement("div");
+    body.className = "coordinate-reply-draft-body";
+    // The saved wording is untrusted text; previews never contain editable or send controls.
+    body.textContent = String(draft.body || "");
+    const footer = document.createElement("div");
+    footer.className = "coordinate-reply-draft-footer";
+    const status = document.createElement("span");
+    status.textContent = draft.blocked ? "Provider review needed" : draft.status === "reviewed" ? "Reviewed version" : "Draft for review";
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "coordinate-button coordinate-button-secondary";
+    edit.dataset.openPanel = "drafts";
+    edit.dataset.openRecord = `coordinate-draft-${draft.id}`;
+    edit.textContent = "Review and edit draft";
+    footer.append(status, edit);
+    content.append(body, footer);
+    card.append(summary, content);
+    return card;
+  }
+
+  function updateReplyDrafts(coordination, replyId) {
+    if (!replyDrafts) return;
+    const drafts = !caseDeleted && replyId ? (coordination?.drafts || [])
+      .filter((draft) => draft.editable !== false && !["queued", "sending", "sent", "unknown"].includes(draft.send_status))
+      .slice(-3).reverse() : [];
+    if (!drafts.length) {
+      replyDrafts.hidden = true;
+      replyDrafts.replaceChildren();
+      delete replyDrafts.dataset.signature;
+      return;
+    }
+    const signature = JSON.stringify([replyId, drafts.map(({ id, recipient, subject, body, status, blocked, quote_test, actual_recipient }) =>
+      ({ id, recipient, subject, body, status, blocked, quote_test, actual_recipient }))]);
+    if (replyDrafts.dataset.signature === signature) return;
+    const states = new Map(Array.from(replyDrafts.querySelectorAll("[data-preview-draft-id]"), (card) => [card.dataset.previewDraftId, card.open]));
+    const heading = document.createElement("div");
+    heading.className = "coordinate-reply-drafts-heading";
+    const title = document.createElement("h3");
+    title.textContent = "Email drafts";
+    const count = document.createElement("span");
+    count.textContent = `${drafts.length} ready to review`;
+    heading.append(title, count);
+    replyDrafts.replaceChildren(heading, ...drafts.map((draft, index) =>
+      renderDraftPreview(draft, states.has(String(draft.id)) ? states.get(String(draft.id)) : index === 0)));
+    replyDrafts.hidden = false;
+    replyDrafts.dataset.signature = signature;
+  }
+
+  function updateWorkspaceLinks(coordination) {
+    if (!messageList) return;
+    const replies = Array.from(messageList.querySelectorAll(".coordinate-message--assistant:not(.is-deleted)"));
+    const latest = replies[replies.length - 1];
+    updateReplyDrafts(coordination, latest?.dataset.messageId);
+    messageList.querySelectorAll(".coordinate-message-workspace").forEach((tray) => {
+      if (tray.parentElement !== latest?.querySelector(".coordinate-message-content") || caseDeleted || !coordination) tray.remove();
+    });
+    if (!latest || caseDeleted || !coordination) return;
+    const items = workspaceItems(coordination).filter((item) => item.panel !== "drafts" || !replyDrafts || replyDrafts.hidden);
+    const content = latest.querySelector(".coordinate-message-content");
+    let tray = content.querySelector(".coordinate-message-workspace");
+    if (!items.length) { tray?.remove(); return; }
+    const signature = JSON.stringify(items);
+    if (tray?.dataset.signature === signature) return;
+    if (!tray) {
+      tray = document.createElement("nav");
+      tray.className = "coordinate-message-workspace";
+      tray.setAttribute("aria-label", "Open case contents");
+      content.append(tray);
+    }
+    const label = document.createElement("span");
+    label.textContent = "In this case";
+    const buttons = items.map((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "coordinate-workspace-link";
+      button.dataset.openPanel = item.panel;
+      if (item.target) button.dataset.openRecord = item.target;
+      button.textContent = item.label;
+      return button;
+    });
+    tray.replaceChildren(label, ...buttons);
+    tray.dataset.signature = signature;
+  }
+
+  function detailKey(item, container) {
+    // Record IDs survive insertions and reorderings. Unkeyed disclosures are
+    // scoped to their nearest keyed record so a new draft cannot inherit another's state.
+    if (item.dataset.stateKey) return item.dataset.stateKey;
+    if (item.id) return item.id;
+    const owner = item.parentElement?.closest("details[id]");
+    const scope = owner && container.contains(owner) ? owner : container;
+    const summary = item.querySelector("summary")?.textContent.trim() || "";
+    return `${scope.id || scope.dataset.panel}/${summary}`;
+  }
+
+  function preserveDetails(existing, replacement) {
+    replacement.open = existing.open;
+    const states = new Map(Array.from(existing.querySelectorAll("details"), (item) => [detailKey(item, existing), item.open]));
+    replacement.querySelectorAll("details").forEach((item) => {
+      const key = detailKey(item, replacement);
+      if (states.has(key)) item.open = states.get(key);
+    });
+  }
+
   function setStatus(element, status) {
     if (!element) return;
     element.dataset.status = status;
@@ -272,6 +435,10 @@
       list.append(empty);
     }
     text(document.getElementById(isTrash ? "coordinate-trash-count" : "coordinate-case-count"), cases.length);
+    if (isTrash) {
+      const emptyTrash = document.getElementById("coordinate-empty-trash");
+      if (emptyTrash) emptyTrash.hidden = cases.length === 0;
+    }
   }
 
   function updateMessages(messages) {
@@ -330,7 +497,7 @@
           // Discard prior message content immediately; never retain it in hidden DOM.
           body.replaceChildren(document.createTextNode(caseDeleted ? "Hidden while this case is in trash." : "Message deleted. Restore to show it again."));
         } else {
-          messageBody(body, String(message.body || ""));
+          conversationBody(body, String(message.body || ""), message.role === "assistant");
         }
         article.dataset.deleted = String(deleted);
         article.dataset.caseHidden = String(caseDeleted);
@@ -369,6 +536,7 @@
         Object.keys(panelSignatures).forEach((key) => { panelSignatures[key] = undefined; });
       } else if (planning) planning.hidden = !state.coordination;
       if (Array.isArray(state.messages)) updateMessages(state.messages);
+      updateWorkspaceLinks(state.coordination);
       updatePlanningRestrictions(state.coordination);
       refreshPanels(state);
     }
@@ -461,6 +629,10 @@
       if (!response.ok) throw new Error("Panel refresh unavailable");
       const documentCopy = new DOMParser().parseFromString(await response.text(), "text/html");
       if (caseDeleted || version !== mutationVersion) return;
+      if (!planning.querySelector(".coordinate-workspace-heading")) {
+        const heading = documentCopy.querySelector("#coordinate-planning .coordinate-workspace-heading");
+        if (heading) planning.prepend(document.importNode(heading, true));
+      }
       for (const key of changed) {
         const existing = planning.querySelector(`[data-panel='${key}']`);
         if (existing?.querySelector("form[data-dirty='true']")) continue;
@@ -468,9 +640,7 @@
         if (!incoming) continue;
         const replacement = document.importNode(incoming, true);
         if (existing) {
-          replacement.open = existing.open;
-          const nestedOpen = Array.from(existing.querySelectorAll("details"), (item) => item.open);
-          replacement.querySelectorAll("details").forEach((item, index) => { item.open = nestedOpen[index] || false; });
+          preserveDetails(existing, replacement);
           existing.replaceWith(replacement);
         } else planning.append(replacement);
         replacement.querySelectorAll("time[datetime]").forEach((element) => formatTime(element, element.dateTime));
@@ -507,6 +677,13 @@
         credentials: "same-origin", cache: "no-store", redirect: "error",
         headers: { Accept: "application/json" }, signal: controller.signal,
       });
+      const home = safePath(root.dataset.homeUrl);
+      if (response.status === 404 && selectedId && home) {
+        // Another staff tab may have emptied trash while this case was selected.
+        stopped = true;
+        window.location.assign(home);
+        return;
+      }
       if (response.status === 401 || response.status === 403) {
         stopped = true;
         connection.dataset.state = "error";
@@ -554,6 +731,21 @@
     setTimeout(() => { if (latestState) { updatePlanningRestrictions(latestState.coordination); refreshPanels(latestState); } }, 0);
   });
   root.addEventListener("click", async (event) => {
+    const workspaceLink = event.target.closest("[data-open-panel]");
+    if (workspaceLink) {
+      const key = workspaceLink.dataset.openPanel;
+      if (!Object.hasOwn(panelKeys, key) || caseDeleted) return;
+      const panel = planning?.querySelector(`[data-panel='${key}']`);
+      if (!panel) { notice("The case contents are updating. Try opening this section again in a moment."); return; }
+      panel.open = true;
+      const record = workspaceLink.dataset.openRecord && document.getElementById(workspaceLink.dataset.openRecord);
+      const target = record && panel.contains(record) ? record : panel;
+      if (target.tagName === "DETAILS") target.open = true;
+      const summary = target.querySelector("summary");
+      (summary || target).focus({ preventScroll: true });
+      target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      return;
+    }
     const source = event.target.closest("[data-source-link]");
     const reference = source?.getAttribute("href") || "";
     if (/^#coordinate-(?:message-\d+|document-[0-9a-f-]{36}|email-[0-9a-f-]{36}|mail-thread-[0-9a-f-]{36})$/i.test(reference)) {

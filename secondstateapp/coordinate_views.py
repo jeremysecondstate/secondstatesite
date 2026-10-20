@@ -9,6 +9,7 @@ from functools import wraps
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core import signing
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Exists, F, OuterRef, Q
 from django.http import Http404, JsonResponse
@@ -17,7 +18,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .models import CoordinateActivity, CoordinateCase, CoordinateJob, CoordinateMessage, CoordinateWorkerState
 from .coordinate_shipping import coordination_state, enabled, enqueue_due_reviews, research_state, save_worker_artifacts, validate_worker_artifacts
@@ -75,6 +76,8 @@ def _conversation_visible():
 
 
 def _state(selected=None):
+    if selected and selected.purged_at:
+        selected = None
     cases = []
     trash_cases = []
     # Fetch pending jobs together, rather than querying separately for every case.
@@ -82,7 +85,7 @@ def _state(selected=None):
     statuses = {}
     for job in pending:
         statuses.setdefault(job.message.case_id, _job_status(job))
-    for case in CoordinateCase.objects.all():
+    for case in CoordinateCase.objects.filter(purged_at__isnull=True):
         item = {
             "id": str(case.pk), "title": case.title,
             "url": reverse("coordinate_case", args=[case.pk]),
@@ -110,7 +113,7 @@ def _state(selected=None):
 @staff_member_required
 @require_GET
 def coordinate(request, case_id=None):
-    case = get_object_or_404(CoordinateCase, pk=case_id) if case_id else None
+    case = get_object_or_404(CoordinateCase, pk=case_id, purged_at__isnull=True) if case_id else None
     if case is None and request.GET.get("new") != "1":
         case = CoordinateCase.objects.filter(deleted_at__isnull=True).first()
     return render(request, "coordinate/index.html", _state(case))
@@ -122,7 +125,7 @@ def coordinate(request, case_id=None):
 def state(request):
     case_id = request.GET.get("case")
     try:
-        case = get_object_or_404(CoordinateCase, pk=uuid.UUID(case_id)) if case_id else None
+        case = get_object_or_404(CoordinateCase, pk=uuid.UUID(case_id), purged_at__isnull=True) if case_id else None
     except (ValueError, TypeError):
         return _error("Invalid case identifier.")
     return JsonResponse(_state(case))
@@ -334,6 +337,8 @@ def restore_message(request, case_id, message_id):
 def delete_case(request, case_id):
     with transaction.atomic():
         case = _locked_case(case_id)
+        if case.purged_at:
+            raise Http404("Case not found.")
         if case.deleted_at is None:
             now = timezone.now()
             case.deleted_at, case.deleted_by, case.updated_at = now, request.user, now
@@ -354,6 +359,8 @@ def delete_case(request, case_id):
 def restore_case(request, case_id):
     with transaction.atomic():
         case = _locked_case(case_id)
+        if case.purged_at:
+            raise Http404("Case not found.")
         if case.deleted_at is not None:
             now = timezone.now()
             case.deleted_at, case.deleted_by, case.updated_at = None, None, now
@@ -365,6 +372,61 @@ def restore_case(request, case_id):
                 "actor_id": request.user.pk, "requeued_jobs": requeued,
             })
     return _case_response(request, case)
+
+
+def _trash_confirmation(request, error="", status=200):
+    cases = list(CoordinateCase.objects.filter(deleted_at__isnull=False, purged_at__isnull=True))
+    snapshot = {"actor": str(request.user.pk), "cases": [
+        {"id": str(case.pk), "deleted_at": _iso(case.deleted_at)} for case in cases
+    ]}
+    return render(request, "coordinate/empty_trash.html", {
+        "trash_cases": cases, "error": error,
+        "trash_token": signing.dumps(snapshot, salt="coordinate.empty-trash", compress=True),
+    }, status=status)
+
+
+@never_cache
+@staff_member_required
+@require_http_methods(["GET", "POST"])
+@_database_retry
+def empty_trash(request):
+    if request.method == "GET":
+        return _trash_confirmation(request)
+    if request.POST.get("confirm_empty_trash") != "yes":
+        return _trash_confirmation(request, "Confirm that these cases cannot be restored before emptying trash.", 400)
+    try:
+        snapshot = signing.loads(request.POST.get("trash_token", ""), salt="coordinate.empty-trash", max_age=600)
+        if not isinstance(snapshot, dict) or snapshot.get("actor") != str(request.user.pk):
+            raise ValueError
+        entries = snapshot["cases"]
+        if not isinstance(entries, list):
+            raise ValueError
+        expected = {uuid.UUID(item["id"]): item["deleted_at"] for item in entries}
+        if len(expected) != len(entries) or not all(isinstance(value, str) for value in expected.values()):
+            raise ValueError
+    except (signing.BadSignature, ValueError, TypeError, KeyError, AttributeError):
+        return _trash_confirmation(request, "This confirmation has expired or changed. Review the current trash and try again.", 400)
+    with transaction.atomic():
+        ready = []
+        # Use the same case locks as restoration and sending; retain internal receipt access.
+        for case_id in sorted(expected, key=str):
+            case = _locked_case(case_id)
+            if case.purged_at:
+                continue
+            if not case.deleted_at or _iso(case.deleted_at) != expected[case_id]:
+                return _trash_confirmation(request, "Trash changed while you were reviewing it. Nothing was removed. Review the list again.", 409)
+            ready.append(case)
+        now = timezone.now()
+        for case in ready:
+            case.purged_at, case.updated_at = now, now
+            case.save(update_fields=["purged_at", "updated_at"])
+            jobs = CoordinateJob.objects.filter(message__case=case)
+            cancelled = jobs.exclude(status="completed").update(status="cancelled")
+            jobs.update(claim_token=None, lease_expires_at=None)
+            CoordinateActivity.objects.create(case=case, event="case_purged", details={
+                "actor_id": request.user.pk, "cancelled_jobs": cancelled,
+            })
+    return redirect("coordinate")
 
 
 def _worker_endpoint(view):

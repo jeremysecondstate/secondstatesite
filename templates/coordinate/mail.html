@@ -13,8 +13,14 @@
       {% else %}<p class="coordinate-mail-readiness is-unavailable">{{ coordination.mail.status_text|default:"Email connection is not ready. Drafting and review remain available; sending waits for the connection." }}</p>{% endif %}
     {% else %}<p class="coordinate-mail-readiness is-unavailable">Email sending is not enabled. Drafts and reviews stay saved here.</p>{% endif %}
     {% for draft in coordination.drafts %}
-      <article class="coordinate-draft" data-draft-id="{{ draft.id }}" data-send-status="{{ draft.send_status|default:'' }}">
-        <header><h3>{{ draft.subject|default:'Untitled draft' }}</h3><span class="coordinate-chip" data-delivery-status>{% if draft.send_status %}{{ draft.send_status|capfirst }}{% else %}{{ draft.status|capfirst }}{% endif %}</span></header>
+      <details class="coordinate-draft" id="coordinate-draft-{{ draft.id }}" data-draft-id="{{ draft.id }}" data-send-status="{{ draft.send_status|default:'' }}">
+        <summary class="coordinate-record-summary">
+          <span class="coordinate-record-label">Email draft</span>
+          <span class="coordinate-record-heading">{{ draft.subject|default:'Untitled draft' }}</span>
+          <span class="coordinate-record-preview">{% if draft.quote_test %}Intended provider{% else %}To{% endif %}: {{ draft.recipient|default:'Recipient needed' }}</span>
+          <span class="coordinate-chip" data-delivery-status>{% if draft.send_status %}{{ draft.send_status|capfirst }}{% else %}{{ draft.status|capfirst }}{% endif %}</span>
+        </summary>
+        <div class="coordinate-record-content">
         <p class="coordinate-quote-pause" data-draft-blocked{% if not draft.blocked %} hidden{% endif %}>Review and sending are blocked while this provider thread is paused for Jeremy.</p>
         <p class="coordinate-mail-delivery-note" data-delivery-note{% if draft.editable != False %} hidden{% endif %}>{% if draft.send_status == 'sent' %}Sent{% if draft.sent_at %} <time datetime="{{ draft.sent_at }}">{{ draft.sent_at }}</time>{% endif %}. This message is read-only. Start a reply draft to continue.{% elif draft.send_status == 'unknown' %}Delivery has not been confirmed. This message is locked while its status is checked. Do not resend it or create a duplicate.{% else %}Sending is in progress. This message is locked while delivery is checked.{% endif %}</p>
         {% if draft.quote_test %}<p class="coordinate-mail-test-route"><strong>Quote test:</strong> Actual recipient: {{ draft.actual_recipient }}. Intended provider: {{ draft.intended_recipient }}. The provider was not contacted.</p>{% endif %}
@@ -44,7 +50,8 @@
           {% endif %}
         {% endif %}
         {% if draft.status_text %}<p class="coordinate-panel-note">{{ draft.status_text }}</p>{% endif %}
-      </article>
+        </div>
+      </details>
     {% empty %}<p class="coordinate-panel-empty">No email drafts yet. Prepare correspondence here before review.</p>{% endfor %}
     <details class="coordinate-add-record"><summary>Write an email draft</summary>
       <form class="coordinate-action-form coordinate-grid-form" method="post" action="{{ coordination.urls.add_draft }}">
@@ -66,8 +73,10 @@
     {% if not coordination.mail.ready %}<p class="coordinate-mail-readiness is-unavailable">{{ coordination.mail.status_text|default:"The email connection is not ready. New replies will appear after the connection is restored and checked." }}</p>{% endif %}
     {% if not coordination.mail.sync_enabled %}<p class="coordinate-panel-note">Reply tracking is not enabled. Previously saved conversations remain available.</p>{% endif %}
     {% for thread in coordination.mail.threads %}
-      <article class="coordinate-mail-thread" id="coordinate-mail-thread-{{ thread.id }}">
-        <header><h3>{{ thread.subject|default:'Email conversation' }}</h3>{% if thread.url %}<a href="{{ thread.url }}" data-source-link>Open email thread</a>{% endif %}</header>
+      <details class="coordinate-mail-thread" id="coordinate-mail-thread-{{ thread.id }}">
+        <summary class="coordinate-record-summary"><span class="coordinate-record-heading">{{ thread.subject|default:'Email conversation' }}</span><span class="coordinate-record-preview">{% if thread.participants %}{{ thread.participants|join:", " }}{% else %}Linked email conversation{% endif %}</span><span class="coordinate-record-meta">{{ thread.messages|length }} message{{ thread.messages|length|pluralize }}</span></summary>
+        <div class="coordinate-record-content">
+        {% if thread.url %}<p class="coordinate-panel-note"><a href="{{ thread.url }}" data-source-link>Open email thread</a></p>{% endif %}
         {% if thread.participants %}<p class="coordinate-panel-note">{{ thread.participants|join:", " }}</p>{% endif %}
         {% if thread.last_synced_at %}<p class="coordinate-panel-note">Last synchronized <time datetime="{{ thread.last_synced_at }}">{{ thread.last_synced_at }}</time>.</p>{% endif %}
         {% for email in thread.messages %}
@@ -79,7 +88,8 @@
             {% if email.source_url %}<p class="coordinate-email-citation"><a href="{{ email.source_url }}" data-source-link>View original message</a>{% if email.source_ref %} · {{ email.source_ref }}{% endif %}</p>{% elif email.source_ref %}<p class="coordinate-email-citation">Source: {{ email.source_ref }}</p>{% endif %}
           </section>
         {% empty %}<p class="coordinate-panel-empty">This thread is linked. Its messages have not been synchronized yet.</p>{% endfor %}
-      </article>
+        </div>
+      </details>
     {% empty %}<p class="coordinate-panel-empty">No email conversations are linked yet. A successfully sent message creates a thread for tracking replies.</p>{% endfor %}
   </div>
 </details>

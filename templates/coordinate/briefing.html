@@ -1,5 +1,5 @@
-<details class="coordinate-panel" data-panel="briefing" open>
-  <summary><span>Case brief{% if coordination.brief.lots %} <span class="coordinate-panel-count">{{ coordination.brief.lots|length }} lot{{ coordination.brief.lots|length|pluralize }}</span>{% endif %}</span><span class="coordinate-panel-summary">Lot details &amp; next steps</span></summary>
+<details class="coordinate-panel" data-panel="briefing">
+  <summary><span>Case brief{% if coordination.brief.lots %} <span class="coordinate-panel-count">{{ coordination.brief.lots|length }} lot{{ coordination.brief.lots|length|pluralize }}</span>{% endif %}</span><span class="coordinate-panel-summary">Lots, research &amp; preparation</span></summary>
   <div class="coordinate-panel-content">
     {% with brief=coordination.brief %}
       {% if brief %}
@@ -8,8 +8,14 @@
         {% if brief.shipping %}{% include "coordinate/shipping_brief.html" %}{% endif %}
         <div class="coordinate-lot-grid">
           {% for lot in brief.lots %}
-            <article class="coordinate-lot-card">
-              <header><p class="coordinate-eyebrow">{% if lot.lot_number %}Lot {{ lot.lot_number }}{% else %}Lot number not provided{% endif %}</p><h3>{% if lot.label %}{{ lot.label }}{% elif lot.title %}{{ lot.title }}{% else %}Lot details{% endif %}</h3></header>
+            <details class="coordinate-lot-card" id="coordinate-lot-{{ lot.lot_number|default:forloop.counter|slugify }}-{{ forloop.counter }}" data-state-key="lot:{{ lot.lot_number }}|{{ lot.label }}|{{ lot.artist }}|{{ lot.title }}|{{ lot.auction_house }}|{{ lot.auction_date }}">
+              <summary class="coordinate-record-summary">
+                <span class="coordinate-record-label">{% if lot.lot_number %}Lot {{ lot.lot_number }}{% else %}Lot {{ forloop.counter }}{% endif %}</span>
+                <span class="coordinate-record-heading">{% if lot.label %}{{ lot.label }}{% elif lot.title %}{{ lot.title }}{% else %}Lot details{% endif %}</span>
+                <span class="coordinate-record-preview">{{ lot.artist|default:"Artist not provided" }}{% if lot.title and lot.title != lot.label %} · {{ lot.title }}{% endif %}</span>
+                <span class="coordinate-record-meta">{% if lot.framed_dimensions %}Framed: {{ lot.framed_dimensions }}{% elif lot.dimensions %}{{ lot.dimensions }}{% else %}Dimensions not provided{% endif %}</span>
+              </summary>
+              <div class="coordinate-record-content">
               <dl class="coordinate-lot-facts">
                 <div><dt>Artist</dt><dd>{{ lot.artist|default:"Not provided" }}</dd></div>
                 <div><dt>Title</dt><dd>{{ lot.title|default:"Not provided" }}</dd></div>
@@ -35,7 +41,7 @@
                     {% if price.kind == "historical_comparison" %}<p class="coordinate-panel-note"><strong>Historical comparison — a different sale</strong></p>{% endif %}
                     <p><strong>{{ price.label }} {{ price.amount }}{% if price.amount_high %}–{{ price.amount_high }}{% endif %}{% if price.currency %} {{ price.currency }}{% endif %}</strong></p>
                     <p class="coordinate-panel-note">{% if not price.currency %}Currency not stated. {% endif %}{% if price.basis == "unknown" %}Price basis not stated; buyer’s premium inclusion is unknown.{% elif price.basis == "hammer" %}Hammer price; buyer’s premium is separate.{% elif price.basis == "premium_inclusive" %}Includes buyer’s premium; taxes and shipping are not established by this figure.{% elif price.basis == "estimate" %}Auction estimate.{% elif price.basis == "invoice_total" %}Invoice total.{% elif price.basis == "tax" %}Tax amount.{% elif price.basis == "shipping" %}Shipping amount.{% elif price.basis == "insurance" %}Insurance value.{% else %}See the source wording for the stated basis.{% endif %}</p>
-                    <details><summary>Source wording &amp; citations</summary><blockquote>{{ price.evidence_quote }}</blockquote><div class="coordinate-brief-sources">{% for ref, source in brief.sources.items %}{% if ref in price.source_refs %}<a href="{{ source.url }}" data-source-link>{{ source.label|default:"View source" }}</a>{% endif %}{% endfor %}</div></details>
+                    <details id="coordinate-lot-{{ lot.lot_number|default:forloop.parentloop.counter|slugify }}-{{ forloop.parentloop.counter }}-price-{{ price.kind|slugify }}-{{ price.label|slugify }}-{{ forloop.counter }}-citations"><summary>Source wording &amp; citations</summary><blockquote>{{ price.evidence_quote }}</blockquote><div class="coordinate-brief-sources">{% for ref, source in brief.sources.items %}{% if ref in price.source_refs %}<a href="{{ source.url }}" data-source-link>{{ source.label|default:"View source" }}</a>{% endif %}{% endfor %}</div></details>
                   </div>
                 {% empty %}<p class="coordinate-panel-note">No verified price is available yet.</p>{% endfor %}
                 {% if lot.price_notes %}<p class="coordinate-price-notes">{{ lot.price_notes }}</p>{% endif %}
@@ -44,21 +50,24 @@
                 {% for ref, source in brief.sources.items %}{% if ref in lot.source_refs %}<a href="{{ source.url }}" data-source-link>{{ source.label|default:"View source" }}</a>{% endif %}{% endfor %}
                 {% if not lot.source_refs %}<span>No source linked yet.</span>{% endif %}
               </div>
-            </article>
+              </div>
+            </details>
           {% empty %}<p class="coordinate-panel-empty">Lot details have not been established yet.</p>{% endfor %}
         </div>
         {% if brief.plan.notes or brief.plan.pickup_deadline %}
-          <section class="coordinate-suggestion" aria-labelledby="coordinate-suggestion-title">
+          <details class="coordinate-suggestion" id="coordinate-suggested-shipping-plan">
+            <summary class="coordinate-record-summary"><span class="coordinate-record-heading">Suggested shipping plan</span><span class="coordinate-record-meta">For your review</span></summary>
+            <div class="coordinate-record-content">
             {{ brief.plan|json_script:"coordinate-suggested-plan" }}
-            <div class="coordinate-suggestion-heading"><h3 id="coordinate-suggestion-title">Suggested shipping plan</h3><span class="coordinate-chip">For your review</span></div>
             {% if brief.plan.notes %}<p class="coordinate-suggestion-notes">{{ brief.plan.notes }}</p>{% endif %}
             {% if brief.plan.pickup_deadline %}<p class="coordinate-suggestion-deadline"><strong>Suggested pickup deadline:</strong> <time datetime="{{ brief.plan.pickup_deadline }}">{{ brief.plan.pickup_deadline }}</time></p>{% endif %}
             {% if brief.plan.deadline_basis %}<p class="coordinate-panel-note">{{ brief.plan.deadline_basis }}</p>{% endif %}
             <div class="coordinate-brief-sources" aria-label="Sources for this suggestion">{% for ref, source in brief.sources.items %}{% if ref in brief.plan.source_refs %}<a href="{{ source.url }}" data-source-link>{{ source.label|default:"View source" }}</a>{% endif %}{% endfor %}</div>
             <div class="coordinate-form-footer"><p>Add this suggestion to your plan, then review and save it.</p><button class="coordinate-button coordinate-button-secondary" type="button" data-use-suggestion>Use suggestion in plan</button></div>
-          </section>
+            </div>
+          </details>
         {% endif %}
-        {% if brief.open_questions %}<section class="coordinate-open-questions" aria-labelledby="coordinate-open-questions-title"><h3 id="coordinate-open-questions-title">{% if brief.shipping %}Additional details to resolve{% else %}Still to confirm{% endif %}</h3><ul>{% for question in brief.open_questions %}<li>{{ question }}</li>{% endfor %}</ul></section>{% endif %}
+        {% if brief.open_questions %}<details class="coordinate-open-questions" id="coordinate-open-questions"><summary class="coordinate-record-summary"><span class="coordinate-record-heading">{% if brief.shipping %}Additional details to resolve{% else %}Still to confirm{% endif %}</span><span class="coordinate-record-meta">{{ brief.open_questions|length }} question{{ brief.open_questions|length|pluralize }}</span></summary><div class="coordinate-record-content"><ul>{% for question in brief.open_questions %}<li>{{ question }}</li>{% endfor %}</ul></div></details>{% endif %}
       {% else %}
         <p class="coordinate-panel-empty">Share lot links, an invoice, or the auction house’s email. The coordinator will bring the details and next steps together here.</p>
       {% endif %}

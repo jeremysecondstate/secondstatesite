@@ -1,6 +1,7 @@
 {% with shipping=brief.shipping %}
-<section class="coordinate-shipping-brief" aria-labelledby="coordinate-shipping-brief-title">
-  <h3 id="coordinate-shipping-brief-title">Shipping preparation</h3>
+<details class="coordinate-shipping-brief" id="coordinate-shipping-preparation">
+  <summary class="coordinate-record-summary"><span class="coordinate-record-heading">Shipping preparation</span><span class="coordinate-record-meta">{% if shipping.quote_readiness.status == "conditional_ready" %}Ready for an initial quote request{% elif shipping.quote_readiness.status == "needs_public_research" %}Public research still needed{% elif shipping.quote_readiness.status == "needs_destination" %}Destination needed{% else %}Readiness, actions &amp; sources{% endif %}</span></summary>
+  <div class="coordinate-record-content">
   <div class="coordinate-shipping-overview">
     <div class="coordinate-quote-readiness" data-readiness="{{ shipping.quote_readiness.status }}">
       <h4>Quote readiness</h4>
@@ -16,8 +17,8 @@
     </div>
   </div>
   {% if shipping.actions %}
-  <section class="coordinate-shipping-actions" aria-labelledby="coordinate-shipping-actions-title">
-    <h4 id="coordinate-shipping-actions-title">Actions and owners</h4>
+  <details class="coordinate-shipping-actions coordinate-shipping-evidence" id="coordinate-shipping-actions">
+    <summary>Actions and owners <span>{{ shipping.actions|length }}</span></summary>
     <ol>
       {% for action in shipping.actions %}
       <li>
@@ -27,24 +28,24 @@
       </li>
       {% endfor %}
     </ol>
-  </section>
+  </details>
   {% endif %}
   {% if shipping.providers %}
-  <details class="coordinate-shipping-evidence">
+  <details class="coordinate-shipping-evidence" id="coordinate-provider-capabilities">
     <summary>Provider options &amp; published capabilities <span>{{ shipping.providers|length }}</span></summary>
     {% for provider in shipping.providers %}
     <article class="coordinate-provider-option">
       <h4>{{ provider.name }}</h4>
       <p class="coordinate-shipping-meta">{% if provider.service_type == "packing" %}Packing{% elif provider.service_type == "fine_art_transport" %}Fine art transport{% elif provider.service_type == "full_service" %}Full service{% elif provider.service_type == "parcel_shipping" %}Parcel shipping{% elif provider.service_type == "other" %}Other published service{% else %}Service type unconfirmed{% endif %}{% if provider.email %} · {{ provider.email }}{% endif %}</p>
       {% if provider.published_capability %}<blockquote>{{ provider.published_capability }}</blockquote>{% else %}<p class="coordinate-shipping-meta">Published capability not established.</p>{% endif %}
-      {% if provider.contact_quote %}<details class="coordinate-provider-contact"><summary>Published contact wording</summary><blockquote>{{ provider.contact_quote }}</blockquote></details>{% endif %}
+      {% if provider.contact_quote %}<details class="coordinate-provider-contact" id="coordinate-provider-{{ provider.name|slugify }}-{{ forloop.counter }}-contact"><summary>Published contact wording</summary><blockquote>{{ provider.contact_quote }}</blockquote></details>{% endif %}
       {% include "coordinate/brief_source_links.html" with source_refs=provider.source_refs %}
     </article>
     {% endfor %}
   </details>
   {% endif %}
   {% if shipping.site_checks %}
-  <details class="coordinate-shipping-evidence">
+  <details class="coordinate-shipping-evidence" id="coordinate-site-checks">
     <summary>Site checks &amp; supporting sources <span>{{ shipping.site_checks|length }}</span></summary>
     {% for check in shipping.site_checks %}
     <article class="coordinate-site-check">
@@ -56,5 +57,6 @@
     {% endfor %}
   </details>
   {% endif %}
-</section>
+  </div>
+</details>
 {% endwith %}

@@ -38,9 +38,15 @@ const listeners = {};
 root.addEventListener = (name, callback) => { (listeners[name] ||= []).push(callback); };
 const planning = new Element();
 const notice = new Element();
+const replyDrafts = new Element("section");
+function descendants(element) {
+  return element.children.flatMap((child) => [child, ...descendants(child)]);
+}
+replyDrafts.querySelectorAll = () => descendants(replyDrafts).filter((element) => element.dataset.previewDraftId);
 const document = {
   getElementById(id) {
-    return { coordinate: root, "coordinate-planning": planning, "coordinate-action-notice": notice }[id] || null;
+    return { coordinate: root, "coordinate-planning": planning, "coordinate-action-notice": notice,
+      "coordinate-reply-drafts": replyDrafts }[id] || null;
   },
   createElement: (tag) => new Element(tag),
   createDocumentFragment: () => new Element("fragment"),
@@ -55,8 +61,10 @@ let source = fs.readFileSync(path.join(__dirname, "static/secondstateapp/coordin
 const finalPoll = source.lastIndexOf("  poll();");
 assert.ok(finalPoll > 0);
 source = source.slice(0, finalPoll) + `
-  globalThis.testHooks = { messageBody, httpLink, newYorkDatetime, useSuggestion,
+  globalThis.testHooks = { messageBody, conversationBody, preserveDetails, workspaceItems, renderDraftPreview, updateReplyDrafts,
+    httpLink, newYorkDatetime, useSuggestion,
     validateIntake, validateEmailSend, panelSignature,
+    setCaseDeleted(value) { caseDeleted = value; },
     setEmailUncertain(id, value) { value ? uncertainEmailSends.add(id) : uncertainEmailSends.delete(id); },
     setLatestState(value) { latestState = value; },
     setActionInFlight(value) { actionInFlight = value; } };
@@ -89,6 +97,117 @@ for (const value of ["javascript:alert(1)", "data:text/html,x", "https://user:se
 assert.equal(hooks.newYorkDatetime("next Friday"), "");
 assert.equal(hooks.newYorkDatetime("2026-10-30T16:00"), "");
 assert.equal(hooks.newYorkDatetime("2026-10-30T20:00:00Z"), "2026-10-30T16:00");
+
+const longResponse = "Here is the first finding.\n\n" + "Full source-backed research <script>untrusted()</script>. ".repeat(30);
+rendered = new Element();
+hooks.conversationBody(rendered, longResponse, true);
+assert.equal(rendered.children[0].textContent, "Here is the first finding.");
+const disclosure = rendered.children[1];
+assert.equal(disclosure.tagName, "details");
+assert.ok(!disclosure.open, "Long historical assistant replies start compact.");
+assert.equal(disclosure.children[0].textContent, "Read full Coordinator response");
+assert.equal(disclosure.children[1].textContent, longResponse, "Every word remains in the full response.");
+assert.ok(!disclosure.children[1].children.some((item) => item.tagName === "script"));
+rendered = new Element();
+hooks.conversationBody(rendered, longResponse, false);
+assert.equal(rendered.textContent, longResponse, "Staff messages and emails are not shortened.");
+assert.ok(!rendered.children.some((item) => item.tagName === "details"));
+rendered = new Element();
+hooks.conversationBody(rendered, `See [the two lot records](https://example.test/${"lot".repeat(350)}).\n\nFull findings.`, true);
+assert.equal(rendered.children[0].textContent, "See the two lot records.",
+  "A long source URL must not cut a Markdown link in half in the reply preview.");
+rendered = new Element();
+hooks.conversationBody(rendered, "A short handoff to the email draft.", true);
+assert.equal(rendered.textContent, "A short handoff to the email draft.");
+assert.ok(!rendered.children.some((item) => item.tagName === "details"));
+
+function detailFixture(id, open) {
+  const detail = new Element("details");
+  detail.id = id;
+  detail.open = open;
+  return detail;
+}
+const oldDetails = [detailFixture("draft-a", true), detailFixture("draft-b", false)];
+const nextDetails = [detailFixture("draft-new", false), detailFixture("draft-b", true), detailFixture("draft-a", false)];
+const oldPanel = detailFixture("drafts", true);
+oldPanel.querySelectorAll = () => oldDetails;
+const nextPanel = detailFixture("drafts", false);
+nextPanel.querySelectorAll = () => nextDetails;
+hooks.preserveDetails(oldPanel, nextPanel);
+assert.equal(nextPanel.open, true);
+assert.deepEqual(nextDetails.map((item) => item.open), [false, false, true],
+  "Polling preserves the selected draft when another draft is inserted or reordered.");
+const caseItems = hooks.workspaceItems({ drafts: [1, 2, 3, 4, 5].map((id) => ({ id, subject: `Inquiry ${id}` })),
+  brief: { lots: [{}, {}] }, research: [{}] });
+assert.deepEqual(Array.from(caseItems.slice(0, 3), (item) => item.target),
+  ["coordinate-draft-5", "coordinate-draft-4", "coordinate-draft-3"],
+  "A later reply surfaces newly prepared drafts after the case has accumulated earlier correspondence.");
+assert.equal(caseItems[3].panel, "briefing");
+assert.equal(caseItems[4].panel, "research");
+
+const unsafeDraft = {
+  id: "draft-preview-1", recipient: "packer@example.test", subject: '<img src=x onerror="alert(1)"> Packing inquiry',
+  body: 'Hello,\n\nPlease protect the frame and certificate.\n<script>untrusted()</script>\n[link](javascript:alert(1))',
+  status: "reviewed", editable: true,
+};
+const preview = hooks.renderDraftPreview(unsafeDraft, true);
+assert.equal(preview.tagName, "details");
+assert.equal(preview.id, "coordinate-reply-draft-draft-preview-1");
+assert.equal(preview.dataset.previewDraftId, unsafeDraft.id);
+assert.equal(preview.open, true, "The first email can be read immediately below the response.");
+const previewNodes = descendants(preview);
+const previewBody = previewNodes.find((element) => element.className === "coordinate-reply-draft-body");
+assert.equal(previewBody.textContent, unsafeDraft.body, "The complete saved wording remains plain text.");
+assert.ok(preview.textContent.includes(unsafeDraft.subject));
+assert.ok(preview.textContent.includes(unsafeDraft.recipient));
+assert.ok(!previewNodes.some((element) => ["img", "script", "form", "input", "textarea", "select"].includes(element.tagName)),
+  "The preview cannot introduce HTML or a second mutable email form.");
+const editDraft = previewNodes.find((element) => element.tagName === "button");
+assert.equal(editDraft.type, "button");
+assert.equal(editDraft.dataset.openPanel, "drafts");
+assert.equal(editDraft.dataset.openRecord, "coordinate-draft-draft-preview-1",
+  "Review opens the canonical editor, preserving its saved review and send bindings.");
+
+const previewState = { drafts: [1, 2, 3, 4].map((id) => ({
+  id: String(id), recipient: `packer${id}@example.test`, subject: `Inquiry ${id}`, body: `Saved email ${id}`, editable: true,
+})).concat(["queued", "sending", "sent", "unknown"].map((send_status) => ({
+  id: send_status, subject: "Locked correspondence", body: "Do not show as an available draft", editable: true, send_status,
+})), [{ id: "readonly", body: "Read-only correspondence", editable: false }]) };
+hooks.updateReplyDrafts(previewState, "reply-44");
+const previewCards = () => descendants(replyDrafts).filter((element) => element.dataset.previewDraftId);
+assert.equal(replyDrafts.hidden, false);
+assert.deepEqual(Array.from(previewCards(), (card) => card.dataset.previewDraftId), ["4", "3", "2"],
+  "Only the latest three editable, unsent drafts appear up front.");
+assert.deepEqual(Array.from(previewCards(), (card) => Boolean(card.open)), [true, false, false]);
+assert.ok(!replyDrafts.textContent.includes("Do not show as an available draft"));
+assert.ok(!replyDrafts.textContent.includes("Read-only correspondence"));
+previewCards()[0].open = false;
+previewCards()[1].open = true;
+previewState.drafts[3].body = "Revised saved wording for provider four.";
+hooks.updateReplyDrafts(previewState, "reply-44");
+assert.ok(replyDrafts.textContent.includes("Revised saved wording for provider four."),
+  "Saved body changes refresh the preview even if its subject stays the same.");
+assert.deepEqual(Array.from(previewCards(), (card) => Boolean(card.open)), [false, true, false],
+  "Refreshing wording preserves which draft the user opened.");
+previewState.drafts[3].recipient = "corrected@example.test";
+hooks.updateReplyDrafts(previewState, "reply-44");
+assert.ok(replyDrafts.textContent.includes("corrected@example.test"));
+previewState.drafts[3].send_status = "sent";
+hooks.updateReplyDrafts(previewState, "reply-44");
+assert.deepEqual(Array.from(previewCards(), (card) => card.dataset.previewDraftId), ["3", "2", "1"]);
+assert.ok(!replyDrafts.textContent.includes("Revised saved wording for provider four."),
+  "A new delivery state removes the former draft from the preview immediately.");
+hooks.updateReplyDrafts(previewState, "");
+assert.equal(replyDrafts.hidden, true);
+assert.equal(replyDrafts.textContent, "", "A hidden/deleted response leaves no previous email wording in the DOM.");
+hooks.updateReplyDrafts({ drafts: [] }, "reply-44");
+assert.equal(replyDrafts.hidden, true);
+hooks.updateReplyDrafts(previewState, "reply-44");
+hooks.setCaseDeleted(true);
+hooks.updateReplyDrafts(previewState, "reply-44");
+assert.equal(replyDrafts.hidden, true);
+assert.equal(replyDrafts.textContent, "", "Trashing the case removes its private previews immediately.");
+hooks.setCaseDeleted(false);
 
 function suggestionFixture(notes = "Staff confirmed: keep the mat.", deadline = "") {
   const form = new Element("form");

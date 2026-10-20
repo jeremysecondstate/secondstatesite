@@ -7,7 +7,7 @@
 
 {% block content %}
 <section class="coordinate" id="coordinate" aria-labelledby="coordinate-title"
-         data-state-url="{% url 'coordinate_state' %}" data-case-id="{{ selected_case.id|default:'' }}" data-case-deleted="{{ selected_case.deleted|yesno:'true,false' }}">
+         data-state-url="{% url 'coordinate_state' %}" data-home-url="{% url 'coordinate' %}" data-case-id="{{ selected_case.id|default:'' }}" data-case-deleted="{{ selected_case.deleted|yesno:'true,false' }}">
   <header class="coordinate-heading">
     <div>
       <p class="coordinate-eyebrow">SecondState / Staff workspace</p>
@@ -41,6 +41,7 @@
           <p class="coordinate-no-cases">A little less back-and-forth.<br>Start your first case to get things moving.</p>
         {% endfor %}
       </nav>
+      <div class="coordinate-trash-section">
       <details class="coordinate-trash" id="coordinate-trash"{% if selected_case.deleted %} open{% endif %}>
         <summary>Trash <span id="coordinate-trash-count">{{ trash_cases|length }}</span></summary>
         <nav class="coordinate-case-list" id="coordinate-trash-list" aria-label="Trashed coordination cases">
@@ -52,6 +53,8 @@
           {% empty %}<p class="coordinate-empty-list">Trash is empty.</p>{% endfor %}
         </nav>
       </details>
+      <a class="coordinate-empty-trash" id="coordinate-empty-trash" href="{% url 'coordinate_empty_trash' %}"{% if not trash_cases %} hidden{% endif %}>Empty trash</a>
+      </div>
       <div class="coordinate-worker">
         <p class="coordinate-eyebrow">Worker connection</p>
         <dl><dt>Last successful check</dt><dd id="coordinate-last-check">{% if worker.last_successful_check %}<time datetime="{{ worker.last_successful_check }}">{{ worker.last_successful_check }}</time>{% else %}No successful check yet{% endif %}</dd></dl>
@@ -97,6 +100,7 @@
             </article>
           {% empty %}<p class="coordinate-no-messages">This case is ready for its first message.</p>{% endfor %}
         </div>
+        <section class="coordinate-reply-drafts" id="coordinate-reply-drafts" aria-label="Prepared email drafts" hidden></section>
         <p class="coordinate-processing-note" id="coordinate-processing-note" role="status">{% if selected_case.deleted %}This case is in trash. Restore it to see its messages and continue coordinating.{% elif selected_case.status == 'processing' %}The worker is reading this conversation and preparing a reply.{% elif selected_case.status == 'waiting' %}Your message is saved. It will be picked up on the next worker check.{% elif selected_case.status == 'retrying' %}Your message is saved. The worker will retry it on a later check.{% else %}The conversation is up to date. Add a message whenever you’re ready.{% endif %}</p>
         <form class="coordinate-composer" method="post" action="{% url 'coordinate_message' selected_case.id %}">
           <fieldset id="coordinate-compose-fields"{% if selected_case.deleted %} disabled{% endif %}>
@@ -109,9 +113,14 @@
         </form>
         <div class="coordinate-planning" id="coordinate-planning"{% if selected_case.deleted or not coordination %} hidden{% endif %}>
           {% if coordination and not selected_case.deleted %}
+            <header class="coordinate-workspace-heading" id="coordinate-workspace-heading">
+              <div><p class="coordinate-eyebrow">Ready when you need it</p><h2>Case workspace</h2></div>
+              <p>Open a draft, lot, or plan to see the details.</p>
+            </header>
+            {% include "coordinate/mail.html" %}
             {% include "coordinate/briefing.html" %}
             {% include "coordinate/intake.html" %}
-            <details class="coordinate-panel" data-panel="plan" open>
+            <details class="coordinate-panel" data-panel="plan">
               <summary><span>Shipping plan</span><span class="coordinate-panel-summary">Destination, handling &amp; progress</span></summary>
               <div class="coordinate-panel-content">
                 <form class="coordinate-action-form coordinate-grid-form" method="post" action="{{ coordination.plan.update_url }}">
@@ -146,7 +155,6 @@
                 <details class="coordinate-add-record"><summary>Add a provider quote</summary><form class="coordinate-action-form coordinate-grid-form" method="post" action="{{ coordination.urls.add_quote }}">{% csrf_token %}<div><label for="coordinate-quote-name">Provider name</label><input id="coordinate-quote-name" type="text" name="provider_name" maxlength="200" required></div><div><label for="coordinate-quote-email">Provider email</label><input id="coordinate-quote-email" type="email" name="provider_email" required maxlength="254"></div><div><label for="coordinate-quote-amount">Quoted amount</label><input id="coordinate-quote-amount" type="number" name="amount" step="0.01" min="0" required></div><div><label for="coordinate-quote-currency">Currency</label><input id="coordinate-quote-currency" type="text" name="currency" value="USD" maxlength="3" readonly required></div><div class="coordinate-form-footer coordinate-field-wide"><p>Record the quote exactly as provided.</p><div><button class="coordinate-text-button" type="reset">Reset changes</button><button class="coordinate-button" type="submit">Add quote</button></div></div></form></details>
               </div>
             </details>
-            {% include "coordinate/mail.html" %}
             <details class="coordinate-panel" data-panel="research">
               <summary><span>Source notes <span class="coordinate-panel-count">{{ coordination.research|length }}</span></span><span class="coordinate-panel-summary">Retrieved lot information</span></summary>
               <div class="coordinate-panel-content">

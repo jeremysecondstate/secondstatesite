@@ -12,6 +12,7 @@ urlpatterns = [
     path("", views.coordinate, name="coordinate"),
     path("state/", views.state, name="coordinate_state"),
     path("cases/", views.create_case, name="coordinate_create"),
+    path("trash/empty/", views.empty_trash, name="coordinate_empty_trash"),
     path("<uuid:case_id>/", views.coordinate, name="coordinate_case"),
     path("<uuid:case_id>/messages/", views.add_message, name="coordinate_message"),
     path("<uuid:case_id>/documents/", intake.add_document, name="coordinate_intake_add"),

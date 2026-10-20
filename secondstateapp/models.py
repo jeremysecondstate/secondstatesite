@@ -513,9 +513,15 @@ class CoordinateCase(models.Model):
     updated_at = models.DateTimeField(default=timezone.now)
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     deleted_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    # Irreversible workspace removal retains delivery receipts and replay tombstones.
+    purged_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         ordering = ["-updated_at", "id"]
+        constraints = [models.CheckConstraint(
+            condition=models.Q(purged_at__isnull=True) | models.Q(deleted_at__isnull=False),
+            name="coordinate_purged_requires_trash",
+        )]
 
 
 class CoordinateMessage(models.Model):
