@@ -46,7 +46,9 @@ def show_browser_helper(parent, entries, *, import_snapshots):
         row=0, column=0, sticky="w",
     )
     ttk.Label(
-        body, text="Choose an artist below. Unfinished searches appear first. Repeat for each artist and results page you need.",
+        body, text=("For a whole artist list, use the SecondState Invaluable Collector extension, then More → "
+                    "Import browser capture and update Calendar. Setup: docs/invaluable-collector.md.\n\n"
+                    "The manual fallback below works for individual pages. Unfinished searches appear first."),
         wraplength=660,
     ).grid(row=1, column=0, sticky="ew", pady=(8, 16))
     choices = ttk.Combobox(body, state="readonly", values=[entry.watch_label for entry in entries], width=60)

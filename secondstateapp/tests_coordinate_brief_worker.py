@@ -1,4 +1,5 @@
 """Worker capability negotiation, document isolation, and brief transport tests."""
+from copy import deepcopy
 import json
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -114,6 +115,72 @@ class BriefWorkerTests(TestCase):
         self.assertEqual(worker.validate_drafts([draft], payload), [draft])
         payload["documents"] = []
         with self.assertRaises(worker.WorkerError):
+            worker.validate_drafts([draft], payload)
+
+    def test_missing_destination_preserves_rough_email_and_separate_brief_for_review(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True, brief_enabled=True,
+                       coordination={"plan": {"stage": "preparing", "destination": ""}})
+        payload["messages"][0]["body"] = (
+            "We won lot 17, a framed print listed at 20 x 30 inches. "
+            "Please prepare a packing and shipping inquiry to packer@example.com. "
+            "We have not chosen the destination."
+        )
+        original = deepcopy(payload)
+        brief = empty_brief()
+        brief.update(summary="Lot 17 is a framed print; listed dimensions are 20 x 30 inches.",
+                     open_questions=["Which destination should the provider quote?"])
+        brief["shipping"] = {
+            "working_currency": {"code": "", "basis": "unknown", "note": "", "source_refs": []},
+            "quote_readiness": {"status": "needs_destination", "note": "Rough inquiry prepared; destination is unselected."},
+            "actions": [{"owner": "provider", "stage": "quote",
+                         "text": "Compare framed packing with safe unframed options.", "source_refs": ["message:41"]}],
+            "providers": [], "site_checks": [],
+        }
+        draft = {
+            "recipient": "packer@example.com", "subject": "packing and shipping inquiry for lot 17!",
+            "body": "hello! we won lot 17, a framed print listed at 20 x 30 inches. "
+                    "could you help with packing and shipping to [destination to confirm]? "
+                    "please compare framed packing with any safe unframed option you can offer, "
+                    "and let us know what you need to provide a quote. thank you!",
+            "purpose": "Rough quote inquiry for staff review; fill in the destination before sending.",
+        }
+        reply = "I've prepared a rough shipper inquiry and organized the packing details. Which destination should the provider quote?"
+        result, captured = self.generate(payload, {"body": reply, "drafts": [draft], "brief": brief})
+
+        self.assertEqual(result["body"], reply)
+        self.assertEqual(result["drafts"], [draft])
+        self.assertEqual(result["brief"]["shipping"]["quote_readiness"]["status"], "needs_destination")
+        self.assertEqual(result["brief"]["shipping"]["actions"], brief["shipping"]["actions"])
+        self.assertEqual(payload, original)
+        self.assertIn("under 100 words", captured["input"])
+        self.assertIn("Keep email text in drafts", captured["input"])
+        self.assertIn("mark it [destination to confirm]", captured["input"])
+        self.assertIn("do not promote a placeholder to a saved destination or an outreach permission", captured["input"])
+        context = json.loads(captured["input"].split("SAVED WEBSITE CONTEXT (JSON):\n", 1)[1])
+        self.assertEqual(context["coordination"]["plan"]["destination"], "")
+        completion = worker.completion_payload({"claim_token": "same-claim"}, result, [])
+        self.assertEqual(completion["drafts"], [draft])
+        self.assertNotIn("destination", completion)
+        self.assertNotIn("outreach_permission", completion)
+
+    def test_missing_destination_does_not_relax_draft_recipient_or_pause_restrictions(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True,
+                       coordination={"plan": {"destination": ""}})
+        draft = {"recipient": "[provider email to confirm]", "subject": "packing inquiry!",
+                 "body": "hello! could you quote shipping to [destination to confirm]?",
+                 "purpose": "Rough inquiry; destination still needs staff confirmation."}
+        with self.assertRaisesRegex(worker.WorkerError, "unverified draft recipient"):
+            worker.validate_drafts([draft], payload)
+        draft["recipient"] = "packer@example.com"
+        payload["messages"][0]["body"] += " Contact packer@example.com."
+        payload["coordination"]["quotes"] = [{"provider_email": "packer@example.com", "paused": True}]
+        with self.assertRaisesRegex(worker.WorkerError, "paused provider"):
+            worker.validate_drafts([draft], payload)
+        payload["coordination"]["quotes"] = []
+        payload["test_mode"] = True
+        with self.assertRaisesRegex(worker.WorkerError, "Test-mode"):
             worker.validate_drafts([draft], payload)
 
     def test_linked_mail_is_private_citable_evidence_but_body_addresses_are_not_recipients(self):

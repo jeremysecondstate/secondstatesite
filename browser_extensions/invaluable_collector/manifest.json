@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "SECONDSTATE Invaluable Collector",
+  "version": "1.0.0",
+  "description": "Collect public lots from Invaluable searches loaded in your browser, then import one bundle in SECONDSTATE Studio.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage", "alarms"],
+  "background": { "service_worker": "worker.js" },
+  "action": { "default_title": "SECONDSTATE Collector", "default_popup": "popup.html" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.invaluable.com/search*", "https://invaluable.com/search*"],
+      "js": ["core-prelude.js", "snapshot-core.js", "observer-main.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://www.invaluable.com/search*", "https://invaluable.com/search*"],
+      "js": ["bridge.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ]
+}

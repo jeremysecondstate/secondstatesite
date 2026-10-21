@@ -3,8 +3,14 @@
 This is the outer scheduled chat's research stage. The website owns case history
 and claims. The isolated reply generator has no search, browser, or action tools.
 The outer chat must actually discover and open sources and hand it validated
-evidence. Read this guide on every independent run; earlier chats, case IDs,
+evidence. Read this guide before handling each claimed research job; earlier chats, case IDs,
 screenshots, and prepared tabs are not fresh evidence.
+
+Public sources remain primary. For a concrete case gap, the outer chat may also
+follow [connected-account research](coordinate-connections.md) using verified
+identities allowed by private operator configuration. Its optional private lookup consumes at most 90 seconds
+of this same research deadline. Private candidates stay outside the public
+evidence handoff unless admitted through an existing validated private intake.
 
 ## Start one job
 

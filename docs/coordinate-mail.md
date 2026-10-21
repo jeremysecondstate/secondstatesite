@@ -31,13 +31,19 @@ The automated inquiry rollout routes tests only to Jeremy; automatic real-provid
 inquiries remain disabled. Explicit staff-approved drafts use the configured live
 email sender. The scheduler must never use Gmail send tools.
 
+This guide governs exact linked-thread synchronization and delivery reconciliation.
+Separate, bounded historical-mail and Drive lookups are described in
+[connected-account research](coordinate-connections.md). Those read-only lookups
+do not extend this guide's account, thread or import scope, establish new reply
+destinations, or grant permission to send.
+
 ## Before claiming a research job
 
 Every existing scheduled run performs a bounded private mail sync **before** the
 normal Coordinate claim. This allows a reply to create work when no research job
 was previously queued. The mail budget is about 60 seconds and is separate from
 the 900-second claimed research lease. Keep the existing ten-minute cadence and
-Astra/Ultra settings.
+saved outer model/reasoning settings. The documented isolated reply command remains Astra/Ultra.
 
 Prepare through the existing ignored production environment:
 
@@ -80,7 +86,9 @@ its manifest reconciliation descriptor, in this order:
    with no additional result page or unexamined matches. Too many results or an
    incomplete search leaves delivery unknown.
 
-These descriptor queries are the only authorized mail searches. Gmail supports
+These descriptor queries are the only authorized searches within this sync and
+delivery-reconciliation stage. Historical lookup follows the separate connected
+research guide and cannot supply an unrelated message to this importer. Gmail supports
 epoch seconds for precise `after`/`before` filtering
 ([Gmail API filtering](https://developers.google.com/workspace/gmail/api/guides/filtering)).
 The server requires one matching observed message and, for fallback, one matching

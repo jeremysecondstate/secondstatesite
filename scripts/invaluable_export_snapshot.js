@@ -304,8 +304,17 @@
     };
   }
 
+  // The companion extension loads this same validator before Invaluable's own
+  // scripts. Core-only mode installs no panel and makes no network requests.
+  const core = { searchSpec, matchingRequests, makeSnapshot, snapshotIsCurrent, snapshotFromCandidate, observeCatalog };
+  if (globalThis.__SECONDSTATE_SNAPSHOT_CORE_ONLY__ === true) {
+    delete globalThis.__SECONDSTATE_SNAPSHOT_CORE_ONLY__;
+    globalThis.SecondStateInvaluableSnapshot = Object.freeze(core);
+    if (typeof module !== "undefined") module.exports = core;
+    return;
+  }
   if (typeof document === "undefined") {
-    if (typeof module !== "undefined") module.exports = { searchSpec, matchingRequests, makeSnapshot, snapshotIsCurrent, snapshotFromCandidate, observeCatalog };
+    if (typeof module !== "undefined") module.exports = core;
     return;
   }
   searchSpec(location.href);

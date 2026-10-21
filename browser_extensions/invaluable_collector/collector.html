@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SECONDSTATE · Invaluable Collector</title><link rel="stylesheet" href="collector.css"></head>
+<body>
+<main>
+  <header><p class="eyebrow">SECONDSTATE</p><h1>Invaluable Collector</h1><p>Visit your artist searches in one browser tab. Save the results as one file for your Calendar.</p></header>
+  <section aria-labelledby="setup-title"><h2 id="setup-title">Set up a capture</h2>
+    <label class="file">Artist bookmarks <input id="bookmarks" type="file" accept=".html,.htm,text/html"></label>
+    <p id="bookmark-note" class="muted">Choose artist-links.html. Only supported Invaluable artist searches are included.</p>
+    <div class="fields"><label>From <input id="start-date" type="date" required></label><label>Through <input id="end-date" type="date" required></label><label>Time zone <input id="time-zone" value="America/New_York" list="zones" required></label><datalist id="zones"><option value="America/New_York"><option value="America/Chicago"><option value="America/Los_Angeles"><option value="Europe/London"><option value="Europe/Paris"></datalist></div>
+    <p class="muted">Both dates are included, up to 90 days. Saved source date filters are removed; Studio filters imported lots to your chosen window. The collector follows all reported source pages, up to 25 pages per artist, and labels incomplete captures.</p>
+    <button id="prepare">Prepare capture</button>
+  </section>
+  <section aria-labelledby="run-title"><div class="section-title"><h2 id="run-title">Capture progress</h2><span id="run-status" class="badge">No run</span></div>
+    <p id="message" role="status" aria-live="polite">Import your bookmarks to begin.</p>
+    <p id="counts" class="muted"></p>
+    <div class="actions"><button id="start">Start</button><button id="pause" class="secondary">Pause</button><button id="resume" class="secondary">Resume</button><button id="skip" class="secondary">Skip artist</button><button id="download">Download bundle</button><button id="reset" class="text-button">Reset run</button></div>
+    <p class="muted">Keep the collector tab available while it works. If verification or a timeout appears, capture pauses and keeps your saved pages. Complete verification yourself, then Resume. You can export partial results at any time.</p>
+    <div class="table-wrap"><table><thead><tr><th>Artist</th><th>Status</th><th>Pages captured</th><th>Lots</th><th>Details</th></tr></thead><tbody id="progress"></tbody></table></div>
+  </section>
+  <footer>Only public lot details from loaded search responses are saved. Your login stays in your browser. Import the downloaded JSON in Studio using <strong>More → Import browser capture and update Calendar…</strong>.</footer>
+</main>
+<script src="core-prelude.js"></script><script src="snapshot-core.js"></script><script src="state.js"></script><script src="collector.js"></script>
+</body></html>

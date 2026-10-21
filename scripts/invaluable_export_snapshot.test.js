@@ -22,6 +22,17 @@ function fixture() {
 }
 const settle = () => new Promise(setImmediate);
 
+test("extension core loads before a document exists without accessing UI or making requests", () => {
+  const context = { __SECONDSTATE_SNAPSHOT_CORE_ONLY__: true, URL, URLSearchParams,
+    document: new Proxy({}, { get() { throw new Error("Core touched the page"); } }),
+    fetch() { throw new Error("Core made a network request"); } };
+  vm.runInNewContext(fs.readFileSync(require.resolve("./invaluable_export_snapshot.js"), "utf8"), context);
+  assert.equal(context.SecondStateInvaluableSnapshot.searchSpec(PAGE).artist, "Josef Albers");
+  assert.ok(Object.isFrozen(context.SecondStateInvaluableSnapshot));
+  assert.equal(context.__SECONDSTATE_SNAPSHOT_CORE_ONLY__, undefined);
+  assert.equal(context.SecondStateInvaluableSnapshot.makeSnapshot(fixture()).results[0].nbHits, 1);
+});
+
 test("repeatedly encoded artist/search URL becomes verified public source URL", () => {
   const spec = searchSpec(PAGE + "&utm_source=private-tracker");
   assert.equal(spec.artist, "Josef Albers");

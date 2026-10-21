@@ -271,6 +271,7 @@ class ArtistWatchlistPanel(ttk.Frame):
         self.more_menu.add_command(label="Load from Calendar", command=self.load_shared_calendar)
         self.more_menu.add_separator()
         self.more_menu.add_command(label="Use my browser for Invaluable…", command=self.use_regular_browser)
+        self.more_menu.add_command(label="Import browser capture and update Calendar…", command=self.import_browser_capture)
         self.more_menu.add_command(label="Import saved Invaluable pages…", command=self.import_saved_invaluable_pages)
         self.more_menu.add_command(label="Import saved Heritage pages…", command=self.import_saved_heritage_pages)
         self.more_menu.add_command(label="Import saved Doyle / Phillips pages…", command=self.import_saved_sale_pages)
@@ -1456,18 +1457,24 @@ class ArtistWatchlistPanel(ttk.Frame):
         callback = (lambda: self.import_saved_invaluable_pages(artist_scope=set(scope))) if scope else self.import_saved_invaluable_pages
         show_browser_helper(self, entries, import_snapshots=callback)
 
-    def import_saved_invaluable_pages(self, *, artist_scope: set[str] | None = None) -> None:
+    def import_browser_capture(self) -> None:
+        """Refresh captured records, including existing Calendar lots."""
+        self.import_saved_invaluable_pages(browser_capture=True)
+
+    def import_saved_invaluable_pages(self, *, artist_scope: set[str] | None = None,
+                                     browser_capture: bool = False) -> None:
         """Import readable search snapshots and upload their normalized lots."""
         if self._is_busy():
             return
         path = self.bookmark_path_var.get().strip()
         if not self._load_watchlist_for_update(path):
             return
-        scope = artist_scope or self.__dict__.get("_last_artist_scope")
-        self._last_artist_scope = set(scope) if scope else None
+        scope = None if browser_capture else artist_scope or self.__dict__.get("_last_artist_scope")
+        if not browser_capture:
+            self._last_artist_scope = set(scope) if scope else None
         chosen = [
-            entry for entry in self.active_entries
-            if entry.source == "Invaluable" and entry.watch_label in (scope or self.selected_artists)
+            entry for entry in (self.all_entries if browser_capture else self.active_entries)
+            if entry.source == "Invaluable" and (browser_capture or entry.watch_label in (scope or self.selected_artists))
         ]
         if not chosen:
             messagebox.showwarning(
@@ -1477,12 +1484,16 @@ class ArtistWatchlistPanel(ttk.Frame):
             )
             return
         paths = filedialog.askopenfilenames(
-            title="Import saved Invaluable upcoming search pages",
-            filetypes=[("Saved Invaluable pages", "*.html *.htm *.json"), ("All Files", "*.*")],
+            title="Import Invaluable browser capture" if browser_capture else "Import saved Invaluable upcoming search pages",
+            filetypes=([("Browser capture", "*.json")] if browser_capture else
+                       [("Saved Invaluable pages", "*.html *.htm *.json"), ("All Files", "*.*")]),
             parent=self,
         )
         if not paths:
             return
+        if browser_capture:
+            self._last_artist_scope = None
+            self._scan_missing_only = False
         previous_lots = list(self.current_lots)
         previous_fallback_keys = set(self.fallback_lot_keys)
         horizon_days = self._horizon_days()
@@ -1509,7 +1520,10 @@ class ArtistWatchlistPanel(ttk.Frame):
                     merged.values(),
                     key=lambda lot: (lot.relevant_at or "9999", lot.artist_watchlist_name.casefold(), lot.lot_number),
                 )
-                self._sync_and_finish_result(result, preserve_source_errors=True, artist_scope=scope)
+                self._sync_and_finish_result(
+                    result, preserve_source_errors=True, artist_scope=scope,
+                    **({"upload_lot_keys": observed_keys} if browser_capture else {}),
+                )
             except Exception as exc:
                 message = " ".join(str(exc).split())[:500]
                 self.after(0, lambda message=message: self._finish_refresh_error(message))
@@ -1605,7 +1619,8 @@ class ArtistWatchlistPanel(ttk.Frame):
         return (lot.artist_watchlist_name or lot.artist).casefold() in {name.casefold() for name in scope}
 
     def _sync_and_finish_result(self, result: WatchlistResult, *, preserve_source_errors: bool = False,
-                                artist_scope: set[str] | None = None) -> None:
+                                artist_scope: set[str] | None = None,
+                                upload_lot_keys: set[str] | None = None) -> None:
         """Run calendar sync on the worker for either a refresh or a saved import."""
 
         if preserve_source_errors:
@@ -1626,7 +1641,8 @@ class ArtistWatchlistPanel(ttk.Frame):
         already_on_calendar = 0
         uploaded_lot_keys = None
         calendar_lot_keys = self.__dict__.get("_calendar_lot_keys")
-        upload_lots = list(result.lots)
+        upload_lots = [lot for lot in result.lots
+                       if upload_lot_keys is None or lot.cache_key in upload_lot_keys]
         configured = self._calendar_sync_configured() if not result.stopped else False
         if not result.stopped and result.lots:
             if configured:
