@@ -1,18 +1,35 @@
 # Coordinate reviewed email and private reply sync
 
-Free-text Coordinate email sends only after staff reviews the exact recipient, subject and body
-and then selects **Send reviewed email** on the website. Review alone does not
-send. Delivery snapshots are immutable. A changed draft needs a new review;
-an accepted send request cannot be used to send a second copy. Provider pauses,
-case visibility and existing quote/plan approval requirements still apply.
+Staff can send the exact displayed email drafts either with **Send reviewed email**
+or by approving them in case chat, for example, **“I love it! Send it!”** A clear
+conversational send instruction is the user's review and send authorization; it
+must not queue another research or reply-generation pass. The button remains
+available for sending an individual draft.
+
+Conversational approval is bound to the displayed latest reply and its exact
+draft IDs and content digests. It never selects older drafts to replace ones
+already sent. If the displayed set or wording changed, the case reports that
+specific issue without sending an unseen version. Conditional, negated, quoted,
+or ambiguous wording does not authorize delivery. Delivery snapshots are
+immutable, accepted requests are idempotent, and uncertain outcomes are
+reconciled rather than resent. Provider pauses, case visibility and existing
+quote/plan approval requirements still apply. Marking a draft reviewed by itself
+does not send it.
+
+The web process allows 180 seconds for a synchronous bundle of at most three
+emails (`GUNICORN_TIMEOUT` and `GUNICORN_GRACEFUL_TIMEOUT` can override it).
+This is operational headroom, not a total Gmail/OAuth deadline; library retries
+and host shutdown limits can still interrupt a request. Reserved delivery records
+survive interruption and must be reconciled, never blindly resent.
 
 The sender is jeremy@secondstate.art. The server uses its existing Gmail send
 OAuth connection; it does not gain inbox access. Reply reading uses the connected
 secondstate Gmail account in the outer app. The isolated reply generator cannot
 send. A separate server-owned initial quote dispatcher can use explicitly saved
 case permission under [Initial quote inquiries](coordinate-quote-outreach.md).
-The current rollout routes those tests only to Jeremy; real provider outreach
-remains disabled. The scheduler must never use Gmail send tools.
+The automated inquiry rollout routes tests only to Jeremy; automatic real-provider
+inquiries remain disabled. Explicit staff-approved drafts use the configured live
+email sender. The scheduler must never use Gmail send tools.
 
 ## Before claiming a research job
 

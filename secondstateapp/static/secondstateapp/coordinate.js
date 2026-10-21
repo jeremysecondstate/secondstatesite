@@ -31,6 +31,7 @@
   let actionInFlight = false;
   let mutationVersion = 0;
   const uncertainEmailSends = new Set();
+  const renderedMessageBodies = new WeakMap();
   let initialPlanning = {};
   const initialPlanningScript = document.getElementById("coordinate-initial-planning");
   if (initialPlanningScript) {
@@ -69,8 +70,11 @@
 
   root.querySelectorAll("time[datetime]").forEach((element) => formatTime(element, element.dateTime));
   formatDeadlineInputs(root);
-  root.querySelectorAll(".coordinate-message-body").forEach((element) => conversationBody(element, element.textContent,
-    Boolean(element.closest(".coordinate-message--assistant:not(.is-deleted)"))));
+  root.querySelectorAll(".coordinate-message-body").forEach((element) => {
+    const article = element.closest(".coordinate-message");
+    if (article) renderedMessageBodies.set(article, element.textContent);
+    conversationBody(element, element.textContent, Boolean(element.closest(".coordinate-message--assistant:not(.is-deleted)")));
+  });
   root.querySelectorAll(".coordinate-email-body").forEach((element) => messageBody(element, element.textContent));
   updateWorkspaceLinks(initialPlanning);
   initialPlanning = null;
@@ -249,13 +253,50 @@
   }
 
   function workspaceItems(coordination) {
-    // The API orders drafts oldest first; the reply should surface recent work.
-    const items = (coordination.drafts || []).slice(-3).reverse().map((draft) => ({
+    const items = replyDraftBundle(coordination).map((draft) => ({
       panel: "drafts", target: `coordinate-draft-${draft.id}`, label: `Email draft · ${draft.subject || "Untitled draft"}`,
     }));
     if (coordination.brief) items.push({ panel: "briefing", label: `Case brief · ${(coordination.brief.lots || []).length} lots` });
     if (coordination.research?.length) items.push({ panel: "research", label: `Sources · ${coordination.research.length}` });
     return items;
+  }
+
+  function replyDraftBundle(coordination) {
+    // Keep the exact latest reply's bundle, including delivered messages. Filtering
+    // all case drafts before taking three can resurrect superseded old wording.
+    const bundle = coordination?.chat_send;
+    if (!bundle?.reply_id || !Array.isArray(bundle.drafts) || !bundle.drafts.length || bundle.drafts.length > 3) return [];
+    const visible = coordination.drafts || [];
+    const drafts = new Map(visible.map((draft) => [String(draft.id), draft]));
+    const ids = bundle.drafts.map((item) => String(item.id));
+    if (drafts.size !== visible.length || new Set(ids).size !== ids.length) return [];
+    const matched = bundle.drafts.map((item) => drafts.get(String(item.id)));
+    // The payload and signed snapshot can come from separate database reads.
+    // Never approve a missing row or wording from a different saved version.
+    if (matched.some((draft, index) => !draft || !bundle.drafts[index].content_digest
+        || draft.current_digest !== bundle.drafts[index].content_digest)) return [];
+    return matched;
+  }
+
+  function setSendContext(context) {
+    const field = document.getElementById("coordinate-send-context");
+    if (field) field.value = context?.token ? JSON.stringify(context) : "";
+  }
+
+  function prepareChatSendContext(form) {
+    const field = form.elements.send_context;
+    if (!field?.value) return;
+    let context;
+    try { context = JSON.parse(field.value); } catch (_) { field.value = ""; return; }
+    const ids = new Set((context.drafts || []).map((draft) => String(draft.id)));
+    const dirty = Array.from(planning?.querySelectorAll(".coordinate-draft[data-draft-id]") || [])
+      .some((card) => ids.has(card.dataset.draftId) && card.querySelector("form[data-dirty='true']"));
+    if (dirty || caseDeleted) {
+      // Ordinary chat still works; a send instruction receives the server's
+      // actionable missing-context response instead of sending unsaved wording.
+      field.value = "";
+      if (dirty) notice("Save or reset the draft’s edits before asking to send it.", true);
+    }
   }
 
   function renderDraftPreview(draft, open = false) {
@@ -283,18 +324,21 @@
     }
     const body = document.createElement("div");
     body.className = "coordinate-reply-draft-body";
-    // The saved wording is untrusted text; previews never contain editable or send controls.
+    // Saved wording remains text, and the canonical editor retains manual Send.
     body.textContent = String(draft.body || "");
     const footer = document.createElement("div");
     footer.className = "coordinate-reply-draft-footer";
     const status = document.createElement("span");
-    status.textContent = draft.blocked ? "Provider review needed" : draft.status === "reviewed" ? "Reviewed version" : "Draft for review";
+    const deliveryLabels = { sent: "Sent", unknown: "Delivery not confirmed", sending: "Sending", queued: "Send queued" };
+    const locked = Object.hasOwn(deliveryLabels, draft.send_status) || draft.editable === false;
+    status.textContent = deliveryLabels[draft.send_status] || (draft.blocked ? "Provider review needed"
+      : draft.status === "reviewed" ? "Reviewed version" : "Draft for review");
     const edit = document.createElement("button");
     edit.type = "button";
     edit.className = "coordinate-button coordinate-button-secondary";
     edit.dataset.openPanel = "drafts";
     edit.dataset.openRecord = `coordinate-draft-${draft.id}`;
-    edit.textContent = "Review and edit draft";
+    edit.textContent = locked ? "View email details" : "Review and edit draft";
     footer.append(status, edit);
     content.append(body, footer);
     card.append(summary, content);
@@ -303,17 +347,32 @@
 
   function updateReplyDrafts(coordination, replyId) {
     if (!replyDrafts) return;
-    const drafts = !caseDeleted && replyId ? (coordination?.drafts || [])
-      .filter((draft) => draft.editable !== false && !["queued", "sending", "sent", "unknown"].includes(draft.send_status))
-      .slice(-3).reverse() : [];
+    const context = coordination?.chat_send;
+    const drafts = !caseDeleted && replyId ? replyDraftBundle(coordination) : [];
     if (!drafts.length) {
       replyDrafts.hidden = true;
       replyDrafts.replaceChildren();
       delete replyDrafts.dataset.signature;
+      setSendContext(null);
       return;
     }
-    const signature = JSON.stringify([replyId, drafts.map(({ id, recipient, subject, body, status, blocked, quote_test, actual_recipient }) =>
-      ({ id, recipient, subject, body, status, blocked, quote_test, actual_recipient }))]);
+    const composer = document.getElementById("coordinate-body");
+    const field = document.getElementById("coordinate-send-context");
+    // A new poll must not silently substitute different emails while the user
+    // writes their approval. The server rejects this older binding if it changed.
+    if (composer?.value.trim() && (composer.dataset.sendContextFrozen === "true" || (field?.value && replyDrafts.dataset.signature))) {
+      const visibleIds = new Set((coordination.drafts || []).map((draft) => String(draft.id)));
+      const displayed = Array.from(replyDrafts.querySelectorAll("[data-preview-draft-id]"));
+      if (displayed.every((card) => visibleIds.has(card.dataset.previewDraftId))) return;
+      replyDrafts.hidden = true;
+      replyDrafts.replaceChildren();
+      delete replyDrafts.dataset.signature;
+      setSendContext(null);
+      return;
+    }
+    setSendContext(context);
+    const signature = JSON.stringify([context, drafts.map(({ id, recipient, subject, body, status, blocked, quote_test, actual_recipient, send_status, editable }) =>
+      ({ id, recipient, subject, body, status, blocked, quote_test, actual_recipient, send_status, editable }))]);
     if (replyDrafts.dataset.signature === signature) return;
     const states = new Map(Array.from(replyDrafts.querySelectorAll("[data-preview-draft-id]"), (card) => [card.dataset.previewDraftId, card.open]));
     const heading = document.createElement("div");
@@ -321,7 +380,8 @@
     const title = document.createElement("h3");
     title.textContent = "Email drafts";
     const count = document.createElement("span");
-    count.textContent = `${drafts.length} ready to review`;
+    const pending = drafts.filter((draft) => draft.editable !== false && !["queued", "sending", "sent", "unknown"].includes(draft.send_status)).length;
+    count.textContent = pending ? `${pending} ready to review` : "Delivery status";
     heading.append(title, count);
     replyDrafts.replaceChildren(heading, ...drafts.map((draft, index) =>
       renderDraftPreview(draft, states.has(String(draft.id)) ? states.get(String(draft.id)) : index === 0)));
@@ -491,13 +551,16 @@
       const deleted = Boolean(message.deleted);
       const hidden = deleted || caseDeleted;
       const deletionChanged = article.dataset.deleted !== String(deleted) || article.dataset.caseHidden !== String(caseDeleted);
-      if (deletionChanged) {
+      const bodyText = String(message.body || "");
+      if (deletionChanged || (!hidden && renderedMessageBodies.get(article) !== bodyText)) {
         const body = article.querySelector(".coordinate-message-body");
         if (hidden) {
           // Discard prior message content immediately; never retain it in hidden DOM.
           body.replaceChildren(document.createTextNode(caseDeleted ? "Hidden while this case is in trash." : "Message deleted. Restore to show it again."));
+          renderedMessageBodies.delete(article);
         } else {
-          conversationBody(body, String(message.body || ""), message.role === "assistant");
+          conversationBody(body, bodyText, message.role === "assistant");
+          renderedMessageBodies.set(article, bodyText);
         }
         article.dataset.deleted = String(deleted);
         article.dataset.caseHidden = String(caseDeleted);
@@ -956,7 +1019,13 @@
   // Retain the same idempotency token on retry. Native POST also works without JS.
   root.querySelectorAll(".coordinate-composer, .coordinate-new-form").forEach((form) => {
     const body = form.querySelector("textarea[name='body']");
-    body.addEventListener("input", () => body.setCustomValidity(""));
+    body.addEventListener("input", () => {
+      body.setCustomValidity("");
+      if (form.matches(".coordinate-composer")) {
+        body.dataset.sendContextFrozen = body.value.trim() ? "true" : "false";
+        if (!body.value.trim() && latestState) updateWorkspaceLinks(latestState.coordination);
+      }
+    });
     form.addEventListener("submit", (event) => {
       if (!body.value.trim()) {
         event.preventDefault();
@@ -964,6 +1033,7 @@
         body.reportValidity();
         return;
       }
+      if (form.matches(".coordinate-composer")) prepareChatSendContext(form);
       const button = form.querySelector("button[type='submit']");
       button.disabled = true;
       button.textContent = "Saving…";

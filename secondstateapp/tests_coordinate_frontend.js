@@ -39,6 +39,9 @@ root.addEventListener = (name, callback) => { (listeners[name] ||= []).push(call
 const planning = new Element();
 const notice = new Element();
 const replyDrafts = new Element("section");
+const messageList = new Element();
+const composerBody = new Element("textarea");
+const sendContext = new Element("input");
 function descendants(element) {
   return element.children.flatMap((child) => [child, ...descendants(child)]);
 }
@@ -46,7 +49,8 @@ replyDrafts.querySelectorAll = () => descendants(replyDrafts).filter((element) =
 const document = {
   getElementById(id) {
     return { coordinate: root, "coordinate-planning": planning, "coordinate-action-notice": notice,
-      "coordinate-reply-drafts": replyDrafts }[id] || null;
+      "coordinate-reply-drafts": replyDrafts, "coordinate-body": composerBody,
+      "coordinate-send-context": sendContext, "coordinate-message-list": messageList }[id] || null;
   },
   createElement: (tag) => new Element(tag),
   createDocumentFragment: () => new Element("fragment"),
@@ -62,6 +66,7 @@ const finalPoll = source.lastIndexOf("  poll();");
 assert.ok(finalPoll > 0);
 source = source.slice(0, finalPoll) + `
   globalThis.testHooks = { messageBody, conversationBody, preserveDetails, workspaceItems, renderDraftPreview, updateReplyDrafts,
+    replyDraftBundle, prepareChatSendContext, updateMessages,
     httpLink, newYorkDatetime, useSuggestion,
     validateIntake, validateEmailSend, panelSignature,
     setCaseDeleted(value) { caseDeleted = value; },
@@ -137,7 +142,8 @@ hooks.preserveDetails(oldPanel, nextPanel);
 assert.equal(nextPanel.open, true);
 assert.deepEqual(nextDetails.map((item) => item.open), [false, false, true],
   "Polling preserves the selected draft when another draft is inserted or reordered.");
-const caseItems = hooks.workspaceItems({ drafts: [1, 2, 3, 4, 5].map((id) => ({ id, subject: `Inquiry ${id}` })),
+const caseItems = hooks.workspaceItems({ drafts: [1, 2, 3, 4, 5].map((id) => ({ id, subject: `Inquiry ${id}`, current_digest: `digest-${id}` })),
+  chat_send: { reply_id: 44, drafts: [5, 4, 3].map((id) => ({ id, content_digest: `digest-${id}` })) },
   brief: { lots: [{}, {}] }, research: [{}] });
 assert.deepEqual(Array.from(caseItems.slice(0, 3), (item) => item.target),
   ["coordinate-draft-5", "coordinate-draft-4", "coordinate-draft-3"],
@@ -168,8 +174,11 @@ assert.equal(editDraft.dataset.openPanel, "drafts");
 assert.equal(editDraft.dataset.openRecord, "coordinate-draft-draft-preview-1",
   "Review opens the canonical editor, preserving its saved review and send bindings.");
 
-const previewState = { drafts: [1, 2, 3, 4].map((id) => ({
+const previewState = { chat_send: { reply_id: 44, last_message_id: 44, token: "signed-bundle-44",
+  drafts: [4, 3, 2].map((id) => ({ id: String(id), content_digest: `digest-${id}` })) },
+  drafts: [1, 2, 3, 4].map((id) => ({
   id: String(id), recipient: `packer${id}@example.test`, subject: `Inquiry ${id}`, body: `Saved email ${id}`, editable: true,
+  current_digest: `digest-${id}`,
 })).concat(["queued", "sending", "sent", "unknown"].map((send_status) => ({
   id: send_status, subject: "Locked correspondence", body: "Do not show as an available draft", editable: true, send_status,
 })), [{ id: "readonly", body: "Read-only correspondence", editable: false }]) };
@@ -177,7 +186,9 @@ hooks.updateReplyDrafts(previewState, "reply-44");
 const previewCards = () => descendants(replyDrafts).filter((element) => element.dataset.previewDraftId);
 assert.equal(replyDrafts.hidden, false);
 assert.deepEqual(Array.from(previewCards(), (card) => card.dataset.previewDraftId), ["4", "3", "2"],
-  "Only the latest three editable, unsent drafts appear up front.");
+  "Only the server-identified reply bundle appears up front.");
+assert.equal(sendContext.value, JSON.stringify(previewState.chat_send),
+  "The submitted approval is bound to the exact displayed IDs, digests, reply and signed context.");
 assert.deepEqual(Array.from(previewCards(), (card) => Boolean(card.open)), [true, false, false]);
 assert.ok(!replyDrafts.textContent.includes("Do not show as an available draft"));
 assert.ok(!replyDrafts.textContent.includes("Read-only correspondence"));
@@ -194,12 +205,43 @@ hooks.updateReplyDrafts(previewState, "reply-44");
 assert.ok(replyDrafts.textContent.includes("corrected@example.test"));
 previewState.drafts[3].send_status = "sent";
 hooks.updateReplyDrafts(previewState, "reply-44");
-assert.deepEqual(Array.from(previewCards(), (card) => card.dataset.previewDraftId), ["3", "2", "1"]);
-assert.ok(!replyDrafts.textContent.includes("Revised saved wording for provider four."),
-  "A new delivery state removes the former draft from the preview immediately.");
+assert.deepEqual(Array.from(previewCards(), (card) => card.dataset.previewDraftId), ["4", "3", "2"],
+  "Sending one message must not resurrect an older superseded draft to fill its place.");
+assert.ok(replyDrafts.textContent.includes("Revised saved wording for provider four."));
+assert.ok(previewCards()[0].textContent.includes("Sent"));
+assert.ok(previewCards()[0].textContent.includes("View email details"));
+previewState.drafts[2].send_status = "unknown";
+hooks.updateReplyDrafts(previewState, "reply-44");
+assert.ok(previewCards()[1].textContent.includes("Delivery not confirmed"));
+
+composerBody.value = "I love it! Send it!";
+const approvedContext = sendContext.value;
+const approvedPreview = replyDrafts.textContent;
+previewState.chat_send = { ...previewState.chat_send, last_message_id: 45, token: "new-unseen-binding" };
+previewState.drafts[1].body = "Different wording from a concurrent edit.";
+hooks.updateReplyDrafts(previewState, "reply-45");
+assert.equal(sendContext.value, approvedContext, "Polling cannot replace consent while the user writes approval.");
+assert.equal(replyDrafts.textContent, approvedPreview, "The displayed wording stays matched to that consent.");
+composerBody.value = "";
+hooks.updateReplyDrafts(previewState, "reply-45");
+assert.equal(sendContext.value, JSON.stringify(previewState.chat_send));
+assert.ok(replyDrafts.textContent.includes("Different wording from a concurrent edit."));
+
+const dirtyDraft = new Element();
+dirtyDraft.dataset.draftId = "2";
+dirtyDraft.querySelector = () => ({});
+planning.querySelectorAll = () => [dirtyDraft];
+hooks.prepareChatSendContext({ elements: { send_context: sendContext } });
+assert.equal(sendContext.value, "", "Unsaved edits cannot authorize sending the earlier saved version.");
+assert.ok(notice.textContent.includes("Save or reset"));
+planning.querySelectorAll = () => [];
+hooks.updateReplyDrafts(previewState, "reply-45");
+assert.equal(sendContext.value, JSON.stringify(previewState.chat_send));
+
 hooks.updateReplyDrafts(previewState, "");
 assert.equal(replyDrafts.hidden, true);
 assert.equal(replyDrafts.textContent, "", "A hidden/deleted response leaves no previous email wording in the DOM.");
+assert.equal(sendContext.value, "");
 hooks.updateReplyDrafts({ drafts: [] }, "reply-44");
 assert.equal(replyDrafts.hidden, true);
 hooks.updateReplyDrafts(previewState, "reply-44");
@@ -207,7 +249,45 @@ hooks.setCaseDeleted(true);
 hooks.updateReplyDrafts(previewState, "reply-44");
 assert.equal(replyDrafts.hidden, true);
 assert.equal(replyDrafts.textContent, "", "Trashing the case removes its private previews immediately.");
+assert.equal(sendContext.value, "");
 hooks.setCaseDeleted(false);
+hooks.updateReplyDrafts({ drafts: previewState.drafts }, "reply-44");
+assert.equal(replyDrafts.hidden, true, "Missing reply binding never falls back to arbitrary old drafts.");
+composerBody.value = "Send it";
+composerBody.dataset.sendContextFrozen = "true";
+hooks.updateReplyDrafts(previewState, "reply-44");
+assert.equal(sendContext.value, "", "A draft that arrives after typing starts cannot gain approval from that message.");
+assert.equal(replyDrafts.hidden, true);
+composerBody.value = "";
+composerBody.dataset.sendContextFrozen = "false";
+
+for (const problem of ["missing", "digest", "duplicate-binding", "duplicate-row"]) {
+  const inconsistent = JSON.parse(JSON.stringify(previewState));
+  if (problem === "missing") inconsistent.drafts = inconsistent.drafts.filter((draft) => draft.id !== "3");
+  if (problem === "digest") inconsistent.drafts.find((draft) => draft.id === "3").current_digest = "newer-saved-version";
+  if (problem === "duplicate-binding") inconsistent.chat_send.drafts[1] = inconsistent.chat_send.drafts[0];
+  if (problem === "duplicate-row") inconsistent.drafts.push(inconsistent.drafts.find((draft) => draft.id === "3"));
+  hooks.updateReplyDrafts(previewState, "reply-44");
+  assert.ok(sendContext.value);
+  hooks.updateReplyDrafts(inconsistent, "reply-44");
+  assert.equal(replyDrafts.hidden, true, `An inconsistent ${problem} bundle is not displayed for approval.`);
+  assert.equal(sendContext.value, "", `An inconsistent ${problem} bundle must discard its signed send binding.`);
+}
+
+const receiptArticle = new Element("article");
+receiptArticle.dataset = { messageId: "99", deleted: "false", caseHidden: "false" };
+receiptArticle.classList = { toggle() {} };
+const receiptBody = new Element();
+receiptArticle.querySelector = (selector) => selector === ".coordinate-message-body" ? receiptBody : null;
+messageList.querySelectorAll = (selector) => selector === "[data-message-id]" ? [receiptArticle] : [];
+hooks.updateMessages([{ id: 99, role: "assistant", body: "Sending the 3 emails you approved." }]);
+assert.equal(receiptBody.textContent, "Sending the 3 emails you approved.");
+hooks.updateMessages([{ id: 99, role: "assistant", body: "Sent 3 emails. The delivery receipts are shown below." }]);
+assert.equal(receiptBody.textContent, "Sent 3 emails. The delivery receipts are shown below.",
+  "A completed send updates its existing conversation message during polling.");
+hooks.updateMessages([{ id: 99, role: "assistant", body: "Sent 3 emails.", deleted: true }]);
+assert.equal(receiptBody.textContent, "Message deleted. Restore to show it again.");
+messageList.querySelectorAll = () => [];
 
 function suggestionFixture(notes = "Staff confirmed: keep the mat.", deadline = "") {
   const form = new Element("form");

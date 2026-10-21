@@ -21,7 +21,7 @@ class CoordinateNewCaseFrontendTests(TestCase):
         self.assertIsNone(response.context["coordination"])
         self.assertTrue(response.context["worker"]["email_sending_enabled"])
         self.assertContains(response, "Staff-reviewed email coordination")
-        self.assertContains(response, "Email requires a separate Send reviewed email action.")
+        self.assertContains(response, "Say “send it” to send the displayed email drafts, or use Send reviewed email.")
         self.assertNotContains(response, "Email not enabled")
         self.assertNotContains(response, "Email sending is not enabled.")
         # Email cannot become globally enabled when the shipping workflow is off.

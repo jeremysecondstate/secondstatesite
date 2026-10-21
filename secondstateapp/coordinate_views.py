@@ -97,6 +97,10 @@ def _state(selected=None):
         }
         (trash_cases if case.deleted_at else cases).append(item)
     worker = CoordinateWorkerState.objects.filter(pk=1).first()
+    coordination = coordination_state(selected)
+    if coordination is not None:
+        from .coordinate_chat_send import chat_send_state
+        coordination["chat_send"] = chat_send_state(selected, coordination["drafts"])
     return {
         "cases": cases,
         "trash_cases": trash_cases,
@@ -104,7 +108,7 @@ def _state(selected=None):
         "messages": [_message_json(message, selected.deleted_at) for message in selected.messages.filter(_conversation_visible()).select_related("author", "job")] if selected else [],
         "worker": {"last_successful_check": _iso(worker.last_successful_check) if worker else None, "test_mode": not enabled(), "draft_only": enabled(),
                    "email_sending_enabled": enabled() and bool(getattr(settings, "COORDINATE_EMAIL_SENDING_ENABLED", False))},
-        "coordination": coordination_state(selected),
+        "coordination": coordination,
         "new_case_token": str(uuid.uuid4()), "message_token": str(uuid.uuid4()),
     }
 
@@ -242,6 +246,7 @@ def create_case(request):
     return _saved_response(request, message)
 
 
+@transaction.non_atomic_requests
 @never_cache
 @staff_member_required
 @require_POST
@@ -255,6 +260,13 @@ def add_message(request, case_id):
     duplicate = _duplicate(request, token, body, case_id)
     if duplicate is not None:
         return duplicate
+    from .coordinate_chat_send import explicit_send, send_from_chat
+    if explicit_send(body):
+        try:
+            message = send_from_chat(case_id, request.user, body, token, request.POST.get("send_context", ""))
+        except ValueError as exc:
+            return _form_error(request, str(exc), case, status=409)
+        return _saved_response(request, message)
     try:
         with transaction.atomic():
             case = _locked_case(case_id)

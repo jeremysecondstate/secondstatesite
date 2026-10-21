@@ -167,6 +167,19 @@ Use Render's protected environment settings or the existing secret-management wo
 
 Environment values take precedence over the local file fallbacks. A fresh production checkout will not contain the ignored originals, so both values are required on Render. If either effective playbook is unavailable, the worker API refuses to claim work. Update private context through the server's environment configuration and restart/reload the service as required by that configuration mechanism; subsequent claims receive the updated context.
 
+## Conversational email approval
+
+The authenticated case chat accepts clear instructions such as “I love it! Send it!”
+as approval to send the exact current displayed drafts. The existing Send reviewed
+email button remains available. The browser submits a signed context bound to the
+latest draft-owning reply and exact content digests. The server validates that
+context, records staff approval, reserves immutable deliveries, and sends directly
+without a research job. Retries never resend accepted or uncertain deliveries.
+Changed or ambiguous context produces a specific in-case explanation. Old drafts
+never replace already-sent drafts in the current approval bundle. This supersedes
+older button-only wording above; the isolated research generator still cannot send.
+See [email delivery](coordinate-mail.md) for the complete contract.
+
 ## Before any production rollout
 
 Review the private local evidence, apply the migrations to the intended database, configure the two private multiline playbook values and server/worker token outside source control, and provide a reachable HTTPS origin and a separately authenticated Codex execution host. For the draft workflow, also enable `COORDINATE_DRAFT_WORKFLOW_ENABLED=true` and configure `COORDINATE_PRICE_REVIEWER_USERNAME`. Verify PostgreSQL concurrency, staff access, and the designated reviewer's identity in that environment. The website does not automatically start a worker. A hosted worker does not inherit the desktop account, tools or connections.

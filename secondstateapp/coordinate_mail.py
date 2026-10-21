@@ -218,14 +218,25 @@ def _headers_for_thread(thread):
 def prepare_delivery(draft_id, user, content_digest, request_id):
     """Commit dispatch intent before network I/O; retries never send a second time."""
     from .coordinate_views import _locked_case
+    identity = CoordinateDraft.objects.only("case_id").get(pk=draft_id)
+    with transaction.atomic(durable=True):
+        case = _locked_case(identity.case_id)
+        return prepare_delivery_locked(case, draft_id, user, content_digest, request_id)
+
+
+def prepare_delivery_locked(case, draft_id, user, content_digest, request_id):
+    """Reserve an exact delivery inside the caller's durable, case-locked transaction."""
+    if not transaction.get_connection().in_atomic_block:
+        raise RuntimeError("Delivery preparation requires a case-locked transaction.")
     try:
         request_id = UUID(str(request_id))
     except (ValueError, TypeError, AttributeError):
         raise ValueError("A valid send request ID is required.") from None
-    identity = CoordinateDraft.objects.only("case_id").get(pk=draft_id)
-    with transaction.atomic(durable=True):
-        case = _locked_case(identity.case_id)
+    # The savepoint also keeps this helper safe if a bundle's later item fails.
+    with transaction.atomic():
         draft = CoordinateDraft.objects.select_related("case", "job__message", "mail_thread").get(pk=draft_id)
+        if draft.case_id != case.pk:
+            raise ValueError("This email does not belong to the current case.")
         require_draft_visible(draft)
         require_current_digest(draft, content_digest)
         existing = draft_delivery(draft)
@@ -275,6 +286,20 @@ def prepare_delivery(draft_id, user, content_digest, request_id):
         invalidate_context(case)
         CoordinateCase.objects.filter(pk=case.pk).update(updated_at=timezone.now())
         return delivery, True
+
+
+def dispatch_delivery(delivery):
+    """Dispatch one already committed snapshot once; uncertain outcomes stay locked."""
+    try:
+        response = send_snapshot(delivery)
+        if not isinstance(response, dict):
+            raise ValueError
+        record_provider_receipt(delivery.pk, response.get("id"), response.get("threadId"))
+        return record_delivery_success(delivery.pk, response.get("id"), response.get("threadId"))
+    except Exception as error:
+        mark_delivery_unknown(delivery.pk, error)
+        delivery.refresh_from_db()
+        return delivery
 
 
 def send_snapshot(delivery):
@@ -430,7 +455,15 @@ def draft_mail_state(draft):
 
 def mail_state(case, max_message_id=None):
     readiness = mail_readiness()
-    result = {**readiness, "last_checked_at": "", "threads": []}
+    result = {**readiness, "last_checked_at": "", "threads": [], "sending_policy": (
+        "Current server policy supersedes older playbook wording about button-only approval: "
+        "signed-in staff can send the exact displayed email bundle with a clear instruction such as 'Send it!' "
+        "or use Send reviewed email. The server binds that instruction to the displayed reply and exact draft "
+        "digests, records approval, and dispatches immutable snapshots once. Missing/stale context and paused "
+        "threads are rejected in the case conversation. The isolated generator cannot send or grant approval. "
+        "Only persisted sent delivery receipts establish sending; never claim chat text alone proves delivery. "
+        "This changes no provider-selection, booking, handling, payment or initial-outreach permission."
+    )}
     if not case or case.deleted_at:
         return result
     query = visible_threads(case)

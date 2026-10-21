@@ -40,17 +40,7 @@ def send_draft(request, case_id, draft_id):
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=409)
     if dispatch:
-        try:
-            response = mail.send_snapshot(delivery)
-            if not isinstance(response, dict):
-                raise ValueError
-            mail.record_provider_receipt(delivery.pk, response.get("id"), response.get("threadId"))
-            delivery = mail.record_delivery_success(delivery.pk, response.get("id"), response.get("threadId"))
-        except Exception as error:
-            # Once dispatch was attempted, even a timeout may mean Gmail sent it.
-            # Preserve the immutable record; neither this endpoint nor retries resend.
-            mail.mark_delivery_unknown(delivery.pk, error)
-            delivery.refresh_from_db()
+        delivery = mail.dispatch_delivery(delivery)
     if request.headers.get("Accept") == "application/json":
         draft.case.refresh_from_db()
         return JsonResponse({**_state(draft.case), "delivery": {"id": str(delivery.pk), "status": delivery.status}})

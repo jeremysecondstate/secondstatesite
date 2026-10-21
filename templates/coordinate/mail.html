@@ -7,7 +7,7 @@
       <a href="{{ coordination.outreach.settings_url }}">Review inquiry permission and destination</a>
     </div>
     {% endif %}
-    <p class="coordinate-panel-note">Save the recipient and wording, mark that version reviewed, then select Send reviewed email. Marking a draft reviewed never sends it. Bookings, charges, and payments remain disabled.</p>
+    <p class="coordinate-panel-note">To send the displayed drafts together, say “send it” in the case conversation. To send one email here, save the recipient and wording, mark that version reviewed, then select Send reviewed email. Marking a draft reviewed never sends it. Bookings, charges, and payments remain disabled.</p>
     {% if coordination.mail.enabled %}
       {% if coordination.mail.ready %}<p class="coordinate-mail-readiness">{{ coordination.mail.status_text|default:"Email credentials are configured." }}{% if coordination.mail.sender %} Sender: {{ coordination.mail.sender }}.{% endif %} Configuration check only; a Gmail receipt confirms each delivery.{% if coordination.mail.sync_enabled %} Tracked replies appear in the linked threads below.{% endif %}</p>
       {% else %}<p class="coordinate-mail-readiness is-unavailable">{{ coordination.mail.status_text|default:"Email connection is not ready. Drafting and review remain available; sending waits for the connection." }}</p>{% endif %}

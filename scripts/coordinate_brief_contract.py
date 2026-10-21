@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+import json
 import re
 
 if __package__:
@@ -127,12 +128,22 @@ def _text(value, maximum, *, required=False):
     return value.strip()
 
 
-def _refs(value, *, required=False):
+def _refs(value, *, required=False, path="source_refs"):
     if not isinstance(value, list) or len(value) > MAX_SOURCE_REFS or (required and not value):
-        raise ValueError("Invalid briefing source references.")
-    result = [_text(item, 2048, required=True) for item in value]
-    if result != value or len(set(result)) != len(result):
-        raise ValueError("Briefing source references must be exact and unique.")
+        raise ValueError(f"{path}: Invalid briefing source references; use a list of at most {MAX_SOURCE_REFS} exact references" +
+                         (" with at least one entry." if required else "."))
+    result = []
+    for index, item in enumerate(value):
+        location = f"{path}[{index}]"
+        try:
+            clean = _text(item, 2048, required=True)
+        except ValueError:
+            raise ValueError(f"{location}: A source reference must be a nonempty string of at most 2048 characters.") from None
+        if clean != item:
+            raise ValueError(f"{location}: Source references must be exact; copy the supplied evidence reference without whitespace or commentary.")
+        if clean in result:
+            raise ValueError(f"{location}: Duplicate source reference; each reference must appear only once in {path}.")
+        result.append(clean)
     return result
 
 
@@ -147,14 +158,15 @@ def _amount(value, *, required=False):
     return value
 
 
-def _prices(value, lot_refs):
+def _prices(value, lot_refs, *, path):
     if not isinstance(value, list) or len(value) > 6:
         raise ValueError("Too many briefing prices.")
     result = []
-    for price in value:
+    for index, price in enumerate(value):
         _object(price, [*PRICE_LIMITS, "kind", "basis", "source_refs"])
         clean = {key: _text(price[key], limit, required=key in ("label", "amount", "evidence_quote")) for key, limit in PRICE_LIMITS.items()}
-        clean.update(kind=price["kind"], basis=price["basis"], source_refs=_refs(price["source_refs"], required=True))
+        clean.update(kind=price["kind"], basis=price["basis"], source_refs=_refs(
+            price["source_refs"], required=True, path=f"{path}[{index}].source_refs"))
         if clean["kind"] not in PRICE_KINDS or clean["basis"] not in PRICE_BASES:
             raise ValueError("Invalid price kind or basis.")
         clean["amount"] = _amount(clean["amount"], required=True)
@@ -168,34 +180,35 @@ def _prices(value, lot_refs):
         if clean["kind"] in ("estimate", "invoice_total", "tax", "shipping", "insurance") and clean["basis"] != clean["kind"]:
             raise ValueError("The price kind and stated basis disagree.")
         if not set(clean["source_refs"]) <= set(lot_refs):
-            raise ValueError("Price citations must also be sources for the lot.")
+            raise ValueError(f"{path}[{index}].source_refs: Price citations must also be sources for the lot.")
         result.append(clean)
     return result
 
 
 def _shipping(value):
-    def clean_record(record, schema):
+    def clean_record(record, schema, path):
         _object(record, schema["required"])
         cleaned = {}
         for name, spec in schema["properties"].items():
             item = record[name]
             if name == "source_refs":
-                cleaned[name] = _refs(item, required=spec.get("minItems", 0) > 0)
+                cleaned[name] = _refs(item, required=spec.get("minItems", 0) > 0, path=f"{path}.{name}")
             elif "enum" in spec:
                 if not isinstance(item, str) or item not in spec["enum"]:
                     raise ValueError("Invalid shipping brief classification.")
                 cleaned[name] = item
             elif spec["type"] == "object":
-                cleaned[name] = clean_record(item, spec)
+                cleaned[name] = clean_record(item, spec, f"{path}.{name}")
             elif spec["type"] == "array":
                 if not isinstance(item, list) or len(item) > spec["maxItems"]:
                     raise ValueError("Too many shipping brief entries.")
-                cleaned[name] = [clean_record(entry, spec["items"]) for entry in item]
+                cleaned[name] = [clean_record(entry, spec["items"], f"{path}.{name}[{index}]")
+                                 for index, entry in enumerate(item)]
             else:
                 cleaned[name] = _text(item, spec["maxLength"], required=spec.get("minLength", 0) > 0)
         return cleaned
 
-    result = clean_record(value, SHIPPING_SCHEMA)
+    result = clean_record(value, SHIPPING_SCHEMA, "shipping")
     currency = result["working_currency"]
     if currency["code"] and not re.fullmatch(r"[A-Z]{3}", currency["code"]):
         raise ValueError("shipping.working_currency.code: Use a three-letter code or remain empty.")
@@ -228,12 +241,53 @@ def _shipping(value):
     return result
 
 
-def brief_source_refs(brief):
-    records = [*brief["lots"], brief["plan"]]
+def _brief_source_records(brief):
+    for index, lot in enumerate(brief["lots"]):
+        yield f"lots[{index}]", lot
+    yield "plan", brief["plan"]
     if "shipping" in brief:
         shipping = brief["shipping"]
-        records += [shipping["working_currency"], *shipping["actions"], *shipping["providers"], *shipping["site_checks"]]
-    return {ref for item in records for ref in item["source_refs"]}
+        yield "shipping.working_currency", shipping["working_currency"]
+        for name in ("actions", "providers", "site_checks"):
+            for index, record in enumerate(shipping[name]):
+                yield f"shipping.{name}[{index}]", record
+
+
+def brief_source_refs(brief):
+    return {ref for _, item in _brief_source_records(brief) for ref in item["source_refs"]}
+
+
+def _missing_citation_error(brief, evidence):
+    missing = [(f"{path}.source_refs[{index}]", ref)
+               for path, item in _brief_source_records(brief)
+               for index, ref in enumerate(item["source_refs"]) if ref not in evidence]
+    if not missing:
+        return
+    # The existing repair prompt carries at most 4000 diagnostic characters.
+    # Show exact locations and only complete candidate IDs, never source text or
+    # an invented/normalized replacement. Membership still proves no claim.
+    lines = ["Briefing cites unavailable or unrelated case evidence."]
+    for path, ref in missing[:10]:
+        quoted = json.dumps(ref, ensure_ascii=True)
+        if len(quoted) > 160:
+            quoted = "(reference value omitted; inspect this field)"
+        lines.append(f"{path}: Unavailable reference {quoted}.")
+    if len(missing) > 10:
+        lines.append(f"{len(missing) - 10} additional references are unavailable; check every source_refs field.")
+    lines.append("Use exact references below only where their evidence supports the claim; otherwise remove the unsupported claim. "
+                 "Never append commentary to a reference. Available reference IDs (bounded list):")
+    shown = 0
+    for ref in sorted(evidence):
+        line = json.dumps(ref, ensure_ascii=True)
+        if len("\n".join([*lines, line])) > 3900:
+            continue
+        lines.append(line)
+        shown += 1
+    if shown < len(evidence):
+        lines.append("Additional reference IDs are in the supplied evidence context.")
+    if not evidence:
+        lines.append("None; omit claims requiring unavailable evidence.")
+    raise ValueError("\n".join(lines))
 
 
 def validate_brief(value):
@@ -249,13 +303,13 @@ def validate_brief(value):
     if not isinstance(lots, list) or len(lots) > 8 or not isinstance(questions, list) or len(questions) > 8:
         raise ValueError("Too many briefing lots or questions.")
     cleaned_lots = []
-    for lot in lots:
+    for index, lot in enumerate(lots):
         if (not isinstance(lot, dict) or not {*LOT_LIMITS, "source_refs"} <= lot.keys()
                 or not lot.keys() <= {*LOT_LIMITS, *LOT_ADDITIONAL_LIMITS, "prices", "source_refs"}):
             raise ValueError("Invalid briefing lot fields.")
         clean = {**{key: _text(lot[key], limit, required=key == "label") for key, limit in LOT_LIMITS.items()},
                  **{key: _text(lot[key], limit) for key, limit in LOT_ADDITIONAL_LIMITS.items() if key in lot},
-                 "source_refs": _refs(lot["source_refs"], required=True)}
+                 "source_refs": _refs(lot["source_refs"], required=True, path=f"lots[{index}].source_refs")}
         if clean.get("auction_date"):
             try:
                 if datetime.strptime(clean["auction_date"], "%Y-%m-%d").strftime("%Y-%m-%d") != clean["auction_date"]:
@@ -263,11 +317,11 @@ def validate_brief(value):
             except ValueError:
                 raise ValueError("Briefing auction dates must use YYYY-MM-DD or remain empty when unknown.") from None
         if "prices" in lot:
-            clean["prices"] = _prices(lot["prices"], clean["source_refs"])
+            clean["prices"] = _prices(lot["prices"], clean["source_refs"], path=f"lots[{index}].prices")
         cleaned_lots.append(clean)
     plan = _object(value["plan"], [*PLAN_LIMITS, "source_refs"])
     cleaned_plan = {**{key: _text(plan[key], limit) for key, limit in PLAN_LIMITS.items()},
-                    "source_refs": _refs(plan["source_refs"])}
+                    "source_refs": _refs(plan["source_refs"], path="plan.source_refs")}
     if cleaned_plan["pickup_deadline"]:
         try:
             deadline = datetime.fromisoformat(cleaned_plan["pickup_deadline"].replace("Z", "+00:00"))
@@ -476,12 +530,13 @@ def validate_price_evidence(brief, evidence):
     """
     if brief is None:
         return
-    refs = brief_source_refs(brief)
-    if not refs <= evidence.keys():
-        raise ValueError("Briefing cites unavailable or unrelated case evidence.")
-    for item in [*brief["lots"], brief["plan"]]:
-        if any(not any(_available(source) for source in _observations([ref], evidence)) for ref in item["source_refs"]):
-            raise ValueError("Lot and plan citations require readable evidence, not failed page observations.")
+    _missing_citation_error(brief, evidence)
+    for path, item in _brief_source_records(brief):
+        if path.startswith("shipping."):
+            continue
+        for index, ref in enumerate(item["source_refs"]):
+            if not any(_available(source) for source in _observations([ref], evidence)):
+                raise ValueError(f"{path}.source_refs[{index}]: Lot and plan citations require readable evidence, not failed page observations.")
     for lot in brief["lots"]:
         lot_observations = [source for ref in lot["source_refs"]
                             for source in evidence[ref].get("observations", [evidence[ref]]) if _available(source)]
