@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Inventory · SecondState{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'secondstateapp/inventory.css' %}">{% endblock %}
+{% block main_class %}inventory-shell{% endblock %}
+{% block content %}
+<section id="inventory" data-state-url="{% url 'inventory_state' %}" data-case-id="{{ selected_case.id|default:'' }}" aria-labelledby="inventory-title">
+  <header class="inventory-heading">
+    <div><p class="inventory-eyebrow">SecondState / Staff workspace</p><h1 id="inventory-title">Inventory<span>.</span></h1><p>From auction win to inventory. Keep every addition in one conversation.</p></div>
+    <a class="inventory-calendar-link" href="{% url 'auction_calendar' %}">Open Auction Calendar ↗</a>
+  </header>
+  <div class="inventory-workflow"><span>01 <strong>Share the win</strong></span><span>02 <strong>Research the lots</strong></span><span>03 <strong>Update SUPREME</strong></span><span>04 <strong>Highlight in Calendar</strong></span></div>
+  <p id="inventory-notice" role="status" class="inventory-notice" hidden></p>
+  <div class="inventory-layout">
+    <aside class="inventory-sidebar" aria-label="Inventory requests">
+      <div class="inventory-sidebar-heading"><h2>Requests</h2><a href="{% url 'inventory' %}?new=1">+ New request</a></div>
+      <nav id="inventory-cases" class="inventory-cases" aria-label="Saved requests">
+        {% for case in cases %}<a href="{{ case.url }}" class="inventory-case{% if selected_case.id == case.id %} selected{% endif %}"><strong>{{ case.title }}</strong><span class="inventory-status" data-status="{{ case.status }}">{{ case.status|capfirst }}</span></a>{% empty %}<p class="inventory-muted">Your inventory requests will appear here.</p>{% endfor %}
+      </nav>
+      <div class="inventory-worker"><p class="inventory-eyebrow">Scheduled check</p><strong>Every 10 minutes</strong><p>Last successful check<br><span id="inventory-last-check">{{ worker.last_successful_check|default:'No successful check yet' }}</span></p><p id="inventory-connection" role="status">Connecting to live updates…</p><noscript>Reload this page to see new replies.</noscript></div>
+    </aside>
+    <section class="inventory-conversation" aria-labelledby="inventory-conversation-title">
+      <header><p class="inventory-eyebrow">Inventory conversation</p><h2 id="inventory-conversation-title">{{ selected_case.title|default:'What did we win?' }}</h2><p>Share the auction house, sale date, lot numbers, and any links. Verified details go into Inventory for Fall 2026; missing information stays clearly marked for follow-up.</p></header>
+      <div id="inventory-messages" class="inventory-messages" aria-live="polite" aria-relevant="additions text">
+        {% for message in messages %}<article class="inventory-message" data-role="{{ message.role }}"><div class="inventory-message-meta"><strong>{{ message.author }}</strong><span class="inventory-status" data-status="{{ message.status }}">{{ message.status|capfirst }}</span></div><p class="inventory-message-body">{{ message.body }}</p>{% if message.error %}<p class="inventory-error">{{ message.error }}</p>{% endif %}{% if message.result.workbook %}<p class="inventory-receipt">Workbook: {{ message.result.workbook.sheet }} · Rows {{ message.result.workbook.rows|join:', ' }}</p>{% endif %}{% if message.result.pending_fields %}<p class="inventory-receipt">Pending: {{ message.result.pending_fields|join:'; ' }}</p>{% endif %}{% if message.result.sources %}<ul class="inventory-sources">{% for source in message.result.sources %}<li><a href="{{ source.url }}" target="_blank" rel="noopener noreferrer">{{ source.title|default:source.url }}</a></li>{% endfor %}</ul>{% endif %}{% if message.retry_url %}<form method="post" action="{{ message.retry_url }}" class="inventory-retry-form">{% csrf_token %}<button type="submit">Retry this request</button></form>{% endif %}</article>{% empty %}<div class="inventory-empty"><span aria-hidden="true">↗</span><h3>A new home for the details.</h3><p>“We won lots 12, 34, and 56 at Tuesday’s sale. Please add them to inventory.”</p></div>{% endfor %}
+      </div>
+      <form id="inventory-form" method="post" action="{% if selected_case %}{% url 'inventory_message' selected_case.id %}{% else %}{% url 'inventory_create' %}{% endif %}">
+        {% csrf_token %}<input type="hidden" name="client_message_id" value="{{ message_token }}">
+        <div id="inventory-title-field"{% if selected_case %} hidden{% endif %}><label for="inventory-request-title">Request title <span>(optional)</span></label><input id="inventory-request-title" name="title" maxlength="160" placeholder="Auction house · New acquisitions"></div>
+        <label for="inventory-body">{% if selected_case %}Add a message{% else %}Your inventory request{% endif %}</label><textarea id="inventory-body" name="body" rows="4" maxlength="12000" required placeholder="We won these lots…"></textarea>
+        <div class="inventory-compose-footer"><p>Codex will post its findings and workbook changes here.</p><button type="submit">Send request <span aria-hidden="true">↑</span></button></div>
+      </form>
+    </section>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'secondstateapp/inventory.js' %}" defer></script>{% endblock %}

@@ -21,6 +21,7 @@
     <a class="brand" href="{% url 'home' %}">SecondState</a>
     <nav>
       {% if user.is_authenticated and user.is_staff %}
+        <a href="{% url 'inventory' %}"{% if request.resolver_match.url_name == 'inventory' or request.resolver_match.url_name == 'inventory_case' %} aria-current="page"{% endif %}>Inventory</a>
         <a href="{% url 'coordinate' %}"{% if request.resolver_match.url_name == 'coordinate' or request.resolver_match.url_name == 'coordinate_case' %} aria-current="page"{% endif %}>Coordinate</a>
       {% endif %}
       <a href="{% url 'about' %}">About</a>

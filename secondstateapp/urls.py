@@ -12,6 +12,7 @@ from . import (
 )
 
 urlpatterns = [
+    path("inventory/", include("secondstateapp.inventory_urls")),
     path("coordinate/", include("secondstateapp.coordinate_urls")),
     path("", views.home, name="home"),
     path("about/", views.about, name="about"),
