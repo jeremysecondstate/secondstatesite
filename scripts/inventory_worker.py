@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE_ROOT = ROOT / "private_data" / "inventory-runs"
 MAX_BYTES = 1_000_000
 WORKER_ID = "inventory-codex"
-TERMINAL_STATUSES = {"completed", "failed", "expired", "superseded", "retry"}
+TERMINAL_STATUSES = {"completed", "failed", "expired", "superseded", "retry", "cancelled"}
 
 
 class InventoryError(Exception):

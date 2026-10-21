@@ -102,6 +102,17 @@ class InventoryHandoffTests(TestCase):
         self.assertTrue((self.root / "active.json").exists())
         self.assertEqual(self.api.post.call_count, 1)
 
+    def test_cancelled_claim_is_archived_without_consuming_another_request(self):
+        path = self.prepare()
+        self.api.post.return_value = {"job": {"status": "cancelled"}}
+        result = worker.prepare(self.api, self.root)
+        self.assertEqual(result["status"], "previous_cancelled")
+        self.assertEqual(result["state_file"], str(path))
+        self.assertFalse((self.root / "active.json").exists())
+        self.assertEqual(worker.read_json(path.with_suffix(".status.json"))["job"]["status"], "cancelled")
+        self.api.post.assert_called_once_with(worker.endpoint(worker.read_json(path), "status"),
+                                              worker.claim_fields(worker.read_json(path)))
+
     def test_explicit_idle_clears_pointer_but_unknown_claim_response_does_not(self):
         self.api.post.return_value = {"job": None}
         self.assertEqual(worker.prepare(self.api, self.root), {"status": "idle"})

@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from scripts import inventory_worker as worker
@@ -90,3 +91,39 @@ class InventoryWorkerAPIRoundtripTests(TestCase):
         self.assertEqual(status["job"]["status"], "superseded")
         self.assertNotEqual(status["job"]["claim_token"], new_claim["job"]["claim_token"])
         self.assertNotIn(new_claim["job"]["claim_token"], json.dumps(status))
+
+    def test_trashed_claim_archives_and_does_not_replay_prepared_work(self):
+        state_path = Path(worker.prepare(self.api, self.root)["state_file"])
+        # A saved draft may exist even if staff removed the request mid-research.
+        state = worker.read_json(state_path)
+        worker.write_json(state_path.with_suffix(".completion.json"), {
+            **worker.claim_fields(state), **worker.read_json(self.result()),
+        })
+        self.client.force_login(self.staff)
+        response = self.client.post(reverse("inventory_delete_case", args=[self.case.pk]))
+        self.assertIn(response.status_code, (200, 302))
+        outcome = worker.prepare(self.api, self.root)
+        self.assertEqual(outcome["status"], "previous_cancelled")
+        self.assertFalse((self.root / "active.json").exists())
+        self.assertTrue(state_path.with_suffix(".completion.json").exists())
+        with self.assertRaises(worker.InventoryError):
+            worker.complete(self.api, state_path)
+        self.assertFalse(InventoryMessage.objects.filter(in_reply_to=self.message).exists())
+        self.assertEqual(worker.prepare(self.api, self.root), {"status": "idle"})
+
+    def test_lost_claim_response_then_message_trash_recovers_cancelled_receipt(self):
+        def lost_response(path, payload):
+            self.post(path, payload)
+            raise worker.InventoryError("Response lost after server commit.")
+
+        self.api.post.side_effect = lost_response
+        with self.assertRaises(worker.InventoryError):
+            worker.prepare(self.api, self.root)
+        self.client.force_login(self.staff)
+        response = self.client.post(reverse("inventory_delete_message", args=[self.case.pk, self.message.pk]))
+        self.assertIn(response.status_code, (200, 302))
+        self.api.post.side_effect = self.post
+        self.assertEqual(worker.prepare(self.api, self.root)["status"], "previous_cancelled")
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.attempts, 1)
+        self.assertFalse((self.root / "active.json").exists())

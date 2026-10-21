@@ -7,6 +7,28 @@ New staff messages enter a durable queue; the page refreshes while open. A local
 Codex heartbeat checks the queue every ten minutes. The workstation, Codex app,
 network and shared drive must be available for local workbook edits.
 
+## Trash and recovery
+
+Staff can move a request or an individual message to Trash and restore it there.
+Trashed content is excluded from worker intake and conversation context. Moving
+content to Trash cancels unfinished work; changing earlier context also stops
+any affected in-flight work. Restoring unfinished work requires an explicit
+Retry so a workbook update is not silently repeated. Completed work stays
+completed.
+
+Empty Trash opens a confirmation listing the requests and messages being removed.
+The confirmation covers only that snapshot; content restored or changed during
+review must be reviewed again. Emptying Trash permanently removes those items
+from Inventory and disables restoration. Internal request and completion records
+are retained for deduplication and recovery. Existing workbook rows and Calendar
+won-lot flags are not undone by trashing or emptying requests.
+
+A worker that discovers a `cancelled` claim must stop without further workbook
+or Calendar changes. `--prepare` archives that handoff as `previous_cancelled`.
+Retain any local workbook receipt if the write already happened; inspect it and
+the saved workbook before an explicitly retried request makes further changes.
+Never recreate a trashed request or replay its workbook additions.
+
 ## What a request authorizes
 
 For a confirmed purchase, match the exact auction house, sale date, lot number and

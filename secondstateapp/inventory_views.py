@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core import signing
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Exists, F, OuterRef, Q
 from django.http import JsonResponse
@@ -18,7 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .models import AuctionWatchLot, InventoryCase, InventoryClaimRequest, InventoryJob, InventoryMessage, InventoryWorkerState
 
@@ -42,23 +43,43 @@ def _message(message):
         "created_at": _iso(message.created_at),
         "status": job.status if job else "completed", "error": job.last_error if job else "",
         "result": job.result if job else {},
-        "retry_url": reverse("inventory_retry", args=[job.pk]) if job and job.status == "failed" else None,
+        "deleted_at": _iso(message.deleted_at),
+        "delete_url": reverse("inventory_delete_message", args=[message.case_id, message.pk]),
+        "restore_url": reverse("inventory_restore_message", args=[message.case_id, message.pk]),
+        "retry_url": reverse("inventory_retry", args=[job.pk]) if job and job.status == "failed" and not _removed(job) else None,
     }
+
+
+def _case_data(case, statuses):
+    return {"id": str(case.pk), "title": case.title, "url": reverse("inventory_case", args=[case.pk]),
+            "status": "trashed" if case.deleted_at else statuses.get(case.pk, "completed"),
+            "updated_at": _iso(case.updated_at), "deleted_at": _iso(case.deleted_at),
+            "delete_url": reverse("inventory_delete_case", args=[case.pk]),
+            "restore_url": reverse("inventory_restore_case", args=[case.pk])}
 
 
 def _state(selected=None):
     statuses = {}
-    for job in InventoryJob.objects.exclude(status="completed").select_related("message").order_by("message_id"):
+    for job in InventoryJob.objects.filter(message__deleted_at__isnull=True, message__case__deleted_at__isnull=True).exclude(status__in=["completed", "cancelled"]).select_related("message").order_by("message_id"):
         statuses.setdefault(job.message.case_id, job.status)
-    cases = [{"id": str(case.pk), "title": case.title, "url": reverse("inventory_case", args=[case.pk]),
-              "status": statuses.get(case.pk, "completed"), "updated_at": _iso(case.updated_at)}
-             for case in InventoryCase.objects.all()[:200]]
+    cases = [_case_data(case, statuses) for case in InventoryCase.objects.filter(deleted_at__isnull=True, purged_at__isnull=True)[:200]]
+    trash_cases_query = InventoryCase.objects.filter(deleted_at__isnull=False, purged_at__isnull=True)
+    trash_cases = [_case_data(case, statuses) for case in trash_cases_query[:200]]
+    trash_messages_query = InventoryMessage.objects.filter(deleted_at__isnull=False, purged_at__isnull=True, case__deleted_at__isnull=True, case__purged_at__isnull=True)
+    trash_messages = [{**_message(message), "case_id": str(message.case_id), "case_title": message.case.title,
+                       "case_url": reverse("inventory_case", args=[message.case_id])}
+                      for message in trash_messages_query.select_related("case", "author", "job").order_by("-deleted_at", "-id")[:200]]
     worker = InventoryWorkerState.objects.filter(pk=1).first()
+    messages = [_message(m) for m in selected.messages.filter(purged_at__isnull=True).select_related("case", "author", "job")] if selected else []
     return {
         "cases": cases,
-        "selected_case": {"id": str(selected.pk), "title": selected.title,
-                          "url": reverse("inventory_case", args=[selected.pk])} if selected else None,
-        "messages": [_message(m) for m in selected.messages.select_related("author", "job")] if selected else [],
+        "trash_cases": trash_cases, "trash_messages": trash_messages,
+        "trash_count": trash_cases_query.count() + trash_messages_query.count(),
+        "empty_trash_url": reverse("inventory_empty_trash"),
+        "selected_case": _case_data(selected, statuses) if selected else None,
+        "messages": messages,
+        "active_messages": [message for message in messages if not message["deleted_at"]],
+        "deleted_messages": [message for message in messages if message["deleted_at"]],
         "worker": {"last_successful_check": _iso(worker.last_successful_check) if worker else None},
         "message_token": str(uuid.uuid4()),
     }
@@ -68,9 +89,9 @@ def _state(selected=None):
 @staff_member_required
 @require_GET
 def inventory(request, case_id=None):
-    case = get_object_or_404(InventoryCase, pk=case_id) if case_id else None
+    case = get_object_or_404(InventoryCase, pk=case_id, purged_at__isnull=True) if case_id else None
     if case is None and request.GET.get("new") != "1":
-        case = InventoryCase.objects.first()
+        case = InventoryCase.objects.filter(deleted_at__isnull=True, purged_at__isnull=True).first()
     return render(request, "inventory/index.html", _state(case))
 
 
@@ -82,7 +103,7 @@ def state(request):
         case_id = uuid.UUID(request.GET["case"]) if request.GET.get("case") else None
     except (TypeError, ValueError):
         return _error("Invalid request identifier.")
-    return JsonResponse(_state(get_object_or_404(InventoryCase, pk=case_id) if case_id else None))
+    return JsonResponse(_state(get_object_or_404(InventoryCase, pk=case_id, purged_at__isnull=True) if case_id else None))
 
 
 def _saved(request, case):
@@ -105,6 +126,8 @@ def _submit(request, case=None):
     def duplicate():
         existing = InventoryMessage.objects.select_related("case").filter(client_message_id=token).first()
         if existing:
+            if existing.deleted_at or existing.purged_at or existing.case.deleted_at or existing.case.purged_at:
+                return _error("This submission is in Trash or was removed. It has not been submitted again.", 409)
             if existing.author_id != request.user.pk or existing.body != body or (submitted_case_id and existing.case_id != submitted_case_id):
                 return _error("This message identifier belongs to another submission.", 409)
             return _saved(request, existing.case)
@@ -116,7 +139,9 @@ def _submit(request, case=None):
     try:
         with transaction.atomic():
             if case:
-                case = InventoryCase.objects.select_for_update().get(pk=case.pk)
+                case = get_object_or_404(InventoryCase.objects.select_for_update(), pk=case.pk, purged_at__isnull=True)
+                if case.deleted_at:
+                    return _error("Restore this request before adding messages.", 409)
             else:
                 case = InventoryCase.objects.create(title=title, created_by=request.user)
             message = InventoryMessage.objects.create(case=case, role="staff", body=body, author=request.user, client_message_id=token)
@@ -139,15 +164,186 @@ def create_case(request):
 @staff_member_required
 @require_POST
 def add_message(request, case_id):
-    return _submit(request, get_object_or_404(InventoryCase, pk=case_id))
+    return _submit(request, get_object_or_404(InventoryCase, pk=case_id, purged_at__isnull=True))
 
 
 @staff_member_required
 @require_POST
 def retry_job(request, job_id):
-    job = get_object_or_404(InventoryJob.objects.select_related("message__case"), pk=job_id)
-    InventoryJob.objects.filter(pk=job.pk, status="failed").update(status="retry", available_at=timezone.now(), last_error="", claim_token=None)
+    with transaction.atomic():
+        job = _locked_job(job_id)
+        if _removed(job):
+            return _error("Restore this request and message before retrying.", 409)
+        InventoryJob.objects.filter(pk=job.pk, status="failed").update(status="retry", available_at=timezone.now(), last_error="", claim_token=None, lease_expires_at=None)
     return _saved(request, job.message.case)
+
+
+def _locked_case(case_id):
+    return get_object_or_404(InventoryCase.objects.select_for_update(), pk=case_id, purged_at__isnull=True)
+
+
+def _locked_job(job_id):
+    # Every worker write takes the case lock first, just like trash and restore.
+    case_id = get_object_or_404(InventoryJob.objects.select_related("message"), pk=job_id).message.case_id
+    get_object_or_404(InventoryCase.objects.select_for_update(), pk=case_id)
+    return get_object_or_404(InventoryJob.objects.select_for_update().select_related("message__case"), pk=job_id)
+
+
+def _removed(job):
+    return bool(job.message.deleted_at or job.message.purged_at or job.message.case.deleted_at or job.message.case.purged_at)
+
+
+def _cancel_jobs(jobs):
+    # Keep the old token so the local worker can reconcile cancellation. No
+    # endpoint accepts a cancelled claim for writes; completed receipts survive.
+    jobs.exclude(status="completed").update(status="cancelled", lease_expires_at=None,
+        last_error="Moved to Trash. Restore and review before retrying.")
+
+
+def _invalidate_processing(case):
+    InventoryJob.objects.filter(message__case=case, status="processing").update(
+        status="failed", lease_expires_at=None,
+        last_error="Conversation changed. Review any saved workbook changes before retrying.",
+    )
+
+
+def _restore_jobs(jobs):
+    jobs.filter(status="cancelled").update(status="failed", lease_expires_at=None,
+        last_error="Restored from Trash. Review any saved workbook changes, then retry if still needed.")
+
+
+@never_cache
+@staff_member_required
+@require_POST
+def delete_case(request, case_id):
+    with transaction.atomic():
+        case = _locked_case(case_id)
+        if case.deleted_at is None:
+            now = timezone.now()
+            case.deleted_at, case.deleted_by, case.updated_at = now, request.user, now
+            case.save(update_fields=["deleted_at", "deleted_by", "updated_at"])
+            _cancel_jobs(InventoryJob.objects.filter(message__case=case))
+    return _saved(request, case)
+
+
+@never_cache
+@staff_member_required
+@require_POST
+def restore_case(request, case_id):
+    with transaction.atomic():
+        case = _locked_case(case_id)
+        if case.deleted_at is not None:
+            case.deleted_at, case.deleted_by, case.updated_at = None, None, timezone.now()
+            case.save(update_fields=["deleted_at", "deleted_by", "updated_at"])
+            _restore_jobs(InventoryJob.objects.filter(message__case=case, message__deleted_at__isnull=True, message__purged_at__isnull=True))
+    return _saved(request, case)
+
+
+@never_cache
+@staff_member_required
+@require_POST
+def delete_message(request, case_id, message_id):
+    with transaction.atomic():
+        case = _locked_case(case_id)
+        if case.deleted_at:
+            return _error("Restore this request before changing messages.", 409)
+        message = get_object_or_404(InventoryMessage, pk=message_id, case=case, purged_at__isnull=True)
+        if message.deleted_at is None:
+            now = timezone.now()
+            InventoryMessage.objects.filter(pk=message.pk).update(deleted_at=now, deleted_by=request.user)
+            _cancel_jobs(InventoryJob.objects.filter(message=message))
+            _invalidate_processing(case)
+            case.updated_at = now
+            case.save(update_fields=["updated_at"])
+    return _saved(request, case)
+
+
+@never_cache
+@staff_member_required
+@require_POST
+def restore_message(request, case_id, message_id):
+    with transaction.atomic():
+        case = _locked_case(case_id)
+        if case.deleted_at:
+            return _error("Restore this request before changing messages.", 409)
+        message = get_object_or_404(InventoryMessage, pk=message_id, case=case, purged_at__isnull=True)
+        if message.deleted_at is not None:
+            InventoryMessage.objects.filter(pk=message.pk).update(deleted_at=None, deleted_by=None)
+            _invalidate_processing(case)
+            _restore_jobs(InventoryJob.objects.filter(message=message))
+            case.updated_at = timezone.now()
+            case.save(update_fields=["updated_at"])
+    return _saved(request, case)
+
+
+def _trash_confirmation(request, error="", status=200):
+    cases = list(InventoryCase.objects.filter(deleted_at__isnull=False, purged_at__isnull=True))
+    messages = list(InventoryMessage.objects.filter(deleted_at__isnull=False, purged_at__isnull=True,
+        case__deleted_at__isnull=True, case__purged_at__isnull=True).select_related("case"))
+    snapshot = {"actor": str(request.user.pk),
+        "cases": [{"id": str(case.pk), "deleted_at": _iso(case.deleted_at)} for case in cases],
+        "messages": [{"id": message.pk, "case_id": str(message.case_id), "deleted_at": _iso(message.deleted_at)} for message in messages]}
+    return render(request, "inventory/empty_trash.html", {
+        "trash_cases": cases, "trash_messages": messages, "error": error,
+        "trash_token": signing.dumps(snapshot, salt="inventory.empty-trash", compress=True),
+    }, status=status)
+
+
+@never_cache
+@staff_member_required
+@require_http_methods(["GET", "POST"])
+def empty_trash(request):
+    if request.method == "GET":
+        return _trash_confirmation(request)
+    if request.POST.get("confirm_empty_trash") != "yes":
+        return _trash_confirmation(request, "Confirm that these items cannot be restored before emptying Trash.", 400)
+    try:
+        snapshot = signing.loads(request.POST.get("trash_token", ""), salt="inventory.empty-trash", max_age=600)
+        if not isinstance(snapshot, dict) or snapshot.get("actor") != str(request.user.pk):
+            raise ValueError
+        expected_cases = {uuid.UUID(item["id"]): item["deleted_at"] for item in snapshot["cases"]}
+        expected_messages = {item["id"]: (uuid.UUID(item["case_id"]), item["deleted_at"]) for item in snapshot["messages"]}
+        if (len(expected_cases) != len(snapshot["cases"]) or len(expected_messages) != len(snapshot["messages"])
+                or any(not isinstance(value, str) for value in expected_cases.values())
+                or any(type(key) is not int or key < 1 or not isinstance(value[1], str) for key, value in expected_messages.items())):
+            raise ValueError
+    except (signing.BadSignature, ValueError, TypeError, KeyError, AttributeError):
+        return _trash_confirmation(request, "This confirmation expired or changed. Review the current Trash and try again.", 400)
+    with transaction.atomic():
+        case_ids = set(expected_cases) | {value[0] for value in expected_messages.values()}
+        locked_cases = {case.pk: case for case in InventoryCase.objects.select_for_update().filter(pk__in=case_ids).order_by("id")}
+        ready_cases, ready_messages = [], []
+        changed = False
+        for case_id, deleted_at in expected_cases.items():
+            case = locked_cases.get(case_id)
+            if case is None or (not case.purged_at and _iso(case.deleted_at) != deleted_at):
+                changed = True
+                break
+            if not case.purged_at:
+                ready_cases.append(case)
+        messages = {message.pk: message for message in InventoryMessage.objects.select_for_update().filter(pk__in=expected_messages)}
+        for message_id, (case_id, deleted_at) in expected_messages.items():
+            message, case = messages.get(message_id), locked_cases.get(case_id)
+            if message and (message.purged_at or (case and case.purged_at)):
+                continue
+            if (message is None or case is None or message.case_id != case_id or case.deleted_at
+                    or _iso(message.deleted_at) != deleted_at):
+                changed = True
+                break
+            ready_messages.append(message)
+        if changed:
+            return _trash_confirmation(request, "Trash changed while you reviewed it. Nothing was removed. Review the list again.", 409)
+        now = timezone.now()
+        for case in ready_cases:
+            case.purged_at, case.purged_by, case.updated_at = now, request.user, now
+            case.save(update_fields=["purged_at", "purged_by", "updated_at"])
+            _cancel_jobs(InventoryJob.objects.filter(message__case=case))
+        for message in ready_messages:
+            message.purged_at, message.purged_by = now, request.user
+            message.save(update_fields=["purged_at", "purged_by"])
+            _cancel_jobs(InventoryJob.objects.filter(message=message))
+            InventoryCase.objects.filter(pk=message.case_id).update(updated_at=now)
+    return redirect("inventory")
 
 
 def _worker_endpoint(view):
@@ -182,14 +378,19 @@ def _worker_endpoint(view):
 
 
 def _eligible(now):
-    return (Q(status__in=["queued", "retry"], available_at__lte=now)
-            | Q(status="processing", lease_expires_at__lte=now))
+    return ((Q(status__in=["queued", "retry"], available_at__lte=now)
+             | Q(status="processing", lease_expires_at__lte=now))
+            & Q(message__deleted_at__isnull=True, message__purged_at__isnull=True,
+                message__case__deleted_at__isnull=True, message__case__purged_at__isnull=True))
 
 
 def _job_data(job):
+    status = "cancelled" if _removed(job) and job.status != "completed" else job.status
+    if status == "processing" and not _live(job):
+        status = "expired"
     return {"id": str(job.pk), "case_id": str(job.message.case_id), "message_id": job.message_id,
             "claim_token": str(job.claim_token), "lease_expires_at": _iso(job.lease_expires_at),
-            "attempt": job.attempts, "status": "expired" if job.status == "processing" and not _live(job) else job.status,
+            "attempt": job.attempts, "status": status,
             "purchase_lot_ids": job.purchase_lot_ids}
 
 
@@ -205,9 +406,11 @@ def claim(request, data):
         if receipt.response is not None:
             response = receipt.response
             if response.get("job"):
-                current = InventoryJob.objects.get(pk=response["job"]["id"])
+                current = InventoryJob.objects.select_related("message__case").get(pk=response["job"]["id"])
                 response["job"]["status"] = (_job_data(current)["status"] if str(current.claim_token) == response["job"]["claim_token"] else "superseded")
                 response["job"]["purchase_lot_ids"] = current.purchase_lot_ids
+                if response["job"]["status"] != "processing":
+                    response["messages"], response["prior_results"] = [], []
             InventoryWorkerState.objects.update_or_create(pk=1, defaults={"last_successful_check": timezone.now()})
             return JsonResponse(response)
         response = _claim_one(data)
@@ -218,19 +421,25 @@ def claim(request, data):
 
 def _claim_one(data):
     now = timezone.now()
-    earlier = InventoryJob.objects.filter(message__case_id=OuterRef("message__case_id"), message_id__lt=OuterRef("message_id")).exclude(status="completed")
+    earlier = InventoryJob.objects.filter(message__case_id=OuterRef("message__case_id"), message_id__lt=OuterRef("message_id"),
+        message__deleted_at__isnull=True, message__purged_at__isnull=True).exclude(status__in=["completed", "cancelled"])
     candidates = InventoryJob.objects.filter(_eligible(now)).annotate(earlier_pending=Exists(earlier)).filter(earlier_pending=False).select_related("message").order_by("message_id")
     for candidate in candidates[:50]:
         with transaction.atomic():
             case = InventoryCase.objects.select_for_update().get(pk=candidate.message.case_id)
-            if InventoryJob.objects.filter(message__case=case, message_id__lt=candidate.message_id).exclude(status="completed").exists():
+            if case.deleted_at or case.purged_at:
+                continue
+            if InventoryJob.objects.filter(message__case=case, message_id__lt=candidate.message_id,
+                    message__deleted_at__isnull=True, message__purged_at__isnull=True).exclude(status__in=["completed", "cancelled"]).exists():
                 continue
             changed = InventoryJob.objects.filter(pk=candidate.pk, attempts=candidate.attempts).filter(_eligible(now)).update(
                 status="processing", attempts=F("attempts") + 1, claim_token=uuid.uuid4(),
                 lease_expires_at=now + timedelta(seconds=LEASE_SECONDS), worker_id=data["worker_id"], last_error="")
             if changed:
-                job = InventoryJob.objects.select_related("message").get(pk=candidate.pk)
-                history = case.messages.filter(Q(role="staff", pk__lt=job.message_id) | Q(role="assistant", in_reply_to_id__lt=job.message_id)).select_related("author", "job").order_by("-id")[:49]
+                job = InventoryJob.objects.select_related("message__case").get(pk=candidate.pk)
+                history = case.messages.filter(Q(role="staff", pk__lt=job.message_id) | Q(role="assistant", in_reply_to_id__lt=job.message_id)).filter(
+                    deleted_at__isnull=True, purged_at__isnull=True, in_reply_to__deleted_at__isnull=True,
+                    in_reply_to__purged_at__isnull=True).select_related("case", "author", "job").order_by("-id")[:49]
                 current = _message(job.message)
                 current.pop("result")
                 context, characters = [current], len(job.message.body)
@@ -242,7 +451,9 @@ def _claim_one(data):
                     context.append(item)
                     characters += len(message.body)
                 prior_results = []
-                for previous in InventoryJob.objects.filter(message__case=case, status="completed", message_id__lt=job.message_id).order_by("-message_id")[:5]:
+                for previous in InventoryJob.objects.filter(message__case=case, status="completed", message_id__lt=job.message_id,
+                        message__deleted_at__isnull=True, message__purged_at__isnull=True,
+                        message__worker_reply__deleted_at__isnull=True, message__worker_reply__purged_at__isnull=True).order_by("-message_id")[:5]:
                     value = previous.result
                     prior_results.append({"message_id": previous.message_id, "purchase_lot_ids": previous.purchase_lot_ids,
                                           "result": {"workbook": value.get("workbook", {}), "summary": value.get("summary", "")[:3000],
@@ -261,7 +472,7 @@ def _matches(job, data):
 
 
 def _live(job):
-    return job.status == "processing" and job.lease_expires_at and job.lease_expires_at > timezone.now()
+    return job.status == "processing" and not _removed(job) and job.lease_expires_at and job.lease_expires_at > timezone.now()
 
 
 def _sale_date(lot):
@@ -319,7 +530,7 @@ def purchases(request, data, job_id):
     if len(ids) != len(set(ids)):
         return _error("Duplicate lot identifiers.")
     with transaction.atomic():
-        job = get_object_or_404(InventoryJob.objects.select_for_update().select_related("message"), pk=job_id)
+        job = _locked_job(job_id)
         if not _matches(job, data) or not _live(job):
             return _error("A matching active claim is required.", 409)
         lots = {lot.pk: lot for lot in AuctionWatchLot.objects.select_for_update().filter(pk__in=ids, superseded_by__isnull=True)}
@@ -372,7 +583,7 @@ def _result(value):
 
 @_worker_endpoint
 def job_status(request, data, job_id):
-    job = get_object_or_404(InventoryJob.objects.select_related("message"), pk=job_id)
+    job = get_object_or_404(InventoryJob.objects.select_related("message__case"), pk=job_id)
     if not _matches(job, data):
         # A transport retry can outlive its lease. Recognize only a recorded old
         # claim, and never reveal the token that replaced it.
@@ -384,7 +595,7 @@ def job_status(request, data, job_id):
                      "purchase_lot_ids": job.purchase_lot_ids}
             return JsonResponse({"job": stale, "result": {}, "body": None})
         return _error("Claim does not match this request.", 409)
-    reply = InventoryMessage.objects.filter(in_reply_to=job.message).first()
+    reply = InventoryMessage.objects.filter(in_reply_to=job.message, deleted_at__isnull=True, purged_at__isnull=True).first()
     return JsonResponse({"job": _job_data(job), "result": job.result, "body": reply.body if reply else None})
 
 
@@ -399,7 +610,7 @@ def complete(request, data, job_id):
         return _error(str(exc))
     digest = hashlib.sha256(json.dumps({"body": body, "result": result}, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     with transaction.atomic():
-        job = get_object_or_404(InventoryJob.objects.select_for_update().select_related("message"), pk=job_id)
+        job = _locked_job(job_id)
         if not _matches(job, data):
             return _error("Claim does not match this request.", 409)
         if job.status == "completed":
@@ -423,7 +634,7 @@ def fail(request, data, job_id):
     if not isinstance(error, str) or not error.strip() or len(error) > 500 or type(retry) is not bool:
         return _error("Provide a concise error and a boolean retry flag.")
     with transaction.atomic():
-        job = get_object_or_404(InventoryJob.objects.select_for_update().select_related("message"), pk=job_id)
+        job = _locked_job(job_id)
         if not _matches(job, data) or not _live(job):
             return _error("A matching active claim is required.", 409)
         job.status, job.last_error = ("retry" if retry else "failed"), error

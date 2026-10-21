@@ -12,9 +12,14 @@ class InventoryCase(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(default=timezone.now)
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    deleted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    purged_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    purged_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
 
     class Meta:
         ordering = ["-updated_at", "id"]
+        constraints = [models.CheckConstraint(condition=models.Q(purged_at__isnull=True) | models.Q(deleted_at__isnull=False), name="inventory_case_purged_in_trash")]
 
 
 class InventoryMessage(models.Model):
@@ -25,9 +30,14 @@ class InventoryMessage(models.Model):
     client_message_id = models.UUIDField(null=True, blank=True, unique=True)
     in_reply_to = models.OneToOneField("self", null=True, blank=True, on_delete=models.PROTECT, related_name="worker_reply")
     created_at = models.DateTimeField(auto_now_add=True)
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    deleted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    purged_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    purged_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
 
     class Meta:
         ordering = ["id"]
+        constraints = [models.CheckConstraint(condition=models.Q(purged_at__isnull=True) | models.Q(deleted_at__isnull=False), name="inventory_message_purged_in_trash")]
 
 
 class InventoryJob(models.Model):
@@ -35,7 +45,7 @@ class InventoryJob(models.Model):
     message = models.OneToOneField(InventoryMessage, on_delete=models.PROTECT, related_name="job")
     status = models.CharField(max_length=12, default="queued", choices=[
         ("queued", "Waiting"), ("processing", "Working"), ("completed", "Complete"),
-        ("retry", "Retrying"), ("failed", "Needs attention"),
+        ("retry", "Retrying"), ("failed", "Needs attention"), ("cancelled", "Cancelled"),
     ])
     attempts = models.PositiveIntegerField(default=0)
     claim_token = models.UUIDField(null=True, blank=True)
