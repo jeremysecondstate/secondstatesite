@@ -1,4 +1,4 @@
-"""Known artist-name differences between Calendar sources and LiveArt."""
+"""Verified artist-name differences across Calendar, Artprice, and LiveArt."""
 
 from catalogapp.artprice_artist_links import artist_identity_key
 
@@ -16,6 +16,9 @@ _LIVEART_NAMES = {
     # Invaluable's watchlist uses John W Nieto; the paired Artprice artist
     # 190556 (john-nieto) and nieto-chick.html sales use John NIETO, 2026-10-17.
     artist_identity_key("John W Nieto"): "John Nieto",
+    # Artprice artist 1474 (will-r-barnet) and barnseason.html use Will R.
+    # BARNET for the Calendar/LiveArt artist Will Barnet, confirmed 2026-10-22.
+    artist_identity_key("Will R Barnet"): "Will Barnet",
 }
 
 
