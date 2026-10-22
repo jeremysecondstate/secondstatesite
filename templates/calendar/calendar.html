@@ -226,6 +226,8 @@
           <option value="catalog">Catalog order</option>
           <option value="artist">Artist surname A–Z</option>
           <option value="house">Auction house</option>
+          <option value="time_asc">Auction time: earliest first</option>
+          <option value="time_desc">Auction time: latest first</option>
           <option value="price_asc">Price: low to high</option>
           <option value="price_desc">Price: high to low</option>
         </select>
@@ -2985,6 +2987,12 @@
 
   const galleryArtistKey = (lot) => String(lot.artist_sort_key || lot.artist || "");
 
+  const galleryTime = (lot) => {
+    if (typeof lot.event_at !== "string" || !lot.event_at.trim()) return null;
+    const timestamp = Date.parse(lot.event_at);
+    return Number.isFinite(timestamp) ? timestamp : null;
+  };
+
   const visibleGalleryLots = () => {
     const lots = (data[selectedDay] || []).map((lot, index) => ({lot, index}));
     const filtered = lots.filter(({lot}) => {
@@ -2995,6 +3003,15 @@
       filtered.sort((a, b) => galleryArtistKey(a.lot).localeCompare(galleryArtistKey(b.lot), "en", {sensitivity: "base"}) || a.index - b.index);
     } else if (gallerySort.value === "house") {
       filtered.sort((a, b) => a.lot.auction_house.localeCompare(b.lot.auction_house) || a.index - b.index);
+    } else if (gallerySort.value === "time_asc" || gallerySort.value === "time_desc") {
+      const direction = gallerySort.value === "time_asc" ? 1 : -1;
+      filtered.sort((a, b) => {
+        const aTime = galleryTime(a.lot);
+        const bTime = galleryTime(b.lot);
+        if (aTime === null) return bTime === null ? a.index - b.index : 1;
+        if (bTime === null) return -1;
+        return direction * (aTime - bTime) || a.index - b.index;
+      });
     } else if (gallerySort.value === "price_asc" || gallerySort.value === "price_desc") {
       const direction = gallerySort.value === "price_asc" ? 1 : -1;
       filtered.sort((a, b) => {
@@ -3129,7 +3146,12 @@
 
   const renderGalleryCards = () => {
     const lots = visibleGalleryLots();
-    gallerySortNote.hidden = gallerySort.value !== "price_asc" && gallerySort.value !== "price_desc";
+    const timeSort = gallerySort.value === "time_asc" || gallerySort.value === "time_desc";
+    const priceSort = gallerySort.value === "price_asc" || gallerySort.value === "price_desc";
+    gallerySortNote.hidden = !timeSort && !priceSort;
+    gallerySortNote.textContent = timeSort
+      ? "Sorted by the auction time shown on each lot. This may be a start or end time; individual lot closing times can differ. Lots with Time TBA appear last."
+      : "Sorted by auction estimate in USD, using the low estimate (high estimate if unavailable). Conversions use recent daily reference rates. Lots without a USD estimate appear last.";
     galleryGrid.replaceChildren();
     lots.slice(0, galleryVisibleCount).forEach(({lot, index}) => galleryGrid.appendChild(galleryCard(lot, index)));
     if (!lots.length) {

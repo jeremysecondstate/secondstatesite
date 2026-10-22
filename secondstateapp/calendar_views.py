@@ -253,6 +253,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "bid": _bid_label(lot),
         "sold": _sold_label(lot),
         "time": _time_label(lot, zone),
+        "event_at": lot.event_at.isoformat() if lot.event_at and not lot.is_all_day else None,
         "url": lot.lot_url or lot.sale_url,
         "lot_url": lot.lot_url,
         "sale_url": lot.sale_url,

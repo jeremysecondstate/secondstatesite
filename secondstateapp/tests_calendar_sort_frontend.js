@@ -115,6 +115,62 @@ test("existing catalog, artist and auction-house orders are unchanged", () => {
   assert.equal(page.gallerySortNote.hidden, true);
 });
 
+test("auction times sort chronologically across offsets, preserve ties, and keep TBA last in both directions", () => {
+  const lots = [
+    {id: "tba", event_at: null, time: "Time TBA"},
+    {id: "noon", event_at: "2026-10-22T12:00:00-07:00", time: "12:00 PM"},
+    {id: "midnight", event_at: "2026-10-22T00:00:00-07:00", time: "12:00 AM", ended: true},
+    {id: "morning-first", event_at: "2026-10-22T14:00:00+02:00", time: "5:00 AM"},
+    {id: "morning-second", event_at: "2026-10-22T12:00:00Z", time: "5:00 AM"},
+    {id: "late", event_at: "2026-10-23T06:59:00Z", time: "11:59 PM"},
+    {id: "invalid", event_at: "invalid", time: "Time TBA"},
+    {id: "missing", time: "Time TBA"},
+    {id: "empty", event_at: "", time: "Time TBA"},
+  ];
+  const before = JSON.stringify(lots);
+  const page = catalog(lots, "time_asc");
+  assert.deepEqual(page.visible().map(item => item.id),
+    ["midnight", "morning-first", "morning-second", "noon", "late", "tba", "invalid", "missing", "empty"]);
+  page.gallerySort.value = "time_desc";
+  assert.deepEqual(page.visible().map(item => item.id),
+    ["late", "noon", "morning-first", "morning-second", "midnight", "tba", "invalid", "missing", "empty"]);
+  assert.equal(JSON.stringify(lots), before);
+  for (const item of page.visible()) assert.equal(lots[item.index].id, item.id);
+});
+
+test("time sorting covers the full filtered day before pagination and resets Show more on sort changes", () => {
+  const lots = Array.from({length: 60}, (_, index) => ({
+    id: index, auction_house: index % 2 ? "House B" : "House A",
+    email_tray_selected: index % 3 === 0,
+    event_at: `2026-10-22T12:${String(59 - index).padStart(2, "0")}:00Z`,
+  }));
+  const page = catalog(lots, "time_asc", "house:House A");
+  page.render();
+  assert.deepEqual(page.galleryGrid.cards.map(card => card.id), Array.from({length: 24}, (_, i) => 58 - 2 * i));
+  assert.equal(page.galleryMore.hidden, false);
+  assert.equal(page.gallerySortNote.hidden, false);
+  assert.match(page.gallerySortNote.textContent, /start or end time/);
+  assert.match(page.gallerySortNote.textContent, /Time TBA appear last/);
+  page.galleryVisibleCount += 24;
+  page.render();
+  assert.equal(page.galleryGrid.cards.length, 30);
+  assert.equal(page.galleryMore.hidden, true);
+  for (const card of page.galleryGrid.cards) assert.equal(lots[card.index].id, card.id);
+  page.gallerySort.value = "time_desc";
+  page.gallerySort.change();
+  assert.equal(page.galleryVisibleCount, 24);
+  assert.equal(page.galleryGrid.cards[0].id, 0);
+  page.galleryFilter = "tray";
+  page.render();
+  assert.deepEqual(page.galleryGrid.cards.map(card => card.id), Array.from({length: 20}, (_, i) => i * 3));
+  page.gallerySort.value = "price_asc";
+  page.render();
+  assert.match(page.gallerySortNote.textContent, /auction estimate in USD/);
+  page.gallerySort.value = "catalog";
+  page.render();
+  assert.equal(page.gallerySortNote.hidden, true);
+});
+
 test("artist order uses supplied surname keys, includes mononyms, and retains lot identity", () => {
   const lots = [
     {id: "miro", artist: "Joan Miró", artist_sort_key: "miro joan"},
