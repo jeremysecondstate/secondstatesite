@@ -224,7 +224,7 @@
       <label class="day-gallery-sort-label" for="day-gallery-sort">Sort
         <select id="day-gallery-sort" class="day-gallery-sort" aria-describedby="day-gallery-sort-note">
           <option value="catalog">Catalog order</option>
-          <option value="artist">Artist A–Z</option>
+          <option value="artist">Artist surname A–Z</option>
           <option value="house">Auction house</option>
           <option value="price_asc">Price: low to high</option>
           <option value="price_desc">Price: high to low</option>
@@ -2974,6 +2974,8 @@
     return window.CalendarCurrency.sortPrice(lot);
   };
 
+  const galleryArtistKey = (lot) => String(lot.artist_sort_key || lot.artist || "");
+
   const visibleGalleryLots = () => {
     const lots = (data[selectedDay] || []).map((lot, index) => ({lot, index}));
     const filtered = lots.filter(({lot}) => {
@@ -2981,7 +2983,7 @@
       return galleryFilter === "all" || lot.auction_house === galleryFilter.slice(6);
     });
     if (gallerySort.value === "artist") {
-      filtered.sort((a, b) => a.lot.artist.localeCompare(b.lot.artist) || a.index - b.index);
+      filtered.sort((a, b) => galleryArtistKey(a.lot).localeCompare(galleryArtistKey(b.lot), "en", {sensitivity: "base"}) || a.index - b.index);
     } else if (gallerySort.value === "house") {
       filtered.sort((a, b) => a.lot.auction_house.localeCompare(b.lot.auction_house) || a.index - b.index);
     } else if (gallerySort.value === "price_asc" || gallerySort.value === "price_desc") {
@@ -3282,13 +3284,14 @@
     return media;
   };
 
+  const matchesResearchSearch = (lot, query) => !query ||
+    [lot.artist, lot.artist_source, lot.title, lot.auction_house, lot.lot_number]
+      .some((value) => String(value || "").toLocaleLowerCase().includes(query));
+
   const renderResearchRail = () => {
     const lots = data[selectedDay] || [];
     const query = researchSearch.value.trim().toLocaleLowerCase();
-    const matches = lots.map((lot, index) => ({lot, index})).filter(({lot}) =>
-      !query || [lot.artist, lot.title, lot.auction_house, lot.lot_number]
-        .some((value) => String(value || "").toLocaleLowerCase().includes(query))
-    );
+    const matches = lots.map((lot, index) => ({lot, index})).filter(({lot}) => matchesResearchSearch(lot, query));
     researchRailTotal.textContent = `${matches.length} of ${lots.length}`;
     researchLotList.replaceChildren();
     if (!matches.length) {
@@ -3586,8 +3589,7 @@
     const next = Math.max(0, Math.min(researchIndex + distance, lots.length - 1));
     if (!lots.length || next === researchIndex) return;
     const query = researchSearch.value.trim().toLocaleLowerCase();
-    if (query && ![lots[next].artist, lots[next].title, lots[next].auction_house, lots[next].lot_number]
-      .some((value) => String(value || "").toLocaleLowerCase().includes(query))) {
+    if (!matchesResearchSearch(lots[next], query)) {
       researchSearch.value = "";
     }
     researchIndex = next;

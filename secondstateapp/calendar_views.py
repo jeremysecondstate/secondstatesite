@@ -56,6 +56,7 @@ from .liveart_artist import liveart_artist_names_match, liveart_artist_search_na
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
 from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, manual_review_eligible, normalize_candidate, resale_candidate_selectable, safe_artwork_reference
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
+from .lot_presentation import artist_display_name, artist_sort_key, clean_display_text
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -199,13 +200,13 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
         first = sale_lots[0]
         auction_house = next((lot.auction_house for lot in sale_lots if lot.auction_house), first.source or "Auction")
         sale_title = next((lot.sale_title for lot in sale_lots if lot.sale_title), "")
-        artists = sorted({_artist_label(lot) for lot in sale_lots}, key=str.casefold)
+        artists = sorted({artist_display_name(_artist_label(lot)) for lot in sale_lots}, key=artist_sort_key)
         groups.append(
             {
-                "auction_house": auction_house,
-                "sale_title": sale_title,
+                "auction_house": clean_display_text(auction_house),
+                "sale_title": clean_display_text(sale_title),
                 "lot_count": len(sale_lots),
-                "artists": ", ".join(artists[:3]),
+                "artists": "; ".join(artists[:3]),
                 "additional_artists": max(0, len(artists) - 3),
                 "time_label": _time_label(first, zone),
                 "url": first.sale_url or first.lot_url,
@@ -230,7 +231,8 @@ def _sale_json(group: dict) -> dict:
 def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None) -> dict:
     selected_lot_ids = selected_lot_ids or set()
     image_url = _calendar_image_url(lot.image_url)
-    artist_artprice_url, artist_invaluable_url = artist_research_urls(_artist_label(lot))
+    source_artist = _artist_label(lot)
+    artist_artprice_url, artist_invaluable_url = artist_research_urls(source_artist)
     if lot.watchlist_artist_id and lot.watchlist_artist.artprice_url:
         try:
             artist_artprice_url = _validated_artist_artprice_url(lot.watchlist_artist.artprice_url)
@@ -238,13 +240,15 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
             pass
     return {
         "id": lot.pk,
-        "artist": _artist_label(lot),
-        "title": lot.title or "Untitled lot",
-        "auction_house": lot.auction_house or lot.source or "Auction",
-        "sale_title": lot.sale_title,
+        "artist": artist_display_name(source_artist),
+        "artist_source": source_artist,
+        "artist_sort_key": artist_sort_key(source_artist),
+        "title": clean_display_text(lot.title, strip_lot_markers=True) or "Untitled lot",
+        "auction_house": clean_display_text(lot.auction_house or lot.source or "Auction"),
+        "sale_title": clean_display_text(lot.sale_title),
         "lot_number": lot.lot_number,
-        "medium": lot.medium,
-        "location": lot.location,
+        "medium": clean_display_text(lot.medium),
+        "location": clean_display_text(lot.location),
         "estimate": _estimate_label(lot),
         "bid": _bid_label(lot),
         "sold": _sold_label(lot),

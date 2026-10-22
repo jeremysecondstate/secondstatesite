@@ -644,7 +644,7 @@ class AuctionCalendarViewTests(TestCase):
         self.assertContains(response, "Bonhams")
         self.assertEqual(response.context["calendar_data"]["2026-07-25"][0]["estimate"], "$2,000–3,000 estimate")
         lot_details = response.context["calendar_data"]["2026-07-25"]
-        self.assertEqual({item["artist"] for item in lot_details}, {"Joan Miró", "Henri Matisse"})
+        self.assertEqual({item["artist"] for item in lot_details}, {"Miró, Joan", "Matisse, Henri"})
         saved_detail = next(item for item in lot_details if item["id"] == saved_lot.pk)
         self.assertEqual(saved_detail["artprice_url"], artprice_url)
         self.assertEqual(saved_detail["images"], [image_url])
@@ -2983,7 +2983,7 @@ class CalendarSyncApiTests(TestCase):
 
         self.assertEqual(calendar.status_code, 200)
         details = calendar.context["calendar_data"]["2026-10-22"]
-        self.assertEqual({item["artist"] for item in details}, {"Rufino Tamayo", "Joan Miró"})
+        self.assertEqual({item["artist"] for item in details}, {"Tamayo, Rufino", "Miró, Joan"})
         first_detail = next(item for item in details if item["id"] == saved_pk)
         self.assertEqual(first_detail["time"], "9:00 AM")
         self.assertEqual(first_detail["url"], payload["lots"][0]["lot_url"])

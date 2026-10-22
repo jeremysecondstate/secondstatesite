@@ -114,3 +114,69 @@ test("existing catalog, artist and auction-house orders are unchanged", () => {
   page.render();
   assert.equal(page.gallerySortNote.hidden, true);
 });
+
+test("artist order uses supplied surname keys, includes mononyms, and retains lot identity", () => {
+  const lots = [
+    {id: "miro", artist: "Joan Miró", artist_sort_key: "miro joan"},
+    {id: "josef", artist: "Josef Albers", artist_sort_key: "albers josef"},
+    {id: "banksy", artist: "Banksy", artist_sort_key: "banksy"},
+    {id: "durer", artist: "Albrecht Dürer", artist_sort_key: "durer albrecht"},
+    {id: "anni", artist: "Anni Albers", artist_sort_key: "albers anni"},
+    {id: "eluard", artist: "Éluard, Paul", artist_sort_key: "eluard paul"},
+  ];
+  const page = catalog(lots, "artist");
+  const before = JSON.stringify(page.data);
+  assert.deepEqual(page.visible().map(item => item.id), ["anni", "josef", "banksy", "durer", "eluard", "miro"]);
+  page.render();
+  for (const card of page.galleryGrid.cards) assert.equal(lots[card.index].id, card.id);
+  assert.equal(JSON.stringify(page.data), before, "sorting must not rewrite source names or reorder research data");
+  assert.equal(page.gallerySortNote.hidden, true);
+});
+
+test("artist keys and legacy names compare without accents or case, preserving catalog ties", () => {
+  const page = catalog([
+    {id: "accent-first", artist: "Éluard, Paul", artist_sort_key: ""},
+    {id: "miro", artist: "Miró, Joan", artist_sort_key: null},
+    {id: "plain-second", artist: "Paul Eluard", artist_sort_key: "eluard, paul"},
+    {id: "banksy", artist: "Banksy"},
+    {id: "case-third", artist: "ELUARD, PAUL"},
+    {id: "accent-key-fourth", artist: "Other display label", artist_sort_key: "Éluard, Paul"},
+  ], "artist");
+  assert.deepEqual(page.visible().map(item => item.id),
+    ["banksy", "accent-first", "plain-second", "case-third", "accent-key-fourth", "miro"]);
+});
+
+test("research searches match original and surname-first artist names and retain matching navigation", () => {
+  const searchFunction = template.slice(template.indexOf("  const matchesResearchSearch ="),
+    template.indexOf("  const renderResearchRail ="));
+  const moveFunction = template.slice(template.indexOf("  const moveResearchLot ="),
+    template.indexOf("  const renderLotBrowser ="));
+  const lots = [
+    {id: "first", artist: "Miró, Joan", artist_source: "Joan Miró", title: "Bleu", auction_house: "House A", lot_number: "42"},
+    {id: "second", artist: "Miró, Joan", artist_source: "Joan Miró", title: "Soleil", auction_house: "House B"},
+    {id: "third", artist: "Banksy", title: "Flower Thrower", auction_house: "House C"},
+  ];
+  const context = vm.createContext({
+    data: {"2026-10-22": lots}, selectedDay: "2026-10-22", researchIndex: 0,
+    researchSearch: {value: " Joan Miró "}, researchLotCard: {querySelector: () => null},
+    renderResearchWorkspace() {}, updateCalendarLocation() {},
+  });
+  vm.runInContext(`${searchFunction}\n${moveFunction}`, context);
+  const matches = (query) => {
+    context.query = query.toLocaleLowerCase();
+    return Array.from(vm.runInContext('data[selectedDay].filter(lot => matchesResearchSearch(lot, query)).map(lot => lot.id)', context));
+  };
+  assert.deepEqual(matches("Joan Miró"), ["first", "second"]);
+  assert.deepEqual(matches("Miró, Joan"), ["first", "second"]);
+  assert.deepEqual(matches("Banksy"), ["third"]);
+  assert.deepEqual(matches("Bleu"), ["first"]);
+  assert.deepEqual(matches("House B"), ["second"]);
+  assert.deepEqual(matches("42"), ["first"]);
+  assert.deepEqual(matches(""), ["first", "second", "third"]);
+  vm.runInContext("moveResearchLot(1)", context);
+  assert.equal(context.researchIndex, 1);
+  assert.equal(context.researchSearch.value, " Joan Miró ", "original-name search survives moving to another matching lot");
+  vm.runInContext("moveResearchLot(1)", context);
+  assert.equal(context.researchIndex, 2);
+  assert.equal(context.researchSearch.value, "", "moving outside the search still clears it");
+});
