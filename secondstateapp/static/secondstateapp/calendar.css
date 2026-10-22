@@ -2961,6 +2961,7 @@ button.day-gallery-visual {
 .day-gallery-open {
   position: absolute;
   inset: 0;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2970,6 +2971,7 @@ button.day-gallery-visual {
   border: 0;
   background: transparent;
   color: inherit;
+  text-decoration: none;
   cursor: pointer;
 }
 

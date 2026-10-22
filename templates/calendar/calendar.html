@@ -3059,18 +3059,25 @@
     return [image, fallback];
   };
 
+  const galleryResearchUrl = (lot) => {
+    const url = new URL(window.location.pathname, window.location.origin);
+    url.search = new URLSearchParams({
+      view: "research", day: selectedDay, lot: String(lot.id), look: researchLook,
+    }).toString();
+    return url.href;
+  };
+
   const galleryCard = (lot, index) => {
     const card = document.createElement("article");
     card.dataset.galleryLotId = String(lot.id);
     card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}`;
     const visual = document.createElement("div");
     visual.className = "day-gallery-visual";
-    const open = document.createElement("button");
-    open.className = "day-gallery-open";
-    open.type = "button";
-    open.setAttribute("aria-label", `Open research workspace for ${lot.title}${lot.artist ? ` by ${lot.artist}` : ""}`);
+    const researchUrl = galleryResearchUrl(lot);
+    const researchLabel = `Open research workspace for ${lot.title}${lot.artist ? ` by ${lot.artist}` : ""} (opens in a new tab)`;
+    const open = externalLink(researchUrl, "day-gallery-open", "");
+    open.setAttribute("aria-label", researchLabel);
     open.append(...galleryImage(lot));
-    open.addEventListener("click", () => openResearchWorkspace(index));
     visual.appendChild(open);
     appendText(visual, "span", "day-gallery-lot-number", lot.lot_number ? `LOT ${lot.lot_number}` : "WATCHED LOT");
     const emailButton = document.createElement("button");
@@ -3099,11 +3106,8 @@
     }
     const actions = document.createElement("div");
     actions.className = "day-gallery-actions";
-    const quickLook = document.createElement("button");
-    quickLook.type = "button";
-    quickLook.className = "day-gallery-quick-look";
-    quickLook.textContent = "Research this lot →";
-    quickLook.addEventListener("click", () => openResearchWorkspace(index));
+    const quickLook = externalLink(researchUrl, "day-gallery-quick-look", "Research this lot ↗");
+    quickLook.setAttribute("aria-label", researchLabel);
     actions.appendChild(quickLook);
     if (lot.url) actions.appendChild(externalLink(lot.url, "day-gallery-auction-link", "Auction ↗"));
     if (lot.artist_invaluable_url) actions.appendChild(externalLink(lot.artist_invaluable_url, "day-gallery-auction-link", "Invaluable ↗"));
