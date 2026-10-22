@@ -125,6 +125,62 @@ class LiveArtResaleTests(SimpleTestCase):
         self.assertEqual(candidate["provider_url"], "https://api.liveart.ai/v1/lots?id=21&limit=1")
         self.assertEqual(candidate["provider_id"], "21")
 
+    def test_lot_artwork_thumbnail_is_retained_without_changing_selection_or_values(self):
+        raw = lot(21)
+        before = normalize_candidate(raw, self.subject, self.calendar_lot)
+        image_url = "https://images.liveart.ai/artworks/21/w240?signature=abc%2F123&expires=1800000000"
+        raw["image"] = {"urls": {"w240": image_url, "w480": "https://images.liveart.ai/artworks/21/w480"}}
+        raw["sale"]["image"] = {"thumbnail_url": "https://images.liveart.ai/sale-cover.jpg"}
+        raw["artwork"]["artist"]["photo_thumbnail_url"] = "https://images.liveart.ai/artist-portrait.jpg"
+
+        candidate = normalize_candidate(raw, self.subject, self.calendar_lot)
+
+        self.assertEqual(candidate["image_url"], image_url)
+        self.assertEqual({key: value for key, value in candidate.items() if key != "image_url"},
+                         {key: value for key, value in before.items() if key != "image_url"})
+        self.assertEqual(build_scenarios([candidate], [candidate["id"]], {}),
+                         build_scenarios([before], [before["id"]], {}))
+        raw.pop("image")
+        self.assertIsNone(normalize_candidate(raw, self.subject, self.calendar_lot)["image_url"])
+
+    def test_documented_image_aliases_and_artwork_lookup_images_are_supported(self):
+        image_url = "https://images.liveart.ai/artworks/21.jpg"
+        for image in ({"thumbnail_url": image_url}, {"medium_url": image_url},
+                      {"large_url": image_url}, {"urls": {"w480": image_url}},
+                      {"urls": {"w768": image_url}}, {"urls": {"w1200": image_url}},
+                      {"urls": {"w1920": image_url}}):
+            with self.subTest(image=image):
+                raw = lot(21)
+                raw["image"] = image
+                self.assertEqual(normalize_candidate(raw, self.subject, self.calendar_lot)["image_url"], image_url)
+                work = artwork(100)
+                work["description"]["image"] = image
+                self.assertEqual(subject_matches(self.calendar_lot, [work])[0]["image_url"], image_url)
+
+    def test_unsafe_or_unrelated_image_values_do_not_become_thumbnails(self):
+        for image_url in (
+            "javascript:alert(1)", "data:image/png;base64,AAAA", "file:///tmp/image.jpg",
+            "//images.liveart.ai/image.jpg", "/image.jpg", "http://images.liveart.ai/image.jpg",
+            "https://name:secret@images.liveart.ai/image.jpg", "https://images.liveart.ai:80/image.jpg",
+            "https://images.liveart.ai:444/image.jpg", "https://localhost/image.jpg",
+            "https://service.local/image.jpg", "https://metadata.internal/image.jpg",
+            "https://127.0.0.1/image.jpg", "https://127.1/image.jpg", "https://[::1]/image.jpg",
+            "https://8.8.8.8/image.jpg", "https://2130706433/image.jpg",
+            "https://images.liveart.ai/", "https://images.liveart.ai/\\image.jpg",
+            "https://images.liveart.ai/\nimage.jpg", "https://images.liveart.ai/" + "x" * 2000,
+        ):
+            with self.subTest(image_url=image_url):
+                raw = lot(21)
+                raw["image"] = {"urls": {"w240": image_url}}
+                self.assertIsNone(normalize_candidate(raw, self.subject, self.calendar_lot)["image_url"])
+                raw["image"]["thumbnail_url"] = "https://images.liveart.ai/valid.jpg"
+                self.assertEqual(normalize_candidate(raw, self.subject, self.calendar_lot)["image_url"],
+                                 "https://images.liveart.ai/valid.jpg")
+        for value in (None, [], "https://images.liveart.ai/image.jpg", {"url": "https://images.liveart.ai/image.jpg"}):
+            raw = lot(21)
+            raw["image"] = value
+            self.assertIsNone(normalize_candidate(raw, self.subject, self.calendar_lot)["image_url"])
+
     def test_mismatched_medium_is_reviewable_but_unselected(self):
         candidate = normalize_candidate(lot(22, materials="oil on canvas"), self.subject, self.calendar_lot)
         self.assertTrue(candidate["credible"])

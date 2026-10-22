@@ -11,6 +11,7 @@ import re
 import unicodedata
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from ipaddress import ip_address
 from statistics import median
 from typing import Any, Mapping
 from urllib.parse import parse_qs, urlencode, urlsplit
@@ -69,6 +70,46 @@ def _record_url(value: Any) -> str | None:
         return None
     parsed = urlsplit(candidate)
     return candidate if parsed.path.strip("/") else None
+
+
+def _safe_image_url(value: Any) -> str | None:
+    """Keep supplied HTTPS artwork images without fetching or rewriting them."""
+    candidate = _safe_url(value)
+    if not candidate:
+        return None
+    parsed = urlsplit(candidate)
+    host = (parsed.hostname or "").rstrip(".").lower()
+    if (parsed.scheme.lower() != "https" or parsed.port not in (None, 443)
+            or not parsed.path.strip("/") or "." not in host
+            or host.endswith((".localhost", ".local", ".internal", ".localdomain", ".lan", ".home"))
+            or not re.fullmatch(r"[a-z][a-z0-9-]*", host.rsplit(".", 1)[-1])):
+        return None
+    try:
+        ip_address(host)
+        return None
+    except ValueError:
+        return candidate
+
+
+def _image_url(image: Any) -> str | None:
+    """Read LiveArt's ImageSchema, never an artist portrait or sale cover.
+
+    Official OpenAPI, verified 2026-10-22: lot.image and artwork.description.image
+    contain the standard width ladder plus thumbnail/medium/large aliases.
+    Signed image URLs are preserved exactly and may expire at the provider.
+    """
+    if not isinstance(image, Mapping):
+        return None
+    urls = image.get("urls") if isinstance(image.get("urls"), Mapping) else {}
+    for value in (
+        urls.get("w240"), image.get("thumbnail_url"), urls.get("w480"),
+        image.get("medium_url"), urls.get("w768"), urls.get("w1200"),
+        image.get("large_url"), urls.get("w1920"),
+    ):
+        candidate = _safe_image_url(value)
+        if candidate:
+            return candidate
+    return None
 
 
 def _artwork_record_url(raw: Mapping[str, Any]) -> str | None:
@@ -307,6 +348,7 @@ def _subject_fields(raw: Mapping[str, Any]) -> dict[str, Any]:
         "title": _text(_description(artwork).get("name") or artwork.get("name")),
         "lot_url": _record_url(raw.get("lot_url")),
         "sale_url": _record_url(sale.get("auction_url")),
+        "image_url": _image_url(raw.get("image")),
         "location": _text(sale.get("location")) or None,
         "medium": _medium(artwork),
         "edition": _artwork_edition(artwork, notes),
@@ -391,6 +433,7 @@ def artwork_matches(
             "missing_data": missing,
             "match_notes": notes,
             "provider_url": _artwork_record_url(raw),
+            "image_url": _image_url(description.get("image")),
         }
         options.append(option)
     return sorted(options, key=lambda item: (-int(item["verified"]), -item["score"], item["id"]))
@@ -648,6 +691,7 @@ def normalize_candidate(raw: Mapping[str, Any], subject: Mapping[str, Any] | Non
         "provider_url": f"https://api.liveart.ai/v1/lots?id={candidate_id}&limit=1" if candidate_id.isdecimal() else None,
         "lot_url": _record_url(raw.get("lot_url")),
         "sale_url": _record_url(_sale(raw).get("auction_url")),
+        "image_url": _image_url(raw.get("image")),
         "location": _text(_sale(raw).get("location")) or None,
         "sale_id": raw.get("sale_id") or _sale(raw).get("id"),
         "artwork_id": candidate_artwork_id,

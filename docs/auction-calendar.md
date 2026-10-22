@@ -60,6 +60,10 @@ Selecting **Email Tray** reveals **Send Email**. Its dialog confirms the current
 
 ### Archive research workflow
 
+Day Workbench sale rows show the artwork thumbnail supplied with each Artprice or LiveArt record. Click a thumbnail to enlarge it; the same images appear in the saved-file source ledger. Images keep their original proportions, load lazily without a referrer, and show **Image unavailable** when the source has no image or the remote image fails. Uploaded HTML is parsed as data; its scripts and local companion-file paths are never executed or loaded. Artprice thumbnails come only from validated HTTPS artwork URLs embedded in each sale, and LiveArt thumbnails come from its artwork image fields rather than artist portraits or sale covers.
+
+New HTML uploads and new LiveArt searches retain image links automatically. For an older Artprice upload, add the exact same HTML file again to recover its missing thumbnails. Matching the existing source's content digest updates only image metadata, preserving source counts, selected sales, assumptions, saved calculations, and their timestamps. Older LiveArt results without saved image metadata need a new user-initiated search to acquire images; simply viewing the Workbench makes no extra provider calls. Source files and companion image folders are not committed to the site repository.
+
 **Archive Research** connects three stages for the same lot: Gallery Dossier, Day Workbench, and Bid Board. The selected day, lot ID, and stage are linkable through `?view=research&day=YYYY-MM-DD&lot=<id>&look=<dossier|workbench|bidboard>`. Existing `look` links remain compatible. A day link without an explicit `month` still loads that day's month. The Gallery Catalog opens the workflow at the selected artwork; Calendar's **Browse all lots** modal remains available for quick sequential viewing. The Calendar layout remains separate and unchanged.
 
 | Stage | Layout | Primary use |

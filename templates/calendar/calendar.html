@@ -375,6 +375,7 @@
 <script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=usd-normalization-20261017"></script>
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=saved-board-20261015"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
+<script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
@@ -1129,6 +1130,10 @@
     const renderCandidateCard = (candidate, selectable) => {
       const card = document.createElement("article");
       card.className = "liveart-candidate";
+      if (options.workspace && window.CalendarResearchImages) {
+        card.classList.add("has-sale-artwork");
+        card.appendChild(window.CalendarResearchImages.create(document, candidate));
+      }
       const top = document.createElement("div");
       top.className = "liveart-candidate-top";
       const isArtprice = candidate.provider === "Artprice" || candidate.match_type === "artprice_html";
@@ -1332,7 +1337,7 @@
         detailSummary.textContent = "Artwork, edition & source details";
         detail.appendChild(detailSummary);
         Array.from(card.children).forEach((child) => {
-          if (!child.matches(".liveart-candidate-top, h5, .liveart-sale-line, .liveart-price-line")) detail.appendChild(child);
+          if (!child.matches(".research-sale-artwork, .liveart-candidate-top, h5, .liveart-sale-line, .liveart-price-line")) detail.appendChild(child);
         });
         card.appendChild(detail);
       }
@@ -2513,6 +2518,10 @@
           sale.className = "archive-source-record";
           const heading = document.createElement("div");
           heading.className = "archive-record-heading";
+          if (window.CalendarResearchImages) {
+            heading.classList.add("has-sale-artwork");
+            heading.appendChild(window.CalendarResearchImages.create(document, {...record, provider: "Artprice"}));
+          }
           const identity = document.createElement("div");
           appendText(identity, "span", "calendar-kicker", record.artist || "Artist not reported");
           appendText(identity, "h5", "", record.title || "Artwork not reported");

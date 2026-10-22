@@ -33,7 +33,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
 
-from .artprice_max_bid import ArtpriceAnalysisError, _artprice_lot_url, analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity, merge_artprice_sources
+from .artprice_max_bid import ArtpriceAnalysisError, _artprice_image_url, _artprice_lot_url, analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity, merge_artprice_sources
 from .artprice_research_links import artprice_research_links
 from .artist_research_registry import artist_research_urls
 from .auction_email import (
@@ -745,6 +745,38 @@ def _stored_artprice_sources(analysis: AuctionMaxBidAnalysis) -> list[dict]:
     }]
 
 
+def _with_artprice_images(records: list[dict], fresh_records: list[dict]) -> list[dict]:
+    """Enrich identical saved evidence without replacing its prices or identity."""
+    def key(record):
+        return ("id", str(record["provider_id"])) if record.get("provider_id") else artprice_sale_identity(record)
+
+    images = {
+        key(record): url for record in fresh_records
+        if (url := _artprice_image_url(record.get("image_url")))
+    }
+    return [
+        {**record, "image_url": images[key(record)]}
+        if not _artprice_image_url(record.get("image_url")) and key(record) in images else record
+        for record in records
+    ]
+
+
+def _refresh_artprice_images_only(lot: AuctionWatchLot, analysis: AuctionMaxBidAnalysis, sources: list[dict]):
+    """Same-file uploads recover thumbnails without recalculating saved bids."""
+    analysis.sources = sources
+    analysis.comparables = _with_artprice_images(analysis.comparables, merge_artprice_sources(sources))
+    analysis.save(update_fields=("sources", "comparables"))
+    saved = LiveArtResaleAnalysis.objects.select_for_update().filter(lot=lot).first()
+    if saved is not None:
+        images = {item["id"]: item["image_url"] for item in _artprice_candidates(lot) if item.get("image_url")}
+        saved.candidates = [
+            {**item, "image_url": images[str(item.get("id"))]}
+            if item.get("provider") == "Artprice" and str(item.get("id")) in images else item
+            for item in saved.candidates
+        ]
+        saved.save(update_fields=("candidates",))
+
+
 def _source_descriptions(analysis: AuctionMaxBidAnalysis) -> list[dict]:
     return [{
         "id": source["id"], "filename": source["filename"],
@@ -985,6 +1017,7 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
             "provider_url": source_url,
             "source_id": provider_id,
             "source_url": source_url,
+            "image_url": _artprice_image_url(comparable.get("image_url")),
             "source_filename": (comparable.get("source_filenames") or [analysis.source_filename])[0],
             "source_filenames": comparable.get("source_filenames") or [analysis.source_filename],
             "source_ids": comparable.get("source_ids") or [legacy_source["id"]],
@@ -1155,28 +1188,38 @@ def auction_lot_artprice_analysis(request, lot_id: int):
                 sources = _stored_artprice_sources(existing) if action == "add_sources" and existing else []
                 existing_ids = {source["id"] for source in sources}
                 sources = list(sources)
+                images_only = bool(existing and sources and all(source["id"] in existing_ids for source in uploaded_sources))
                 for source in uploaded_sources:
                     if source["id"] not in existing_ids:
                         sources.append(source)
                         existing_ids.add(source["id"])
+                    else:
+                        sources = [
+                            {**saved, "comparables": _with_artprice_images(saved["comparables"], source["comparables"])}
+                            if saved["id"] == source["id"] else saved for saved in sources
+                        ]
                 if len(sources) > MAX_ARTPRICE_SOURCES:
                     raise _ArtpriceAnalysisRequestError("Save up to 10 Artprice HTML files per lot. Remove a saved file before adding more.")
-                result = analyze_artprice_comparables(
-                    merge_artprice_sources(sources), currency="USD", **_analysis_options(request.POST),
-                )
-                analysis = _replace_artprice_analysis(
-                    lot,
-                    result,
-                    source_filename=sources[0]["filename"],
-                    created_by=request.user,
-                    sources=sources,
-                )
-                _refresh_saved_resale_from_artprice(lot)
+                if images_only:
+                    analysis = existing
+                    _refresh_artprice_images_only(lot, analysis, sources)
+                else:
+                    result = analyze_artprice_comparables(
+                        merge_artprice_sources(sources), currency="USD", **_analysis_options(request.POST),
+                    )
+                    analysis = _replace_artprice_analysis(
+                        lot,
+                        result,
+                        source_filename=sources[0]["filename"],
+                        created_by=request.user,
+                        sources=sources,
+                    )
+                    _refresh_saved_resale_from_artprice(lot)
             return JsonResponse(
                 {
                     "ok": True,
                     "analysis": _analysis_json(analysis),
-                    "message": "Artprice analysis saved.",
+                    "message": "Saved source images refreshed; bids and selections are unchanged." if images_only else "Artprice analysis saved.",
                 }
             )
 

@@ -19,7 +19,7 @@ from decimal import (
 )
 from typing import Any
 from html.parser import HTMLParser
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 
 PRELOADED_STATE_MARKER = "window.__PRELOADED_STATE__"
@@ -52,6 +52,7 @@ class AuctionResult:
     estimate_high: Decimal | None
     provider_id: str | None = None
     provider_url: str | None = None
+    image_url: str | None = None
     artist: str | None = None
     category: str | None = None
     medium: str | None = None
@@ -447,6 +448,47 @@ def _lot_location(lot: Mapping[str, Any]) -> str | None:
     )) or None
 
 
+def _artprice_image_url(value: Any) -> str | None:
+    """Allow only explicit Artprice artwork-image URLs, never local saved-page paths."""
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if (
+        not candidate or len(candidate) > 2000
+        or any(char.isspace() or ord(char) < 32 for char in candidate)
+        or "\\" in candidate
+    ):
+        return None
+    try:
+        parsed = urlsplit(candidate)
+        decoded_path = unquote(parsed.path)
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname not in {"imgprivate2.artprice.com", "imgpublic.artprice.com"}
+            or parsed.username or parsed.password
+            or parsed.port not in (None, 443)
+            or not parsed.path.startswith("/lots/")
+            or parsed.path == "/lots/"
+            or any(part in {".", ".."} for part in decoded_path.split("/"))
+            or "\\" in decoded_path
+            or parsed.fragment
+        ):
+            return None
+    except ValueError:
+        return None
+    return candidate
+
+
+def _lot_image_url(lot: Mapping[str, Any]) -> str | None:
+    """Keep the first valid image attached to this lot's own embedded record."""
+    image_urls = lot.get("imageUrls")
+    if isinstance(image_urls, list):
+        for value in image_urls:
+            if image_url := _artprice_image_url(value):
+                return image_url
+    return _artprice_image_url(lot.get("imageUrl"))
+
+
 def _require_two_decimal_places(value: Decimal, *, label: str) -> Decimal:
     rounded = _rounded_money(value)
     if value != rounded:
@@ -486,6 +528,7 @@ def _normalize_results(lots: Iterable[Mapping[str, Any]]) -> list[AuctionResult]
             ),
             provider_id=provider_id,
             provider_url=_artprice_lot_url(lot.get("url")),
+            image_url=_lot_image_url(lot),
             artist=_optional_lot_text(lot.get("artistOrAssociation")),
             category=_optional_lot_text(lot.get("category")),
             medium=_optional_lot_text(lot.get("technique")),
@@ -745,7 +788,7 @@ def _result_to_json(result: AuctionResult) -> dict[str, Any]:
             else None
         ),
     }
-    for key in ("provider_id", "provider_url", "artist", "category", "medium", "edition", "size", "signature", "condition", "location"):
+    for key in ("provider_id", "provider_url", "image_url", "artist", "category", "medium", "edition", "size", "signature", "condition", "location"):
         value = getattr(result, key)
         if value is not None:
             normalized[key] = value
@@ -780,6 +823,7 @@ def _results_from_comparables(
                 },
                 "id": comparable.get("provider_id"),
                 "url": comparable.get("provider_url"),
+                "imageUrl": comparable.get("image_url"),
                 "artistOrAssociation": comparable.get("artist"),
                 "category": comparable.get("category"),
                 "technique": comparable.get("medium"),
@@ -821,6 +865,12 @@ def merge_artprice_sources(sources: Iterable[Mapping[str, Any]]) -> list[dict[st
     for source in sources:
         _require_usd(source.get("currency"))
         for comparable in source.get("comparables", []):
+            comparable = dict(comparable)
+            image_url = _artprice_image_url(comparable.get("image_url"))
+            if image_url:
+                comparable["image_url"] = image_url
+            else:
+                comparable.pop("image_url", None)
             provider_id = str(comparable.get("provider_id") or "")
             sale_key = artprice_sale_identity(comparable)
             existing = by_provider.get(provider_id) if provider_id else None
@@ -1067,6 +1117,7 @@ __all__ = [
     "SUPPORTED_METHODS",
     "analyze_artprice_comparables",
     "analyze_artprice_html",
+    "_artprice_image_url",
     "calculate_bid_rows",
     "choose_resale_value",
     "extract_preloaded_state",

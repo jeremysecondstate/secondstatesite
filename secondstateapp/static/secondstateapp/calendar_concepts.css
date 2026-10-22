@@ -225,6 +225,40 @@
 .research-workspace .archive-sales-pagination span { margin-right: auto; }
 .research-workspace .archive-sales-pagination button { border: 0; background: transparent; border-bottom: 1px solid var(--research-line); font-size: 11px; padding: 4px 0; }
 .research-workspace .resale-source-heading { text-transform: none; letter-spacing: 0; }
+
+/* Keep the sale's artwork beside its evidence, with uncropped print proportions. */
+.research-workspace .liveart-candidate.has-sale-artwork { grid-template-columns: 112px minmax(0, 1fr) minmax(130px, .4fr) 175px; min-height: 124px; }
+.research-workspace .has-sale-artwork > .liveart-candidate-top { grid-column: 2 / -1; }
+.research-workspace .has-sale-artwork > h5 { grid-column: 2; grid-row: 2; }
+.research-workspace .has-sale-artwork > .liveart-sale-line { grid-column: 3; grid-row: 2; }
+.research-workspace .has-sale-artwork > .liveart-price-line { grid-column: 4; grid-row: 2; }
+.research-workspace .has-sale-artwork > .archive-sale-detail { grid-column: 2 / -1; }
+.research-sale-artwork { grid-column: 1; grid-row: 1 / span 3; margin: 0; width: 112px; align-self: start; }
+.research-workspace .research-sale-image-open { display: block; position: relative; width: 100%; height: 124px; padding: 8px; border: 1px solid var(--research-line); background: var(--research-soft); cursor: zoom-in; }
+.research-sale-image-open img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.research-sale-image-hint { position: absolute; bottom: 4px; right: 5px; background: var(--research-paper, #f1eee6); color: var(--research-text); padding: 2px 4px; font-size: 9px; opacity: 0; }
+.research-sale-image-open:hover .research-sale-image-hint, .research-sale-image-open:focus-visible .research-sale-image-hint { opacity: 1; }
+.research-sale-image-unavailable { display: flex; align-items: center; justify-content: center; box-sizing: border-box; height: 124px; padding: 12px; border: 1px dashed var(--research-line); color: var(--research-muted); text-align: center; font-size: 11px; line-height: 1.4; }
+.research-sale-artwork [hidden] { display: none !important; }
+.research-sale-image-caption { color: var(--research-muted); font-size: 12px; margin: 12px 0 0; }
+.archive-record-heading.has-sale-artwork { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 20px; align-items: start; }
+.archive-record-heading.has-sale-artwork > .research-sale-artwork { grid-row: 1; }
+@media (max-width: 1100px) {
+  .research-workspace .liveart-candidate.has-sale-artwork { grid-template-columns: 96px minmax(0, 1fr) 150px; gap: 6px 16px; }
+  .research-sale-artwork { width: 96px; }
+  .research-workspace .has-sale-artwork > .liveart-sale-line { grid-column: 2; grid-row: 3; }
+  .research-workspace .has-sale-artwork > .liveart-price-line { grid-column: 3; grid-row: 2 / span 2; }
+  .research-workspace .has-sale-artwork > .archive-sale-detail { grid-row: 4; }
+}
+@media (max-width: 640px) {
+  .research-workspace .liveart-candidate.has-sale-artwork { grid-template-columns: 76px minmax(0, 1fr); gap: 8px 13px; }
+  .research-sale-artwork { width: 76px; }
+  .research-workspace .research-sale-image-open, .research-sale-image-unavailable { height: 96px; }
+  .research-workspace .has-sale-artwork > .liveart-price-line { grid-column: 2; grid-row: 4; text-align: left; }
+  .research-workspace .has-sale-artwork > .archive-sale-detail { grid-column: 1 / -1; grid-row: 5; }
+  .archive-record-heading.has-sale-artwork { grid-template-columns: 76px minmax(0, 1fr); gap: 13px; }
+  .archive-record-heading.has-sale-artwork > div:last-child { grid-column: 2; text-align: left; }
+}
 /* Compact masthead leaves the working surface to the artwork and evidence. */
 .research-workspace-header { padding: 13px 0; }
 .research-workspace-header h2 { font-size: clamp(21px, 2.1vw, 27px); }

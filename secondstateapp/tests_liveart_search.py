@@ -161,6 +161,28 @@ class LiveArtTermSearchViewTests(TestCase):
             for term in ("Boomerangs", "Stabiles")
         ])
 
+    def test_artwork_thumbnail_survives_research_save_and_reload_without_another_lookup(self):
+        raw = self.sale(22)
+        image_url = "https://images.liveart.ai/lot-22/w240?signature=source-supplied"
+        raw["image"] = {"urls": {"w240": image_url}}
+        self.api.list_lots.return_value = liveart_page([raw])
+
+        response = self.research(search_terms="Boomerangs")
+        self.assertEqual(response.status_code, 200)
+        research = response.json()
+        self.assertEqual(research["candidates"][0]["image_url"], image_url)
+        self.assertEqual(research["selected_ids"], [])
+        saved = self.save(research, ["22"])
+        self.assertEqual(saved.status_code, 200)
+        analysis = saved.json()["analysis"]
+        self.assertEqual(analysis["candidates"][0]["image_url"], image_url)
+        self.assertEqual(analysis["selected_ids"], ["22"])
+        reloaded = self.client.get(self.analysis_url)
+        self.assertEqual(reloaded.status_code, 200)
+        self.assertEqual(reloaded.json()["analysis"]["candidates"][0]["image_url"], image_url)
+        self.assertEqual(reloaded.json()["analysis"]["scenarios"], analysis["scenarios"])
+        self.api.list_lots.assert_called_once()
+
     def test_nieto_middle_initial_finds_prints_and_rejects_artist_conflicts(self):
         self.lot.artist = "John W. NIETO"
         self.lot.artist_watchlist_name = "John W Nieto"

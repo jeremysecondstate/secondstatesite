@@ -83,6 +83,112 @@ class MultipleArtpriceSourceTests(TestCase):
         self.assertEqual(set(self.preview()["selected_ids"]), {"artprice:101", "artprice:103"})
         self.assertEqual(added.json()["analysis"]["source_count"], 2)
 
+    def test_same_html_recovers_old_thumbnails_without_changing_saved_analysis(self):
+        images = {
+            "101": "https://imgprivate2.artprice.com/lots/first/image/xl",
+            "102": "https://imgprivate2.artprice.com/lots/second/image/xl",
+            "103": "https://imgprivate2.artprice.com/lots/third/image/xl",
+        }
+        lots = [
+            self.sale(101, 1200, imageUrls=[images["101"]], estimation={"low": "900", "high": "1500"}),
+            self.sale(102, 2400, imageUrl=images["102"], estimation={"low": "2000", "high": "3000"}),
+            # Older results without a provider ID must retain their sale identity, too.
+            self.sale("no-provider", 3600, number="103", imageUrl=images["103"]),
+        ]
+        response = self.add(
+            artprice_upload("saved.html", lots=lots), method="manual", manual_resale_value="2750",
+            recent_count="2", inbound_shipping="321", target_profit="234",
+            seller_commission_pct="12", outbound_shipping="87", other_resale_costs="65",
+            premium_min="24", premium_max="28",
+        )
+        self.assertEqual(response.status_code, 200)
+        saved = self.client.post(self.resale_url, json.dumps({
+            "action": "save", "selected_ids": ["artprice:102"],
+            "assumptions": {
+                "inbound_shipping": "123", "other_buying_costs": "45", "target_profit": "456",
+                "seller_commission_pct": "9", "outbound_shipping": "67", "other_resale_costs": "89",
+                "premium_min": 25, "premium_max": 27, "downside_factor": "0.75", "upside_factor": "1.25",
+            },
+        }), content_type="application/json")
+        self.assertEqual(saved.status_code, 200)
+
+        def without_images(value):
+            if isinstance(value, dict):
+                return {key: without_images(item) for key, item in value.items() if key != "image_url"}
+            if isinstance(value, list):
+                return [without_images(item) for item in value]
+            return value
+
+        # Simulate a source saved before thumbnails were extracted from HTML.
+        artprice = AuctionMaxBidAnalysis.objects.get(lot=self.lot)
+        artprice.sources = without_images(artprice.sources)
+        artprice.comparables = without_images(artprice.comparables)
+        artprice.save(update_fields=("sources", "comparables"))
+        resale = LiveArtResaleAnalysis.objects.get(lot=self.lot)
+        resale.candidates = without_images(resale.candidates)
+        resale.save(update_fields=("candidates",))
+        artprice_before = AuctionMaxBidAnalysis.objects.filter(lot=self.lot).values().get()
+        resale_before = LiveArtResaleAnalysis.objects.filter(lot=self.lot).values().get()
+        response_before = self.client.get(self.url).json()["analysis"]
+
+        # Re-upload exactly the same HTML. Submitted defaults must not reset saved custom bids.
+        refreshed = self.add(artprice_upload("saved.html", lots=lots), method="mean", target_profit="1")
+        self.assertEqual(refreshed.status_code, 200)
+        analysis = refreshed.json()["analysis"]
+        self.assertEqual(without_images(analysis), response_before)
+        self.assertEqual(analysis["source_count"], 1)
+        self.assertEqual({item["lot_number"]: item["image_url"] for item in analysis["comparables"]}, images)
+        self.assertEqual({
+            item["lot_number"]: item["image_url"] for item in analysis["source_ledger"][0]["comparables"]
+        }, images)
+        workbench = self.preview()
+        self.assertEqual({item["lot_number"]: item["image_url"] for item in workbench["candidates"]}, images)
+        self.assertEqual(workbench["selected_ids"], ["artprice:102"])
+        self.assertEqual(workbench["scenarios"], resale_before["scenarios"])
+        self.assertEqual(workbench["assumptions"], resale_before["assumptions"])
+        # Compare every persisted field, including source IDs, original prices, and timestamps.
+        self.assertEqual(without_images(AuctionMaxBidAnalysis.objects.filter(lot=self.lot).values().get()), artprice_before)
+        self.assertEqual(without_images(LiveArtResaleAnalysis.objects.filter(lot=self.lot).values().get()), resale_before)
+
+    def test_thumbnails_survive_new_sources_recalculation_and_source_removal(self):
+        images = {
+            "101": "https://imgprivate2.artprice.com/lots/first/image/xl",
+            "102": "https://imgprivate2.artprice.com/lots/shared/image/xl",
+            "103": "https://imgprivate2.artprice.com/lots/third/image/xl",
+        }
+        shared = self.sale(102, 2000, imageUrls=[images["102"]])
+
+        def assert_images(response, expected):
+            self.assertEqual(response.status_code, 200)
+            analysis = response.json()["analysis"]
+            self.assertEqual({item["provider_id"]: item["image_url"] for item in analysis["comparables"]}, expected)
+            for source in analysis["source_ledger"]:
+                for item in source["comparables"]:
+                    self.assertEqual(item["image_url"], expected[item["provider_id"]])
+            candidates = self.preview()["candidates"]
+            self.assertEqual({item["provider_id"]: item["image_url"] for item in candidates}, expected)
+            return analysis
+
+        first = assert_images(self.add(artprice_upload("first.html", lots=[
+            self.sale(101, 1000, imageUrl=images["101"]), shared,
+        ])), {key: images[key] for key in ("101", "102")})
+        self.assertEqual(self.save_selection(["artprice:102"]).status_code, 200)
+        added = assert_images(self.add(artprice_upload("second.html", lots=[
+            shared, self.sale(103, 6000, imageUrl=images["103"]),
+        ])), images)
+        self.assertEqual(added["source_count"], 2)
+        assert_images(self.client.post(self.url, {"action": "recalculate", "method": "mean"}), images)
+        removed = assert_images(self.client.post(self.url, {
+            "action": "remove_source", "source_id": first["sources"][0]["id"],
+        }), {key: images[key] for key in ("102", "103")})
+        self.assertEqual(removed["source_count"], 1)
+        self.assertEqual(removed["source_ledger"][0]["filename"], "second.html")
+        self.assertEqual(set(self.preview()["selected_ids"]), {"artprice:102", "artprice:103"})
+        persisted = LiveArtResaleAnalysis.objects.get(lot=self.lot)
+        self.assertEqual({item["provider_id"]: item["image_url"] for item in persisted.candidates}, {
+            key: images[key] for key in ("102", "103")
+        })
+
     def test_removing_one_file_preserves_shared_sales_and_refreshes_saved_bids(self):
         response = self.add(
             artprice_upload("first.html", lots=[self.sale(101, 1000), self.sale(102, 2000)]),
