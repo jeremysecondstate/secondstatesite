@@ -26,6 +26,7 @@ urlpatterns = [
     path("u/<str:username>/", views.public_profile, name="public_profile"),
     path("capital-dashboard/", capital_dashboard_views.capital_dashboard, name="capital_dashboard"),
     path("calendar/", calendar_views.auction_calendar, name="auction_calendar"),
+    path("calendar/usd-prices/", calendar_views.auction_calendar_usd_prices, name="auction_calendar_usd_prices"),
     path("calendar/sync/", calendar_views.sync_auction_calendar, name="auction_calendar_sync"),
     path("calendar/watchlist/", watchlist_shared_views.shared_artist_watchlist, name="shared_artist_watchlist"),
     path("calendar/inventory/", calendar_views.auction_calendar_inventory, name="auction_calendar_inventory"),

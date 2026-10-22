@@ -2863,6 +2863,22 @@ body:has(.lot-browser[open]) {
   line-height: 1.5;
 }
 
+.calendar-currency-status {
+  margin: 0 0 16px;
+  color: var(--calendar-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.calendar-currency-status button {
+  margin-left: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--calendar-line);
+  background: #111715;
+  color: var(--calendar-gold);
+  cursor: pointer;
+}
+
 .day-gallery-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

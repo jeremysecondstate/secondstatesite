@@ -51,6 +51,7 @@ from .calendar_images import (
     prepare_saved_calendar_image,
     store_saved_calendar_image,
 )
+from .currency import convert_to_usd
 from .liveart_artist import liveart_artist_names_match, liveart_artist_search_name
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
 from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, manual_review_eligible, normalize_candidate, resale_candidate_selectable, safe_artwork_reference
@@ -277,6 +278,42 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "email_tray_update_url": reverse("auction_email_lot_selection", args=(lot.pk,)),
         "ended": not lot.active,
     }
+
+
+@never_cache
+@staff_member_required
+@require_http_methods(["GET"])
+def auction_calendar_usd_prices(request):
+    """Normalize one watched day after the Calendar's initial render."""
+    day_value = request.GET.get("day", "")
+    try:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day_value):
+            raise ValueError
+        selected_day = date.fromisoformat(day_value)
+        if not 2000 <= selected_day.year <= 2100:
+            raise ValueError
+    except ValueError:
+        return JsonResponse({"error": "Choose a valid calendar day (YYYY-MM-DD)."}, status=400)
+
+    day_start, day_end = _utc_bounds(selected_day, selected_day + timedelta(days=1), _calendar_zone())
+    source_lots = AuctionWatchLot.objects.filter(
+        superseded_by__isnull=True, event_at__gte=day_start, event_at__lt=day_end,
+    ).order_by("id").values(
+        "id", "currency", "sold_currency", "estimate_low", "estimate_high", "current_bid", "sold_price",
+    )
+    # convert_to_usd reuses cached currency quotes, including failed lookups,
+    # so all amounts from the same currency share a quote without per-lot requests.
+    lots = [
+        {
+            "id": lot["id"],
+            "estimate_low": convert_to_usd(lot["estimate_low"], lot["currency"]),
+            "estimate_high": convert_to_usd(lot["estimate_high"], lot["currency"]),
+            "current_bid": convert_to_usd(lot["current_bid"], lot["currency"]),
+            "sold_price": convert_to_usd(lot["sold_price"], lot["sold_currency"] or lot["currency"]),
+        }
+        for lot in source_lots
+    ]
+    return JsonResponse({"day": day_value, "lots": lots})
 
 
 @never_cache

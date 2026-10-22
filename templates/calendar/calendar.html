@@ -88,6 +88,11 @@
     <button id="research-view-toggle" type="button" aria-controls="day-research-workspace" aria-pressed="false">Archive Research</button>
   </div>
 
+  <div id="calendar-currency-status" class="calendar-currency-status" role="status" hidden>
+    <span id="calendar-currency-message"></span>
+    <button id="calendar-currency-retry" type="button" hidden>Retry USD conversion</button>
+  </div>
+
   <div id="calendar-layout" class="calendar-layout">
     <div class="calendar-board">
       <div class="calendar-toolbar">
@@ -231,7 +236,7 @@
       <span id="day-gallery-description">A catalog across auction houses</span>
       <span id="day-gallery-results">0 lots</span>
     </div>
-    <p id="day-gallery-sort-note" class="day-gallery-sort-note" hidden>Sorted by low auction estimate (high estimate if unavailable). Currencies are not converted. Lots without estimates appear last.</p>
+    <p id="day-gallery-sort-note" class="day-gallery-sort-note" hidden>Sorted by auction estimate in USD, using the low estimate (high estimate if unavailable). Conversions use recent daily reference rates. Lots without a USD estimate appear last.</p>
     <div id="day-gallery-grid" class="day-gallery-grid"></div>
     <div class="day-gallery-pagination">
       <button id="day-gallery-more" type="button" hidden>Show more lots</button>
@@ -369,6 +374,7 @@
 {{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
 <script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=usd-normalization-20261017"></script>
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=saved-board-20261015"></script>
+<script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
@@ -488,6 +494,11 @@
   const liveartTitleVariants = new Map();
   const researchLotCache = new Map();
   const researchDaySelection = new Map();
+  const currencyDays = new Map();
+  const currencyLotsById = new Map(Object.values(data).flat().map((lot) => [String(lot.id), lot]));
+  const currencyStatus = document.getElementById("calendar-currency-status");
+  const currencyMessage = document.getElementById("calendar-currency-message");
+  const currencyRetry = document.getElementById("calendar-currency-retry");
   const archiveDraftKey = (lotId, kind) => `archive:{{ request.user.pk|default:'staff' }}:${lotId}:${kind}`;
   const readDraft = (lotId, kind) => {
     try { return JSON.parse(sessionStorage.getItem(archiveDraftKey(lotId, kind)) || "null"); }
@@ -522,6 +533,97 @@
     node.textContent = value;
     parent.appendChild(node);
   };
+
+  const applyCurrencyPrice = (node, lot, kind) => {
+    const display = window.CalendarCurrency.display(lot, kind);
+    node.textContent = display.text;
+    node.title = display.title;
+    node.hidden = !display.text;
+  };
+
+  const appendCurrencyPrice = (parent, lot, kind, className) => {
+    const node = document.createElement("p");
+    node.className = className;
+    node.dataset.calendarPriceLotId = String(lot.id);
+    node.dataset.calendarPriceKind = kind;
+    applyCurrencyPrice(node, lot, kind);
+    parent.appendChild(node);
+  };
+
+  const refreshCurrencyPrices = (day) => {
+    // Update price nodes only: research editors and cached drafts keep their DOM and focus.
+    for (const root of [document, ...researchLotCache.values()]) {
+      root.querySelectorAll("[data-calendar-price-lot-id]").forEach((node) => {
+        const lot = currencyLotsById.get(node.dataset.calendarPriceLotId);
+        if (lot) applyCurrencyPrice(node, lot, node.dataset.calendarPriceKind);
+      });
+    }
+    if (day !== selectedDay) return;
+    const state = currencyDays.get(day)?.state;
+    const unavailable = (data[day] || []).some(window.CalendarCurrency.hasUnavailablePrices);
+    currencyStatus.hidden = state !== "loading" && !unavailable;
+    currencyMessage.textContent = state === "loading"
+      ? "Converting this day’s prices to USD…"
+      : "Some USD conversions are unavailable. Original prices are shown; lots without USD estimates sort last.";
+    currencyRetry.hidden = state === "loading" || !unavailable;
+    if (activeView === "catalog" && ["price_asc", "price_desc"].includes(gallerySort.value)) {
+      const focused = document.activeElement;
+      const card = focused?.closest(".day-gallery-work");
+      const lotId = card?.dataset.galleryLotId;
+      const controlIndex = card ? Array.from(card.querySelectorAll("button, a, input, select, textarea")).indexOf(focused) : -1;
+      renderGalleryCards();
+      if (lotId && controlIndex >= 0) {
+        const newCard = Array.from(galleryGrid.children).find((item) => item.dataset.galleryLotId === lotId);
+        (newCard?.querySelectorAll("button, a, input, select, textarea")[controlIndex] || gallerySort).focus({preventScroll: true});
+      }
+    }
+  };
+
+  const loadCurrencyPrices = async (day, {force = false} = {}) => {
+    const lots = data[day] || [];
+    const previous = currencyDays.get(day);
+    if (previous?.state === "loading") { refreshCurrencyPrices(day); return previous.promise; }
+    if (!force && previous && Date.now() - previous.loadedAt < 5 * 60 * 1000) {
+      refreshCurrencyPrices(day);
+      return;
+    }
+    if (!lots.some(window.CalendarCurrency.hasForeignPrices)) {
+      currencyDays.set(day, {state: "ready", loadedAt: Date.now()});
+      refreshCurrencyPrices(day);
+      return;
+    }
+    const state = {state: "loading", loadedAt: 0};
+    currencyDays.set(day, state);
+    lots.forEach((lot) => { lot.usd_status = "loading"; lot.usd_prices = null; });
+    refreshCurrencyPrices(day);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    state.promise = (async () => {
+      try {
+        const url = "{% url 'auction_calendar_usd_prices' %}?" + new URLSearchParams({day});
+        const response = await fetch(url, {credentials: "same-origin", signal: controller.signal,
+          headers: {"Accept": "application/json"}});
+        if (!response.ok) throw new Error("USD conversion unavailable");
+        const payload = await response.json();
+        if (payload.day !== day || !Array.isArray(payload.lots)) throw new Error("Invalid USD prices");
+        const byId = new Map(payload.lots.map((prices) => [String(prices.id), prices]));
+        lots.forEach((lot) => {
+          lot.usd_prices = byId.get(String(lot.id)) || {};
+          lot.usd_status = window.CalendarCurrency.hasUnavailablePrices(lot) ? "unavailable" : "ready";
+        });
+        state.state = "ready";
+      } catch (_error) {
+        lots.forEach((lot) => { lot.usd_prices = null; lot.usd_status = "unavailable"; });
+        state.state = "unavailable";
+      } finally {
+        clearTimeout(timeout);
+        state.loadedAt = Date.now();
+        refreshCurrencyPrices(day);
+      }
+    })();
+    return state.promise;
+  };
+  currencyRetry.addEventListener("click", () => loadCurrencyPrices(selectedDay, {force: true}));
 
   const externalLink = (href, className, label) => {
     const link = document.createElement("a");
@@ -2869,12 +2971,7 @@
   };
 
   const galleryPrice = (lot) => {
-    const amounts = [lot.estimate_low, lot.estimate_high];
-    for (const amount of amounts) {
-      const price = Number(amount);
-      if (Number.isFinite(price) && price > 0) return price;
-    }
-    return null;
+    return window.CalendarCurrency.sortPrice(lot);
   };
 
   const visibleGalleryLots = () => {
@@ -2964,6 +3061,7 @@
 
   const galleryCard = (lot, index) => {
     const card = document.createElement("article");
+    card.dataset.galleryLotId = String(lot.id);
     card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}`;
     const visual = document.createElement("div");
     visual.className = "day-gallery-visual";
@@ -2992,8 +3090,8 @@
     appendText(caption, "h3", "day-gallery-title", lot.title);
     appendText(caption, "p", "day-gallery-meta", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
     appendText(caption, "p", "day-gallery-meta", [lot.medium, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.time].filter(Boolean).join(" · "));
-    appendText(caption, "p", "day-gallery-estimate", lot.estimate);
-    appendText(caption, "p", "day-gallery-bid", lot.bid);
+    appendCurrencyPrice(caption, lot, "estimate", "day-gallery-estimate");
+    appendCurrencyPrice(caption, lot, "bid", "day-gallery-bid");
     if (window.SavedBidBoard) {
       const savedBoard = document.createElement("div");
       window.SavedBidBoard.mountSummary(savedBoard, {lot, csrfToken});
@@ -3446,9 +3544,10 @@
     heading.tabIndex = -1;
     overview.appendChild(heading);
     appendText(overview, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
-    appendText(overview, "p", "lot-facts", [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.estimate, lot.medium].filter(Boolean).join(" · "));
+    appendText(overview, "p", "lot-facts", [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.medium].filter(Boolean).join(" · "));
+    appendCurrencyPrice(overview, lot, "estimate", "lot-facts");
     if (lot.location) appendText(overview, "p", "lot-location", `Location: ${lot.location}`);
-    appendText(overview, "p", "lot-bid", lot.bid);
+    appendCurrencyPrice(overview, lot, "bid", "lot-bid");
     const actionLinks = document.createElement("div");
     actionLinks.className = "lot-browser-action-links";
     if (lot.url) actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "Open auction lot ↗"));
@@ -3521,10 +3620,11 @@
     appendArtistLabel(copy, lot);
     appendText(copy, "h3", "lot-title", lot.title);
     appendText(copy, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
-    const facts = [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.estimate, lot.medium].filter(Boolean);
+    const facts = [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.medium].filter(Boolean);
     appendText(copy, "p", "lot-facts", facts.join(" · "));
+    appendCurrencyPrice(copy, lot, "estimate", "lot-facts");
     appendText(copy, "p", "lot-location", lot.location ? `Location: ${lot.location}` : "");
-    appendText(copy, "p", "lot-bid", lot.bid);
+    appendCurrencyPrice(copy, lot, "bid", "lot-bid");
 
     const actionLinks = document.createElement("div");
     actionLinks.className = "lot-browser-action-links";
@@ -3762,6 +3862,7 @@
   gallerySort.addEventListener("change", () => {
     galleryVisibleCount = 24;
     renderGalleryCards();
+    loadCurrencyPrices(selectedDay);
   });
   galleryMore.addEventListener("click", () => {
     const previousCount = galleryVisibleCount;
@@ -3832,9 +3933,10 @@
       appendArtistLabel(item, lot);
       appendText(item, "h3", "lot-title", lot.title);
       appendText(item, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
-      const facts = [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.estimate, lot.medium].filter(Boolean);
+      const facts = [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.medium].filter(Boolean);
       appendText(item, "p", "lot-facts", facts.join(" · "));
-      appendText(item, "p", "lot-bid", lot.bid);
+      appendCurrencyPrice(item, lot, "estimate", "lot-facts");
+      appendCurrencyPrice(item, lot, "bid", "lot-bid");
       const actionLinks = document.createElement("div");
       actionLinks.className = "lot-action-links";
       if (lot.url) {
@@ -3888,6 +3990,7 @@
     else if (activeView === "research") renderResearchWorkspace();
     else renderSidebarLots(lots);
     updateCalendarLocation();
+    loadCurrencyPrices(isoDate);
   };
 
   document.querySelectorAll("[data-calendar-day]").forEach((button) => {

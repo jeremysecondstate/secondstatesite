@@ -1054,7 +1054,6 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual(labels[lots["current"].pk], "Current bid: $1,700 · 4 bids")
         self.assertEqual(labels[lots["none"].pk], "Current bid: No bids")
         self.assertEqual(labels[lots["unavailable"].pk], "Current bid: N/A")
-        self.assertContains(response, 'appendText(item, "p", "lot-bid", lot.bid)')
 
     def test_calendar_does_not_auto_load_images_from_untrusted_hosts(self):
         unsafe_lot = watch_lot(
