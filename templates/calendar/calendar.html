@@ -217,10 +217,12 @@
         <button id="day-gallery-send-launch" class="day-gallery-send-launch" type="button" hidden>Send Email</button>
       </div>
       <label class="day-gallery-sort-label" for="day-gallery-sort">Sort
-        <select id="day-gallery-sort" class="day-gallery-sort">
+        <select id="day-gallery-sort" class="day-gallery-sort" aria-describedby="day-gallery-sort-note">
           <option value="catalog">Catalog order</option>
           <option value="artist">Artist A–Z</option>
           <option value="house">Auction house</option>
+          <option value="price_asc">Price: low to high</option>
+          <option value="price_desc">Price: high to low</option>
         </select>
       </label>
     </div>
@@ -229,6 +231,7 @@
       <span id="day-gallery-description">A catalog across auction houses</span>
       <span id="day-gallery-results">0 lots</span>
     </div>
+    <p id="day-gallery-sort-note" class="day-gallery-sort-note" hidden>Sorted by low auction estimate (high estimate if unavailable). Currencies are not converted. Lots without estimates appear last.</p>
     <div id="day-gallery-grid" class="day-gallery-grid"></div>
     <div class="day-gallery-pagination">
       <button id="day-gallery-more" type="button" hidden>Show more lots</button>
@@ -422,6 +425,7 @@
   const catalogEmailDialog = document.getElementById("catalog-email-dialog");
   const catalogEmailForm = document.getElementById("catalog-email-form");
   const gallerySort = document.getElementById("day-gallery-sort");
+  const gallerySortNote = document.getElementById("day-gallery-sort-note");
   const galleryDescription = document.getElementById("day-gallery-description");
   const galleryResults = document.getElementById("day-gallery-results");
   const galleryGrid = document.getElementById("day-gallery-grid");
@@ -2864,6 +2868,15 @@
     button.textContent = lot.email_tray_selected ? "★" : "☆";
   };
 
+  const galleryPrice = (lot) => {
+    const amounts = [lot.estimate_low, lot.estimate_high];
+    for (const amount of amounts) {
+      const price = Number(amount);
+      if (Number.isFinite(price) && price > 0) return price;
+    }
+    return null;
+  };
+
   const visibleGalleryLots = () => {
     const lots = (data[selectedDay] || []).map((lot, index) => ({lot, index}));
     const filtered = lots.filter(({lot}) => {
@@ -2874,6 +2887,15 @@
       filtered.sort((a, b) => a.lot.artist.localeCompare(b.lot.artist) || a.index - b.index);
     } else if (gallerySort.value === "house") {
       filtered.sort((a, b) => a.lot.auction_house.localeCompare(b.lot.auction_house) || a.index - b.index);
+    } else if (gallerySort.value === "price_asc" || gallerySort.value === "price_desc") {
+      const direction = gallerySort.value === "price_asc" ? 1 : -1;
+      filtered.sort((a, b) => {
+        const aPrice = galleryPrice(a.lot);
+        const bPrice = galleryPrice(b.lot);
+        if (aPrice === null) return bPrice === null ? a.index - b.index : 1;
+        if (bPrice === null) return -1;
+        return direction * (aPrice - bPrice) || a.index - b.index;
+      });
     }
     return filtered;
   };
@@ -2994,6 +3016,7 @@
 
   const renderGalleryCards = () => {
     const lots = visibleGalleryLots();
+    gallerySortNote.hidden = gallerySort.value !== "price_asc" && gallerySort.value !== "price_desc";
     galleryGrid.replaceChildren();
     lots.slice(0, galleryVisibleCount).forEach(({lot, index}) => galleryGrid.appendChild(galleryCard(lot, index)));
     if (!lots.length) {

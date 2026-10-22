@@ -44,6 +44,8 @@ Selecting a calendar date shows **Selected date → Auctions Happening This Day 
 
 The Gallery Catalog groups day/month navigation into aligned pairs and displays auction-house filters in a responsive grid. **All houses** and **Email Tray** remain separate from the house filters, with sorting beside them.
 
+The **Sort** menu also offers **Price: low to high** and **Price: high to low**. Price sorting uses the auction's positive low estimate, falling back to the high estimate when no positive low estimate is available. Current bids and sold prices do not affect the order. Sorting compares numeric estimate amounts in their original currencies without conversion, as noted below the controls. Lots without a positive estimate stay last in either direction, and equal estimates keep catalog order. House and Email Tray filters still apply; the entire filtered day is sorted before showing the first 24 lots.
+
 Selecting **Email Tray** reveals **Send Email**. Its dialog confirms the current sale date and selected-lot count and lets staff choose recipients. Sending includes only that day's selected lots, using the Calendar timezone; other dates remain in the active tray. The server verifies that the selected lot IDs still match the reviewed day before sending. A successful delivery archives only the sent lots and returns to the same catalog view; a failed delivery returns there for an explicit scoped retry. **Review full tray** retains the existing option to review and send selections across all dates.
 
 ### Archive research workflow
@@ -228,6 +230,7 @@ Removing obsolete Render variables before the code deployment is safe for the ne
 .\.venv\Scripts\python.exe manage.py check
 .\.venv\Scripts\python.exe manage.py makemigrations --check
 .\.venv\Scripts\python.exe manage.py test secondstateapp.tests_calendar
+node --test secondstateapp/tests_calendar_sort_frontend.js
 .\.venv\Scripts\python.exe manage.py test
 ```
 

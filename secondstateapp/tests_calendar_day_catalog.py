@@ -1,4 +1,6 @@
+import json
 from datetime import datetime
+from decimal import Decimal
 from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
@@ -18,6 +20,30 @@ class CalendarDayCatalogLinkTests(TestCase):
         self.client.force_login(
             get_user_model().objects.create_user("day-catalog-admin", is_staff=True)
         )
+
+    def test_catalog_price_sort_receives_numeric_estimates_and_missing_values(self):
+        priced = watch_lot(
+            source_lot_id="catalog-price-estimates",
+            estimate_low=Decimal("900.25"),
+            estimate_high=Decimal("1200.50"),
+        )
+        unpriced = watch_lot(
+            source_lot_id="catalog-price-missing",
+            estimate_low=None,
+            estimate_high=None,
+        )
+
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        page = BeautifulSoup(response.content, "html.parser")
+        calendar_data = json.loads(page.select_one("#auction-calendar-data").string)
+        lots = {lot["id"]: lot for lot in calendar_data["2026-07-25"]}
+
+        self.assertEqual(lots[priced.pk]["estimate_low"], "900.25")
+        self.assertEqual(lots[priced.pk]["estimate_high"], "1200.50")
+        self.assertIsNone(lots[unpriced.pk]["estimate_low"])
+        self.assertIsNone(lots[unpriced.pk]["estimate_high"])
+        sort_options = {option["value"] for option in page.select("#day-gallery-sort option")}
+        self.assertTrue({"price_asc", "price_desc"}.issubset(sort_options))
 
     def test_populated_day_links_below_sales_without_nesting_interactive_controls(self):
         for index in range(4):

@@ -2856,6 +2856,13 @@ body:has(.lot-browser[open]) {
   margin: 0;
 }
 
+.day-gallery-sort-note {
+  margin: 0 0 14px;
+  color: var(--calendar-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .day-gallery-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

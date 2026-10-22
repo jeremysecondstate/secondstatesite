@@ -254,6 +254,8 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "images": [image_url] if image_url else [],
         "image_urls": [image_url] if image_url else [],
         "currency": lot.currency,
+        "estimate_low": _decimal_json(lot.estimate_low),
+        "estimate_high": _decimal_json(lot.estimate_high),
         "current_bid": _decimal_json(lot.current_bid),
         "bid_count": lot.bid_count,
         "sold_price": _decimal_json(lot.sold_price),
