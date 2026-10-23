@@ -449,6 +449,7 @@ def auction_calendar(request):
         "initial_day": initial_day,
         "upcoming_groups": visible_upcoming_groups,
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
+        "calendar_timezone": str(zone),
         "synced_lot_count": AuctionWatchLot.objects.filter(superseded_by__isnull=True).count(),
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),

@@ -2521,7 +2521,7 @@ body:has(.lot-browser[open]) {
 }
 
 .calendar-view-switch button:focus-visible,
-.day-gallery-catalog :is(button, a, select):focus-visible {
+.day-gallery-catalog :is(button, a, select, summary):focus-visible {
   outline: 2px solid var(--calendar-gold);
   outline-offset: 3px;
 }
@@ -2676,7 +2676,6 @@ body:has(.lot-browser[open]) {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 8px;
   padding-bottom: 20px;
-  border-bottom: 1px solid var(--calendar-line);
 }
 
 .day-gallery-house-filters:empty {
@@ -2687,6 +2686,175 @@ body:has(.lot-browser[open]) {
   width: 100%;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.day-gallery-section {
+  border-bottom: 1px solid var(--calendar-line);
+}
+
+.day-gallery-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  list-style: none;
+  cursor: pointer;
+}
+
+.day-gallery-section-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.day-gallery-section-toggle::after {
+  content: "+";
+  flex-shrink: 0;
+  color: var(--calendar-gold);
+  font-size: 23px;
+  line-height: 1;
+}
+
+.day-gallery-section[open] > .day-gallery-section-toggle::after {
+  content: "−";
+}
+
+.day-gallery-section-title {
+  display: block;
+  color: rgba(255, 255, 255, .9);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.day-gallery-section-summary {
+  display: block;
+  margin-top: 5px;
+  color: var(--calendar-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.day-gallery-artists-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 14px;
+}
+
+.day-gallery-artist-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day-gallery-artist-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: start;
+  align-items: baseline;
+  gap: 6px 12px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--calendar-line);
+  border-radius: 2px;
+  background: rgba(217, 184, 120, .035);
+}
+
+.day-gallery-artist-name {
+  margin: 0;
+  color: rgba(255, 255, 255, .9);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.day-gallery-artist-total {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+  color: var(--calendar-gold);
+  white-space: nowrap;
+}
+
+.day-gallery-artist-total strong {
+  font-size: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-gallery-artist-total span {
+  font-size: 11px;
+}
+
+.day-gallery-artist-time {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--calendar-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.day-gallery-artist-time > :last-child {
+  white-space: nowrap;
+}
+
+.day-gallery-artist-arrival > :last-child {
+  color: var(--calendar-gold);
+}
+
+.day-gallery-artist-lot {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--calendar-muted);
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.day-gallery-artists-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-top: 12px;
+  padding-bottom: 18px;
+}
+
+.day-gallery-artists-footer p {
+  flex: 1 1 380px;
+  max-width: 780px;
+  margin: 0;
+  color: var(--calendar-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.day-gallery-artists-footer button {
+  margin-left: auto;
+  padding: 7px 12px;
+  min-height: 36px;
+  border: 1px solid rgba(217, 184, 120, .45);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--calendar-gold);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.day-gallery-artists-footer button:hover {
+  background: var(--calendar-gold-soft);
+  border-color: var(--calendar-gold);
 }
 
 .day-gallery-filter:hover {

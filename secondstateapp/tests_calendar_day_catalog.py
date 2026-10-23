@@ -45,6 +45,22 @@ class CalendarDayCatalogLinkTests(TestCase):
         sort_options = {option["value"] for option in page.select("#day-gallery-sort option")}
         self.assertTrue({"price_asc", "price_desc"}.issubset(sort_options))
 
+    def test_catalog_sections_can_collapse_without_hiding_primary_controls(self):
+        watch_lot()
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        page = BeautifulSoup(response.content, "html.parser")
+        for section_id in ("day-gallery-houses", "day-gallery-artists"):
+            section = page.select_one(f"#{section_id}")
+            self.assertEqual(section.name, "details")
+            self.assertNotIn("open", section.attrs)
+            self.assertIsNotNone(section.find("summary", recursive=False))
+            self.assertIsNone(section.summary.select_one("button, select, input, a"))
+        for control_id in ("day-gallery-filters", "day-gallery-sort", "day-gallery-send-launch"):
+            self.assertIsNone(page.select_one(f"#{control_id}").find_parent("details"))
+        self.assertEqual(page.select_one("#day-gallery-artists")["data-time-zone"], "America/Los_Angeles")
+        self.assertIsNotNone(page.select_one('#day-gallery-artist-sort option[value="arrival_asc"]'))
+        self.assertIn("Assumes the listed time is the sale start", page.select_one("#day-gallery-artists-note").get_text())
+
     def test_populated_day_links_below_sales_without_nesting_interactive_controls(self):
         for index in range(4):
             watch_lot(
