@@ -5,6 +5,7 @@
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012b">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=starting-hammer-20261016">
+  <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=web-evidence-20261025">
 {% endblock %}
 
 {% block main_class %}calendar-page-shell{% endblock %}
@@ -418,6 +419,7 @@
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=arrival-20261023"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
+<script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=web-evidence-20261025"></script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
@@ -1138,7 +1140,8 @@
     const describeSources = (data, saved) => {
       const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
       const artpriceCount = candidates.filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html").length;
-      const liveartCount = candidates.length - artpriceCount;
+      const webCount = candidates.filter((candidate) => candidate.entry_method === "manual_web").length;
+      const liveartCount = candidates.length - artpriceCount - webCount;
       const parts = [];
       if (data?.search_category?.id === 2) {
         parts.push("LiveArt search filter: Prints & Multiples only.");
@@ -1162,6 +1165,7 @@
         parts.push(`${artpriceCount} unique Artprice HTML sale${artpriceCount === 1 ? "" : "s"} ingested${filenames.length ? ` from ${filenames.join(", ")}` : " from saved files"}.`);
       }
       if (liveartCount) parts.push(`${liveartCount} LiveArt sale${liveartCount === 1 ? "" : "s"} retrieved ${formatAnalysisTimestamp(data?.retrieved_at || researchRetrievedAt)}.`);
+      if (webCount) parts.push(`${webCount} LiveArt web sale${webCount === 1 ? "" : "s"} entered manually; no API units used to add them.`);
       if (data?.data_units_spent != null) parts.push(`${data.data_units_spent} LiveArt Data Units used in ${saved ? "saved research" : "this search"}.`);
       if (candidates.length) parts.push("Only eligible USD hammer prices enter resale estimates; premiums and estimates are excluded.");
       return parts.join(" ");
@@ -1253,11 +1257,33 @@
       const providerUrl = candidate.provider_url || "";
       const provider = providerUrl && /(^|\.)liveart\.ai$/i.test((() => {
         try { return new URL(providerUrl).hostname; } catch (_error) { return ""; }
-      })()) ? providerLink(providerUrl, "LiveArt API record ↗") : null;
+      })()) ? providerLink(providerUrl, candidate.entry_method === "manual_web" ? "LiveArt web source ↗" : "LiveArt API record ↗") : null;
       if (provider) top.appendChild(provider);
       const sourceUrl = candidate.source_url || candidate.lot_url || (!provider ? providerUrl : "");
       const source = providerLink(sourceUrl, isArtprice ? "Artprice source record ↗" : "Original auction lot ↗");
       if (source && source.href !== provider?.href) top.appendChild(source);
+      if (candidate.entry_method === "manual_web") {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "liveart-manual-remove";
+        remove.textContent = "Remove entered sale";
+        remove.setAttribute("aria-label", `Remove entered sale: ${candidate.title}`);
+        remove.addEventListener("click", async () => {
+          if (busy || pendingSourceRefresh || options.isParentBusy?.()) return;
+          if (!window.confirm("Remove this manually entered sale from the review list? Save selected evidence to apply the removal. You can add a corrected sale afterward.")) return;
+          setBusy(true);
+          try {
+            const payload = await requestAnalysisJson(lot.liveart_analysis_url, {
+              method: "POST", credentials: "same-origin",
+              headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
+              body: JSON.stringify({action: "remove_manual", candidate_id: String(candidate.id), selected_ids: [...selectedIds], research_id: currentResearchId}),
+            }, "The entered sale could not be removed.");
+            applyManualResearch(payload);
+          } catch (error) { setStatus(error.message, "error"); }
+          finally { setBusy(false); }
+        });
+        top.appendChild(remove);
+      }
       if (!selectable && subjectNeedsChoice) {
         const choose = document.createElement("button");
         choose.type = "button";
@@ -1317,7 +1343,7 @@
       price.className = "liveart-price-line";
       price.textContent = candidate.hammer_usd === null || candidate.hammer_usd === undefined
         ? "USD hammer unavailable — excluded from valuation"
-        : `${isArtprice ? "Artprice HTML USD hammer" : "Verified LiveArt USD hammer"}: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}${canSelectCandidate(candidate) ? "" : " — excluded from valuation"}`;
+        : `${isArtprice ? "Artprice HTML USD hammer" : candidate.entry_method === "manual_web" ? "LiveArt web USD hammer · entered manually" : "Verified LiveArt USD hammer"}: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}${canSelectCandidate(candidate) ? "" : " — excluded from valuation"}`;
       card.appendChild(price);
       const facts = document.createElement("div");
       facts.className = "liveart-facts";
@@ -1345,11 +1371,16 @@
       appendFact(facts, "Size", candidate.size);
       appendFact(facts, "Condition", candidate.condition);
       if (!isArtprice) {
-        appendFact(facts, "LiveArt lot ID", candidate.provider_id || candidate.id);
+        appendFact(facts, candidate.entry_method === "manual_web" ? "Entry ID" : "LiveArt lot ID", candidate.provider_id || candidate.id);
         appendFact(facts, "Sale ID", candidate.sale_id);
         appendFact(facts, "Artwork ID", candidate.artwork_id);
       }
       appendFact(facts, "Retrieved", formatAnalysisTimestamp(candidate.retrieved_at || researchRetrievedAt));
+      if (candidate.entry_method === "manual_web") {
+        appendFact(facts, "Source evidence", candidate.evidence_note);
+        appendFact(facts, "Entered by", candidate.entered_by_name || candidate.entered_by);
+        appendFact(facts, "Entry method", "LiveArt website · staff transcription");
+      }
       card.appendChild(facts);
       const notesValue = candidate.match_notes || candidate.exclusion_reasons;
       const notes = Array.isArray(notesValue) ? notesValue : (notesValue ? [notesValue] : []);
@@ -1426,7 +1457,9 @@
       } else if (hasResearch && currentCandidates.some((candidate) => candidate.provider !== "Artprice")) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
-        note.textContent = currentCandidates.some((candidate) => candidate.search_terms?.length)
+        note.textContent = currentCandidates.every((candidate) => candidate.entry_method === "manual_web" || isArtpriceCandidate(candidate))
+          ? "Review the source links, USD hammer and artwork details for each manually entered sale before selecting it."
+          : currentCandidates.some((candidate) => candidate.search_terms?.length)
           ? "These searches match words in titles or catalogue descriptions. Review the artwork, medium, edition, and sale details before selecting comparables."
           : "No exact artwork reference was found. Review the similar sold works below and their differences before using them.";
         subjectResults.appendChild(note);
@@ -1435,7 +1468,7 @@
       if (!currentCandidates.length) {
         const note = document.createElement("p");
         note.className = "artprice-analysis-empty";
-        note.textContent = "No sold results were found in this limited search. No maximum bid can be estimated from LiveArt yet.";
+        note.textContent = "No sale records are in this review list. Add a sale from LiveArt web, search LiveArt, or save Artprice sources to continue.";
         candidateResults.appendChild(note);
       } else if (!currentCandidates.some(canSelectCandidate)) {
         const note = document.createElement("p");
@@ -1447,11 +1480,12 @@
         ["exact_work", "Exact artwork references", "An artwork reference does not establish an identical impression, edition, dimensions, signature, or condition. Check each sale before including it."],
         ["related_work", currentCandidates.some((candidate) => candidate.search_terms?.length) ? "LiveArt term search results" : "Similar sold works", "Compare the medium, edition, signature, size, and condition before selecting a sale."],
         ["artprice_html", "Saved Artprice HTML sales", "These sold records combine your saved HTML files. Overlapping sales count once. Review each date, price, source file, and missing detail."],
+        ["liveart_web", "LiveArt web sales · entered manually", "These sales were entered from website research. Check the linked source and evidence before selecting a comparable."],
         ["other", "Other candidate sold results", "Review the artwork identity and sale details before selecting a sale."],
       ];
       groups.forEach(([type, label, explanation]) => {
         const items = currentCandidates.filter((candidate) => type === "other"
-          ? !["exact_work", "related_work", "artprice_html"].includes(candidate.match_type)
+          ? !["exact_work", "related_work", "artprice_html", "liveart_web"].includes(candidate.match_type)
           : candidate.match_type === type);
         if (!items.length) return;
         if (options.workspace) {
@@ -1699,7 +1733,7 @@
     };
     const syncBusyControls = () => {
       const disabled = busy || Boolean(options.isParentBusy?.());
-      section.querySelectorAll("button, input").forEach((control) => { control.disabled = disabled; });
+      section.querySelectorAll("button, input, textarea, select").forEach((control) => { control.disabled = disabled; });
       if (options.researchButton) options.researchButton.disabled = disabled;
       if (options.titleVariantInput) options.titleVariantInput.disabled = disabled;
       if (!disabled) {
@@ -1846,15 +1880,15 @@
           body: JSON.stringify(subjectId === null ? {search_terms: searchTerms} : {subject_id: subjectId, search_title: subjectTitle}),
         }, "LiveArt research could not be completed.");
         const previousArtpriceIds = new Set(currentCandidates
-          .filter(isArtpriceCandidate).map(candidateSelectionKey));
+          .filter((candidate) => isArtpriceCandidate(candidate) || candidate.entry_method === "manual_web").map(candidateSelectionKey));
         const selectedArtpriceIds = new Set(currentCandidates
-          .filter((candidate) => isArtpriceCandidate(candidate) && selectedIds.has(String(candidate.id)))
+          .filter((candidate) => (isArtpriceCandidate(candidate) || candidate.entry_method === "manual_web") && selectedIds.has(String(candidate.id)))
           .map(candidateSelectionKey));
         currentCandidates = Array.isArray(payload.candidates) ? payload.candidates : [];
         const responseSelectedIds = new Set((Array.isArray(payload.selected_ids) ? payload.selected_ids : []).map(String));
         selectedIds = new Set(currentCandidates
           .filter((candidate) => canSelectCandidate(candidate)
-            && (isArtpriceCandidate(candidate) && previousArtpriceIds.has(candidateSelectionKey(candidate))
+            && ((isArtpriceCandidate(candidate) || candidate.entry_method === "manual_web") && previousArtpriceIds.has(candidateSelectionKey(candidate))
               ? selectedArtpriceIds.has(candidateSelectionKey(candidate))
               : responseSelectedIds.has(String(candidate.id)) || candidate.selected))
           .map((candidate) => String(candidate.id)));
@@ -2016,6 +2050,46 @@
       }
       setStatus("");
     };
+    const applyManualResearch = (payload) => {
+      currentCandidates = Array.isArray(payload.candidates) ? payload.candidates : [];
+      selectedIds = new Set((payload.selected_ids || []).map(String));
+      currentResearchId = payload.research_id || "";
+      researchRetrievedAt = payload.retrieved_at || "";
+      hasResearch = true;
+      currentSearchInfo = {search_terms_used: payload.search_terms_used, search_summary: payload.search_summary, data_units_spent: payload.data_units_spent, search_category: payload.search_category, excluded_category_count: payload.excluded_category_count};
+      subjectNeedsChoice = Boolean(payload.requires_subject_choice);
+      sourceMeta.textContent = describeSources(payload, false);
+      renderCandidates(payload.subject_matches || []);
+      const webGroup = candidateResults.querySelector('[data-group="liveart_web"]');
+      if (webGroup) webGroup.open = true;
+      markAnalysisPending("Website evidence changes are not saved yet. Review the selected sales, then save selected evidence to use them on the Bid Board.");
+      setStatus(payload.message || "Website evidence updated for review. No LiveArt API request was made.", "success");
+    };
+    if (window.LiveArtManualEntry) window.LiveArtManualEntry.mount(section, {
+      artist: lot.artist || lot.artist_watchlist_name || "",
+      idPrefix: `${options.idPrefix || ""}liveart-${lot.id}-`,
+      draftKey: archiveDraftKey(lot.id, "manual-sale"),
+      onAdd: async (entry) => {
+        await load();
+        if (!loaded || busy || pendingSourceRefresh || options.isParentBusy?.()) {
+          throw new Error("Wait for the saved evidence to finish loading, then try again.");
+        }
+        setBusy(true);
+        try {
+          const payload = await requestAnalysisJson(lot.liveart_analysis_url, {
+            method: "POST", credentials: "same-origin",
+            headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
+            body: JSON.stringify({
+              action: "add_manual", confirmed: true,
+              entry: {...entry, price_basis: "hammer", currency: "USD", category: "prints_and_multiples", status: "sold"},
+              selected_ids: [...selectedIds], research_id: currentResearchId,
+            }),
+          }, "The website sale could not be added.");
+          applyManualResearch(payload);
+          return payload;
+        } finally { setBusy(false); }
+      },
+    });
     registerLotInstance(liveartAnalysisInstances, lot.id, section, receiveAnalysis);
     if (liveartAnalysisCache.has(String(lot.id))) {
       loaded = true;
@@ -2411,7 +2485,10 @@
       appendText(compsHeader, "span", "calendar-kicker", "02 / EVIDENCE");
       appendText(compsHeader, "h3", "", "Sales & comparable works");
       appendText(compsHeader, "p", "", "Select eligible sold USD hammer evidence. Up to 25 unique sales across Artprice and LiveArt.");
-      compsPanel.append(compsHeader, liveartSearch, ...liveartChildren.slice(3, 8), liveartChildren[9]);
+      compsPanel.append(compsHeader, liveartSearch);
+      const manualEntry = liveartSection.querySelector(".liveart-manual-entry");
+      if (manualEntry) compsPanel.appendChild(manualEntry);
+      compsPanel.append(...liveartChildren.slice(3, 8), liveartChildren[9]);
       liveartChildren[9].querySelector(".is-primary").textContent = "Save selected evidence";
       const evidenceSummary = document.createElement("details");
       evidenceSummary.className = "archive-evidence-summary";

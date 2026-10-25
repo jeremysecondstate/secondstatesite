@@ -836,6 +836,24 @@ def _same_sale(artprice: Mapping[str, Any], liveart: Mapping[str, Any]) -> bool:
     return abs(artprice_hammer - liveart_hammer) <= max(artprice_hammer, liveart_hammer) * Decimal("0.02")
 
 
+def same_liveart_sale(first: Mapping[str, Any], second: Mapping[str, Any]) -> bool:
+    """Match a web transcription to a sale without relying on its entered price.
+
+    A copied ``Lot 0072`` label and API lot ``72`` identify the same lot. Keep
+    suffixes intact, and still require both the sale date and auction house.
+    """
+    def lot_number(value):
+        label = _key(value)
+        label = re.sub(r"^lot\s+(?:(?:no|number)\s+)?", "", label)
+        label = re.sub(r"^no\s+", "", label)
+        return re.sub(r"^0+(?=\d)", "", label)
+
+    first_lot, second_lot = lot_number(first.get("lot_number")), lot_number(second.get("lot_number"))
+    if not first_lot or not second_lot:
+        return False
+    return _same_sale({**first, "lot_number": first_lot}, {**second, "lot_number": second_lot})
+
+
 def build_scenarios(
     candidates: list[Mapping[str, Any]], selected_ids: list[str | int], assumptions: Mapping[str, Any] | None
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -888,6 +906,7 @@ def build_scenarios_with_sources(
     values: list[Decimal] = []
     liveart_sales: list[Mapping[str, Any]] = []
     artprice_sales: list[tuple[Mapping[str, Any], Decimal]] = []
+    liveart_duplicate_count = 0
     for candidate in candidates:
         if str(candidate.get("id")) not in selected or candidate.get("status") != "sold":
             continue
@@ -901,6 +920,21 @@ def build_scenarios_with_sources(
             if candidate.get("provider") == "Artprice":
                 artprice_sales.append((candidate, hammer))
             else:
+                # A web transcription and an API result can describe the same
+                # sale. Retain both records for inspection, but count it once.
+                duplicate = next((previous for previous in liveart_sales if (
+                    candidate.get("entry_method") == "manual_web" or previous.get("entry_method") == "manual_web"
+                ) and same_liveart_sale(previous, candidate)), None)
+                if duplicate is not None:
+                    if Decimal(str(duplicate["hammer_usd"])) != hammer:
+                        message = "The same LiveArt sale has conflicting USD hammers. Review the sources and select only one record."
+                        if not allow_unestimable:
+                            raise ArtpriceAnalysisError(message)
+                        # Saved records stay readable, but conflicting evidence
+                        # cannot supply a fresh resale estimate or Bid Board.
+                        return merged, [], {"combined_comp_count": 0, "calculation_error": message}
+                    liveart_duplicate_count += 1
+                    continue
                 values.append(hammer)
                 liveart_sales.append(candidate)
     artprice_included_count = 0
@@ -931,6 +965,8 @@ def build_scenarios_with_sources(
         })
     source_summary = {
         "liveart_selected_count": len(liveart_sales),
+        "liveart_duplicate_count": liveart_duplicate_count,
+        "liveart_web_selected_count": sum(item.get("entry_method") == "manual_web" for item in liveart_sales),
         "artprice_sold_count": artprice_sold_count if artprice_sold_count is not None else sum(
             1 for item in candidates if item.get("provider") == "Artprice"
         ),

@@ -54,6 +54,7 @@ from .calendar_images import (
 from .currency import convert_to_usd
 from .liveart_artist import liveart_artist_names_match, liveart_artist_search_name
 from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfigurationError
+from .liveart_manual import MAX_MANUAL_SALES, find_existing_sale, is_manual_web, normalize_manual_entry, retained_manual_candidates
 from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, manual_review_eligible, normalize_candidate, resale_candidate_selectable, safe_artwork_reference
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
 from .lot_presentation import artist_display_name, artist_sort_key, clean_display_text
@@ -1599,11 +1600,29 @@ def auction_lot_liveart_research(request, lot_id: int):
     except ValueError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
+    existing = LiveArtResaleAnalysis.objects.filter(lot=lot).first()
+    previous = request.session.get(f"liveart_research_{lot.pk}")
+    previous = previous if isinstance(previous, dict) else {}
+    manual = retained_manual_candidates(
+        existing.candidates if existing is not None else [], previous.get("candidates"),
+    )
+    removed_manual_ids = set(previous.get("removed_manual_ids") or [])
+    manual = [item for item in manual if str(item.get("id")) not in removed_manual_ids]
+    # Web transcriptions are independent evidence, not disposable API results.
+    # Keep their IDs and explicit selections, including an unsaved draft.
+    manual_ids = {str(item["id"]) for item in manual}
+    pending_manual_ids = {str(item["id"]) for item in retained_manual_candidates(previous.get("candidates"))}
+    research["candidates"] = [*research.get("candidates", []), *manual]
+    research["selected_ids"] = list(dict.fromkeys([
+        *research.get("selected_ids", []),
+        *(str(item) for item in (existing.selected_ids if existing is not None else []) if str(item) in manual_ids and str(item) not in pending_manual_ids),
+        *(str(item) for item in previous.get("selected_ids", []) if str(item) in manual_ids),
+    ]))
+    research["removed_manual_ids"] = sorted(removed_manual_ids)
     research["search_category"] = {"id": PRINTS_AND_MULTIPLES_CATEGORY_ID, "label": PRINTS_AND_MULTIPLES_LABEL}
     research.setdefault("excluded_category_count", 0)
     research["research_id"] = secrets.token_hex(16)
     request.session[f"liveart_research_{lot.pk}"] = research
-    existing = LiveArtResaleAnalysis.objects.filter(lot=lot).first()
     candidates = _merged_resale_candidates(lot, research.get("candidates"))
     selected_ids = list(research.get("selected_ids") or [])
     if existing is not None:
@@ -1621,6 +1640,72 @@ def auction_lot_liveart_research(request, lot_id: int):
         "selected_ids": selected_ids,
     }
     return JsonResponse({"ok": True, **response_research})
+
+
+def _manual_liveart_research(request, lot: AuctionWatchLot, existing: LiveArtResaleAnalysis | None, payload: dict):
+    """Stage staff-entered web evidence in the same opaque research session."""
+    remove = payload.get("action") == "remove_manual"
+    allowed_fields = {"action", "selected_ids", "research_id"} | ({"candidate_id"} if remove else {"entry", "confirmed"})
+    if set(payload) - allowed_fields:
+        return JsonResponse({"ok": False, "error": "Manual sale request contains unsupported fields."}, status=400)
+    research_id = payload.get("research_id", "")
+    if not isinstance(research_id, str) or len(research_id) > 80:
+        return JsonResponse({"ok": False, "error": "Invalid research reference."}, status=400)
+    pending = request.session.get(f"liveart_research_{lot.pk}")
+    if research_id and (not isinstance(pending, dict) or pending.get("research_id") != research_id):
+        return JsonResponse({"ok": False, "error": "This research was replaced in another tab. Reload saved research before adding a sale."}, status=409)
+    if research_id:
+        research = dict(pending)
+    elif existing is not None:
+        research = {
+            "subject_match": existing.subject_match or None, "subject_matches": existing.subject_matches,
+            "candidates": existing.candidates, "selected_ids": existing.selected_ids,
+            "retrieved_at": existing.retrieved_at.isoformat(),
+            "data_units_spent": float(existing.data_units_spent) if existing.data_units_spent is not None else None,
+            **_liveart_search_context(existing.search_context or {}),
+        }
+    else:
+        research = {"subject_match": None, "subject_matches": [], "candidates": [], "selected_ids": [],
+                    "retrieved_at": timezone.now().isoformat(), "data_units_spent": None}
+    try:
+        candidates = _merged_resale_candidates(lot, research.get("candidates"))
+        selected_ids = payload.get("selected_ids", research.get("selected_ids", []))
+        if (not isinstance(selected_ids, list) or len(selected_ids) > MAX_SELECTED_RESALE_COMPS
+                or any(isinstance(item, bool) or not isinstance(item, (str, int)) for item in selected_ids)):
+            raise ValueError("Select up to 25 eligible sold USD hammer comparables.")
+        selected_ids = list(dict.fromkeys(str(item) for item in selected_ids))
+        allowed = {str(item.get("id")) for item in candidates if resale_candidate_selectable(item) and item.get("status") == "sold"}
+        if any(item not in allowed for item in selected_ids):
+            raise ValueError("Select only eligible sold USD hammer comparables.")
+        removed_manual_ids = set(research.get("removed_manual_ids") or [])
+        if remove:
+            candidate_id = payload.get("candidate_id")
+            if not isinstance(candidate_id, str) or not any(is_manual_web(item) and str(item.get("id")) == candidate_id for item in candidates):
+                raise ValueError("Choose a manually entered sale to remove.")
+            candidates = [item for item in candidates if str(item.get("id")) != candidate_id]
+            selected_ids = [identifier for identifier in selected_ids if identifier != candidate_id]
+            removed_manual_ids.add(candidate_id)
+            result = {"removed_id": candidate_id}
+            message = "Web sale removed from this draft. Save the evidence to keep the removal."
+        else:
+            candidate = normalize_manual_entry(payload.get("entry"), confirmed=payload.get("confirmed"), calendar_lot=lot, user_id=request.user.pk)
+            candidate["entered_by_name"] = request.user.get_username()
+            duplicate = find_existing_sale(candidates, candidate)
+            if duplicate is None:
+                if sum(is_manual_web(item) for item in candidates) >= MAX_MANUAL_SALES:
+                    raise ValueError(f"Keep up to {MAX_MANUAL_SALES} manually entered sales per lot.")
+                candidates.append(candidate)
+                removed_manual_ids.discard(candidate["id"])
+            result = {"added_id": str(duplicate["id"] if duplicate else candidate["id"]), "duplicate": duplicate is not None}
+            message = "This sale is already present; its saved evidence was kept." if duplicate else "Web sale added for review. Select it and save the evidence to use it in the Bid Board."
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+    research.update({
+        "research_id": secrets.token_hex(16), "candidates": _candidates_with_selection(candidates, selected_ids),
+        "selected_ids": selected_ids, "removed_manual_ids": sorted(removed_manual_ids), "message": message,
+    })
+    request.session[f"liveart_research_{lot.pk}"] = research
+    return JsonResponse({"ok": True, **research, **result})
 
 
 @never_cache
@@ -1644,6 +1729,8 @@ def auction_lot_liveart_analysis(request, lot_id: int):
     if not isinstance(payload, dict):
         return JsonResponse({"ok": False, "error": "Analysis request must be a JSON object."}, status=400)
     action = str(payload.get("action") or "save").strip().casefold()
+    if action in {"add_manual", "remove_manual"}:
+        return _manual_liveart_research(request, lot, existing, payload)
     if action == "delete":
         if existing:
             existing.delete()

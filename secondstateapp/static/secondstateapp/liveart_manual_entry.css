@@ -1,0 +1,23 @@
+.liveart-manual-entry { margin: 18px 0; border: 1px solid var(--research-line, #555); padding: 14px 16px; }
+.liveart-manual-entry > summary { cursor: pointer; font-size: 14px; font-weight: 500; }
+.liveart-manual-body { padding-top: 12px; }
+.liveart-manual-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; margin: 16px 0; }
+.liveart-manual-grid .is-wide { grid-column: 1 / -1; }
+.liveart-manual-entry .artprice-analysis-field { min-width: 0; }
+.liveart-manual-entry label { display: block; margin-bottom: 6px; }
+.liveart-manual-entry :is(input:not([type="checkbox"]), textarea) { box-sizing: border-box; width: 100%; min-width: 0; }
+.liveart-manual-entry textarea { resize: vertical; padding: 10px; font: inherit; line-height: 1.5; }
+.research-workspace .liveart-manual-entry textarea { background: var(--research-paper); color: var(--research-text); border: 1px solid var(--research-line); border-radius: 0; font-size: 13px; }
+.liveart-manual-paste { margin: 12px 0 18px; }
+.liveart-manual-paste > label { margin-top: 12px; }
+.liveart-manual-paste summary, .liveart-manual-extra summary { cursor: pointer; font-size: 12px; }
+.liveart-manual-entry .liveart-manual-confirmation { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0; font-size: 12px; line-height: 1.6; }
+.liveart-manual-confirmation input { flex: 0 0 auto; margin-top: 4px; accent-color: #96734c; }
+.liveart-manual-entry :is(button, input, textarea):focus-visible { outline: 2px solid #96734c; outline-offset: 3px; }
+.liveart-manual-entry .artprice-analysis-status { overflow-wrap: anywhere; }
+.research-workspace .liveart-manual-remove { padding: 4px 0; border: 0; border-bottom: 1px solid var(--research-line); background: transparent; color: var(--research-muted); font: inherit; font-size: 11px; cursor: pointer; }
+@media (max-width: 600px) {
+  .liveart-manual-entry { padding: 12px; }
+  .liveart-manual-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .research-workspace .liveart-manual-entry :is(input:not([type="checkbox"]), textarea) { font-size: 16px; }
+}

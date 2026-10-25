@@ -152,6 +152,36 @@ The Artprice estimate uses the combined unique sales across those files. Overlap
 
 The same normalized sold records feed **Sold comps for resale bids**. USD Artprice hammer sales with a matching named artist are preselected up to the 25-sale limit, alongside any selected LiveArt sales. Artprice and LiveArt use the same verified artist aliases, including the imported Leroy Neimann spelling for Leroy Neiman. Existing saved Artprice records are rechecked on reload without another upload. A recorded USD hammer remains visible when an artist conflict excludes a sale, and the row explains the exclusion. Staff can uncheck individual records, manually select rows whose artist is missing, and save updated bids. The saved resale analysis displays how many Artprice records were ingested, eligible for automatic selection, selected, and actually used, including any overlap counted once across sources. Each saved filename appears with its own counts. Unsaved resale selections, research, and costs survive file changes and remain pending until saved again.
 
+## LiveArt website evidence without an API search
+
+In **Day Workbench → Sales & comparable works**, use **Add a sale from LiveArt web** when researching on LiveArt's website, including while the API quota is exhausted. Enter one sale in the form, or expand **Quick paste · one sale**, insert a template, and choose **Fill fields from paste**. Use `YYYY-MM-DD` dates and plain numeric amounts without commas or currency symbols. This action makes no LiveArt API request and does not require an API key.
+
+Supply the matching artist, artwork title, sale date, auction house, lot number, LiveArt source link, and the **USD hammer shown by the source**. Include a short evidence note recording the sold status, hammer basis and print category, and confirm those facts before adding the record. Preserve the original hammer/currency and original auction link when available, plus medium, edition and other relevant distinctions. Do not enter a premium-inclusive result, estimate, opening bid, or unverified currency conversion as a USD hammer.
+
+The paste format uses one labeled field per line; optional fields can be omitted. Replace every placeholder with the observed sale details:
+
+```text
+Artist: Joan Miró
+Title: [artwork title]
+Sale date: [YYYY-MM-DD]
+Auction house: [house]
+Lot number: [number]
+USD hammer: [source-reported USD hammer]
+LiveArt URL: [LiveArt sale-record URL]
+Source evidence: [sold status, USD hammer basis and print category observed on the source]
+Original hammer: [optional source-currency hammer]
+Original currency: [optional three-letter currency]
+Original auction URL: [optional auction record URL]
+Medium: [optional]
+Edition: [optional]
+```
+
+Choose **Add sale for review** after checking the populated fields and confirmation. The added sale appears as **LiveArt web evidence** and remains unselected until reviewed. Select the sale's checkbox, choose **Save selected evidence**, and continue to **Bid Board** for the same cost, bid-increment and resale-case workflow. Adding a record alone does not save an analysis or a bid. The saved evidence and Bid Board snapshot retain the web link, evidence note, entry method, staff identity and capture time; staff-entered evidence is never labeled as an API-verified result.
+
+To correct a transcription, choose **Remove entered sale** on that manual record, then add the corrected sale and select it again. Choose **Save selected evidence** to persist the correction or removal. Removing a manual row leaves API and Artprice records, other selections and existing costs intact; the saved analysis changes only when saved.
+
+The server checks the matching artist, sold/hammer/USD/Prints & Multiples confirmation, source links, date and bounded positive amount. Repeated entries do not create another copy of the same sale; conflicting prices cannot silently replace an existing record. Manual records survive later API searches, and overlapping sales count once in the combined evidence. Existing Artprice source records and the 25-selected-sale limit continue to apply.
+
 ## LiveArt word and phrase searches
 
 All new LiveArt searches are restricted to **Prints & Multiples**. The server sends `category_id=2` on every artwork and sold-lot lookup, including default-title searches, each alternative term, chosen artwork sale history, and related-work fallbacks. This category was verified against [LiveArt's canonical taxonomy](https://api.liveart.ai/v1/categories) on October 12, 2026; both endpoints support the filter in the [OpenAPI specification](https://api.liveart.ai/openapi.json). Returned records must also explicitly report that category; missing, conflicting, or other categories are excluded without inferring category from a title or medium. The result summary reports any excluded records.
