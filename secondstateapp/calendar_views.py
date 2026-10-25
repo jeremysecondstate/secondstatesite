@@ -57,6 +57,7 @@ from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfiguration
 from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, manual_review_eligible, normalize_candidate, resale_candidate_selectable, safe_artwork_reference
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
 from .lot_presentation import artist_display_name, artist_sort_key, clean_display_text
+from .oliver_houses import is_oliver_house, oliver_house_names
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -245,6 +246,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "artist_sort_key": artist_sort_key(source_artist),
         "title": clean_display_text(lot.title, strip_lot_markers=True) or "Untitled lot",
         "auction_house": clean_display_text(lot.auction_house or lot.source or "Auction"),
+        "oliver_house": is_oliver_house(lot.auction_house),
         "sale_title": clean_display_text(lot.sale_title),
         "lot_number": lot.lot_number,
         "medium": clean_display_text(lot.medium),
@@ -450,6 +452,7 @@ def auction_calendar(request):
         "upcoming_groups": visible_upcoming_groups,
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
         "calendar_timezone": str(zone),
+        "oliver_house_count": len(oliver_house_names()),
         "synced_lot_count": AuctionWatchLot.objects.filter(superseded_by__isnull=True).count(),
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),
@@ -1750,7 +1753,8 @@ def _email_scope_date(value: str) -> date:
 
 
 def _email_success_redirect(request):
-    if request.POST.get("return_view") == "catalog":
+    return_view = request.POST.get("return_view")
+    if return_view in {"catalog", "oliver"}:
         try:
             selected_day = _email_scope_date(request.POST.get("day", ""))
         except ValueError:
@@ -1758,7 +1762,7 @@ def _email_success_redirect(request):
         query = urlencode({
             "month": _month_start(request.POST.get("month"), selected_day).strftime("%Y-%m"),
             "day": selected_day.isoformat(),
-            "view": "catalog",
+            "view": return_view,
             "filter": "tray",
         })
         return redirect(f"{reverse('auction_calendar')}?{query}")
@@ -1766,7 +1770,7 @@ def _email_success_redirect(request):
 
 
 def _email_failure_redirect(request):
-    if "scope_day" in request.POST and request.POST.get("return_view") == "catalog":
+    if "scope_day" in request.POST and request.POST.get("return_view") in {"catalog", "oliver"}:
         return _email_success_redirect(request)
     return _email_tray_redirect()
 
@@ -1855,6 +1859,16 @@ def clear_auction_email_tray(request):
 
 def _prepare_auction_email_dispatch(request, *, retry: bool):
     submitted_keys = request.POST.getlist("recipients")
+    house_scopes = request.POST.getlist("scope_houses")
+    house_scope = request.POST.get("scope_houses", "")
+    if (
+        len(house_scopes) > 1
+        or house_scope not in {"", "oliver"}
+        or (request.POST.get("return_view") == "oliver" and house_scope != "oliver")
+        or (house_scope and "scope_day" not in request.POST)
+    ):
+        messages.error(request, "Choose a valid calendar house scope before sending.")
+        return None
     scope_day = None
     if "scope_day" in request.POST:
         try:
@@ -1896,6 +1910,8 @@ def _prepare_auction_email_dispatch(request, *, retry: bool):
                 item for item in items
                 if item.lot.event_at is not None and timezone.localtime(item.lot.event_at, zone).date() == scope_day
             ]
+            if house_scope == "oliver":
+                items = [item for item in items if is_oliver_house(item.lot.auction_house)]
             if not items:
                 messages.error(request, "No selected lots remain for this calendar day.")
                 return None

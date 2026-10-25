@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "source": {
+    "path": "docs/oliver-houses/oliver-auction-houses.xlsx",
+    "sha256": "1c0c064256211d577f6ddce641b49cf4051ea8705b8303e7651ef4dccb6a193f",
+    "sheet": "Auction Houses",
+    "range": "A2:B18"
+  },
+  "houses": [
+    {"name": "Sotheby's", "url": "https://www.sothebys.com", "aliases": []},
+    {"name": "Christie's", "url": "https://www.christies.com", "aliases": []},
+    {"name": "Bonhams", "url": "https://www.bonhams.com", "aliases": []},
+    {"name": "Phillips", "url": "https://www.phillips.com", "aliases": []},
+    {"name": "Swann Auction Galleries", "url": "https://www.swanngalleries.com", "aliases": []},
+    {"name": "Doyle", "url": "https://www.doyle.com", "aliases": []},
+    {"name": "Rago Auctions", "url": "https://www.ragoarts.com", "aliases": ["Rago Arts and Auction Center"]},
+    {"name": "Wright", "url": "https://www.wright20.com", "aliases": []},
+    {"name": "John Moran Auctioneers", "url": "https://www.johnmoran.com", "aliases": []},
+    {"name": "Heritage Auctions", "url": "https://www.ha.com", "aliases": []},
+    {"name": "Freeman's", "url": "https://www.freemansauction.com", "aliases": []},
+    {"name": "Artcurial", "url": "https://www.artcurial.com", "aliases": []},
+    {"name": "Dorotheum", "url": "https://www.dorotheum.com", "aliases": []},
+    {"name": "Bukowskis", "url": "https://www.bukowskis.com", "aliases": []},
+    {"name": "Bradford's Auction Galleries", "url": "https://www.bradfordsauction.com/auctions/upcoming-auctions/", "aliases": ["Bradford's"]},
+    {"name": "Los Angeles Modern Auctions (LAMA)", "url": "https://www.lamodern.com", "aliases": ["Los Angeles Modern Auctions"]},
+    {"name": "Clars Auctions", "url": "https://www.clars.com", "aliases": []}
+  ]
+}

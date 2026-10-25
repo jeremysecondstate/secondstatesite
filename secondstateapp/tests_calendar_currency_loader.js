@@ -56,6 +56,8 @@ function page(data) {
       return new Promise((resolve, reject) => pending.push({url, options, resolve, reject}));
     },
     renderGalleryCards() { renders.push(context.selectedDay); },
+    isGalleryView() { return ["catalog", "oliver"].includes(context.activeView); },
+    dayLots(day = context.selectedDay) { return context.data[day] || []; },
   });
   vm.runInContext(`${loaderCode}\nthis.load = loadCurrencyPrices; this.appendPrice = appendCurrencyPrice; this.refresh = refreshCurrencyPrices;`, context);
   return Object.assign(context, {pending, timers, renders});
@@ -170,4 +172,17 @@ test("USD-only and empty days need no exchange-rate request", async () => {
   assert.equal(context.pending.length, 0);
   assert.equal(context.currencyStatus.hidden, true);
   assert.equal(context.timers.size, 0);
+});
+
+test("Oliver price sorting refreshes after the shared USD conversion completes", async () => {
+  const lot = {...foreignLot(1), oliver_house: true};
+  const context = page({[dayA]: [lot]});
+  context.activeView = "oliver";
+  const load = context.load(dayA);
+  const before = context.renders.length;
+  context.pending[0].resolve(response(dayA, [convertedLot(lot, "125.00")]));
+  await load;
+  assert.equal(CalendarCurrency.sortPrice(lot), 125);
+  assert(context.renders.length > before);
+  assert.equal(context.renders.at(-1), dayA);
 });

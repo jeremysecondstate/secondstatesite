@@ -86,6 +86,7 @@
     <button id="calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="true">Calendar</button>
     <button id="catalog-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Gallery Catalog</button>
     <button id="research-view-toggle" type="button" aria-controls="day-research-workspace" aria-pressed="false">Archive Research</button>
+    <button id="oliver-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Oliver’s Calendar</button>
   </div>
 
   <div id="calendar-currency-status" class="calendar-currency-status" role="status" hidden>
@@ -216,6 +217,7 @@
         <button id="day-gallery-browser-launch" class="day-gallery-browser-launch" type="button">Research this day →</button>
       </div>
     </header>
+    <p id="day-gallery-scope" class="day-gallery-sort-note" hidden>Lots from the auction houses we work with.</p>
     <div class="day-gallery-tools">
       <div class="day-gallery-primary-actions">
         <div id="day-gallery-filters" class="day-gallery-filters" role="group" aria-label="Filter the day's lots"></div>
@@ -224,6 +226,8 @@
       <label class="day-gallery-sort-label" for="day-gallery-sort">Sort lots
         <select id="day-gallery-sort" class="day-gallery-sort" aria-describedby="day-gallery-sort-note">
           <option value="catalog">Catalog order</option>
+          <option value="lot_asc">Lot number: low to high</option>
+          <option value="lot_desc">Lot number: high to low</option>
           <option value="artist">Artist surname A–Z</option>
           <option value="house">Auction house</option>
           <option value="time_asc">Auction time: earliest first</option>
@@ -263,7 +267,7 @@
       </div>
       <ul id="day-gallery-artist-list" class="day-gallery-artist-list"></ul>
       <div class="day-gallery-artists-footer">
-        <p id="day-gallery-artists-note">Full-day counts across all houses. Estimated arrival = earliest listed auction time + first lot number × 1 minute. Assumes the listed time is the sale start; sources may list closing times. Actual pace and session numbering vary. Times use {{ timezone_label }}; unknown times sort last.</p>
+        <p id="day-gallery-artists-note"><span id="day-gallery-artists-scope">Full-day counts across all houses.</span> Estimated arrival = earliest listed auction time + first lot number × 1 minute. Assumes the listed time is the sale start; sources may list closing times. Actual pace and session numbering vary. Times use {{ timezone_label }}; unknown times sort last.</p>
         <button id="day-gallery-artists-more" type="button" aria-expanded="false" aria-controls="day-gallery-artist-list" hidden>Show all artists</button>
       </div>
     </details>
@@ -370,7 +374,7 @@
       <button id="catalog-email-close" type="button" aria-label="Close email dialog">×</button>
     </div>
     <p id="catalog-email-summary"></p>
-    <p class="catalog-email-scope">Only this day’s selected lots will be sent. Selections for other dates stay in your tray.</p>
+    <p id="catalog-email-scope" class="catalog-email-scope">Only this day’s selected lots will be sent. Selections for other dates stay in your tray.</p>
     {% if email_configuration_warnings %}
       <p class="email-review-notice is-warning">{{ email_configuration_warnings|join:" " }}</p>
     {% elif email_batch.status == 'sending' %}
@@ -384,6 +388,7 @@
       <input type="hidden" name="month" value="{{ month_value }}">
       <input type="hidden" name="day" value="">
       <input type="hidden" name="scope_day" value="">
+      <input type="hidden" name="scope_houses" value="">
       <div id="catalog-email-lot-ids"></div>
       <fieldset class="catalog-email-recipients">
         <legend>Send to</legend>
@@ -445,6 +450,7 @@
   const calendarLayout = document.getElementById("calendar-layout");
   const calendarViewToggle = document.getElementById("calendar-view-toggle");
   const catalogViewToggle = document.getElementById("catalog-view-toggle");
+  const oliverViewToggle = document.getElementById("oliver-view-toggle");
   const researchViewToggle = document.getElementById("research-view-toggle");
   const galleryCatalog = document.getElementById("day-gallery-catalog");
   const researchWorkspace = document.getElementById("day-research-workspace");
@@ -491,6 +497,13 @@
   let galleryArtistsExpanded = false;
   let galleryArtistsDay = "";
   let activeView = "calendar";
+  let researchScope = "";
+  const isGalleryView = () => activeView === "catalog" || activeView === "oliver";
+  const inOliverScope = () => activeView === "oliver" || (activeView === "research" && researchScope === "oliver");
+  // Filtering shares the original lot objects and IDs with every other view.
+  const dayLots = (day = selectedDay) => inOliverScope()
+    ? (data[day] || []).filter((lot) => lot.oliver_house === true)
+    : (data[day] || []);
   let researchLook = "dossier";
   let researchTab = "bids";
   let researchIndex = 0;
@@ -613,13 +626,13 @@
     }
     if (day !== selectedDay) return;
     const state = currencyDays.get(day)?.state;
-    const unavailable = (data[day] || []).some(window.CalendarCurrency.hasUnavailablePrices);
+    const unavailable = dayLots(day).some(window.CalendarCurrency.hasUnavailablePrices);
     currencyStatus.hidden = state !== "loading" && !unavailable;
     currencyMessage.textContent = state === "loading"
       ? "Converting this day’s prices to USD…"
       : "Some USD conversions are unavailable. Original prices are shown; lots without USD estimates sort last.";
     currencyRetry.hidden = state === "loading" || !unavailable;
-    if (activeView === "catalog" && ["price_asc", "price_desc"].includes(gallerySort.value)) {
+    if (isGalleryView() && ["price_asc", "price_desc"].includes(gallerySort.value)) {
       const focused = document.activeElement;
       const card = focused?.closest(".day-gallery-work");
       const lotId = card?.dataset.galleryLotId;
@@ -3014,8 +3027,19 @@
   const galleryDays = Object.keys(data)
     .filter((day) => (data[day] || []).length)
     .sort();
-  const previousGalleryDay = () => galleryDays.filter((day) => day < selectedDay).pop();
-  const nextGalleryDay = () => galleryDays.find((day) => day > selectedDay);
+  const previousGalleryDay = () => galleryDays.filter((day) => day < selectedDay && dayLots(day).length).pop();
+  const nextGalleryDay = () => galleryDays.find((day) => day > selectedDay && dayLots(day).length);
+
+  const renderResearchDays = () => {
+    researchDaySelect.replaceChildren();
+    galleryDays.filter((day) => dayLots(day).length || day === selectedDay).forEach((day) => {
+      const option = document.createElement("option");
+      option.value = day;
+      option.textContent = formatCalendarDay(day, {month: "short", day: "numeric", year: "numeric"});
+      researchDaySelect.appendChild(option);
+    });
+    researchDaySelect.value = selectedDay;
+  };
 
   const updateGalleryEmailButton = (button, lot) => {
     button.setAttribute("aria-pressed", lot.email_tray_selected ? "true" : "false");
@@ -3044,13 +3068,22 @@
   };
 
   const visibleGalleryLots = () => {
-    const lots = (data[selectedDay] || []).map((lot, index) => ({lot, index}));
+    const lots = dayLots().map((lot, index) => ({lot, index}));
     const filtered = lots.filter(({lot}) => {
       if (galleryFilter === "tray") return Boolean(lot.email_tray_selected);
       return galleryFilter === "all" || lot.auction_house === galleryFilter.slice(6);
     });
     if (gallerySort.value === "artist") {
       filtered.sort((a, b) => galleryArtistKey(a.lot).localeCompare(galleryArtistKey(b.lot), "en", {sensitivity: "base"}) || a.index - b.index);
+    } else if (gallerySort.value === "lot_asc" || gallerySort.value === "lot_desc") {
+      const direction = gallerySort.value === "lot_asc" ? 1 : -1;
+      filtered.sort((a, b) => {
+        const aNumber = String(a.lot.lot_number || "").trim();
+        const bNumber = String(b.lot.lot_number || "").trim();
+        if (!aNumber) return bNumber ? 1 : a.index - b.index;
+        if (!bNumber) return -1;
+        return direction * aNumber.localeCompare(bNumber, "en", {numeric: true, sensitivity: "base"}) || a.index - b.index;
+      });
     } else if (gallerySort.value === "house") {
       filtered.sort((a, b) => a.lot.auction_house.localeCompare(b.lot.auction_house) || a.index - b.index);
     } else if (gallerySort.value === "time_asc" || gallerySort.value === "time_desc") {
@@ -3076,7 +3109,7 @@
   };
 
   const renderGalleryFilters = () => {
-    const lots = data[selectedDay] || [];
+    const lots = dayLots();
     const houseCounts = new Map();
     lots.forEach((lot) => houseCounts.set(lot.auction_house, (houseCounts.get(lot.auction_house) || 0) + 1));
     galleryHousesSummary.textContent = `${houseCounts.size} house${houseCounts.size === 1 ? "" : "s"}`
@@ -3144,6 +3177,7 @@
     url.search = new URLSearchParams({
       view: "research", day: selectedDay, lot: String(lot.id), look: researchLook,
     }).toString();
+    if (inOliverScope()) url.searchParams.set("scope", "oliver");
     return url.href;
   };
 
@@ -3209,10 +3243,11 @@
     if (!lots.length) {
       appendText(galleryGrid, "p", "day-gallery-empty", galleryFilter === "tray"
         ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Research, then add it to the tray."
+        : activeView === "oliver" ? "No lots from Oliver’s auction houses on this date. Choose another watched day or switch to Gallery Catalog."
         : "No watched lots match this view.");
     }
     galleryDescription.textContent = galleryFilter === "all"
-      ? "A catalog across auction houses"
+      ? (activeView === "oliver" ? "A catalog from Oliver’s auction houses" : "A catalog across auction houses")
       : galleryFilter === "tray" ? "Lots selected for the next email" : galleryFilter.slice(6);
     galleryResults.textContent = lots.length
       ? `Showing ${Math.min(galleryVisibleCount, lots.length)} of ${lots.length} watched lot${lots.length === 1 ? "" : "s"}`
@@ -3222,7 +3257,7 @@
   };
 
   const renderGalleryArtists = () => {
-    const lots = data[selectedDay] || [];
+    const lots = dayLots();
     if (galleryArtistsDay !== selectedDay) {
       galleryArtistsExpanded = false;
       galleryArtistsDay = selectedDay;
@@ -3266,7 +3301,11 @@
   };
 
   const renderGalleryCatalog = () => {
-    const lots = data[selectedDay] || [];
+    document.getElementById("day-gallery-title").firstChild.textContent = activeView === "oliver" ? "Oliver’s Calendar" : "The day’s catalog";
+    document.getElementById("day-gallery-scope").hidden = activeView !== "oliver";
+    document.getElementById("day-gallery-artists-scope").textContent = activeView === "oliver"
+      ? "Full-day counts across Oliver’s houses." : "Full-day counts across all houses.";
+    const lots = dayLots();
     galleryDate.textContent = selectedDay
       ? `Auction Calendar / ${formatCalendarDay(selectedDay, {weekday: "long", year: "numeric", month: "long", day: "numeric"})}`
       : "Auction Calendar / Choose a date";
@@ -3282,7 +3321,7 @@
   };
 
   const refreshGalleryLot = (lot) => {
-    if (activeView !== "catalog") return;
+    if (!isGalleryView()) return;
     if (galleryFilter === "tray") {
       renderGalleryCatalog();
       return;
@@ -3417,7 +3456,7 @@
       .some((value) => String(value || "").toLocaleLowerCase().includes(query));
 
   const renderResearchRail = () => {
-    const lots = data[selectedDay] || [];
+    const lots = dayLots();
     const query = researchSearch.value.trim().toLocaleLowerCase();
     const matches = lots.map((lot, index) => ({lot, index})).filter(({lot}) => matchesResearchSearch(lot, query));
     researchRailTotal.textContent = `${matches.length} of ${lots.length}`;
@@ -3626,7 +3665,7 @@
   };
 
   const renderResearchWorkspace = () => {
-    const lots = data[selectedDay] || [];
+    const lots = dayLots();
     researchTitle.textContent = selectedDay
       ? formatCalendarDay(selectedDay, {weekday: "long", month: "long", day: "numeric", year: "numeric"})
       : "Research workspace";
@@ -3706,6 +3745,7 @@
   };
 
   const openResearchWorkspace = (index = 0) => {
+    if (activeView !== "research") researchScope = activeView === "oliver" ? "oliver" : "";
     researchIndex = index;
     setCalendarView("research", {push: activeView !== "research"});
     researchWorkspace.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
@@ -3713,7 +3753,7 @@
   };
 
   const moveResearchLot = (distance) => {
-    const lots = data[selectedDay] || [];
+    const lots = dayLots();
     const next = Math.max(0, Math.min(researchIndex + distance, lots.length - 1));
     if (!lots.length || next === researchIndex) return;
     const query = researchSearch.value.trim().toLocaleLowerCase();
@@ -3727,7 +3767,7 @@
   };
 
   const renderLotBrowser = () => {
-    const lots = data[selectedDay] || [];
+    const lots = dayLots();
     if (!lots.length) return;
     lotBrowserIndex = Math.max(0, Math.min(lotBrowserIndex, lots.length - 1));
     const lot = lots[lotBrowserIndex];
@@ -3781,14 +3821,14 @@
   };
 
   const moveLotBrowser = (distance) => {
-    const lots = data[selectedDay] || [];
+    const lots = dayLots();
     if (lots.length < 2) return;
     lotBrowserIndex = (lotBrowserIndex + distance + lots.length) % lots.length;
     renderLotBrowser();
   };
 
   const openLotBrowser = (index = 0) => {
-    const lots = data[selectedDay] || [];
+    const lots = dayLots();
     if (!lots.length) return;
     lotBrowserIndex = Math.max(0, Math.min(index, lots.length - 1));
     lotBrowserReturnFocus = document.activeElement;
@@ -3843,7 +3883,7 @@
       renderLotBrowser();
     } else if (event.key === "End") {
       event.preventDefault();
-      lotBrowserIndex = Math.max(0, (data[selectedDay] || []).length - 1);
+      lotBrowserIndex = Math.max(0, dayLots().length - 1);
       renderLotBrowser();
     }
   });
@@ -3851,15 +3891,17 @@
   const updateCalendarLocation = ({push = false} = {}) => {
     if (restoringHistory) return;
     const url = new URL(window.location.href);
-    if (activeView === "catalog" || activeView === "research") url.searchParams.set("view", activeView);
+    if (isGalleryView() || activeView === "research") url.searchParams.set("view", activeView);
     else url.searchParams.delete("view");
     if (selectedDay) url.searchParams.set("day", selectedDay);
     else url.searchParams.delete("day");
-    if (activeView === "catalog" && galleryFilter === "tray") url.searchParams.set("filter", "tray");
+    if (isGalleryView() && galleryFilter === "tray") url.searchParams.set("filter", "tray");
     else url.searchParams.delete("filter");
+    if (activeView === "research" && inOliverScope()) url.searchParams.set("scope", "oliver");
+    else url.searchParams.delete("scope");
     if (activeView === "research") {
       url.searchParams.set("look", researchLook);
-      const lot = (data[selectedDay] || [])[researchIndex];
+      const lot = dayLots()[researchIndex];
       if (lot) url.searchParams.set("lot", String(lot.id));
       else url.searchParams.delete("lot");
     } else {
@@ -3873,37 +3915,51 @@
       const monthUrl = new URL(link.href);
       monthUrl.searchParams.delete("day");
       monthUrl.searchParams.delete("lot");
-      if (activeView === "catalog" || activeView === "research") monthUrl.searchParams.set("view", activeView);
+      if (isGalleryView() || activeView === "research") monthUrl.searchParams.set("view", activeView);
       else monthUrl.searchParams.delete("view");
       if (activeView === "research") monthUrl.searchParams.set("look", researchLook);
       else monthUrl.searchParams.delete("look");
+      if (activeView === "research" && inOliverScope()) monthUrl.searchParams.set("scope", "oliver");
+      else monthUrl.searchParams.delete("scope");
       link.href = monthUrl;
     });
   };
 
   const setCalendarView = (view, {push = false} = {}) => {
-    activeView = view === "catalog" || view === "research" ? view : "calendar";
+    const wasOliver = inOliverScope();
+    activeView = ["catalog", "oliver", "research"].includes(view) ? view : "calendar";
+    if (activeView !== "research") researchScope = "";
+    if (wasOliver !== inOliverScope()) {
+      galleryFilter = "all";
+      galleryVisibleCount = 24;
+      galleryArtistsDay = "";
+      if (activeView !== "research") researchIndex = 0;
+    }
     calendarLayout.hidden = activeView !== "calendar";
-    galleryCatalog.hidden = activeView !== "catalog";
+    galleryCatalog.hidden = !isGalleryView();
     researchWorkspace.hidden = activeView !== "research";
     auctionCalendar.classList.toggle("is-research-view", activeView === "research");
     calendarPageShell.classList.toggle("is-research-layout", activeView === "research");
     calendarViewToggle.setAttribute("aria-pressed", String(activeView === "calendar"));
     catalogViewToggle.setAttribute("aria-pressed", String(activeView === "catalog"));
+    oliverViewToggle.setAttribute("aria-pressed", String(activeView === "oliver"));
     researchViewToggle.setAttribute("aria-pressed", String(activeView === "research"));
-    if (activeView === "catalog") renderGalleryCatalog();
+    renderResearchDays();
+    if (isGalleryView()) renderGalleryCatalog();
     else if (activeView === "research") renderResearchWorkspace();
-    else if (selectedDay && sidebarRenderedDay !== selectedDay) renderSidebarLots(data[selectedDay] || []);
+    else if (selectedDay && sidebarRenderedDay !== selectedDay) renderSidebarLots(dayLots());
     updateCalendarLocation({push});
+    if (selectedDay) refreshCurrencyPrices(selectedDay);
   };
 
   calendarViewToggle.addEventListener("click", () => setCalendarView("calendar"));
   catalogViewToggle.addEventListener("click", () => setCalendarView("catalog"));
+  oliverViewToggle.addEventListener("click", () => setCalendarView("oliver"));
   researchViewToggle.addEventListener("click", () => openResearchWorkspace(researchIndex));
   researchBack.addEventListener("click", () => {
     if (window.history.state?.researchEntry) window.history.back();
     else {
-      setCalendarView("catalog");
+      setCalendarView(inOliverScope() ? "oliver" : "catalog");
       document.getElementById("day-gallery-title").focus({preventScroll: true});
     }
   });
@@ -3911,6 +3967,8 @@
     restoringHistory = true;
     try {
       const params = new URLSearchParams(window.location.search);
+      researchScope = params.get("scope") === "oliver" ? "oliver" : "";
+      activeView = ["catalog", "oliver", "research"].includes(params.get("view")) ? params.get("view") : "calendar";
       const day = params.get("day");
       if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)
         && (Object.hasOwn(data, day) || dayButtons.some((button) => button.dataset.calendarDay === day))
@@ -3920,16 +3978,17 @@
       researchWorkspace.dataset.look = researchLook;
       researchLookButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.researchLook === researchLook)));
       const requestedLot = Number(params.get("lot"));
-      const requestedIndex = (data[selectedDay] || []).findIndex((lot) => lot.id === requestedLot);
+      const requestedIndex = dayLots().findIndex((lot) => lot.id === requestedLot);
       if (requestedIndex >= 0) researchIndex = requestedIndex;
       const view = params.get("view");
       galleryFilter = params.get("filter") === "tray" ? "tray" : "all";
       setCalendarView(view);
       const focusTarget = view === "research" ? researchTitle
-        : view === "catalog" ? document.getElementById("day-gallery-title") : calendarViewToggle;
+        : isGalleryView() ? document.getElementById("day-gallery-title") : calendarViewToggle;
       focusTarget.focus({preventScroll: true});
     } finally {
       restoringHistory = false;
+      updateCalendarLocation();
     }
   });
   researchPrevious.addEventListener("click", () => moveResearchLot(-1));
@@ -3955,7 +4014,12 @@
     if (event.key === "ArrowRight") { event.preventDefault(); moveResearchLot(1); }
   });
   gallerySendLaunch.addEventListener("click", () => {
-    const selectedLots = (data[selectedDay] || []).filter((lot) => lot.email_tray_selected);
+    catalogEmailForm.elements.namedItem("return_view").value = activeView === "oliver" ? "oliver" : "catalog";
+    catalogEmailForm.elements.namedItem("scope_houses").value = activeView === "oliver" ? "oliver" : "";
+    document.getElementById("catalog-email-scope").textContent = activeView === "oliver"
+      ? "Only this day’s selected lots from Oliver’s houses will be sent. Other selections stay in your tray."
+      : "Only this day’s selected lots will be sent. Selections for other dates stay in your tray.";
+    const selectedLots = dayLots().filter((lot) => lot.email_tray_selected);
     if (!selectedLots.length) return;
     catalogEmailForm.elements.namedItem("day").value = selectedDay;
     catalogEmailForm.elements.namedItem("scope_day").value = selectedDay;
@@ -4099,10 +4163,10 @@
       researchRenderedKey = "";
       if (selectedDay) {
         const remembered = researchDaySelection.get(isoDate);
-        researchIndex = Math.max(0, (data[isoDate] || []).findIndex((lot) => lot.id === remembered));
+        researchIndex = Math.max(0, dayLots(isoDate).findIndex((lot) => lot.id === remembered));
         researchSearch.value = "";
       }
-      if (activeView === "catalog") list.replaceChildren();
+      if (isGalleryView()) list.replaceChildren();
     }
     selectedDay = isoDate;
     const dayLabel = formatCalendarDay(isoDate, {weekday: "long", year: "numeric", month: "long", day: "numeric"});
@@ -4116,6 +4180,7 @@
       button.setAttribute("aria-pressed", String(selected));
     });
 
+    // These launch controls belong to the unfiltered Calendar sidebar.
     const lots = data[isoDate] || [];
     lotBrowserLaunch.hidden = !lots.length;
     researchLaunch.hidden = !lots.length;
@@ -4125,7 +4190,7 @@
       "aria-label",
       lots.length === 1 ? `Browse the lot for ${dayLabel}` : `Browse all ${lots.length} lots for ${dayLabel}`
     );
-    if (activeView === "catalog") renderGalleryCatalog();
+    if (isGalleryView()) renderGalleryCatalog();
     else if (activeView === "research") renderResearchWorkspace();
     else renderSidebarLots(lots);
     updateCalendarLocation();
@@ -4147,12 +4212,6 @@
   });
 
   const initialDay = "{{ initial_day|escapejs }}";
-  Object.keys(data).filter((day) => data[day]?.length).sort().forEach((day) => {
-    const option = document.createElement("option");
-    option.value = day;
-    option.textContent = formatCalendarDay(day, {month: "short", day: "numeric", year: "numeric"});
-    researchDaySelect.appendChild(option);
-  });
   researchDaySelect.addEventListener("change", () => showDay(researchDaySelect.value));
   const initialParams = new URLSearchParams(window.location.search);
   const requestedView = initialParams.get("view");
@@ -4165,18 +4224,19 @@
   researchWorkspace.dataset.look = researchLook;
   researchLookButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.researchLook === researchLook)));
   const startingDay = validRequestedDay ? requestedDay : initialDay;
+  researchScope = initialParams.get("scope") === "oliver" ? "oliver" : "";
+  activeView = ["catalog", "oliver", "research"].includes(requestedView) ? requestedView : "calendar";
   const requestedLot = Number(initialParams.get("lot"));
   if (startingDay && Number.isSafeInteger(requestedLot)) {
-    const matchingIndex = (data[startingDay] || []).findIndex((lot) => lot.id === requestedLot);
+    const matchingIndex = dayLots(startingDay).findIndex((lot) => lot.id === requestedLot);
     if (matchingIndex >= 0) researchIndex = matchingIndex;
   }
-  activeView = requestedView === "catalog" || requestedView === "research" ? requestedView : "calendar";
   if (validRequestedDay || initialDay) showDay(validRequestedDay ? requestedDay : initialDay);
   galleryFilter = initialParams.get("filter") === "tray" ? "tray" : "all";
   setCalendarView(requestedView);
   const requestedSavedBoard = initialParams.get("saved_bid_board");
   if (requestedSavedBoard && window.SavedBidBoard) {
-    const savedLot = (data[selectedDay] || []).find((lot) => String(lot.id) === requestedSavedBoard);
+    const savedLot = dayLots().find((lot) => String(lot.id) === requestedSavedBoard);
     if (savedLot?.saved_bid_board) window.SavedBidBoard.open(savedLot, {csrfToken});
   }
 })();

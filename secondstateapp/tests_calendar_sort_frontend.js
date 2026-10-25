@@ -19,12 +19,15 @@ function catalog(lots, sort = "price_asc", filter = "all") {
     window: {CalendarCurrency},
     data: {"2026-10-22": lots.map(lot => ({currency: "USD", ...lot}))}, selectedDay: "2026-10-22", galleryFilter: filter,
     galleryVisibleCount: 24,
+    activeView: "catalog",
     gallerySort: {value: sort, addEventListener(type, callback) { this[type] = callback; }},
     gallerySortNote: {}, galleryDescription: {}, galleryResults: {}, galleryMore: {},
     galleryGrid: {cards: [], replaceChildren() { this.cards = []; }, appendChild(card) { this.cards.push(card); }},
     galleryCard: (lot, index) => ({id: lot.id, index}), appendText() {},
     loadCurrencyPrices() {},
   });
+  context.dayLots = () => context.data[context.selectedDay] || [];
+  context.inOliverScope = () => false;
   vm.runInContext(`${sortFunctions}\n${renderFunction}\n${sortListener}`, context);
   context.visible = () => Array.from(vm.runInContext("visibleGalleryLots()", context), ({lot, index}) => ({id: lot.id, index}));
   context.render = () => vm.runInContext("renderGalleryCards()", context);
@@ -217,6 +220,7 @@ test("research searches match original and surname-first artist names and retain
     researchSearch: {value: " Joan Miró "}, researchLotCard: {querySelector: () => null},
     renderResearchWorkspace() {}, updateCalendarLocation() {},
   });
+  context.dayLots = () => context.data[context.selectedDay] || [];
   vm.runInContext(`${searchFunction}\n${moveFunction}`, context);
   const matches = (query) => {
     context.query = query.toLocaleLowerCase();
