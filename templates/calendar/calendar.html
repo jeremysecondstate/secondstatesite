@@ -412,6 +412,7 @@
 
 {{ calendar_data|json_script:"auction-calendar-data" }}
 {{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
+{{ oliver_house_names|json_script:"oliver-house-names" }}
 <script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=usd-normalization-20261017"></script>
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=saved-board-20261015"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
@@ -421,6 +422,7 @@
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
   const salesData = JSON.parse(document.getElementById("auction-calendar-sales-data").textContent);
+  const oliverHouseNames = JSON.parse(document.getElementById("oliver-house-names").textContent);
   window.addEventListener("archive-bid-board-saved", (event) => {
     Object.values(data).flat().forEach((lot) => {
       if (String(lot.id) === String(event.detail.lotId)) lot.saved_bid_board = event.detail.savedBoard;
@@ -3067,11 +3069,14 @@
     return Number.isFinite(timestamp) ? timestamp : null;
   };
 
+  const galleryHouseName = (lot) => activeView === "oliver"
+    ? (lot.oliver_house_name || lot.auction_house) : lot.auction_house;
+
   const visibleGalleryLots = () => {
     const lots = dayLots().map((lot, index) => ({lot, index}));
     const filtered = lots.filter(({lot}) => {
       if (galleryFilter === "tray") return Boolean(lot.email_tray_selected);
-      return galleryFilter === "all" || lot.auction_house === galleryFilter.slice(6);
+      return galleryFilter === "all" || galleryHouseName(lot) === galleryFilter.slice(6);
     });
     if (gallerySort.value === "artist") {
       filtered.sort((a, b) => galleryArtistKey(a.lot).localeCompare(galleryArtistKey(b.lot), "en", {sensitivity: "base"}) || a.index - b.index);
@@ -3110,9 +3115,13 @@
 
   const renderGalleryFilters = () => {
     const lots = dayLots();
-    const houseCounts = new Map();
-    lots.forEach((lot) => houseCounts.set(lot.auction_house, (houseCounts.get(lot.auction_house) || 0) + 1));
+    const houseCounts = new Map(activeView === "oliver" ? oliverHouseNames.map((name) => [name, 0]) : []);
+    lots.forEach((lot) => {
+      const house = galleryHouseName(lot);
+      houseCounts.set(house, (houseCounts.get(house) || 0) + 1);
+    });
     galleryHousesSummary.textContent = `${houseCounts.size} house${houseCounts.size === 1 ? "" : "s"}`
+      + (activeView === "oliver" ? ` · ${Array.from(houseCounts.values()).filter((count) => count > 0).length} with lots` : "")
       + (galleryFilter.startsWith("house:") ? ` · Selected: ${galleryFilter.slice(6)}` : galleryFilter === "tray" ? " · Email Tray selected" : " · All houses selected");
     const choices = [
       {key: "all", label: "All houses", count: houseCounts.size},
@@ -3243,6 +3252,7 @@
     if (!lots.length) {
       appendText(galleryGrid, "p", "day-gallery-empty", galleryFilter === "tray"
         ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Research, then add it to the tray."
+        : galleryFilter.startsWith("house:") ? `No lots from ${galleryFilter.slice(6)} on this date.`
         : activeView === "oliver" ? "No lots from Oliver’s auction houses on this date. Choose another watched day or switch to Gallery Catalog."
         : "No watched lots match this view.");
     }
@@ -3309,12 +3319,15 @@
     galleryDate.textContent = selectedDay
       ? `Auction Calendar / ${formatCalendarDay(selectedDay, {weekday: "long", year: "numeric", month: "long", day: "numeric"})}`
       : "Auction Calendar / Choose a date";
-    const houses = new Set(lots.map((lot) => lot.auction_house));
-    gallerySummary.textContent = `${lots.length} watched lot${lots.length === 1 ? "" : "s"} · ${houses.size} auction house${houses.size === 1 ? "" : "s"}`;
+    const houses = new Set(lots.map(galleryHouseName));
+    gallerySummary.textContent = `${lots.length} watched lot${lots.length === 1 ? "" : "s"} · `
+      + (activeView === "oliver" ? `${houses.size} of ${oliverHouseNames.length} auction houses with lots`
+        : `${houses.size} auction house${houses.size === 1 ? "" : "s"}`);
     galleryPrevious.disabled = !previousGalleryDay();
     galleryNext.disabled = !nextGalleryDay();
     galleryBrowserLaunch.disabled = !lots.length;
-    if (galleryFilter !== "all" && galleryFilter !== "tray" && !houses.has(galleryFilter.slice(6))) galleryFilter = "all";
+    const availableHouses = activeView === "oliver" ? new Set(oliverHouseNames) : houses;
+    if (galleryFilter !== "all" && galleryFilter !== "tray" && !availableHouses.has(galleryFilter.slice(6))) galleryFilter = "all";
     renderGalleryFilters();
     renderGalleryArtists();
     renderGalleryCards();

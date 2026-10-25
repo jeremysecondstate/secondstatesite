@@ -57,7 +57,7 @@ from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfiguration
 from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, manual_review_eligible, normalize_candidate, resale_candidate_selectable, safe_artwork_reference
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
 from .lot_presentation import artist_display_name, artist_sort_key, clean_display_text
-from .oliver_houses import is_oliver_house, oliver_house_names
+from .oliver_houses import is_oliver_house, oliver_house_name, oliver_house_names
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -232,6 +232,7 @@ def _sale_json(group: dict) -> dict:
 def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None) -> dict:
     selected_lot_ids = selected_lot_ids or set()
     image_url = _calendar_image_url(lot.image_url)
+    canonical_oliver_house = oliver_house_name(lot.auction_house)
     source_artist = _artist_label(lot)
     artist_artprice_url, artist_invaluable_url = artist_research_urls(source_artist)
     if lot.watchlist_artist_id and lot.watchlist_artist.artprice_url:
@@ -246,7 +247,8 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "artist_sort_key": artist_sort_key(source_artist),
         "title": clean_display_text(lot.title, strip_lot_markers=True) or "Untitled lot",
         "auction_house": clean_display_text(lot.auction_house or lot.source or "Auction"),
-        "oliver_house": is_oliver_house(lot.auction_house),
+        "oliver_house": bool(canonical_oliver_house),
+        "oliver_house_name": canonical_oliver_house,
         "sale_title": clean_display_text(lot.sale_title),
         "lot_number": lot.lot_number,
         "medium": clean_display_text(lot.medium),
@@ -453,6 +455,7 @@ def auction_calendar(request):
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
         "calendar_timezone": str(zone),
         "oliver_house_count": len(oliver_house_names()),
+        "oliver_house_names": list(oliver_house_names()),
         "synced_lot_count": AuctionWatchLot.objects.filter(superseded_by__isnull=True).count(),
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),

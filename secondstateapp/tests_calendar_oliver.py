@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from .calendar_views import _lot_json
 from .models import AuctionEmailBatch, AuctionEmailBatchItem, AuctionWatchLot
+from .oliver_houses import oliver_house_names
 from .tests_calendar import CALENDAR_ZONE, watch_lot
 
 
@@ -78,10 +79,15 @@ class OliverCalendarTests(TestCase):
         unrelated = self.lot("unrelated", "Another Auction Gallery")
         before = list(AuctionWatchLot.objects.order_by("pk").values())
 
-        for lot, eligible in ((partner, True), (alias, True), (unrelated, False)):
+        for lot, eligible, canonical_name in (
+            (partner, True, "Bonhams"),
+            (alias, True, "Bradford's Auction Galleries"),
+            (unrelated, False, ""),
+        ):
             with self.subTest(house=lot.auction_house):
                 record = _lot_json(lot, CALENDAR_ZONE, {lot.pk})
                 self.assertIs(record["oliver_house"], eligible)
+                self.assertEqual(record["oliver_house_name"], canonical_name)
                 self.assertEqual(record["id"], lot.pk)
                 self.assertEqual(record["auction_house"], lot.auction_house)
                 self.assertTrue(record["email_tray_selected"])
@@ -113,7 +119,37 @@ class OliverCalendarTests(TestCase):
                 self.assertTrue(records[partner.pk]["oliver_house"])
                 self.assertFalse(records[unrelated.pk]["oliver_house"])
                 self.assertEqual(response.context["oliver_house_count"], 17)
+                self.assertEqual(response.context["oliver_house_names"], list(oliver_house_names()))
         self.sender.assert_not_called()
+
+    def test_complete_workbook_house_list_is_available_on_empty_and_nonpartner_days(self):
+        for populated in (False, True):
+            with self.subTest(nonpartner_lot_present=populated):
+                if populated:
+                    self.lot("nonpartner-only", "Another Auction Gallery")
+                response = self.client.get(reverse("auction_calendar"), {
+                    "month": "2026-07", "day": "2026-07-25", "view": "oliver",
+                })
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["oliver_house_names"], list(oliver_house_names()))
+                self.assertEqual(len(response.context["oliver_house_names"]), 17)
+                records = response.context["calendar_data"].get("2026-07-25", [])
+                self.assertFalse(any(record["oliver_house_name"] for record in records))
+        self.sender.assert_not_called()
+
+    def test_distinct_source_house_aliases_share_the_workbook_label_without_rewriting_lots(self):
+        canonical = self.lot("canonical-house", "Bradford's Auction Galleries")
+        alias = self.lot("alias-house", "Bradford's")
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07", "view": "oliver"})
+        records = {record["id"]: record for record in response.context["calendar_data"]["2026-07-25"]}
+        self.assertEqual(records[canonical.pk]["oliver_house_name"], "Bradford's Auction Galleries")
+        self.assertEqual(records[alias.pk]["oliver_house_name"], "Bradford's Auction Galleries")
+        self.assertEqual(records[canonical.pk]["auction_house"], "Bradford's Auction Galleries")
+        self.assertEqual(records[alias.pk]["auction_house"], "Bradford's")
+        canonical.refresh_from_db()
+        alias.refresh_from_db()
+        self.assertEqual(canonical.auction_house, "Bradford's Auction Galleries")
+        self.assertEqual(alias.auction_house, "Bradford's")
 
     def test_oliver_send_preserves_hidden_houses_and_other_days_in_shared_tray(self):
         partner = self.lot("partner")

@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from .oliver_houses import is_oliver_house, oliver_house_names
+from .oliver_houses import is_oliver_house, oliver_house_name, oliver_house_names
 
 
 class OliverHouseMembershipTests(SimpleTestCase):
@@ -15,13 +15,19 @@ class OliverHouseMembershipTests(SimpleTestCase):
         for name in expected:
             with self.subTest(name=name):
                 self.assertTrue(is_oliver_house(name))
+                self.assertEqual(oliver_house_name(name), name)
 
     def test_observed_calendar_names_match_explicit_aliases(self):
-        for name in (
-            "Bradford's", "Rago Arts and Auction Center", "Los Angeles Modern Auctions", "Freeman’s",
-        ):
+        aliases = {
+            "Bradford's": "Bradford's Auction Galleries",
+            "Rago Arts and Auction Center": "Rago Auctions",
+            "Los Angeles Modern Auctions": "Los Angeles Modern Auctions (LAMA)",
+            "Freeman’s": "Freeman's",
+        }
+        for name, canonical in aliases.items():
             with self.subTest(name=name):
                 self.assertTrue(is_oliver_house(name))
+                self.assertEqual(oliver_house_name(name), canonical)
 
     def test_case_unicode_punctuation_and_spacing_do_not_prevent_membership(self):
         for name in (
@@ -31,6 +37,7 @@ class OliverHouseMembershipTests(SimpleTestCase):
         ):
             with self.subTest(name=name):
                 self.assertTrue(is_oliver_house(name))
+                self.assertIn(oliver_house_name(name), oliver_house_names())
 
     def test_similar_names_affiliates_and_unlisted_houses_are_excluded(self):
         for name in (
@@ -41,8 +48,14 @@ class OliverHouseMembershipTests(SimpleTestCase):
         ):
             with self.subTest(name=name):
                 self.assertFalse(is_oliver_house(name))
+                self.assertEqual(oliver_house_name(name), "")
 
     def test_short_names_are_not_inferred_and_missing_names_are_excluded(self):
         for name in ("Heritage", "Swann", "Rago", "Moran", "Clars", "LAMA", "", "   ", None):
             with self.subTest(name=name):
                 self.assertFalse(is_oliver_house(name))
+                self.assertEqual(oliver_house_name(name), "")
+
+    def test_aliases_resolve_to_one_canonical_house_label(self):
+        variants = ("Bradford's Auction Galleries", "Bradford's", "BRADFORD’S", "Bradford&apos;s")
+        self.assertEqual({oliver_house_name(name) for name in variants}, {"Bradford's Auction Galleries"})

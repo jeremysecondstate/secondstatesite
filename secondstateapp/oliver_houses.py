@@ -19,17 +19,25 @@ def _house_key(value: str) -> str:
 _DATA_PATH = Path(__file__).with_name("data") / "oliver_auction_houses.json"
 _REGISTRY = json.loads(_DATA_PATH.read_text(encoding="utf-8"))
 _HOUSE_NAMES = tuple(house["name"] for house in _REGISTRY["houses"])
-_HOUSE_KEYS = frozenset(
-    _house_key(name)
+_HOUSE_NAMES_BY_KEY = {
+    _house_key(name): house["name"]
     for house in _REGISTRY["houses"]
     for name in (house["name"], *house["aliases"])
-)
+}
+
+
+def oliver_house_name(name: str) -> str:
+    """Return the workbook label for a recognized house or its verified alias."""
+
+    if not isinstance(name, str) or not name.strip():
+        return ""
+    return _HOUSE_NAMES_BY_KEY.get(_house_key(name), "")
 
 
 def is_oliver_house(name: str) -> bool:
     """Match one supplied house name or an explicit, verified display alias."""
 
-    return isinstance(name, str) and bool(name.strip()) and _house_key(name) in _HOUSE_KEYS
+    return bool(oliver_house_name(name))
 
 
 def oliver_house_names() -> tuple[str, ...]:
