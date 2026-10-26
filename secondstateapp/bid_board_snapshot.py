@@ -21,6 +21,8 @@ def saved_board_summary(record):
         "selected_case_label": CASE_LABELS.get(case, case),
         "qualifies": detail.get("qualifies") if detail else None,
         "qualifying_bid": qualifying.get("bid"),
+        "qualifying_coverage_limited": bool(qualifying.get("coverage_limited")),
+        "coverage_limit": analysis.get("coverage_limit"),
         "detail": deepcopy(detail),
         "updated_at": record.updated_at.isoformat(),
         "include_in_email": record.include_in_email,

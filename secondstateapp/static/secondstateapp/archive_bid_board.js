@@ -56,7 +56,7 @@
     input(costs, "selling_costs", "Other selling costs (USD)");
     input(costs, "downside_factor", "Conservative factor × lowest sale", {max: "1"});
     input(costs, "upside_factor", "Optimistic factor × highest sale", {max: "2"});
-    const tiersLabel = el("label", "Auction tiers: upper limit, increment (USD); one tier per line; * for no upper limit", "ab-tier-label");
+    const tiersLabel = el("label", "Auction tiers: upper limit, increment (USD); one tier per line. Bids stop at the final limit; use * only for a known open-ended tier.", "ab-tier-label");
     const tiers = el("textarea"); tiers.rows = 4; tiers.spellcheck = false; tiers.setAttribute("aria-label", "Auction bid tiers"); tiersLabel.append(tiers);
     const resaleHeading = el("h3", "Resale cases");
     const resaleGrid = el("div", null, "ab-resale-fields");
@@ -124,7 +124,7 @@
     }
     function render(data) {
       analysis = data; page = data.pagination?.page || 0;
-      selectedBid = data.detail?.bid ?? data.detail?.hammer ?? data.selected_bid ?? selectedBid;
+      selectedBid = data.detail?.bid ?? data.detail?.hammer ?? data.selected_bid ?? null;
       selectedCase = data.selected_case || data.detail?.case_key || selectedCase;
       const summary = data.source_summary || {};
       sources.textContent = `${summary.artprice_included_count || 0} Artprice + ${summary.liveart_selected_count || 0} LiveArt · ${summary.combined_comp_count || 0} unique sales used`;
@@ -136,7 +136,7 @@
       caseList.forEach(c => {const key = c.key || c.case_key; if (basisTexts[key]) basisTexts[key].textContent = `${money(c.resale_hammer)} · ${c.basis || "No evidence available"}${c.origin === "manual" && !c.basis?.includes("Manual") ? " · Manual override" : ""}`;});
       result.replaceChildren(); result.classList.remove("ab-stale"); result.removeAttribute("aria-label"); result.inert = saving; stale = false;
       fields.starting_hammer.removeAttribute("aria-describedby");
-      notice.textContent += ` ${data.assumptions.starting_basis === "current" ? "Current hammer is a reference; the grid starts at the next available bid." : "Opening hammer is available as the first bid."}`;
+      notice.textContent += ` ${data.coverage_limit != null && data.empty_reason ? "No supported bid is available from this starting hammer." : data.assumptions.starting_basis === "current" ? "Current hammer is a reference; the grid starts at the next available bid." : "Opening hammer is available as the first bid."}`;
       (data.notices || []).forEach(message => result.append(el("p", message, "ab-notice")));
       if (data.evidence_changed_since_save) result.append(el("p", "Selected evidence has changed since the saved analysis. Review and save the refreshed Bid Board.", "ab-notice"));
       if (data.evidence_notice) result.append(el("p", data.evidence_notice, "ab-notice"));
@@ -174,16 +174,17 @@
         result.append(scenarioTitle, scenarioCards, setup);
         return;
       }
-      const pickTitle = el("div", null, "ab-section-title"); pickTitle.append(el("span", "BIDS TO REVIEW", "ab-overline"), el("small", "Highest available bid meeting both minimums in each case"));
+      const pickTitle = el("div", null, "ab-section-title"); pickTitle.append(el("span", "BIDS TO REVIEW", "ab-overline"), el("small", data.coverage_limit == null ? "Highest available bid meeting both minimums in each case" : "Highest supported bid meeting both minimums within the known tier limits"));
       const picks = el("div", null, "ab-shortlist");
       (data.shortlist || []).forEach(pick => {
         const key = pick.case_key || pick.key, button = el("button", null, "ab-pick"); button.type = "button";
-        button.append(el("span", ceilings[key] || labels[key]), el("strong", pick.bid == null ? "No qualifying bid" : money(pick.bid)));
+        button.append(el("span", pick.label || ceilings[key] || labels[key]), el("strong", pick.bid == null ? "No qualifying bid" : money(pick.bid)));
         button.disabled = pick.bid == null;
         button.setAttribute("aria-pressed", String(pick.bid === selectedBid && key === selectedCase));
         if (pick.detail) button.append(el("small", `${money(pick.detail.net_profit)} profit · ${pct(pick.detail.return_on_cost_pct)} return`));
         if (key !== "conservative" && pick.conservative_downside) button.append(el("small", `Conservative result: ${money(pick.conservative_downside.net_profit)}`, Number(pick.conservative_downside.net_profit) < 0 ? "ab-loss" : ""));
-        if (pick.bid == null) button.append(el("small", pick.reason || "No available bid meets both minimums."));
+        if (pick.coverage_limited) button.append(el("small", pick.reason || "Limited by known bid tiers; higher bids have not been evaluated."));
+        else if (pick.bid == null) button.append(el("small", pick.reason || "No available bid meets both minimums."));
         button.addEventListener("click", () => choose(pick.bid, key)); picks.append(button);
       });
       if (picks.childElementCount) result.append(pickTitle, picks);
@@ -228,20 +229,22 @@
       const targets = el("details", null, "ab-disclosure"); targets.append(el("summary", "Compare more profit targets"));
       const targetWrap = el("div", null, "ab-table-wrap"), targetTable = el("table", null, "ab-targets"), targetHead = el("tr");
       ["Minimum profit", ...cases.map(key => labels[key])].forEach(label => targetHead.append(el("th", label))); targetTable.append(targetHead);
-      (data.profit_targets || []).forEach(target => {const tr = el("tr"); tr.append(el("th", money(target.target_profit ?? target.minimum_profit))); cases.forEach(key => {const bid = target.ceilings?.[key]?.bid ?? target.ceilings?.[key]; tr.append(el("td", bid == null || typeof bid === "object" ? "No available bid" : money(bid)));}); targetTable.append(tr);});
-      targetWrap.append(targetTable); targets.append(el("p", "Maximum available hammer with the return floor applied.", "ab-muted"), targetWrap); result.append(targets);
+      (data.profit_targets || []).forEach(target => {const tr = el("tr"); tr.append(el("th", money(target.target_profit ?? target.minimum_profit))); cases.forEach(key => {const bid = target.ceilings?.[key]?.bid ?? target.ceilings?.[key], cell = el("td", bid == null || typeof bid === "object" ? "No available bid" : money(bid)); if (target.coverage_limited?.[key]) cell.append(el("small", "At known tier limit")); tr.append(cell);}); targetTable.append(tr);});
+      targetWrap.append(targetTable); targets.append(el("p", data.coverage_limit == null ? "Maximum available hammer with the return floor applied." : "Highest supported hammer with the return floor applied. Higher bids require additional verified tier rules.", "ab-muted"), targetWrap); result.append(targets);
     }
     function renderDetail(detail, data) {
       const panel = el("section", null, "ab-detail");
       const title = el("div", null, "ab-section-title"); title.append(el("h3", `${money(detail.bid ?? detail.hammer)} hammer · ${labels[detail.case_key] || labels[selectedCase]}`));
       const next = detail.one_more_bid;
-      const more = el("button", "One more bid →"); more.type = "button"; more.disabled = !next?.bid || next.available === false;
-      more.addEventListener("click", () => choose(next.bid, selectedCase)); title.append(more);
+      const nextAvailable = next?.bid != null && next.available !== false;
+      const more = el("button", "One more bid →"); more.type = "button"; more.disabled = !nextAvailable;
+      more.addEventListener("click", () => {if (nextAvailable) choose(next.bid, selectedCase);}); title.append(more);
       const metrics = el("dl", null, "ab-metrics");
       [["All-in acquisition", money(detail.all_in_acquisition)], ["Gross resale hammer", money(detail.gross_resale_hammer)], ["Net resale proceeds", money(detail.net_resale_proceeds)], ["Net profit / loss", money(detail.net_profit)], ["Return on cost", pct(detail.return_on_cost_pct)], ["Profit / gross resale", pct(detail.profit_on_gross_pct)]].forEach(([name, value]) => {const group = el("div"); group.append(el("dt", name), el("dd", value)); metrics.append(group);});
       const flags = el("p", `${detail.profit_500 ? "✓" : "×"} $500 profit · ${detail.profit_1000 ? "✓" : "×"} $1,000 profit · ${detail.qualifies ? "Meets both minimums" : "Below minimums"}`, "ab-target-flags");
       panel.append(title, metrics, flags);
-      if (next) panel.append(el("p", `Next bid ${money(next.bid)}: ${money(next.additional_all_in_cost)} more acquisition cost / ${money(next.profit_reduction)} less profit.`, "ab-muted"));
+      if (nextAvailable) panel.append(el("p", `Next bid ${money(next.bid)}: ${money(next.additional_all_in_cost)} more acquisition cost / ${money(next.profit_reduction)} less profit.`, "ab-muted"));
+      else if (next || data.coverage_limit != null) panel.append(el("p", next?.reason || (data.coverage_limit != null ? "The next bid is unavailable beyond the known tier limits. Add verified higher-tier rules to continue." : "The next bid is outside the supported range."), "ab-muted"));
       const breakdown = el("details", null, "ab-disclosure"); breakdown.append(el("summary", "Cost breakdown & break-even resale"));
       const list = el("dl", null, "ab-metrics");
       [["Purchase hammer", detail.bid ?? detail.hammer], ["Buyer premium", detail.buyer_premium], ["Purchase tax basis", detail.purchase_tax_basis_amount], ["Purchase tax", detail.purchase_tax], ["Other acquisition", analysis.assumptions.acquisition_costs], ["Selling commission", detail.selling_commission], ["Other selling costs", analysis.assumptions.selling_costs], ["Break-even resale hammer", detail.break_even_resale]].forEach(([name, value]) => {const group = el("div"); group.append(el("dt", name), el("dd", money(value))); list.append(group);});

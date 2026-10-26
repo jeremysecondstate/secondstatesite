@@ -299,6 +299,8 @@ def _snapshot_email_bid_board(record, sale_date, zone) -> dict:
                 else "No qualifying bid"
             ),
             "basis": case.get("basis", ""),
+            "bid_label": "highest supported bid" if ceiling.get("coverage_limited") else "qualifying bid ceiling",
+            "coverage_note": "Known increment range ends here; higher bids are unverified." if ceiling.get("coverage_limited") else "",
         })
     rows = []
     for row in analysis.get("rows", []):
@@ -334,6 +336,8 @@ def _snapshot_email_bid_board(record, sale_date, zone) -> dict:
         "selected_bid": _board_amount(summary.get("selected_bid")),
         "selected_case": summary.get("selected_case_label", "Working"),
         "qualification": qualification,
+        "qualifying_label": "Highest supported qualifying bid" if summary.get("qualifying_coverage_limited") else "Qualifying bid ceiling",
+        "cases_heading": "Resale cases and supported qualifying bids" if any(item.get("coverage_limited") for item in shortlist.values()) else "Resale cases and qualifying bid ceilings",
         "qualifying_bid": (
             _board_amount(summary.get("qualifying_bid")) if summary.get("qualifying_bid") is not None
             else "Qualification unavailable" if summary.get("qualifies") is None
@@ -355,12 +359,12 @@ def _bid_board_text(snapshot: dict) -> list[str]:
         "Saved Bid Board (USD)", f"Saved: {board['saved_label']}",
         f"Selected bid: {board['selected_bid']} hammer · {board['selected_case']} case",
         board["qualification"],
-        f"Qualifying bid ceiling ({board['selected_case']}): {board['qualifying_bid']}",
+        f"{board['qualifying_label']} ({board['selected_case']}): {board['qualifying_bid']}",
         *[f"{metric['label']}: {metric['value']}" for metric in board["metrics"]],
-        "Resale cases and qualifying bid ceilings:",
+        board["cases_heading"] + ":",
     ]
     for case in board["cases"]:
-        lines.append(f"{case['label']}: {case['resale']} resale hammer · {case['ceiling']} qualifying bid ceiling. {case['basis']}")
+        lines.append(f"{case['label']}: {case['resale']} resale hammer · {case['ceiling']} {case['bid_label']}. {case['basis']} {case['coverage_note']}".rstrip())
     if board["rows"]:
         labels = [case["label"] for case in board["cases"]]
         lines.extend([board["page_label"], "Hammer | All-in acquisition | " + " | ".join(f"{label} profit / return" for label in labels)])

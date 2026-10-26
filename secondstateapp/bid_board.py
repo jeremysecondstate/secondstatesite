@@ -107,8 +107,6 @@ def normalize_assumptions(supplied=None):
         if upper is not None:
             previous = upper
         normalized_tiers.append({"up_to": money(upper) if upper is not None else None, "increment": money(increment)})
-    if normalized_tiers[-1]["up_to"] is not None:
-        raise BidBoardError("The final increment tier must have no upper amount.")
     result["tiers"] = normalized_tiers
     return result
 
@@ -118,6 +116,7 @@ class BidLadder:
 
     A step that would cross a boundary lands on that boundary first. Fixed
     ladders are anchored to the supplied current/opening bid, never to zero.
+    A finite final boundary is included, but no step beyond it is inferred.
     """
 
     def __init__(self, assumptions):
@@ -127,9 +126,13 @@ class BidLadder:
             (Decimal(tier["up_to"]) if tier["up_to"] is not None else None, Decimal(tier["increment"]))
             for tier in assumptions["tiers"]
         ]
+        self.coverage_limit = self.tiers[-1][0]
+        self.segments = []
+        self.count = 0
         if assumptions["starting_basis"] == "current":
             current = self.next(current)
-        self.segments = []
+        if current is None or self.coverage_limit is not None and current > self.coverage_limit:
+            return
         offset = 0
         for upper, step in self.tiers:
             if upper is not None and upper <= current:
@@ -143,13 +146,18 @@ class BidLadder:
             if upper is None or upper > MAX_MONEY:
                 break
             current = upper
+        if self.coverage_limit is not None:
+            # Each segment excludes its upper boundary, which normally starts
+            # the following segment. A bounded ladder needs that final bid too.
+            self.segments.append((offset, 1, self.coverage_limit, CENT))
+            offset += 1
         self.count = offset
 
     def next(self, bid):
         for upper, step in self.tiers:
             if upper is None or bid < upper:
                 return min(bid + step, upper) if upper is not None else bid + step
-        raise BidBoardError("No next increment is available.")
+        return None
 
     def at(self, index):
         if index < 0 or index >= self.count:
@@ -223,11 +231,14 @@ def detail_for(bid, resale, assumptions, ladder):
             low = middle + 1
     gross = Decimal(low) / 100
     next_bid = ladder.next(bid)
-    extra = acquisition(next_bid, assumptions)["all_in_acquisition"] - flow["all_in_acquisition"]
-    return {**{key: money(value) if isinstance(value, Decimal) else value for key, value in flow.items()}, "bid": money(bid), "break_even_resale": money(gross), "one_more_bid": {
-        "bid": money(next_bid), "hammer_increment": money(next_bid - bid), "additional_all_in_cost": money(extra), "profit_reduction": money(extra),
-        "net_profit": money(flow["net_profit"] - extra), "available": next_bid <= MAX_MONEY,
-    }}
+    if next_bid is None:
+        one_more_bid = {"bid": None, "hammer_increment": None, "additional_all_in_cost": None, "profit_reduction": None,
+                        "net_profit": None, "available": False, "reason": "No bid rules are provided above this ladder's final upper amount."}
+    else:
+        extra = acquisition(next_bid, assumptions)["all_in_acquisition"] - flow["all_in_acquisition"]
+        one_more_bid = {"bid": money(next_bid), "hammer_increment": money(next_bid - bid), "additional_all_in_cost": money(extra), "profit_reduction": money(extra),
+                        "net_profit": money(flow["net_profit"] - extra), "available": next_bid <= MAX_MONEY}
+    return {**{key: money(value) if isinstance(value, Decimal) else value for key, value in flow.items()}, "bid": money(bid), "break_even_resale": money(gross), "one_more_bid": one_more_bid}
 
 
 def build_board(assumptions, evidence_scenarios=None, source_summary=None, *, page=0, selected_bid=None, selected_case="working", focus_selected=False):
@@ -255,25 +266,31 @@ def build_board(assumptions, evidence_scenarios=None, source_summary=None, *, pa
     if len(values) == 3 and not values[0] <= values[1] <= values[2]:
         notices.append("Manual resale cases are not in ascending order; review the assumptions.")
     increment_notice = "Configured fixed increment; verify the auction house's bidding rules." if assumptions["increment_mode"] == "fixed" else "Configurable example tier schedule, not verified house rules. A crossing step lands on the tier boundary."
+    coverage_limit = assumptions["tiers"][-1]["up_to"] if assumptions["increment_mode"] == "tiers" else None
+    if coverage_limit is not None:
+        notices.append(f"Bid rules are provided only through ${Decimal(coverage_limit):,.2f}. Bids above this amount are not evaluated; a qualifying bid at this limit does not establish a higher walk-away ceiling.")
     result = {"assumptions": assumptions, "cases": cases, "source_summary": source_summary or {}, "rows": [], "shortlist": [], "detail": None,
               "profit_targets": [], "pagination": {"page": 0, "page_size": 8, "page_count": 0, "has_previous": False, "has_next": False},
-              "increment_notice": increment_notice, "notices": notices, "selected_case": selected_case, "selected_bid": None, "selected_bid_index": None,
+              "increment_notice": increment_notice, "notices": notices, "coverage_limit": coverage_limit, "selected_case": selected_case, "selected_bid": None, "selected_bid_index": None,
               "calculation_basis": "USD cash flows, each premium, tax and commission rounded to cents (half up). Return on cost = net profit / all-in acquisition. Both minimums are checked against unrounded ratios. Ceilings are conditional, not probabilities."}
     if assumptions["starting_hammer"] is None:
         result["notices"].append("Enter an opening or current hammer to create the available bid ladder.")
         return result
     ladder = BidLadder(assumptions)
     if not ladder.count:
-        result["notices"].append("No available bid remains within the supported range.")
+        result["empty_reason"] = "No available bid remains within the provided bid rules. Extend the tiers with verified auction rules to evaluate higher bids." if coverage_limit is not None else "No available bid remains within the supported range."
+        result["notices"].append(result["empty_reason"])
         return result
     by_case = {case["key"]: Decimal(case["resale_hammer"]) if case["resale_hammer"] is not None else None for case in cases}
     for key in CASE_KEYS:
         resale = by_case[key]
         bid = ceiling(ladder, resale, assumptions) if resale is not None else None
-        result["shortlist"].append({"case_key": key, "label": {"conservative": "Conservative ceiling", "working": "Working-case ceiling", "optimistic": "Optimistic stretch"}[key], "bid": money(bid) if bid is not None else None,
+        coverage_limited = bid is not None and bid == ladder.coverage_limit
+        label = f"{CASE_LABELS[key]} highest supported bid" if coverage_limited else {"conservative": "Conservative ceiling", "working": "Working-case ceiling", "optimistic": "Optimistic stretch"}[key]
+        result["shortlist"].append({"case_key": key, "label": label, "bid": money(bid) if bid is not None else None, "coverage_limited": coverage_limited,
             "detail": detail_for(bid, resale, assumptions, ladder) if bid is not None else None,
             "conservative_downside": detail_for(bid, by_case["conservative"], assumptions, ladder) if bid is not None and by_case["conservative"] is not None else None,
-            "reason": None if bid is not None else "Resale assumption unavailable" if resale is None else "No available bid satisfies both minimums"})
+            "reason": "Qualifies at the highest supported bid; higher bid rules are unknown, so the walk-away ceiling is not established." if coverage_limited else None if bid is not None else "Resale assumption unavailable" if resale is None else "No available bid satisfies both minimums"})
     if selected_bid not in (None, ""):
         chosen = decimal_value(selected_bid, "Selected bid", minimum=CENT)
         if ladder.at(ladder.index_at_or_below(chosen)) != chosen:
@@ -302,9 +319,10 @@ def build_board(assumptions, evidence_scenarios=None, source_summary=None, *, pa
     if by_case[selected_case] is not None:
         result["detail"] = {"case_key": selected_case, **detail_for(chosen, by_case[selected_case], assumptions, ladder)}
     for target in sorted({Decimal(0), Decimal(500), Decimal(1000), Decimal(2000), Decimal(assumptions["minimum_profit"])}):
-        ceilings = {}
+        ceilings, coverage_limited = {}, {}
         for key, resale in by_case.items():
             bid = ceiling(ladder, resale, assumptions, minimum_profit=target) if resale is not None else None
             ceilings[key] = money(bid) if bid is not None else None
-        result["profit_targets"].append({"minimum_profit": money(target), "minimum_return_pct": assumptions["minimum_return_pct"], "ceilings": ceilings})
+            coverage_limited[key] = bid is not None and bid == ladder.coverage_limit
+        result["profit_targets"].append({"minimum_profit": money(target), "minimum_return_pct": assumptions["minimum_return_pct"], "ceilings": ceilings, "coverage_limited": coverage_limited})
     return result

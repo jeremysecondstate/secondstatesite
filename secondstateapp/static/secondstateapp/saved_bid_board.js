@@ -81,6 +81,7 @@
       root.hidden = !summary;
       if (!summary) return;
       copy.replaceChildren(el("strong", summary.qualifying_bid == null ? (summary.qualifies == null ? "Qualifying Bid: Unavailable" : "Qualifying Bid: No qualifying bid") : `Qualifying Bid: ${money(summary.qualifying_bid)}`, "sb-qualifying-bid"));
+      if (summary.qualifying_coverage_limited) copy.append(el("small", "At known tier limit; higher bids not evaluated.", "ab-muted"));
       root.querySelector("input").checked = pending.get(String(lot.id)) ?? Boolean(summary.include_in_email);
     };
     root.updateSavedBoard(lot.saved_bid_board);
@@ -100,7 +101,7 @@
     const selected = el("section", null, "sb-saved-selection");
     selected.append(el("span", "SAVED BID · USD HAMMER", "ab-overline"));
     selected.append(el("h3", summary.qualifying_bid == null ? (summary.qualifies == null ? "Qualifying Bid: Unavailable" : "No qualifying bid") : `Qualifying Bid: ${money(summary.qualifying_bid)}`));
-    selected.append(el("p", `${caseLabel} · ${summary.qualifying_bid == null ? (summary.qualifies == null ? "Save a starting hammer and resale case to calculate a qualifying bid." : "no available bid meets both saved minimums") : "highest saved bid meeting both minimums"}`, "ab-muted"));
+    selected.append(el("p", `${caseLabel} · ${summary.qualifying_bid == null ? (data.empty_reason || (summary.qualifies == null ? "Save a starting hammer and resale case to calculate a qualifying bid." : "no available bid meets both saved minimums")) : summary.qualifying_coverage_limited ? "highest supported bid at the known tier limit; higher bids not evaluated" : "highest saved bid meeting both minimums"}`, "ab-muted"));
     if (summary.selected_bid != null) selected.append(el("p", `Selected bid: ${money(summary.selected_bid)} · ${qualification(summary)}`, "sb-saved-selected"));
     else selected.append(el("p", "No bid selected in this saved board.", "ab-muted"));
     if (detail) selected.append(metrics([
@@ -120,7 +121,8 @@
       const item = el("div", null, "ab-pick");
       item.append(el("span", pick.label || labels[pick.case_key]), el("strong", pick.bid == null ? (pick.reason === "Resale assumption unavailable" ? "Unavailable" : "No qualifying bid") : money(pick.bid)));
       if (pick.detail) item.append(el("small", `${money(pick.detail.net_profit)} profit · ${pct(pick.detail.return_on_cost_pct)} return`));
-      if (pick.bid == null) item.append(el("small", pick.reason || "No bid meets both minimums."));
+      if (pick.coverage_limited) item.append(el("small", pick.reason || "Limited by known bid tiers; higher bids have not been evaluated."));
+      else if (pick.bid == null) item.append(el("small", pick.reason || "No bid meets both minimums."));
       picks.append(item);
     });
     root.append(picks);

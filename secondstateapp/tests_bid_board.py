@@ -53,6 +53,79 @@ class BidBoardCalculationTests(SimpleTestCase):
         self.assertEqual(detail_for(Decimal(975), Decimal(1500), assumptions, ladder)["one_more_bid"]["hammer_increment"], "25.00")
         self.assertEqual(detail_for(Decimal(1000), Decimal(1500), assumptions, ladder)["one_more_bid"]["hammer_increment"], "100.00")
 
+    def test_finite_tiers_include_final_boundary_without_extrapolating(self):
+        assumptions = self.assumptions(starting_hammer="975", increment_mode="tiers", tiers=[
+            {"up_to": "1000", "increment": "50"}, {"up_to": "1300", "increment": "200"},
+        ])
+        ladder = BidLadder(assumptions)
+        self.assertEqual(ladder.count, 4)
+        self.assertEqual([ladder.at(index) for index in range(5)], [Decimal(975), Decimal(1000), Decimal(1200), Decimal(1300), None])
+        self.assertEqual(ladder.index_at_or_below(Decimal(1299)), 2)
+        self.assertEqual(ladder.index_at_or_below(Decimal(9999)), 3)
+        self.assertEqual(ladder.next(Decimal(1200)), Decimal(1300))
+        self.assertIsNone(ladder.next(Decimal(1300)))
+        self.assertIsNone(ladder.next(Decimal(1400)))
+        self.assertEqual(ceiling(ladder, Decimal(5000), assumptions), Decimal(1300))
+        last = detail_for(Decimal(1300), Decimal(5000), assumptions, ladder)
+        self.assertFalse(last["one_more_bid"]["available"])
+        self.assertIsNone(last["one_more_bid"]["bid"])
+        self.assertIsNone(last["one_more_bid"]["additional_all_in_cost"])
+        self.assertIn("No bid rules", last["one_more_bid"]["reason"])
+
+    def test_finite_tier_opening_and_current_at_or_above_final_boundary(self):
+        for start, basis, expected in (("1300", "opening", ["1300.00"]), ("1250", "current", ["1300.00"]),
+                                       ("1300", "current", []), ("1300.01", "opening", []), ("1400", "current", [])):
+            with self.subTest(start=start, basis=basis):
+                assumptions = self.assumptions(starting_hammer=start, starting_basis=basis, increment_mode="tiers",
+                                               tiers=[{"up_to": "1300", "increment": "100"}], resale_overrides={"working": "5000"})
+                board = build_board(assumptions)
+                self.assertEqual([row["bid"] for row in board["rows"]], expected)
+                self.assertEqual(board["coverage_limit"], "1300.00")
+                self.assertFalse(board["pagination"]["has_next"])
+                if not expected:
+                    self.assertIsNone(board["selected_bid"])
+                    self.assertIsNone(board["detail"])
+                    self.assertIn("No available bid", board["empty_reason"])
+
+    def test_finite_coverage_limit_is_not_reported_as_financial_ceiling(self):
+        assumptions = self.assumptions(increment_mode="tiers", tiers=[{"up_to": "1300", "increment": "100"}],
+                                       minimum_profit="100", resale_overrides={"conservative": "1200", "working": "5000"})
+        board = build_board(assumptions)
+        conservative, working, optimistic = board["shortlist"]
+        self.assertEqual(conservative["bid"], "1100.00")
+        self.assertFalse(conservative["coverage_limited"])
+        self.assertEqual(conservative["label"], "Conservative ceiling")
+        self.assertEqual(working["bid"], "1300.00")
+        self.assertTrue(working["coverage_limited"])
+        self.assertEqual(working["label"], "Working highest supported bid")
+        self.assertIn("ceiling is not established", working["reason"])
+        self.assertFalse(optimistic["coverage_limited"])
+        self.assertTrue(any("Bids above this amount are not evaluated" in notice for notice in board["notices"]))
+        target = next(item for item in board["profit_targets"] if item["minimum_profit"] == "100.00")
+        self.assertEqual(target["coverage_limited"], {"conservative": False, "working": True, "optimistic": False})
+        with self.assertRaisesMessage(BidBoardError, "not an available bid"):
+            build_board(assumptions, selected_bid="1400")
+
+    def test_finite_ladder_pagination_ends_at_last_supported_bid(self):
+        assumptions = self.assumptions(starting_hammer="100", increment_mode="tiers",
+                                       tiers=[{"up_to": "950", "increment": "100"}], resale_overrides={"working": "5000"})
+        board = build_board(assumptions, page=1)
+        self.assertEqual([row["bid"] for row in board["rows"]], ["900.00", "950.00"])
+        self.assertEqual(board["pagination"]["row_count"], 10)
+        self.assertFalse(board["pagination"]["has_next"])
+        self.assertEqual(board["selected_bid"], "950.00")
+
+    def test_open_ended_tiers_and_fixed_ladders_remain_unbounded(self):
+        for values in ({"increment_mode": "tiers", "tiers": [{"up_to": "1300", "increment": "100"}, {"up_to": None, "increment": "200"}]},
+                       {"increment_mode": "fixed", "tiers": [{"up_to": "1300", "increment": "100"}]}):
+            with self.subTest(values=values):
+                assumptions = self.assumptions(**values, resale_overrides={"working": "5000"})
+                board = build_board(assumptions)
+                self.assertIsNone(board["coverage_limit"])
+                self.assertGreater(Decimal(board["shortlist"][1]["bid"]), Decimal(1300))
+                self.assertFalse(board["shortlist"][1]["coverage_limited"])
+                self.assertTrue(board["detail"]["one_more_bid"]["available"])
+
     def test_ceiling_satisfies_both_and_next_bid_does_not(self):
         for resale in ("2000", "2499.99", "3000", "3999.99"):
             for target, minimum_return in (("500", "20"), ("1000", "0"), ("0", "40")):
@@ -100,7 +173,9 @@ class BidBoardCalculationTests(SimpleTestCase):
         self.assertIsNone(with_start["detail"])
 
     def test_invalid_inputs_rejected(self):
-        for values in ({"fixed_increment": "0"}, {"selling_commission_pct": "100"}, {"minimum_profit": "NaN"}, {"acquisition_costs": "1.001"}, {"starting_hammer": True}, {"purchase_tax_basis": "whatever"}, {"tiers": [{"up_to": "1000", "increment": "100"}]}):
+        for values in ({"fixed_increment": "0"}, {"selling_commission_pct": "100"}, {"minimum_profit": "NaN"}, {"acquisition_costs": "1.001"}, {"starting_hammer": True}, {"purchase_tax_basis": "whatever"},
+                       {"tiers": [{"up_to": None, "increment": "100"}, {"up_to": "1000", "increment": "100"}]},
+                       {"tiers": [{"up_to": "1000", "increment": "100"}, {"up_to": "1000", "increment": "100"}]}):
             with self.subTest(values=values), self.assertRaises(BidBoardError):
                 normalize_assumptions(values)
 
@@ -177,6 +252,34 @@ class BidBoardAPITests(TestCase):
         self.assertEqual(loaded["assumptions"]["minimum_profit"], "650.00")
         self.assertEqual(loaded["selected_case"], "optimistic")
         self.assertEqual(loaded["selected_ids"], ["501"])
+
+    def test_finite_tiers_save_reload_and_keep_coverage_warning(self):
+        self.save_research()
+        response = self.post(action="save", research_id="session-proof", selected_ids=["501"], selected_bid="1200",
+                             assumptions={"increment_mode": "tiers", "tiers": [{"up_to": "1200", "increment": "100"}]})
+        self.assertEqual(response.status_code, 200, response.content)
+        loaded = self.client.get(self.url).json()["analysis"]
+        stored = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+        for board in (response.json()["analysis"], loaded, stored.analysis):
+            with self.subTest(source=board.get("saved")):
+                self.assertEqual(board["assumptions"]["tiers"], [{"up_to": "1200.00", "increment": "100.00"}])
+                self.assertEqual(board["coverage_limit"], "1200.00")
+                self.assertEqual(board["selected_bid"], "1200.00")
+                self.assertTrue(board["shortlist"][1]["coverage_limited"])
+                self.assertFalse(board["detail"]["one_more_bid"]["available"])
+                self.assertIsNone(board["detail"]["one_more_bid"]["bid"])
+
+    def test_changed_finite_ladder_with_no_next_bid_clears_previous_selection(self):
+        response = self.post(action="save", assumptions={"resale_overrides": {"working": "4000"}}, selected_bid="1500")
+        self.assertEqual(response.status_code, 200, response.content)
+        response = self.post(assumptions={"increment_mode": "tiers", "starting_hammer": "1200", "starting_basis": "current",
+                                          "tiers": [{"up_to": "1200", "increment": "100"}]})
+        self.assertEqual(response.status_code, 200, response.content)
+        board = response.json()["analysis"]
+        self.assertEqual(board["rows"], [])
+        self.assertIsNone(board["selected_bid"])
+        self.assertIn("No available bid", board["empty_reason"])
+        self.assertEqual(AuctionBidBoardAnalysis.objects.get(lot=self.lot).analysis["selected_bid"], "1500.00")
 
     def test_updated_workbench_selection_is_used_instead_of_stale_board_snapshot(self):
         self.save_research()

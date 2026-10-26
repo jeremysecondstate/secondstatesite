@@ -3,16 +3,16 @@
   <div style="margin:3px 0 10px;color:#666;font-size:11px;">Saved {{ board.saved_label }}. These figures reflect this saved version.</div>
   <div style="font:500 20px Georgia,serif;">{{ board.selected_bid }} selected hammer · {{ board.selected_case }} case</div>
   <div style="margin-top:4px;">{{ board.qualification }}</div>
-  <div><strong>Qualifying bid ceiling ({{ board.selected_case }}): {{ board.qualifying_bid }}</strong></div>
+  <div><strong>{{ board.qualifying_label }} ({{ board.selected_case }}): {{ board.qualifying_bid }}</strong></div>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:10px 0;border-collapse:collapse;font:12px Arial,sans-serif;color:#242720;">
     {% for metric in board.metrics %}
       <tr><td style="padding:4px 0;">{{ metric.label }}</td><td align="right" style="padding:4px 0;">{{ metric.value }}</td></tr>
     {% endfor %}
   </table>
   <table width="100%" cellspacing="0" cellpadding="0" style="margin:12px 0;border-collapse:collapse;font:11px/1.5 Arial,sans-serif;color:#242720;">
-    <caption style="text-align:left;font-weight:bold;padding:4px 0;">Resale cases and qualifying bid ceilings</caption>
-    <thead><tr><th scope="col" align="left" style="padding:6px 4px;border-bottom:1px solid #cfc4b0;">Case</th><th scope="col" align="right" style="padding:6px 4px;border-bottom:1px solid #cfc4b0;">Resale hammer</th><th scope="col" align="right" style="padding:6px 4px;border-bottom:1px solid #cfc4b0;">Bid ceiling</th></tr></thead>
-    <tbody>{% for case in board.cases %}<tr><td style="padding:6px 4px;border-bottom:1px solid #ded6c8;">{{ case.label }}<br><span style="color:#666;font-size:10px;">{{ case.basis }}</span></td><td align="right" style="padding:6px 4px;border-bottom:1px solid #ded6c8;">{{ case.resale }}</td><td align="right" style="padding:6px 4px;border-bottom:1px solid #ded6c8;">{{ case.ceiling }}</td></tr>{% endfor %}</tbody>
+    <caption style="text-align:left;font-weight:bold;padding:4px 0;">{{ board.cases_heading }}</caption>
+    <thead><tr><th scope="col" align="left" style="padding:6px 4px;border-bottom:1px solid #cfc4b0;">Case</th><th scope="col" align="right" style="padding:6px 4px;border-bottom:1px solid #cfc4b0;">Resale hammer</th><th scope="col" align="right" style="padding:6px 4px;border-bottom:1px solid #cfc4b0;">Qualifying bid</th></tr></thead>
+    <tbody>{% for case in board.cases %}<tr><td style="padding:6px 4px;border-bottom:1px solid #ded6c8;">{{ case.label }}<br><span style="color:#666;font-size:10px;">{{ case.basis }}</span></td><td align="right" style="padding:6px 4px;border-bottom:1px solid #ded6c8;">{{ case.resale }}</td><td align="right" style="padding:6px 4px;border-bottom:1px solid #ded6c8;">{{ case.ceiling }}{% if case.coverage_note %}<br><span style="color:#666;font-size:10px;">{{ case.coverage_note }}</span>{% endif %}</td></tr>{% endfor %}</tbody>
   </table>
   {% if board.rows %}
     <div style="overflow-x:auto;">

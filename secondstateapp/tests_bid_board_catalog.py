@@ -117,6 +117,15 @@ class SavedBidBoardCatalogTests(TestCase):
         self.assertEqual(summary["selected_bid"], "2000.00")
         self.assertEqual(summary["qualifying_bid"], "1800.00")
 
+    def test_saved_summary_retains_finite_coverage_without_recalculating(self):
+        self.save_board(assumptions={"increment_mode": "tiers", "tiers": [{"up_to": "1500", "increment": "100"}]})
+        with patch("secondstateapp.bid_board_views.build_board", side_effect=AssertionError("Must use saved snapshot")):
+            summary = self.client.get(self.saved_url).json()["board"]["summary"]
+        self.assertEqual(summary["qualifying_bid"], "1500.00")
+        self.assertEqual(summary["coverage_limit"], "1500.00")
+        self.assertTrue(summary["qualifying_coverage_limited"])
+        self.assertEqual(summary["selected_bid"], "1400.00")
+
     def test_unavailable_evidence_and_no_qualifying_bid_remain_null(self):
         record = self.save_board(assumptions={"resale_overrides": {}})
         summary = saved_board_summary(record)

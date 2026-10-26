@@ -96,6 +96,15 @@ class SavedBidBoardEmailTests(TestCase):
         self.assertNotIn("<script>", email.html_body)
         self.assertNotIn("<img src=x", email.html_body)
 
+    def test_finite_coverage_is_not_presented_as_an_established_ceiling(self):
+        self.saved_board(selected_bid="1400", increment_mode="tiers", tiers=[{"up_to": "1500", "increment": "100"}])
+        email = compose_auction_email([self.lot])
+        self.assertIn("Highest supported qualifying bid (Working): $1,500.00", email.text_body)
+        self.assertIn("Highest supported qualifying bid (Working): $1,500.00", email.html_body)
+        self.assertIn("Known increment range ends here; higher bids are unverified.", email.text_body)
+        self.assertIn("Known increment range ends here; higher bids are unverified.", email.html_body)
+        self.assertNotIn("Qualifying bid ceiling (Working):", email.text_body)
+
     def test_board_without_selected_cash_flows_reports_unavailable(self):
         self.saved_board(selected_bid="1100", resale_overrides={})
         email = compose_auction_email([self.lot])
