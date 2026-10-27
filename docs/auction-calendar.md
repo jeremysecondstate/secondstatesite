@@ -92,6 +92,8 @@ New HTML uploads and new LiveArt searches retain image links automatically. For 
 
 Stage changes preserve the lot and loaded controls. Per-lot browser drafts retain pending edits across navigation and reload, while saved sources, comparable selections and Bid Board assumptions use the database. Stage navigation never initiates a LiveArt search. Exact artwork identity does not establish that the impression, edition, size or condition matches; those fields remain independently reviewable. Links point to supplied auction lots or documented LiveArt record endpoints; missing links remain unavailable.
 
+If a completed search response is lost from the browser, **Recover pending research** checks this signed-in session for that lot's retained response. It restores candidates, query provenance and recorded Data Units for review without a new LiveArt API request or a save. Existing unsaved reviews are kept instead of replaced. An absent pending response does not prove that an earlier interrupted request consumed no Data Units; reconcile that uncertainty separately before repeating a paid query.
+
 The image viewer uses every validated image exposed by the current lot record. The present sync model stores one primary or saved image, so it does not invent reverse/detail images. A single image and a missing/failed image have explicit states. The expanded viewer uses a keyboard-accessible dialog.
 
 The source ledger displays normalized artwork, artist, USD hammer, medium, dimensions, edition, sale house/date, lot/location, signature, condition, file provenance and source URL when supplied. Unreported values remain visible as unavailable. Source HTML is parsed as data; its scripts and markup are never inserted into the page.

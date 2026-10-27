@@ -1563,11 +1563,53 @@ def _research_liveart_lot(
 
 @never_cache
 @staff_member_required
-@require_POST
+@require_http_methods(["GET", "POST"])
 def auction_lot_liveart_research(request, lot_id: int):
     lot = AuctionWatchLot.objects.filter(pk=lot_id).first()
     if lot is None:
         return JsonResponse({"ok": False, "error": "Auction lot not found."}, status=404)
+    if request.method == "GET":
+        # Recover an already completed response without a new provider request,
+        # rotating its ID, consuming it, or refreshing persisted analysis.
+        pending = request.session.get(f"liveart_research_{lot.pk}")
+        if not (
+            isinstance(pending, dict)
+            and isinstance(pending.get("research_id"), str)
+            and pending["research_id"]
+            and isinstance(pending.get("candidates"), list)
+        ):
+            return JsonResponse({
+                "ok": True, "pending_found": False,
+                "message": (
+                    "No pending research is stored for this lot in this session. "
+                    "This recovery check made no LiveArt API request; it does not establish "
+                    "whether an earlier request consumed Data Units. Saved evidence is unchanged."
+                ),
+            })
+        candidates = _merged_resale_candidates(lot, pending["candidates"])
+        existing = LiveArtResaleAnalysis.objects.filter(lot=lot).first()
+        selected_ids = list(pending.get("selected_ids") or [])
+        if existing is not None:
+            selected_ids.extend(str(item) for item in existing.selected_ids if str(item).startswith("artprice:"))
+        selected_ids = _selected_resale_ids(
+            candidates, selected_ids,
+            previous_candidates=existing.candidates if existing is not None else None,
+            initialize_artprice=_initialize_legacy_artprice(existing),
+        )
+        recovered = {key: pending[key] for key in (
+            "research_id", "retrieved_at", "data_units_spent", "subject_match", "subject_matches",
+            "requires_subject_choice",
+        ) if key in pending}
+        return JsonResponse({
+            "ok": True, "pending_found": True,
+            **recovered, **_liveart_search_context(pending),
+            "candidates": _candidates_with_selection(candidates, selected_ids),
+            "selected_ids": selected_ids,
+            "message": (
+                "Pending research recovered for review. No LiveArt API request was made. "
+                "Saved evidence is unchanged; reconcile the recovered selections before saving."
+            ),
+        })
     if len(request.body) > 2_000:
         return JsonResponse({"ok": False, "error": "Research request is too large."}, status=413)
     try:

@@ -1742,6 +1742,7 @@
       const disabled = busy || Boolean(options.isParentBusy?.());
       section.querySelectorAll("button, input, textarea, select").forEach((control) => { control.disabled = disabled; });
       if (options.researchButton) options.researchButton.disabled = disabled;
+      if (options.recoverButton) options.recoverButton.disabled = disabled;
       if (options.titleVariantInput) options.titleVariantInput.disabled = disabled;
       if (!disabled) {
         candidateResults.querySelectorAll('input[type="checkbox"]').forEach((control) => {
@@ -2072,6 +2073,28 @@
       markAnalysisPending("Website evidence changes are not saved yet. Review the selected sales, then save selected evidence to use them on the Bid Board.");
       setStatus(payload.message || "Website evidence updated for review. No LiveArt API request was made.", "success");
     };
+    const recover = async () => {
+      if (busy || options.isParentBusy?.() || !lot.liveart_research_url) return;
+      // A read-only server check must not discard an unrelated browser draft.
+      if (hasUnsavedChanges) {
+        setStatus("Finish the current unsaved evidence review before recovering another pending response. Your draft has been kept.", "error");
+        return;
+      }
+      setBusy(true);
+      setStatus("Checking for pending research without a new LiveArt API request…", "loading");
+      try {
+        const payload = await requestAnalysisJson(lot.liveart_research_url, {
+          method: "GET", credentials: "same-origin", headers: {"X-Requested-With": "XMLHttpRequest"},
+        }, "Pending research could not be recovered. No new LiveArt API request was made.");
+        if (payload.pending_found) {
+          loaded = true;
+          applyManualResearch(payload);
+        }
+        else setStatus(payload.message, "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Pending research could not be recovered.", "error");
+      } finally { setBusy(false); }
+    };
     if (window.LiveArtManualEntry) window.LiveArtManualEntry.mount(section, {
       artist: lot.artist || lot.artist_watchlist_name || "",
       idPrefix: `${options.idPrefix || ""}liveart-${lot.id}-`,
@@ -2107,6 +2130,7 @@
     return {
       load,
       find,
+      recover,
       refresh,
       syncBusyControls,
       getEvidence: () => ({
@@ -2322,6 +2346,10 @@
     researchButton.className = "is-primary";
     researchButton.type = "button";
     researchButton.textContent = "Find LiveArt sales";
+    const recoverButton = document.createElement("button");
+    recoverButton.type = "button";
+    recoverButton.textContent = "Recover pending research";
+    recoverButton.title = "Restore this session's pending results without a new LiveArt API request or a save.";
     const titleVariantField = document.createElement("div");
     titleVariantField.className = "artprice-analysis-field liveart-title-variant-field";
     const titleVariantLabel = document.createElement("label");
@@ -2420,7 +2448,7 @@
     deleteButton.type = "button";
     deleteButton.textContent = "Remove all Artprice files";
     deleteButton.hidden = true;
-    actions.append(analyzeButton, researchButton, recalculateButton, deleteButton);
+    actions.append(analyzeButton, researchButton, recoverButton, recalculateButton, deleteButton);
 
     const status = document.createElement("p");
     status.id = `${idPrefix}artprice-analysis-status-${lot.id}`;
@@ -2453,6 +2481,7 @@
       isParentBusy: () => busy,
       onScenarioSummary: options.onScenarioSummary,
       researchButton,
+      recoverButton,
       titleVariantInput,
       onSavedChange: (saved) => {
         hasResaleAnalysis = saved;
@@ -2461,6 +2490,7 @@
       },
     });
     researchButton.addEventListener("click", liveart.find);
+    recoverButton.addEventListener("click", liveart.recover);
     if (options.workspace) {
       details.classList.add("is-workspace");
       const sourcePanel = document.createElement("section");
@@ -2486,7 +2516,7 @@
       compsPanel.setAttribute("role", "tabpanel");
       const liveartSearch = document.createElement("div");
       liveartSearch.className = "research-liveart-search";
-      liveartSearch.append(titleVariantField, researchButton);
+      liveartSearch.append(titleVariantField, researchButton, recoverButton);
       const compsHeader = document.createElement("div");
       compsHeader.className = "archive-panel-heading";
       appendText(compsHeader, "span", "calendar-kicker", "02 / EVIDENCE");
