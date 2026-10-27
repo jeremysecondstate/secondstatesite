@@ -68,10 +68,10 @@ class Element {
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name] ?? null; }
   addEventListener(name, callback) { this[name] = callback; }
-  focus() { this.focused = true; }
+  focus(options) { this.focused = true; this.focusOptions = options; }
   querySelectorAll() { return []; }
   querySelector() { return null; }
-  scrollIntoView() {}
+  scrollIntoView(options) { this.scrollOptions = options; }
 }
 
 const dayA = "2026-10-24";
@@ -111,6 +111,7 @@ function page(data, view = "oliver") {
     galleryFilters: new Element(), galleryHouseFilters: new Element(), galleryHousesSummary: new Element(),
     gallerySendLaunch: new Element("button"), galleryArtists: Object.assign(new Element(), {dataset: {timeZone: "America/Los_Angeles"}}),
     galleryArtistSummary: new Element(), galleryArtistList: new Element(), galleryArtistsMore: new Element(),
+    galleryArtistClear: new Element("button"),
     researchSearch: new Element("input"), researchLotCard: new Element(),
     renderResearchWorkspace() { context.lastResearchLot = context.data[context.selectedDay]?.find(l => l.id === context.lastResearchLot?.id); },
     updateCalendarLocation() {}, loadCurrencyPrices() {}, refreshCurrencyPrices() {}, restoringHistory: false,
@@ -127,6 +128,9 @@ function page(data, view = "oliver") {
   vm.runInContext(declaration("renderGalleryFilters"), context);
   vm.runInContext(declaration("renderGalleryCards"), context);
   vm.runInContext(declaration("renderGalleryArtists"), context);
+  vm.runInContext(declaration("chooseGalleryArtist"), context);
+  vm.runInContext(between('  galleryArtistClear.addEventListener("click"',
+    '  galleryArtistsMore.addEventListener("click"'), context);
   context.run = expression => vm.runInContext(expression, context);
   context.ids = expression => Array.from(context.run(expression), item => item.id);
   return context;
@@ -351,6 +355,13 @@ test("Oliver and scoped research URLs retain their view across month links and c
   assert.equal(current.searchParams.get("filter"), "tray");
   assert.equal(new URL(links[0].href).searchParams.get("view"), "oliver");
   assert.equal(new URL(links[0].href).searchParams.has("lot"), false);
+  const artistKey = CalendarArtists.artistKey({artist: "Miró, Joan"});
+  context.galleryFilter = `artist:${artistKey}`;
+  context.run("updateCalendarLocation()");
+  current = new URL(context.window.history.url);
+  assert.equal(current.searchParams.get("artist"), artistKey);
+  assert.equal(current.searchParams.has("filter"), false, "artist navigation replaces the Email Tray filter");
+  assert.equal(new URL(links[0].href).searchParams.has("artist"), false, "month navigation starts with all artists");
   context.activeView = "research";
   context.researchScope = "oliver";
   context.researchLook = "workbench";
@@ -360,6 +371,7 @@ test("Oliver and scoped research URLs retain their view across month links and c
   assert.equal(current.searchParams.get("lot"), "4");
   assert.equal(current.searchParams.get("scope"), "oliver");
   assert.equal(current.searchParams.get("look"), "workbench");
+  assert.equal(current.searchParams.has("artist"), false);
   const month = new URL(links[0].href);
   assert.equal(month.searchParams.get("scope"), "oliver");
   assert.equal(month.searchParams.get("view"), "research");
@@ -373,7 +385,7 @@ test("Oliver and scoped research URLs retain their view across month links and c
   assert.equal(new URL(links[0].href).searchParams.has("scope"), false);
 });
 
-test("browser Back from Oliver research restores Oliver month links after popstate", () => {
+test("browser Back from Oliver research restores the artist selection and Oliver month links after popstate", () => {
   const context = page({[dayA]: [lot(1, "Other", false), lot(2, "Phillips", true)]});
   for (const name of ["calendarLayout", "researchWorkspace", "researchTitle", "auctionCalendar",
     "calendarPageShell", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle",
@@ -405,8 +417,10 @@ test("browser Back from Oliver research restores Oliver month links after popsta
   vm.runInContext(["updateCalendarLocation", "setCalendarView", "openResearchWorkspace"].map(declaration).join("\n"), context);
   vm.runInContext(between('  window.addEventListener("popstate"',
     '  researchPrevious.addEventListener("click"'), context);
+  context.galleryFilter = `artist:${CalendarArtists.artistKey({artist: "Artist 2"})}`;
   context.run('setCalendarView("oliver")');
   const oliverUrl = context.window.location.href;
+  assert.equal(new URL(oliverUrl).searchParams.get("artist"), "artist 2");
   context.run("openResearchWorkspace()");
   assert.equal(new URL(monthLinks[0].href).searchParams.get("view"), "research");
   assert.equal(new URL(monthLinks[0].href).searchParams.get("scope"), "oliver");
@@ -415,6 +429,8 @@ test("browser Back from Oliver research restores Oliver month links after popsta
   listeners.get("popstate")();
   const restoredMonth = new URL(monthLinks[0].href);
   assert.equal(context.activeView, "oliver");
+  assert.equal(context.galleryFilter, "artist:artist 2");
+  assert.deepEqual(context.ids("visibleGalleryLots().map(entry => entry.lot)"), [2]);
   assert.equal(context.restoringHistory, false);
   assert.equal(restoredMonth.searchParams.get("view"), "oliver");
   for (const key of ["scope", "look", "lot"]) assert.equal(restoredMonth.searchParams.has(key), false);
@@ -436,7 +452,11 @@ test("switching Oliver, research and regular Calendar reuses the same gallery an
   context.window.history.pushState = function(state, _title, url) { this.state = state; this.url = String(url); };
   vm.runInContext(between("  const galleryDays =", "  const updateGalleryEmailButton ="), context);
   vm.runInContext(["updateCalendarLocation", "setCalendarView", "openResearchWorkspace"].map(declaration).join("\n"), context);
+  context.galleryFilter = "artist:artist 1";
+  context.galleryVisibleCount = 72;
   context.run('setCalendarView("oliver")');
+  assert.equal(context.galleryFilter, "all", "changing house scope clears an artist from the prior scope");
+  assert.equal(context.galleryVisibleCount, 24);
   assert.equal(context.activeView, "oliver");
   assert.equal(context.oliverViewToggle.getAttribute("aria-pressed"), "true");
   assert.equal(context.galleryCatalog.hidden, false);
@@ -473,7 +493,11 @@ test("an empty Oliver day preserves the regular Calendar's Research and Browse l
   context.renderGalleryCatalog = () => { context.galleryLotIds = context.ids("dayLots()"); };
   context.renderSidebarLots = lots => { context.sidebarLotIds = lots.map(item => item.id); };
   vm.runInContext(["showDay", "setCalendarView"].map(declaration).join("\n"), context);
+  context.galleryFilter = "artist:artist 1";
+  context.galleryVisibleCount = 72;
   context.run(`showDay("${dayB}")`);
+  assert.equal(context.galleryFilter, "all", "changing dates clears the previous day's artist selection");
+  assert.equal(context.galleryVisibleCount, 24);
   assert.deepEqual(context.galleryLotIds, [], "the selected day has no Oliver lots");
   assert.equal(context.researchLaunch.hidden, false);
   assert.equal(context.researchLaunch.textContent, "Research this lot");
@@ -527,4 +551,132 @@ test("Oliver email dialog includes only selected relationship lots and declares 
   assert.equal(fields.get("scope_houses").value, "");
   assert.equal(fields.get("return_view").value, "catalog");
   assert.deepEqual(context.document.getElementById("catalog-email-lot-ids").children.map(x => x.value), ["1", "2"]);
+});
+
+function artistButton(context, name) {
+  const text = node => [node.textContent || "", ...node.children.map(text)].join(" ");
+  const row = context.galleryArtistList.children.find(node => text(node).includes(name));
+  assert(row, `Artist summary is rendered for ${name}`);
+  const descendants = node => [node, ...node.children.flatMap(descendants)];
+  const button = descendants(row).find(node => node.tag === "button");
+  assert(button, `The ${name} card contains a native button`);
+  return button;
+}
+
+test("an artist card reveals its full-day lots before pagination and preserves sort and research identities", () => {
+  const lots = Array.from({length: 60}, (_, index) => lot(index + 1,
+    index % 2 ? "Phillips" : "Swann", true, {
+      artist: index % 3 ? "Max, Peter" : "Other artist",
+      estimate_low: String(1000 - index), email_tray_selected: index % 5 === 0,
+    }));
+  const before = JSON.stringify(lots);
+  const context = page({[dayA]: lots}, "catalog");
+  context.galleryFilter = "house:Phillips";
+  context.gallerySort.value = "price_asc";
+  context.galleryVisibleCount = 72;
+  context.run("renderGalleryArtists()");
+  const button = artistButton(context, "Max, Peter");
+  assert.equal(button.type, "button");
+  assert.equal(button.getAttribute("aria-pressed"), "false");
+  assert.equal(button.getAttribute("aria-controls"), "day-gallery-grid");
+  assert.equal(button.getAttribute("aria-label"), "Show 40 lots by Max, Peter");
+  button.click();
+  const matching = lots.filter(item => item.artist === "Max, Peter").reverse();
+  assert.equal(context.galleryFilter, `artist:${CalendarArtists.artistKey({artist: "Max, Peter"})}`);
+  assert.equal(context.gallerySort.value, "price_asc");
+  assert.equal(context.galleryVisibleCount, 24);
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), matching.slice(0, 24).map(item => item.id));
+  assert.equal(context.galleryMore.hidden, false);
+  assert.match(context.galleryResults.textContent, /24 of 40/);
+  assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "true");
+  assert.equal(context.galleryDescription.focused, true);
+  assert.equal(context.galleryDescription.scrollOptions.block, "start");
+  assert.equal(context.galleryArtistClear.hidden, false);
+  context.galleryVisibleCount += 24;
+  context.run("renderGalleryCards()");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), matching.map(item => item.id));
+  for (const card of context.galleryGrid.children) assert.equal(lots[card.index].id, card.id);
+  assert.equal(context.galleryMore.hidden, true);
+  assert.equal(JSON.stringify(lots), before, "artist navigation cannot rewrite lots or Email Tray membership");
+});
+
+test("artist navigation uses the summary's normalized label without merging attribution or accents", () => {
+  const context = page({[dayA]: [
+    lot(1, "Phillips", true, {artist: "  Miró,\tJoan  ", artist_sort_key: "miro, joan"}),
+    lot(2, "Phillips", true, {artist: "MIRÓ, JOAN", artist_sort_key: "miro, joan"}),
+    lot(3, "Swann", true, {artist: "Miro\u0301, Joan", artist_sort_key: "miro, joan"}),
+    lot(4, "Swann", true, {artist: "Miro, Joan", artist_sort_key: "miro, joan"}),
+    lot(5, "Phillips", true, {artist: "After Miró, Joan", artist_sort_key: "miro, joan"}),
+    lot(6, "Phillips", true, {artist: "", artist_sort_key: ""}),
+    lot(7, "Phillips", true, {artist: null, artist_sort_key: ""}),
+  ]}, "catalog");
+  context.galleryFilter = "tray";
+  context.run("renderGalleryArtists()");
+  artistButton(context, "Miró, Joan").click();
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1, 2, 3]);
+  context.run(`chooseGalleryArtist(${JSON.stringify(CalendarArtists.artistKey({artist: "After Miró, Joan"}))})`);
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [5]);
+  context.run(`chooseGalleryArtist(${JSON.stringify(CalendarArtists.artistKey({artist: ""}))})`);
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [6, 7]);
+  assert(context.galleryGrid.children.every(card => context.run("dayLots()")[card.index].id === card.id));
+});
+
+test("clearing the artist restores all lots and respects reduced motion when moving focus", () => {
+  const context = page({[dayA]: [
+    lot(1, "Phillips", true, {artist: "Max, Peter", estimate_low: "400"}),
+    lot(2, "Swann", true, {artist: "Other artist", estimate_low: "900"}),
+  ]}, "catalog");
+  context.window.matchMedia = () => ({matches: true});
+  context.gallerySort.value = "price_desc";
+  context.run(`chooseGalleryArtist(${JSON.stringify(CalendarArtists.artistKey({artist: "Max, Peter"}))})`);
+  assert.equal(context.galleryDescription.scrollOptions.behavior, "auto");
+  context.galleryArtistClear.click();
+  assert.equal(context.galleryFilter, "all");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [2, 1]);
+  assert.equal(context.galleryArtistClear.hidden, true);
+  assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "false");
+  assert.equal(context.galleryDescription.focused, true);
+});
+
+test("an artist card in Oliver's Calendar never reveals the same artist at unrelated houses", () => {
+  const context = page({[dayA]: [
+    lot(1, "Other", false, {artist: "Max, Peter"}),
+    lot(2, "Phillips", true, {artist: "Max, Peter"}),
+    lot(3, "Swann", true, {artist: "Another artist"}),
+  ]}, "oliver");
+  context.run("renderGalleryArtists()");
+  artistButton(context, "Max, Peter").click();
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [2]);
+  assert.match(context.galleryArtistSummary.textContent, /2 artists.*2 watched lots/);
+  assert.equal(context.run("dayLots()[0].id"), 2);
+  context.run('chooseGalleryArtist("")');
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [2, 3]);
+});
+
+test("a full catalog refresh preserves the selected artist while another house or tray selection clears it", () => {
+  const context = page({[dayA]: [
+    lot(1, "Phillips", true, {artist: "Max, Peter"}),
+    lot(2, "Swann", true, {artist: "Max, Peter"}),
+    lot(3, "Phillips", true, {artist: "Another artist", email_tray_selected: true}),
+  ]}, "catalog");
+  for (const name of ["galleryDate", "gallerySummary", "galleryPrevious", "galleryNext", "galleryBrowserLaunch"]) {
+    context[name] = new Element();
+  }
+  context.document.getElementById("day-gallery-title").firstChild = new Element();
+  context.formatCalendarDay = day => day;
+  context.previousGalleryDay = () => undefined;
+  context.nextGalleryDay = () => undefined;
+  vm.runInContext(declaration("renderGalleryCatalog"), context);
+  context.run('chooseGalleryArtist("max, peter"); renderGalleryCatalog()');
+  assert.equal(context.galleryFilter, "artist:max, peter");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1, 2]);
+  context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:Phillips").click();
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1, 3]);
+  assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "false");
+  assert.equal(context.galleryArtistClear.hidden, true);
+  context.run('chooseGalleryArtist("max, peter")');
+  context.galleryFilters.children.find(button => button.dataset.galleryFilter === "tray").click();
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [3]);
+  assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "false");
+  assert.equal(context.galleryArtistClear.hidden, true);
 });

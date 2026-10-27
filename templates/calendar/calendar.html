@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=artist-jump-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012b">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=finite-tier-notes-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
@@ -279,7 +279,10 @@
       </div>
     </details>
     <div class="day-gallery-count" aria-live="polite">
-      <span id="day-gallery-description">A catalog across auction houses</span>
+      <div class="day-gallery-result-heading">
+        <span id="day-gallery-description" tabindex="-1">A catalog across auction houses</span>
+        <button id="day-gallery-artist-clear" type="button" hidden>All artists</button>
+      </div>
       <span id="day-gallery-results">0 lots</span>
     </div>
     <p id="day-gallery-sort-note" class="day-gallery-sort-note" hidden>Sorted by auction estimate in USD, using the low estimate (high estimate if unavailable). Conversions use recent daily reference rates. Lots without a USD estimate appear last.</p>
@@ -424,7 +427,7 @@
 <script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=finite-tiers-20261026"></script>
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=finite-tiers-20261026"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
-<script src="{% static 'secondstateapp/calendar_artists.js' %}?v=arrival-20261023"></script>
+<script src="{% static 'secondstateapp/calendar_artists.js' %}?v=artist-jump-20261027"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=web-categories-20261027"></script>
 <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261027"></script>
@@ -495,6 +498,7 @@
   const gallerySort = document.getElementById("day-gallery-sort");
   const gallerySortNote = document.getElementById("day-gallery-sort-note");
   const galleryDescription = document.getElementById("day-gallery-description");
+  const galleryArtistClear = document.getElementById("day-gallery-artist-clear");
   const galleryResults = document.getElementById("day-gallery-results");
   const galleryGrid = document.getElementById("day-gallery-grid");
   const galleryMore = document.getElementById("day-gallery-more");
@@ -3198,6 +3202,7 @@
     const lots = dayLots().map((lot, index) => ({lot, index}));
     const filtered = lots.filter(({lot}) => {
       if (galleryFilter === "tray") return Boolean(lot.email_tray_selected);
+      if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
       return galleryFilter === "all" || galleryHouseName(lot) === galleryFilter.slice(6);
     });
     if (gallerySort.value === "artist") {
@@ -3271,6 +3276,7 @@
         galleryFilter = key;
         galleryVisibleCount = 24;
         renderGalleryFilters();
+        renderGalleryArtists();
         renderGalleryCards();
         updateCalendarLocation();
         Array.from(galleryCatalog.querySelectorAll("[data-gallery-filter]"))
@@ -3379,7 +3385,11 @@
         : activeView === "oliver" ? "No lots from Oliver’s auction houses on this date. Choose another watched day or switch to Gallery Catalog."
         : "No watched lots match this view.");
     }
-    galleryDescription.textContent = galleryFilter === "all"
+    const artistSelected = galleryFilter.startsWith("artist:");
+    const selectedArtist = artistSelected
+      ? window.CalendarArtists.summarize(dayLots()).find((artist) => artist.key === galleryFilter.slice(7)) : null;
+    galleryArtistClear.hidden = !artistSelected;
+    galleryDescription.textContent = artistSelected ? `${selectedArtist?.name || "Artist"} · lots this day` : galleryFilter === "all"
       ? (activeView === "oliver" ? "A catalog from Oliver’s auction houses" : "A catalog across auction houses")
       : galleryFilter === "tray" ? "Lots selected for the next email" : galleryFilter.slice(6);
     galleryResults.textContent = lots.length
@@ -3401,20 +3411,26 @@
     galleryArtistList.replaceChildren();
     galleryArtistSummary.textContent = `${artists.length} artist${artists.length === 1 ? "" : "s"} · ${lots.length} watched lot${lots.length === 1 ? "" : "s"}`;
     visibleArtists.forEach((artist) => {
-      const card = document.createElement("li");
+      const item = document.createElement("li");
+      const card = document.createElement("button");
+      card.type = "button";
       card.className = "day-gallery-artist-card";
-      appendText(card, "h4", "day-gallery-artist-name", artist.name);
-      const count = document.createElement("p");
+      card.setAttribute("aria-pressed", String(galleryFilter === `artist:${artist.key}`));
+      card.setAttribute("aria-controls", "day-gallery-grid");
+      card.setAttribute("aria-label", `Show ${artist.count} ${artist.count === 1 ? "lot" : "lots"} by ${artist.name}`);
+      card.addEventListener("click", () => chooseGalleryArtist(artist.key));
+      appendText(card, "span", "day-gallery-artist-name", artist.name);
+      const count = document.createElement("span");
       count.className = "day-gallery-artist-total";
       appendText(count, "strong", "", String(artist.count));
       appendText(count, "span", "", artist.count === 1 ? "lot" : "lots");
       card.appendChild(count);
-      const auctionTime = document.createElement("p");
+      const auctionTime = document.createElement("span");
       auctionTime.className = "day-gallery-artist-time";
       appendText(auctionTime, "span", "", "Listed auction");
       appendText(auctionTime, "span", "", artist.earliestTime === null ? "Time TBA" : artist.timeLabel);
       card.appendChild(auctionTime);
-      const arrival = document.createElement("p");
+      const arrival = document.createElement("span");
       arrival.className = "day-gallery-artist-time day-gallery-artist-arrival";
       appendText(arrival, "span", "", "Est. lot arrival");
       appendText(arrival, "span", "", artist.arrivalTime === null
@@ -3424,13 +3440,33 @@
         : `Assumes the listed auction time is the start, plus ${artist.arrivalLotNumber} minutes at one minute per lot.`;
       card.appendChild(arrival);
       if (artist.arrivalTime !== null) {
-        appendText(card, "p", "day-gallery-artist-lot", [`Lot ${artist.arrivalLotNumber}`, artist.arrivalHouse].filter(Boolean).join(" · "));
+        appendText(card, "span", "day-gallery-artist-lot", [`Lot ${artist.arrivalLotNumber}`, artist.arrivalHouse].filter(Boolean).join(" · "));
       }
-      galleryArtistList.appendChild(card);
+      card.setAttribute("aria-description", [
+        `Listed auction: ${artist.earliestTime === null ? "Time TBA" : artist.timeLabel}.`,
+        `Estimated lot arrival: ${artist.arrivalTime === null ? "Unavailable" : window.CalendarArtists.formatArrival(artist, galleryArtists.dataset.timeZone)}.`,
+        artist.arrivalTime === null ? "" : `Lot ${artist.arrivalLotNumber}, ${artist.arrivalHouse}.`,
+      ].filter(Boolean).join(" "));
+      item.appendChild(card);
+      galleryArtistList.appendChild(item);
     });
     galleryArtistsMore.hidden = artists.length <= 12;
     galleryArtistsMore.setAttribute("aria-expanded", String(galleryArtistsExpanded));
     galleryArtistsMore.textContent = galleryArtistsExpanded ? "Show fewer artists" : `Show all ${artists.length} artists`;
+  };
+
+  const chooseGalleryArtist = (key) => {
+    galleryFilter = key ? `artist:${key}` : "all";
+    galleryVisibleCount = 24;
+    renderGalleryFilters();
+    renderGalleryArtists();
+    renderGalleryCards();
+    updateCalendarLocation();
+    galleryDescription.focus({preventScroll: true});
+    galleryDescription.scrollIntoView({
+      block: "start",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
   };
 
   const renderGalleryCatalog = () => {
@@ -3450,7 +3486,8 @@
     galleryNext.disabled = !nextGalleryDay();
     galleryBrowserLaunch.disabled = !lots.length;
     const availableHouses = activeView === "oliver" ? new Set(oliverHouseNames) : houses;
-    if (galleryFilter !== "all" && galleryFilter !== "tray" && !availableHouses.has(galleryFilter.slice(6))) galleryFilter = "all";
+    if (galleryFilter.startsWith("house:") && !availableHouses.has(galleryFilter.slice(6))) galleryFilter = "all";
+    if (galleryFilter.startsWith("artist:") && !lots.some((lot) => window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7))) galleryFilter = "all";
     renderGalleryFilters();
     renderGalleryArtists();
     renderGalleryCards();
@@ -4035,6 +4072,8 @@
     else url.searchParams.delete("day");
     if (isGalleryView() && galleryFilter === "tray") url.searchParams.set("filter", "tray");
     else url.searchParams.delete("filter");
+    if (isGalleryView() && galleryFilter.startsWith("artist:")) url.searchParams.set("artist", galleryFilter.slice(7));
+    else url.searchParams.delete("artist");
     if (activeView === "research" && inOliverScope()) url.searchParams.set("scope", "oliver");
     else url.searchParams.delete("scope");
     if (activeView === "research") {
@@ -4053,6 +4092,7 @@
       const monthUrl = new URL(link.href);
       monthUrl.searchParams.delete("day");
       monthUrl.searchParams.delete("lot");
+      monthUrl.searchParams.delete("artist");
       if (isGalleryView() || activeView === "research") monthUrl.searchParams.set("view", activeView);
       else monthUrl.searchParams.delete("view");
       if (activeView === "research") monthUrl.searchParams.set("look", researchLook);
@@ -4119,7 +4159,7 @@
       const requestedIndex = dayLots().findIndex((lot) => lot.id === requestedLot);
       if (requestedIndex >= 0) researchIndex = requestedIndex;
       const view = params.get("view");
-      galleryFilter = params.get("filter") === "tray" ? "tray" : "all";
+      galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : params.get("filter") === "tray" ? "tray" : "all";
       setCalendarView(view);
       const focusTarget = view === "research" ? researchTitle
         : isGalleryView() ? document.getElementById("day-gallery-title") : calendarViewToggle;
@@ -4196,6 +4236,7 @@
     if (catalogEmailForm.getAttribute("aria-busy") === "true") event.preventDefault();
   });
   galleryArtistSort.addEventListener("change", renderGalleryArtists);
+  galleryArtistClear.addEventListener("click", () => chooseGalleryArtist(""));
   galleryArtistsMore.addEventListener("click", () => {
     galleryArtistsExpanded = !galleryArtistsExpanded;
     renderGalleryArtists();
@@ -4371,7 +4412,7 @@
     if (matchingIndex >= 0) researchIndex = matchingIndex;
   }
   if (validRequestedDay || initialDay) showDay(validRequestedDay ? requestedDay : initialDay);
-  galleryFilter = initialParams.get("filter") === "tray" ? "tray" : "all";
+  galleryFilter = initialParams.get("artist") ? `artist:${initialParams.get("artist")}` : initialParams.get("filter") === "tray" ? "tray" : "all";
   setCalendarView(requestedView);
   const requestedSavedBoard = initialParams.get("saved_bid_board");
   if (requestedSavedBoard && window.SavedBidBoard) {

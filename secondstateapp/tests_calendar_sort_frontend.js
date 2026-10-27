@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const {test} = require("node:test");
 const CalendarCurrency = require("./static/secondstateapp/calendar_currency.js");
+const CalendarArtists = require("./static/secondstateapp/calendar_artists.js");
 
 const template = fs.readFileSync(path.join(__dirname, "../templates/calendar/calendar.html"), "utf8");
 const sortFunctions = template.slice(template.indexOf("  const galleryPrice ="),
@@ -16,12 +17,13 @@ const sortListener = template.slice(template.indexOf('  gallerySort.addEventList
 
 function catalog(lots, sort = "price_asc", filter = "all") {
   const context = vm.createContext({
-    window: {CalendarCurrency},
+    window: {CalendarCurrency, CalendarArtists},
     data: {"2026-10-22": lots.map(lot => ({currency: "USD", ...lot}))}, selectedDay: "2026-10-22", galleryFilter: filter,
     galleryVisibleCount: 24,
     activeView: "catalog",
     gallerySort: {value: sort, addEventListener(type, callback) { this[type] = callback; }},
     gallerySortNote: {}, galleryDescription: {}, galleryResults: {}, galleryMore: {},
+    galleryArtistClear: {},
     galleryGrid: {cards: [], replaceChildren() { this.cards = []; }, appendChild(card) { this.cards.push(card); }},
     galleryCard: (lot, index) => ({id: lot.id, index}), appendText() {},
     loadCurrencyPrices() {},

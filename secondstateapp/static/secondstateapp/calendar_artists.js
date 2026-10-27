@@ -13,15 +13,18 @@
     return Number.isSafeInteger(number) && number > 0 ? number : null;
   };
 
+  const artistName = (lot) => String(lot.artist || "").normalize("NFC").trim().replace(/\s+/g, " ") || "Artist unknown";
+  const artistKey = (lot) => artistName(lot).toLocaleLowerCase("en");
+
   const summarize = (lots) => {
     const groups = new Map();
     lots.forEach((lot) => {
-      const name = String(lot.artist || "").normalize("NFC").trim().replace(/\s+/g, " ") || "Artist unknown";
+      const name = artistName(lot);
       // Group display labels only. Surname sort keys omit attribution ("After",
       // etc.) and must not be used to combine distinct artist labels.
-      const key = name.toLocaleLowerCase("en");
+      const key = artistKey(lot);
       if (!groups.has(key)) groups.set(key, {
-        name, sortKey: String(lot.artist_sort_key || name), count: 0,
+        key, name, sortKey: String(lot.artist_sort_key || name), count: 0,
         earliestTime: null, timeLabel: "Time TBA",
         arrivalTime: null, arrivalLotNumber: null, arrivalHouse: "",
       });
@@ -79,5 +82,5 @@
     }).format(artist.arrivalTime);
   };
 
-  return {summarize, sorted, formatArrival};
+  return {artistKey, summarize, sorted, formatArrival};
 });
