@@ -4,8 +4,9 @@
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012b">
-  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=starting-hammer-20261016">
-  <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=web-evidence-20261025">
+  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=finite-tier-notes-20261027">
+  <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
+  <link rel="stylesheet" href="{% static 'secondstateapp/research_queue.css' %}?v=queue-20261027">
 {% endblock %}
 
 {% block main_class %}calendar-page-shell{% endblock %}
@@ -31,6 +32,11 @@
       {{ synced_lot_count }} synced lot{{ synced_lot_count|pluralize }}
     </div>
   </header>
+
+  <nav class="research-queue-navigation" aria-label="LiveArt research queue">
+    <a class="research-queue-link" href="{% url 'auction_research_queue' %}">LiveArt Queue · <span data-research-queue-count>{{ research_queue_count }}</span></a>
+    <p>Save lots across dates, then tell the LiveArt Worker: “Process my LiveArt queue”.</p>
+  </nav>
 
   <section class="email-tray-card" aria-labelledby="email-tray-title">
     <div class="email-tray-heading">
@@ -295,6 +301,7 @@
         <label class="research-day-label" for="research-day-select">Watched day</label>
         <select id="research-day-select" aria-label="Choose watched day"></select>
         <a class="research-tray-link" href="{% url 'auction_email_tray' %}">Email Tray · <span data-email-tray-count>{{ email_selected_count }}</span></a>
+        <a class="research-tray-link" href="{% url 'auction_research_queue' %}">LiveArt Queue · <span data-research-queue-count>{{ research_queue_count }}</span></a>
         <span id="research-workspace-count" aria-live="polite"></span>
         <button id="research-previous" type="button" aria-label="Previous research lot">← Previous</button>
         <button id="research-next" type="button" aria-label="Next research lot">Next →</button>
@@ -420,6 +427,7 @@
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=arrival-20261023"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=web-categories-20261027"></script>
+<script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261027"></script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
@@ -3341,6 +3349,7 @@
       window.SavedBidBoard.mountSummary(savedBoard, {lot, csrfToken});
       caption.appendChild(savedBoard);
     }
+    if (window.ResearchQueue) caption.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
     const actions = document.createElement("div");
     actions.className = "day-gallery-actions";
     const quickLook = externalLink(researchUrl, "day-gallery-quick-look", "Research this lot ↗");
@@ -3859,6 +3868,7 @@
     }
     if (lot.artprice_url) actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
     overview.appendChild(actionLinks);
+    if (window.ResearchQueue) overview.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
     content.appendChild(overview);
     const workflow = document.createElement("section");
     workflow.className = "lot-browser-workflow";
@@ -3934,6 +3944,7 @@
       actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
     }
     copy.appendChild(actionLinks);
+    if (window.ResearchQueue) copy.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
     lotBrowserCard.appendChild(copy);
 
     const workflow = document.createElement("section");
@@ -4276,6 +4287,7 @@
         actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
       }
       item.appendChild(actionLinks);
+      if (window.ResearchQueue) item.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
       appendArtpriceEditor(item, lot, actionLinks);
       appendArtpriceAnalysis(item, lot);
       list.appendChild(item);

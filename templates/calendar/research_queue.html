@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}LiveArt Research Queue · SecondState{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
+  <link rel="stylesheet" href="{% static 'secondstateapp/research_queue.css' %}?v=queue-20261027">
+{% endblock %}
+{% block main_class %}calendar-page-shell{% endblock %}
+
+{% block content %}
+<section class="auction-calendar research-queue-page" data-research-queue-page aria-labelledby="research-queue-title">
+  {% if queue_error %}
+    <div class="calendar-alerts"><p class="calendar-alert is-error" tabindex="-1" role="alert">{{ queue_error }}</p></div>
+  {% endif %}
+  {% if messages %}
+    <div class="calendar-alerts" aria-live="polite">
+      {% for message in messages %}
+        <p class="calendar-alert is-{{ message.tags|default:'info' }}" tabindex="-1">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+  <header class="research-queue-hero">
+    <div>
+      <a class="research-queue-back" href="{% url 'auction_calendar' %}">← Auction Calendar</a>
+      <p class="calendar-kicker">Saved across all dates</p>
+      <h1 id="research-queue-title" tabindex="-1">LiveArt Research Queue</h1>
+      <p>Choose lots in the Calendar, then review their order and notes here.</p>
+    </div>
+    <nav class="research-queue-nav" aria-label="Calendar tools">
+      <a href="{% url 'auction_research_queue' %}" aria-current="page">LiveArt Queue · <span data-research-queue-count>{{ research_queue_count }}</span></a>
+      <a href="{% url 'auction_email_tray' %}">Email Tray</a>
+    </nav>
+  </header>
+
+  <aside class="research-queue-instructions" aria-labelledby="research-queue-instructions-title">
+    <div>
+      <h2 id="research-queue-instructions-title">Ready for research?</h2>
+      <p>Tell the LiveArt Worker: <strong>“Process my LiveArt queue”</strong></p>
+      <p class="research-queue-help">Adding lots saves your selection. The worker starts research when you ask. Refresh this page to see saved progress and results.</p>
+    </div>
+    {% if active_run %}
+      <p class="research-queue-run"><span class="research-queue-state is-researching">Worker run in progress</span><span>Started {{ active_run.created_at|date:"M j, Y g:i A" }}</span></p>
+    {% else %}
+      <p class="research-queue-run">Queue order is the requested research order.</p>
+    {% endif %}
+  </aside>
+
+  <div class="research-queue-list-heading">
+    <h2>{{ queue_items|length }} selected lot{{ queue_items|length|pluralize }}</h2>
+    <p>Selections and Email Tray are independent.</p>
+  </div>
+  {% if queue_items %}
+    <ol class="research-queue-list" aria-label="LiveArt research order">
+      {% for item in queue_items %}
+        <li class="research-queue-list-item">
+          <article class="research-queue-item" aria-labelledby="queue-item-{{ item.lot.pk }}">
+            <div class="research-queue-artwork">
+              {% if item.image_url %}
+                <img src="{{ item.image_url }}" alt="{{ item.lot.title|default:'Untitled lot' }}{% if item.lot.artist_watchlist_name or item.lot.artist %} by {% firstof item.lot.artist_watchlist_name item.lot.artist %}{% endif %}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-queue-image>
+                <span data-queue-image-fallback hidden>Image unavailable</span>
+              {% else %}
+                <span>Image unavailable</span>
+              {% endif %}
+            </div>
+            <div class="research-queue-copy">
+              <p class="research-queue-artist">{% firstof item.lot.artist_watchlist_name item.lot.artist "Unknown artist" %}</p>
+              <h3 id="queue-item-{{ item.lot.pk }}" tabindex="-1">{{ item.lot.title|default:"Untitled lot" }}</h3>
+              <dl class="research-queue-facts">
+                <div><dt>Auction house</dt><dd>{{ item.lot.auction_house|default:item.lot.source }}</dd></div>
+                <div><dt>Sale date</dt><dd>{% if item.sale_date %}{{ item.sale_date|date:"M j, Y" }}{% else %}Date unavailable{% endif %}</dd></div>
+                <div><dt>Lot</dt><dd>{% firstof item.lot.lot_number item.lot.source_lot_id "Not listed" %}</dd></div>
+                {% if item.lot.sale_title %}<div class="research-queue-sale"><dt>Sale</dt><dd>{{ item.lot.sale_title }}</dd></div>{% endif %}
+              </dl>
+              <div class="research-queue-item-links">
+                <a href="{{ item.dossier_url }}">Open dossier ↗</a>
+                {% if item.research_url %}<a href="{{ item.research_url }}">Saved research ↗</a>{% endif %}
+                {% if item.board_url %}<a href="{{ item.board_url }}">Saved Bid Board ↗</a>{% endif %}
+                {% if item.lot.lot_url or item.lot.sale_url %}<a href="{% firstof item.lot.lot_url item.lot.sale_url %}" target="_blank" rel="noopener noreferrer">Auction lot ↗</a>{% endif %}
+              </div>
+            </div>
+            <div class="research-queue-result">
+              <span class="research-queue-state is-{{ item.status }}">{{ item.get_status_display }}</span>
+              {% if item.outcome_label and item.outcome_label != item.get_status_display %}<strong class="research-queue-outcome">{{ item.outcome_label }}</strong>{% endif %}
+              {% if item.outcome_summary %}
+                {% if item.status == 'queued' or item.status == 'researching' %}<span class="research-queue-previous">Previous outcome</span>{% endif %}
+                <p>{{ item.outcome_summary }}</p>
+              {% endif %}
+              {% if item.status == 'researching' %}<p class="research-queue-removal-note">Removing this selection does not stop research already in progress. Its result will be preserved.</p>{% endif %}
+              {% if item.status == 'done' or item.status == 'needs_attention' %}
+                <details class="research-queue-retry" {% if item.error_action == 'requeue' %}open{% endif %}>
+                  <summary>Research again</summary>
+                  <form method="post" action="{% url 'auction_research_queue_item' item.lot.pk %}" data-queue-item-form="queue-item-{{ item.lot.pk }}">
+                    {% csrf_token %}<input type="hidden" name="action" value="requeue">
+                    <label for="queue-retry-reason-{{ item.lot.pk }}">Reason to research again</label>
+                    <input id="queue-retry-reason-{{ item.lot.pk }}" name="reason" type="text" required maxlength="2000" value="{{ item.retry_reason }}" placeholder="What changed or why repeat this research?" aria-describedby="queue-retry-help-{{ item.lot.pk }}{% if item.error_action == 'requeue' %} queue-retry-error-{{ item.lot.pk }}{% endif %}" {% if item.error_action == 'requeue' %}aria-invalid="true"{% endif %}>
+                    <p id="queue-retry-help-{{ item.lot.pk }}">Saves a new request for your next worker run.</p>
+                    {% if item.error_action == 'requeue' %}<p id="queue-retry-error-{{ item.lot.pk }}" class="research-queue-field-error" role="alert">{{ item.form_error }}</p>{% endif %}
+                    <button id="queue-requeue-{{ item.lot.pk }}" type="submit">Queue again</button>
+                  </form>
+                </details>
+              {% endif %}
+            </div>
+            <div class="research-queue-manage">
+              <span class="research-queue-order" aria-label="Position {{ forloop.counter }}">{{ forloop.counter|stringformat:"02d" }}</span>
+              <form method="post" action="{% url 'auction_research_queue_item' item.lot.pk %}" data-queue-item-form="queue-item-{{ item.lot.pk }}" class="research-queue-order-form">
+                {% csrf_token %}<input type="hidden" name="action" value="move">
+                <button id="queue-up-{{ item.lot.pk }}" type="submit" name="direction" value="up" aria-label="Move {{ item.lot.title|default:'this lot' }} up" {% if not item.can_move_up %}disabled{% endif %}>↑ Up</button>
+                <button id="queue-down-{{ item.lot.pk }}" type="submit" name="direction" value="down" aria-label="Move {{ item.lot.title|default:'this lot' }} down" {% if not item.can_move_down %}disabled{% endif %}>↓ Down</button>
+              </form>
+              <form method="post" action="{% url 'auction_research_queue_item' item.lot.pk %}" data-queue-item-form="queue-item-{{ item.lot.pk }}">
+                {% csrf_token %}<input type="hidden" name="action" value="remove">
+                <button id="queue-remove-{{ item.lot.pk }}" class="research-queue-remove" type="submit" aria-label="Remove {{ item.lot.title|default:'this lot' }} from LiveArt Queue">Remove</button>
+              </form>
+            </div>
+            <form class="research-queue-note" method="post" action="{% url 'auction_research_queue_item' item.lot.pk %}" data-queue-item-form="queue-item-{{ item.lot.pk }}">
+              {% csrf_token %}<input type="hidden" name="action" value="note">
+              <label for="queue-note-{{ item.lot.pk }}">Research note <span>(optional)</span></label>
+              <textarea id="queue-note-{{ item.lot.pk }}" name="note" rows="2" maxlength="10000" placeholder="What should the worker pay attention to?" aria-describedby="queue-note-{{ item.lot.pk }}-status" {% if item.error_action == 'note' %}aria-invalid="true"{% endif %}>{{ item.note }}</textarea>
+              <p id="queue-note-{{ item.lot.pk }}-status" class="research-queue-note-status" role="status">{% if item.error_action == 'note' %}{{ item.form_error }}{% endif %}</p>
+              <button id="queue-save-note-{{ item.lot.pk }}" type="submit">Save note</button>
+            </form>
+          </article>
+        </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <div class="research-queue-empty">
+      <p class="calendar-kicker">Your next research session</p>
+      <h2>No lots in the queue yet</h2>
+      <p>Use <strong>Add to research</strong> on any Calendar lot, including Gallery Catalog and Oliver’s Calendar. Selections stay together across sale dates.</p>
+      <a href="{% url 'auction_calendar' %}">Choose lots in the Calendar →</a>
+    </div>
+  {% endif %}
+  <p class="research-queue-footer">Queued = waiting for a worker · Researching = worker started · Done = outcome saved · Needs attention = review the outcome before continuing.</p>
+</section>
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261027"></script>
+  <script>ResearchQueue.initQueuePage();</script>
+{% endblock %}

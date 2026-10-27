@@ -301,3 +301,14 @@ node --test secondstateapp/tests_calendar_currency_frontend.js secondstateapp/te
 ```
 
 Tests mock Gmail delivery and make no external Gmail, Twilio, Artprice, Invaluable, or production website calls.
+
+
+## LiveArt Research Queue
+
+**Add to research** on a Calendar lot saves a staff-shared selection independently of the Email Tray star. No existing Artprice/LiveArt link or saved analysis is needed. **LiveArt Queue · N** opens selections across all auction dates, with order controls, optional instructions and progress/results. Selections survive date changes, filters, pagination, reloads and auction synchronization because they reference the existing lot ID.
+
+To start, tell LiveArt Worker **“Process my LiveArt queue.”** The automation stays paused. This request captures an immutable ordered snapshot; later additions and note/order edits wait for the next request. Empty queues do no research. There is no website launch button, polling, catalog fallback or fixed lot quota.
+
+**Queued**, **Researching**, **Done** and **Needs attention** report saved progress. Terminal research, unavailable valuation, skips and triage retain distinct dispositions; saved research/Board links appear only when those artifacts exist. A blocked lot retains its reason. **Research again → Queue again** requires an explicit reason and never starts research by itself. Removing unclaimed work cancels it safely; removing a researching selection preserves its in-flight result and receipts.
+
+See [LiveArt Research Queue implementation](liveart-research-queue.md) for coordination, proof validation, recovery and tests. New migrations create an empty queue; old catalog priorities are never imported.

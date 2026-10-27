@@ -583,3 +583,4 @@ from .coordinate_intake_models import CoordinateDocument  # noqa: E402,F401
 from .coordinate_mail_models import CoordinateMailDelivery, CoordinateMailMessage, CoordinateMailThread  # noqa: E402,F401
 from .coordinate_outreach_models import CoordinateOutreachPolicy, CoordinateQuoteInquiry  # noqa: E402,F401
 from .inventory_models import InventoryCase, InventoryClaimRequest, InventoryJob, InventoryMessage, InventoryWorkerState  # noqa: E402,F401
+from .research_queue_models import ResearchQueueItem, ResearchQueueOperation, ResearchQueueRun, ResearchQueueRunItem, ResearchQueueState  # noqa: E402,F401
