@@ -419,7 +419,7 @@
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=arrival-20261023"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
-<script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=web-evidence-20261025"></script>
+<script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=web-categories-20261027"></script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
@@ -1129,10 +1129,16 @@
     };
     const needsManualReview = (candidate) => candidate.manual_selectable === true
       || (candidate.manual_selectable == null && legacyManualReview(candidate));
+    const supportedLiveArtCategory = (candidate) => {
+      if (candidate.entry_method !== "manual_web") return String(candidate.category_id) === "2";
+      if (candidate.source_confirmed !== true || candidate.price_basis !== "hammer" || candidate.hammer_currency !== "USD") return false;
+      return candidate.category === "prints_and_multiples" ? String(candidate.category_id) === "2"
+        : candidate.category === "works_on_paper" && candidate.category_id == null;
+    };
     const canSelectCandidate = (candidate) => {
       const hammer = Number(candidate?.hammer_usd);
       return candidate?.status === "sold" && Number.isFinite(hammer) && hammer > 0
-        && hammer <= 1e12 && (isArtpriceCandidate(candidate) || String(candidate.category_id) === "2")
+        && hammer <= 1e12 && (isArtpriceCandidate(candidate) || supportedLiveArtCategory(candidate))
         && (candidate.credible === true || needsManualReview(candidate));
     };
 
@@ -1377,6 +1383,7 @@
       }
       appendFact(facts, "Retrieved", formatAnalysisTimestamp(candidate.retrieved_at || researchRetrievedAt));
       if (candidate.entry_method === "manual_web") {
+        appendFact(facts, "Artwork category", candidate.category_label || candidate.category);
         appendFact(facts, "Source evidence", candidate.evidence_note);
         appendFact(facts, "Entered by", candidate.entered_by_name || candidate.entered_by);
         appendFact(facts, "Entry method", "LiveArt website · staff transcription");
@@ -2081,7 +2088,7 @@
             headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"},
             body: JSON.stringify({
               action: "add_manual", confirmed: true,
-              entry: {...entry, price_basis: "hammer", currency: "USD", category: "prints_and_multiples", status: "sold"},
+              entry: {...entry, price_basis: "hammer", currency: "USD", status: "sold"},
               selected_ids: [...selectedIds], research_id: currentResearchId,
             }),
           }, "The website sale could not be added.");

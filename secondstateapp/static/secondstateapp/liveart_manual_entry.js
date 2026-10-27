@@ -5,6 +5,10 @@
   else root.LiveArtManualEntry = api;
 })(typeof window === "undefined" ? globalThis : window, () => {
   "use strict";
+  const categories = {
+    prints_and_multiples: "Prints & Multiples",
+    works_on_paper: "Drawings / Works on paper",
+  };
   const definitions = [
     ["artist", "Artist", "text", true, 200],
     ["title", "Title", "text", true, 500],
@@ -14,6 +18,7 @@
     ["hammer_usd", "USD hammer", "number", true, 30],
     ["provider_url", "LiveArt URL", "url", true, 2000],
     ["evidence_note", "Source evidence", "textarea", true, 3000],
+    ["category", "Category", "select", true, 50],
     ["original_hammer", "Original hammer", "number", false, 30],
     ["original_currency", "Original currency", "text", false, 3],
     ["lot_url", "Original auction URL", "url", false, 2000],
@@ -34,13 +39,18 @@
       const key = split >= 0 && keys.get(label);
       if (!key) throw new Error(`Use a template label followed by a colon: ${line.slice(0, 70)}`);
       if (Object.hasOwn(values, key)) throw new Error(`The ${label} field appears twice. Paste one sale at a time.`);
-      const value = line.slice(split + 1).trim();
+      let value = line.slice(split + 1).trim();
       const limit = definitions.find(([name]) => name === key)[4];
       if (value.length > limit) throw new Error(`${label} is too long (maximum ${limit} characters).`);
       if (["hammer_usd", "original_hammer"].includes(key) && value && !/^\d+(?:\.\d{1,2})?$/.test(value)) {
         throw new Error(`${label}: use a plain amount such as 3305.00, without a currency symbol or commas.`);
       }
       if (key === "sale_date" && value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("Sale date must use YYYY-MM-DD.");
+      if (key === "category" && value) {
+        const match = Object.entries(categories).find(([name, label]) => [name, label.toLowerCase()].includes(value.toLowerCase()));
+        if (!match) throw new Error("Category must be Prints & Multiples or Drawings / Works on paper.");
+        value = match[0];
+      }
       values[key] = value;
     }
     if (!Object.keys(values).length) throw new Error("Paste the sale details first.");
@@ -53,6 +63,7 @@
     return node;
   };
   function mount(parent, options) {
+    const defaultValue = name => name === "artist" ? options.artist || "" : name === "category" ? "prints_and_multiples" : "";
     const details = el("details", null, "liveart-manual-entry");
     details.append(el("summary", "Add a sale from LiveArt web"));
     const body = el("div", null, "liveart-manual-body");
@@ -65,7 +76,7 @@
     textarea.maxLength = 12000;
     textarea.rows = 9;
     textarea.spellcheck = false;
-    const template = definitions.slice(0, 8).map(([key, label]) => `${label}: ${key === "artist" ? options.artist || "" : ""}`).join("\n");
+    const template = definitions.filter(([, , , required]) => required).map(([key, label]) => `${label}: ${key === "category" ? categories.prints_and_multiples : defaultValue(key)}`).join("\n");
     textarea.placeholder = template;
     pasteLabel.htmlFor = textarea.id;
     const pasteActions = el("div", null, "artprice-analysis-actions");
@@ -85,9 +96,14 @@
     definitions.forEach(([name, labelText, type, required, max]) => {
       const group = el("div", null, `artprice-analysis-field${type === "textarea" || type === "url" ? " is-wide" : ""}`);
       const label = el("label", labelText);
-      const input = el(type === "textarea" ? "textarea" : "input");
-      if (type !== "textarea") input.type = type;
-      else input.rows = 3;
+      const input = el(["textarea", "select"].includes(type) ? type : "input");
+      if (type === "select") Object.entries(categories).forEach(([value, label]) => {
+        const option = el("option", label);
+        option.value = value;
+        input.append(option);
+      });
+      else if (type === "textarea") input.rows = 3;
+      else input.type = type;
       input.id = `${options.idPrefix}manual-${name}`;
       input.name = name;
       input.required = required;
@@ -95,8 +111,8 @@
       if (type === "number") { input.min = "0.01"; input.max = "1000000000000"; input.step = "0.01"; input.inputMode = "decimal"; }
       if (name === "original_currency") input.placeholder = "e.g. CHF";
       if (name === "provider_url") input.placeholder = "https://liveart.ai/…";
-      if (name === "artist") input.value = options.artist || "";
-      if (name === "evidence_note") input.placeholder = "Paste the source text showing the sold result, USD hammer and print category; note any discrepancies.";
+      input.value = defaultValue(name);
+      if (name === "evidence_note") input.placeholder = "Paste the source text showing the sold result, USD hammer and selected artwork category; note any discrepancies.";
       label.htmlFor = input.id;
       fields[name] = input;
       group.append(label, input);
@@ -109,7 +125,7 @@
     const confirmed = el("input");
     confirmed.type = "checkbox";
     confirmed.required = true;
-    confirmation.append(confirmed, el("span", "I checked the source: this is a sold Print or Multiple by the named artist, and the USD price is hammer only (excluding buyer’s premium)."));
+    confirmation.append(confirmed, el("span", "I checked the source: this is a sold work in the selected artwork category by the named artist, and the USD price is hammer only (excluding buyer’s premium)."));
     const actions = el("div", null, "artprice-analysis-actions");
     const addButton = el("button", "Add sale for review", "is-primary");
     addButton.type = "button";
@@ -125,6 +141,7 @@
       confirmed.checked = false;
     };
     body.addEventListener("input", event => { if (event.target !== confirmed) saveDraft(); });
+    fields.category.addEventListener("change", saveDraft);
     try {
       const draft = JSON.parse(sessionStorage.getItem(options.draftKey) || "null");
       if (draft?.fields) Object.entries(fields).forEach(([key, input]) => { if (typeof draft.fields[key] === "string") input.value = draft.fields[key]; });
@@ -133,7 +150,7 @@
     fillButton.addEventListener("click", () => {
       try {
         const values = parsePaste(textarea.value);
-        Object.entries(fields).forEach(([key, input]) => { input.value = key === "artist" ? options.artist || "" : ""; });
+        Object.entries(fields).forEach(([key, input]) => { input.value = defaultValue(key); });
         Object.entries(values).forEach(([key, value]) => { fields[key].value = value; });
         if (definitions.some(([name, , , required]) => !required && values[name])) extra.open = true;
         saveDraft();
@@ -151,7 +168,7 @@
       status.textContent = "Adding the sale for review…";
       try {
         const result = await options.onAdd(Object.fromEntries(Object.entries(fields).map(([key, input]) => [key, input.value.trim()])));
-        Object.entries(fields).forEach(([key, input]) => { input.value = key === "artist" ? options.artist || "" : ""; });
+        Object.entries(fields).forEach(([key, input]) => { input.value = defaultValue(key); });
         textarea.value = "";
         confirmed.checked = false;
         try { sessionStorage.removeItem(options.draftKey); } catch (_) {}

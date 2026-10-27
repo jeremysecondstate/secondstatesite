@@ -15,6 +15,10 @@ from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID
 
 
 MAX_MANUAL_SALES = 50
+MANUAL_CATEGORIES = {
+    "prints_and_multiples": "Prints & Multiples",
+    "works_on_paper": "Drawings / Works on paper",
+}
 ENTRY_FIELDS = {
     "artist", "title", "sale_date", "auction_house", "lot_number", "hammer_usd",
     "provider_url", "evidence_note", "original_hammer", "original_currency", "lot_url",
@@ -79,10 +83,13 @@ def normalize_manual_entry(entry: object, *, confirmed: object, calendar_lot, us
     if not isinstance(entry, dict) or set(entry) - ENTRY_FIELDS:
         raise ValueError("Manual sale must contain only the supported evidence fields.")
     if confirmed is not True:
-        raise ValueError("Confirm that you checked the source and the sold USD hammer for this print.")
-    required_facts = {"price_basis": "hammer", "currency": "USD", "category": "prints_and_multiples", "status": "sold"}
+        raise ValueError("Confirm that you checked the source, artwork category and sold USD hammer.")
+    category = _text(entry, "category", required=True)
+    if category not in MANUAL_CATEGORIES:
+        raise ValueError("Choose Prints & Multiples or Drawings / Works on paper, as verified on the source.")
+    required_facts = {"price_basis": "hammer", "currency": "USD", "status": "sold"}
     if any(entry.get(field) != expected for field, expected in required_facts.items()):
-        raise ValueError("Only sold Prints & Multiples with an explicitly reported USD hammer can be entered.")
+        raise ValueError("Only completed sales with an explicitly reported USD hammer can be entered.")
     fields = {field: _text(entry, field, required=True, limit=limit) for field, limit in (
         ("artist", 300), ("title", 500), ("sale_date", 10), ("auction_house", 300),
         ("lot_number", 80), ("provider_url", 2000), ("evidence_note", 4000),
@@ -122,11 +129,13 @@ def normalize_manual_entry(entry: object, *, confirmed: object, calendar_lot, us
         "auction_house_name": fields["auction_house"], "sale_datetime": fields["sale_date"],
         "lot_url": fields["lot_url"], "_retrieved_at": now,
         "price": {"hammer_usd": fields["hammer_usd"], "hammer": original_hammer, "currency": original_currency or None},
-        "artwork": {"artist": fields["artist"], "name": fields["title"], "materials": fields["medium"], "category_id": PRINTS_AND_MULTIPLES_CATEGORY_ID},
+        "artwork": {"artist": fields["artist"], "name": fields["title"], "materials": fields["medium"],
+                    "category_id": PRINTS_AND_MULTIPLES_CATEGORY_ID if category == "prints_and_multiples" else None},
     }, None, calendar_lot)
     candidate.update({
         **fields, "provider_id": None, "entry_method": "manual_web", "match_type": "liveart_web",
-        "price_basis": "hammer", "hammer_currency": "USD", "category": "prints_and_multiples",
+        "price_basis": "hammer", "hammer_currency": "USD", "category": category,
+        "category_label": MANUAL_CATEGORIES[category],
         "original_hammer": original_hammer, "hammer_original": original_hammer,
         "original_currency": original_currency or None, "currency": original_currency or None,
         "entered_by": user_id, "entered_at": now, "source_confirmed": True,
@@ -139,7 +148,7 @@ def normalize_manual_entry(entry: object, *, confirmed: object, calendar_lot, us
     candidate["missing_data"] = [field for field in candidate["missing_data"] if field not in {"provider_id", "provider_url"} and not candidate.get(field)]
     candidate["manual_selectable"] = manual_review_eligible(candidate, calendar_lot)
     if not candidate["manual_selectable"]:
-        raise ValueError("This manual sale does not meet the sold-print evidence requirements.")
+        raise ValueError("This manual sale does not meet the verified sold-evidence requirements.")
     return candidate
 
 
@@ -150,6 +159,11 @@ def find_existing_sale(candidates: list[dict], candidate: dict) -> dict | None:
             continue
         if str(existing.get("id")) != candidate["id"] and not same_liveart_sale(existing, candidate):
             continue
+        existing_category = existing.get("category") if is_manual_web(existing) else (
+            "prints_and_multiples" if str(existing.get("category_id")) == str(PRINTS_AND_MULTIPLES_CATEGORY_ID) else None
+        )
+        if existing_category != candidate["category"]:
+            raise ValueError("This sale already exists with a different artwork category. Review the saved source before adding it again.")
         raw_hammer = existing.get("hammer_usd")
         if raw_hammer is None:
             continue

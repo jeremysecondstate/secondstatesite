@@ -17,7 +17,7 @@ from django.views.decorators.http import require_http_methods
 from .bid_board import BidBoardError, BidLadder, build_board, normalize_assumptions
 from .bid_board_snapshot import saved_board_snapshot, saved_board_summary
 from .currency import convert_to_usd
-from .liveart_resale import resale_candidate_selectable
+from .liveart_resale import liveart_evidence_category_supported, resale_candidate_selectable
 from .models import AuctionBidBoardAnalysis, AuctionEmailBatch, AuctionWatchLot, LiveArtResaleAnalysis
 
 
@@ -51,8 +51,8 @@ def _evidence(request, lot, payload, saved):
             continue
         seen.add(identity)
         # Legacy unfiltered research remains inspectable in the workbench but
-        # cannot become fresh Prints & Multiples evidence without verification.
-        if candidate.get("provider") != "Artprice" and str(candidate.get("category_id")) != "2":
+        # cannot become fresh evidence without a verified supported category.
+        if candidate.get("provider") != "Artprice" and not liveart_evidence_category_supported(candidate):
             continue
         candidates.append(candidate)
     allowed = {str(item.get("id")) for item in candidates if resale_candidate_selectable(item) and item.get("status") == "sold" and item.get("hammer_usd") is not None}
@@ -62,7 +62,7 @@ def _evidence(request, lot, payload, saved):
             raise BidBoardError("Select up to 25 eligible sold USD hammer comparables.")
         selections = list(dict.fromkeys(str(item) for item in selections))
         if any(item not in allowed for item in selections):
-            raise BidBoardError("Select only eligible sold USD hammer comparables; LiveArt evidence must be verified Prints & Multiples.")
+            raise BidBoardError("Select only eligible sold USD hammer comparables with a verified supported artwork category.")
     else:
         selections = _selected_resale_ids(
             candidates, [str(item) for item in research.get("selected_ids", []) if str(item) in allowed],

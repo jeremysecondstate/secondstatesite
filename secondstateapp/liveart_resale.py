@@ -245,11 +245,23 @@ def is_prints_and_multiples(raw: Mapping[str, Any]) -> bool:
     )
 
 
-def _sold_print_evidence(candidate: Mapping[str, Any]) -> bool:
+def liveart_evidence_category_supported(candidate: Mapping[str, Any]) -> bool:
+    """Keep API evidence print-only; separately verify staff-entered categories."""
+    if candidate.get("entry_method") != "manual_web":
+        return is_prints_and_multiples(candidate)
+    if (candidate.get("source_confirmed") is not True or candidate.get("price_basis") != "hammer"
+            or candidate.get("hammer_currency") != "USD"):
+        return False
+    if candidate.get("category") == "prints_and_multiples":
+        return is_prints_and_multiples(candidate)
+    return candidate.get("category") == "works_on_paper" and candidate.get("category_id") is None
+
+
+def _sold_liveart_evidence(candidate: Mapping[str, Any]) -> bool:
     """Check the hard LiveArt sale requirements independently of artwork matching."""
 
     if (candidate.get("provider") != "LiveArt" or candidate.get("status") != "sold"
-            or not is_prints_and_multiples(candidate)):
+            or not liveart_evidence_category_supported(candidate)):
         return False
     raw_hammer = candidate.get("hammer_usd")
     if raw_hammer is None or isinstance(raw_hammer, bool):
@@ -261,6 +273,8 @@ def _sold_print_evidence(candidate: Mapping[str, Any]) -> bool:
     if not hammer.is_finite() or not 0 < hammer <= MAX_MONEY:
         return False
     sale_date = _text(candidate.get("sale_date"))
+    if candidate.get("entry_method") == "manual_web" and not sale_date:
+        return False
     if sale_date:
         try:
             if date.fromisoformat(sale_date) > datetime.now(timezone.utc).date():
@@ -271,13 +285,13 @@ def _sold_print_evidence(candidate: Mapping[str, Any]) -> bool:
 
 
 def manual_review_eligible(candidate: Mapping[str, Any], calendar_lot: Any) -> bool:
-    """Allow staff to choose a sold print despite uncertain artwork details.
+    """Allow staff to choose supported sold evidence despite uncertain work details.
 
     This also rechecks older normalized research without another metered API call.
     Artist, sold USD hammer, category, and date remain hard requirements.
     """
 
-    if candidate.get("credible") is True or not _sold_print_evidence(candidate):
+    if candidate.get("credible") is True or not _sold_liveart_evidence(candidate):
         return False
     artist = _text(candidate.get("artist"))
     expected_artist = _text(_value(calendar_lot, "artist") or _value(calendar_lot, "artist_watchlist_name"))
@@ -286,7 +300,7 @@ def manual_review_eligible(candidate: Mapping[str, Any], calendar_lot: Any) -> b
 
 def resale_candidate_selectable(candidate: Mapping[str, Any]) -> bool:
     if candidate.get("provider") == "LiveArt":
-        return _sold_print_evidence(candidate) and (
+        return _sold_liveart_evidence(candidate) and (
             candidate.get("credible") is True or candidate.get("manual_selectable") is True
         )
     return candidate.get("credible") is True
@@ -874,7 +888,7 @@ def build_scenarios_with_sources(
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     """Calculate scenario maximum hammer bids from selected sold evidence.
 
-    A selected LiveArt print may need manual catalogue review, but still needs
+    A selected LiveArt sale may need manual catalogue review, but still needs
     a positive sold USD hammer and the same artist.
     """
 

@@ -11,6 +11,7 @@ const sample = {
   auction_house: "Germann", lot_number: "123", hammer_usd: "3305.00",
   provider_url: "https://www.liveart.ai/artists/pierre-alechinsky/droit-et-regard?source=web:result#sale",
   evidence_note: "Prints & Multiples; sold; USD hammer: $3,305. Original CHF 3,000 excludes premium.",
+  category: "prints_and_multiples",
 };
 const pasteText = () => Object.entries(sample).map(([key, value]) => `${key}: ${value}`).join("\n");
 
@@ -26,6 +27,16 @@ test("optional source and artwork fields use the same readable labels as the for
     medium: "Etching and aquatint", edition: "10/65", size: "40 x 60 cm",
     signature: "Signed in pencil", condition: "Unexamined outside frame",
   });
+});
+
+test("category paste accepts only supported names and labels", () => {
+  for (const value of ["works_on_paper", "Drawings / Works on paper"]) {
+    assert.equal(parsePaste(`Category: ${value}`).category, "works_on_paper");
+  }
+  assert.equal(parsePaste("Category: Prints & Multiples").category, "prints_and_multiples");
+  for (const value of ["painting", "2", "drawing maybe"]) {
+    assert.throws(() => parsePaste(`Category: ${value}`), /Category must be/);
+  }
 });
 
 test("blank templates can fill fields but empty input has a clear error", () => {
@@ -119,6 +130,42 @@ test("draft restoration retains typed evidence but never restores verification c
   assert.equal(p.paste.value, pasteText());
   assert.equal(p.confirmed.checked, false);
   assert.equal(p.confirmed.required, true);
+});
+
+test("drawing category restores in the form and changing it resets source confirmation", async () => {
+  const p = page({draft: {fields: {...sample, category: "works_on_paper"}}});
+  assert.equal(p.fields.category.tagName, "select");
+  assert.equal(p.fields.category.value, "works_on_paper");
+  assert.equal(p.confirmed.checked, false);
+  p.confirmed.checked = true;
+  p.fields.category.value = "prints_and_multiples";
+  await p.fields.category.dispatch("change");
+  assert.equal(p.confirmed.checked, false);
+  assert.equal(JSON.parse(p.storage.get("test-draft")).fields.category, "prints_and_multiples");
+});
+
+test("drawing add submits and retains its category on failure, then resets to prints on success", async () => {
+  let reject = true, submitted;
+  const p = page({draft: {fields: {...sample, category: "works_on_paper"}}, onAdd: async entry => {
+    submitted = entry;
+    if (reject) throw new Error("Review the source.");
+  }});
+  await p.button("Add sale for review").dispatch("click");
+  assert.equal(submitted.category, "works_on_paper");
+  assert.equal(p.fields.category.value, "works_on_paper");
+  reject = false;
+  await p.button("Add sale for review").dispatch("click");
+  assert.equal(p.fields.category.value, "prints_and_multiples");
+  assert.equal(p.confirmed.checked, false);
+});
+
+test("a paste without Category resets the prior drawing category to the print default", async () => {
+  const p = page({draft: {fields: {...sample, category: "works_on_paper"}}});
+  p.paste.value = "Title: Another sale";
+  p.confirmed.checked = true;
+  await p.button("Fill fields from paste").dispatch("click");
+  assert.equal(p.fields.category.value, "prints_and_multiples");
+  assert.equal(p.confirmed.checked, false);
 });
 
 test("editing or filling a paste resets source confirmation and persists the new draft", async () => {
@@ -278,6 +325,36 @@ test("failed manual request preserves prior evidence and token, and always re-en
   assert.deepEqual([...p.selectedIds], ["old-api"]);
   assert.equal(p.pendingMessage, undefined);
   assert.equal(p.busy, false);
+});
+
+test("Workbench sends the explicit drawing category without substituting prints", async () => {
+  const p = integration();
+  await p.entryOptions.onAdd({...sample, category: "works_on_paper", medium: "Pencil on paper"});
+  const request = JSON.parse(p.requests[0].options.body);
+  assert.equal(request.entry.category, "works_on_paper");
+  assert.equal(request.entry.medium, "Pencil on paper");
+  assert.equal(request.entry.price_basis, "hammer");
+  assert.equal(request.entry.currency, "USD");
+  assert.equal(request.entry.category_id, undefined);
+});
+
+test("evidence checkboxes accept verified manual drawings while keeping API categories print-only", () => {
+  const template = fs.readFileSync(path.join(__dirname, "../templates/calendar/calendar.html"), "utf8");
+  const start = template.indexOf("    const legacyManualReview = (candidate) => {");
+  const end = template.indexOf("    const textValue", start);
+  const context = vm.createContext({isArtpriceCandidate: candidate => candidate.provider === "Artprice"});
+  vm.runInContext(template.slice(start, end) + "globalThis.canSelect = canSelectCandidate;", context);
+  const drawing = {provider: "LiveArt", status: "sold", hammer_usd: "3305.00", entry_method: "manual_web",
+    category: "works_on_paper", category_id: null, source_confirmed: true,
+    price_basis: "hammer", hammer_currency: "USD", credible: false, manual_selectable: true};
+  assert.equal(context.canSelect(drawing), true);
+  assert.equal(context.canSelect({...drawing, category: "prints_and_multiples", category_id: 2}), true);
+  assert.equal(context.canSelect({provider: "LiveArt", status: "sold", hammer_usd: "1000", category_id: 2, credible: true}), true);
+  for (const change of [{category_id: 2}, {entry_method: "api"}, {source_confirmed: false},
+    {category: "painting"}, {price_basis: "premium_inclusive"}, {hammer_currency: "CHF"},
+    {manual_selectable: false}, {status: "unsold"}, {hammer_usd: "0"}]) {
+    assert.equal(context.canSelect({...drawing, ...change}), false, JSON.stringify(change));
+  }
 });
 
 test("busy evidence does not accept a manual entry until it can be preserved safely", async () => {

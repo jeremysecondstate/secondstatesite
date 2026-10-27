@@ -180,7 +180,7 @@ Choose **Add sale for review** after checking the populated fields and confirmat
 
 To correct a transcription, choose **Remove entered sale** on that manual record, then add the corrected sale and select it again. Choose **Save selected evidence** to persist the correction or removal. Removing a manual row leaves API and Artprice records, other selections and existing costs intact; the saved analysis changes only when saved.
 
-The server checks the matching artist, sold/hammer/USD/Prints & Multiples confirmation, source links, date and bounded positive amount. Repeated entries do not create another copy of the same sale; conflicting prices cannot silently replace an existing record. Manual records survive later API searches, and overlapping sales count once in the combined evidence. Existing Artprice source records and the 25-selected-sale limit continue to apply.
+Choose the source-verified artwork category: **Prints & Multiples** (the default) or **Drawings / Works on paper**. The category is retained with the sale and shown alongside its source evidence; a drawing is never assigned the API print category ID. The server checks the matching artist, category confirmation, sold USD hammer, source links, date and bounded positive amount. Repeated entries do not create another copy of the same sale; conflicting prices or categories cannot silently replace an existing record. Manual records survive later API searches, and overlapping sales count once in the combined evidence. Existing Artprice source records and the 25-selected-sale limit continue to apply. API searches remain restricted to Prints & Multiples.
 
 ## LiveArt word and phrase searches
 

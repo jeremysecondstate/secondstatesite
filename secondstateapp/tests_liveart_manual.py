@@ -113,6 +113,88 @@ class ManualLiveArtEvidenceTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(LiveArtResaleAnalysis.objects.exists())
 
+    @patch("secondstateapp.calendar_views.LiveArtClient")
+    @patch("secondstateapp.calendar_views._research_liveart_lot")
+    def test_drawing_category_persists_through_evidence_and_board_without_relabeling(self, paid_lookup, client_class):
+        first = self.added()
+        self.save(first)
+        board = self.client.post(self.board_url, json.dumps({"action": "save"}), content_type="application/json")
+        self.assertEqual(board.status_code, 200, board.content)
+        AuctionBidBoardAnalysis.objects.filter(lot=self.lot).update(include_in_email=True)
+        subject_medium = self.lot.medium
+        drawing = {**self.entry, "category": "works_on_paper", "title": "Pencil study", "lot_number": "73",
+                   "medium": "Pencil on paper", "edition": "", "signature": "Signed",
+                   "evidence_note": "LiveArt Works on paper; sold; USD hammer 3305 excluding premium."}
+        research = self.added(entry=drawing, selected_ids=[first["added_id"]])
+        candidate = next(row for row in research["candidates"] if row["id"] == research["added_id"])
+        self.assertEqual(candidate["category"], "works_on_paper")
+        self.assertEqual(candidate["category_label"], "Drawings / Works on paper")
+        self.assertIsNone(candidate["category_id"])
+        self.assertEqual(candidate["medium"], "Pencil on paper")
+        self.assertEqual(candidate["original_currency"], "CHF")
+        self.assertTrue(candidate["manual_selectable"])
+        self.assertFalse(candidate["selected"])
+        selected = [first["added_id"], candidate["id"]]
+        response = self.post(action="save", research_id=research["research_id"], selected_ids=selected, assumptions={})
+        self.assertEqual(response.status_code, 200, response.content)
+        reloaded = self.client.get(self.url).json()["analysis"]
+        self.assertEqual(set(reloaded["selected_ids"]), set(selected))
+        saved_drawing = next(row for row in reloaded["candidates"] if row["id"] == candidate["id"])
+        self.assertEqual(saved_drawing["category"], "works_on_paper")
+        self.assertIsNone(saved_drawing["category_id"])
+        self.assertTrue(saved_drawing["manual_selectable"])
+        board = self.client.post(self.board_url, json.dumps({"action": "save"}), content_type="application/json")
+        self.assertEqual(board.status_code, 200, board.content)
+        self.assertEqual(board.json()["analysis"]["source_summary"]["combined_comp_count"], 2)
+        self.assertEqual(board.json()["analysis"]["cases"][1]["resale_hammer"], "3305.00")
+        saved_board = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+        self.assertTrue(saved_board.include_in_email)
+        record = next(row for row in saved_board.evidence_snapshot["selected_records"] if row["id"] == candidate["id"])
+        self.assertEqual(record["category"], "works_on_paper")
+        self.assertIsNone(record["category_id"])
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.medium, subject_medium)
+        paid_lookup.assert_not_called()
+        client_class.assert_not_called()
+
+    def test_drawing_entry_keeps_all_sale_and_attestation_requirements(self):
+        drawing = {**self.entry, "category": "works_on_paper", "medium": "Pencil on paper"}
+        for change in ({"category": "painting"}, {"category": ""}, {"category": {}},
+                       {"category_id": 2}, {"status": "unsold"}, {"price_basis": "premium_inclusive"},
+                       {"currency": "CHF"}, {"artist": "Pablo Picasso"}, {"sale_date": ""},
+                       {"sale_date": (date.today() + timedelta(days=3)).isoformat()}, {"hammer_usd": "0"}):
+            with self.subTest(change=change):
+                self.assertEqual(self.add(entry={**drawing, **change}).status_code, 400)
+        self.assertEqual(self.add(entry=drawing, confirmed=False).status_code, 400)
+
+    def test_saved_drawing_eligibility_is_rechecked_before_selection(self):
+        research = self.added(entry={**self.entry, "category": "works_on_paper", "medium": "Pencil on paper"})
+        self.save(research)
+        saved = LiveArtResaleAnalysis.objects.get(lot=self.lot)
+        original = copy.deepcopy(saved.candidates)
+        for change in ({"entry_method": "api"}, {"source_confirmed": False}, {"category_id": 2},
+                       {"category": "painting"}, {"price_basis": "premium_inclusive"}, {"hammer_currency": "CHF"},
+                       {"sale_date": None}, {"sale_date": "bad-date"},
+                       {"sale_date": (date.today() + timedelta(days=3)).isoformat()}, {"artist": "Pablo Picasso"}):
+            with self.subTest(change=change):
+                saved.candidates = [{**original[0], **change}]
+                saved.save(update_fields=["candidates"])
+                reloaded = self.client.get(self.url).json()["analysis"]
+                self.assertFalse(reloaded["candidates"][0]["manual_selectable"])
+                self.assertNotIn(research["added_id"], reloaded["selected_ids"])
+                self.assertEqual(self.post(action="save", selected_ids=[research["added_id"]], assumptions={}).status_code, 400)
+                board = self.client.post(self.board_url, json.dumps({"action": "save", "selected_ids": [research["added_id"]]}), content_type="application/json")
+                self.assertEqual(board.status_code, 400, board.content)
+
+    def test_duplicate_sale_cannot_silently_keep_a_conflicting_category(self):
+        first = self.added()
+        response = self.add(entry={**self.entry, "category": "works_on_paper"}, research_id=first["research_id"])
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("different artwork category", response.json()["error"])
+        pending = self.client.session[f"liveart_research_{self.lot.pk}"]
+        self.assertEqual(len(pending["candidates"]), 1)
+        self.assertEqual(pending["candidates"][0]["category"], "prints_and_multiples")
+
     def test_required_source_and_sale_identity_fields(self):
         for field in ("artist", "title", "sale_date", "auction_house", "lot_number", "hammer_usd", "provider_url", "evidence_note", "price_basis", "currency", "category", "status"):
             with self.subTest(field=field):
@@ -218,6 +300,15 @@ class ManualLiveArtEvidenceTests(TestCase):
         saved = LiveArtResaleAnalysis.objects.get(lot=self.lot)
         self.assertEqual(saved.source_summary["combined_comp_count"], 2)
         self.assertTrue(any(row.get("entry_method") == "manual_web" for row in saved.candidates))
+
+    def test_drawing_survives_the_existing_api_refresh_and_selection_flow(self):
+        self.entry.update(category="works_on_paper", medium="Pencil on paper", edition="")
+        self.test_api_refresh_preserves_saved_manual_sale_and_selection()
+        saved = LiveArtResaleAnalysis.objects.get(lot=self.lot)
+        drawing = next(row for row in saved.candidates if row.get("entry_method") == "manual_web")
+        self.assertEqual(drawing["category"], "works_on_paper")
+        self.assertIsNone(drawing["category_id"])
+        self.assertIn(drawing["id"], saved.selected_ids)
 
     def test_saved_artprice_and_manual_evidence_share_the_existing_selection_flow(self):
         artprice = stored_analysis(self.lot, created_by=self.staff)
