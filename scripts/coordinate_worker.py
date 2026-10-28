@@ -245,9 +245,12 @@ Use several useful options: house in-house/recommended providers plus nearby UPS
 or packers and an art-capable option where available. published_capability is a
 verbatim opened excerpt naming this provider, or empty; it is not proof of handling
 competence. If no attributed capability exists use empty capability and unknown
-service_type. contact_quote
-must be a contiguous opened excerpt containing provider name AND email together.
-Never infer an email. Omit an unsupported contact; keep a source-backed name if useful.
+service_type. contact_quote must always be a nonblank contiguous opened excerpt
+containing this exact provider name. When email is supplied, that same excerpt
+must also contain the email. If no email is verified, use email="" and a
+name-bearing opened excerpt for contact_quote. Never infer an email or use an
+empty/whitespace placeholder quote. Omit the provider if no supported name-bearing
+excerpt exists; a source URL or page title alone is not a contact quote.
 The provider name must appear exactly in both contact_quote and any capability
 quote. A house directory may name a store differently from its own website. Do
 not combine those aliases: choose one supported source name/contact, or retain

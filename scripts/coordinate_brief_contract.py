@@ -122,9 +122,18 @@ def _object(value, keys):
     return value
 
 
-def _text(value, maximum, *, required=False):
-    if not isinstance(value, str) or len(value) > maximum or (required and not value.strip()):
-        raise ValueError("Invalid or oversized briefing text.")
+def _text(value, maximum, *, required=False, path=None):
+    error = None
+    if not isinstance(value, str):
+        error = "Expected text as a string."
+    elif len(value) > maximum:
+        error = f"Text exceeds maximum length of {maximum} characters."
+    elif required and not value.strip():
+        error = "Text must not be blank."
+    if error:
+        # Give the bounded corrective generation a field it can fix, without
+        # copying private source text or generated values into diagnostics.
+        raise ValueError(f"{path}: {error}" if path else "Invalid or oversized briefing text.")
     return value.strip()
 
 
@@ -205,7 +214,8 @@ def _shipping(value):
                 cleaned[name] = [clean_record(entry, spec["items"], f"{path}.{name}[{index}]")
                                  for index, entry in enumerate(item)]
             else:
-                cleaned[name] = _text(item, spec["maxLength"], required=spec.get("minLength", 0) > 0)
+                cleaned[name] = _text(item, spec["maxLength"], required=spec.get("minLength", 0) > 0,
+                                      path=f"{path}.{name}")
         return cleaned
 
     result = clean_record(value, SHIPPING_SCHEMA, "shipping")
@@ -383,7 +393,7 @@ def _shipping_evidence(shipping, evidence):
         sources = supporting(currency["source_refs"], path="shipping.working_currency")
         if currency["basis"] == "inferred":
             # This is a labeled planning assumption, never a sale-price currency fact.
-            us_location = re.compile(r"\b(?:United States|USA|U\.S\.A?\.?|Arizona|California|New York|Scottsdale|Phoenix)\b|\b(?:AZ|CA|NY)\s+\d{5}(?:-\d{4})?\b", re.I)
+            us_location = re.compile(r"\b(?:United States|USA|U\.S\.A?\.?|Arizona|California|Michigan|New York|Scottsdale|Phoenix)\b|\b(?:AZ|CA|MI|NY)\s+\d{5}(?:-\d{4})?\b", re.I)
             if not any(us_location.search(source["text"]) for source in sources):
                 raise ValueError("shipping.working_currency.source_refs: A working USD inference needs cited US location context; otherwise keep the currency unknown.")
         elif currency["basis"] in ("source", "staff"):
@@ -400,7 +410,9 @@ def _shipping_evidence(shipping, evidence):
                 or _normalized(provider["name"]) not in quote
                 or provider["email"] and not re.search(
                     r"(?<![\w.!#$%&'*+/=?^`{|}~@-])" + re.escape(provider["email"].casefold())
-                    + r"(?![\w.@-])", quote)):
+                    # A sentence-ending period is punctuation, while a period
+                    # followed by mailbox/domain characters extends the address.
+                    + r"(?![\w@-]|\.(?=[\w.@-]))", quote)):
             raise ValueError(f"{path}.contact_quote: Use one contiguous opened excerpt containing this exact provider name and its email when supplied; omit this provider if no supported contact quote exists.")
         capability = _normalized(provider["published_capability"])
         if capability and (_normalized(provider["name"]) not in capability

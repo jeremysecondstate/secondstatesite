@@ -1,14 +1,20 @@
 """Shipping proposals preserve evidence boundaries and do not approve actions."""
 from copy import deepcopy
+import json
+from pathlib import Path
+from subprocess import CompletedProcess
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from scripts.coordinate_brief_contract import BRIEF_SCHEMA, brief_source_refs, validate_brief, validate_price_evidence
+from scripts import coordinate_worker as worker
 from .coordinate_brief import brief_state, save_brief
 from .models import CoordinateBrief, CoordinateCase, CoordinateJob, CoordinateMessage, CoordinatePlan, CoordinateResearch
 from .tests_coordinate_brief import fixture_brief, fixture_price
+from .tests_coordinate_worker import claim_payload
 
 
 URL = "https://house.example/shipping"
@@ -135,6 +141,61 @@ class ShippingBriefContractTests(SimpleTestCase):
         with self.assertRaises(ValueError):
             self.validate(brief)
 
+    def test_provider_without_email_still_needs_a_source_backed_name_quote(self):
+        brief = deepcopy(self.brief)
+        provider = brief["shipping"]["providers"][0]
+        provider.update(email="", contact_quote="Example Packers")
+        self.assertEqual(self.validate(brief)["shipping"]["providers"][0]["email"], "")
+        for changes in ({"contact_quote": "Example Packers invented contact"},
+                        {"name": "Invented Packers", "contact_quote": "Invented Packers"},
+                        {"email": "other@example.test", "contact_quote": CONTACT}):
+            invalid = deepcopy(brief)
+            invalid["shipping"]["providers"][0].update(changes)
+            with self.subTest(changes=changes), self.assertRaisesRegex(
+                    ValueError, r"shipping\.providers\[0\]\.contact_quote"):
+                self.validate(invalid)
+
+    def test_provider_email_may_end_a_sentence_but_cannot_match_address_prefix(self):
+        brief = deepcopy(self.brief)
+        brief["shipping"]["providers"][0]["contact_quote"] = CONTACT + "."
+        evidence = evidence_for(source_fixture(text=TEXT.replace(CONTACT, CONTACT + ".")))
+        self.validate(brief, evidence)
+        for suffix in (".evil", ".evil.example", "x", "-other"):
+            invalid = deepcopy(brief)
+            quote = CONTACT + suffix
+            invalid["shipping"]["providers"][0]["contact_quote"] = quote
+            with self.subTest(suffix=suffix), self.assertRaisesRegex(
+                    ValueError, r"shipping\.providers\[0\]\.contact_quote"):
+                self.validate(invalid, evidence_for(source_fixture(text=TEXT.replace(CONTACT, quote))))
+
+    def test_michigan_pickup_supports_only_inferred_working_currency(self):
+        for location in ("Detroit, Michigan", "Detroit, MI 48226"):
+            with self.subTest(location=location):
+                source = source_fixture(text=TEXT.replace("Scottsdale, Arizona 85251", location))
+                cleaned = self.validate(evidence=evidence_for(source))
+                self.assertEqual(cleaned["shipping"]["working_currency"]["code"], "USD")
+                self.assertEqual(cleaned["shipping"]["working_currency"]["basis"], "inferred")
+        unsupported = source_fixture(text=TEXT.replace("Scottsdale, Arizona 85251", "Toronto, Canada"))
+        with self.assertRaisesRegex(ValueError, r"shipping\.working_currency\.source_refs"):
+            self.validate(evidence=evidence_for(unsupported))
+
+    def test_invalid_contact_text_identifies_exact_provider_without_echoing_content(self):
+        cases = (("", "Text must not be blank."),
+                 (" \t\n", "Text must not be blank."),
+                 ({"private": "PRIVATE_MARKER"}, "Expected text as a string."),
+                 ("PRIVATE_MARKER" + "x" * 1200, "Text exceeds maximum length of 1200 characters."))
+        for value, message in cases:
+            brief = deepcopy(self.brief)
+            provider = deepcopy(brief["shipping"]["providers"][0])
+            provider.update(name="Another Packer", email="", contact_quote=value)
+            brief["shipping"]["providers"].append(provider)
+            original = deepcopy(brief)
+            with self.subTest(value_type=type(value).__name__, message=message), self.assertRaises(ValueError) as error:
+                validate_brief(brief)
+            self.assertEqual(str(error.exception), "shipping.providers[1].contact_quote: " + message)
+            self.assertNotIn("PRIVATE_MARKER", str(error.exception))
+            self.assertEqual(brief, original)
+
     def test_provider_repair_paths_preserve_valid_contact_without_merging_alias_capability(self):
         brief = deepcopy(self.brief)
         alias = deepcopy(brief["shipping"]["providers"][0])
@@ -254,6 +315,64 @@ class ShippingBriefContractTests(SimpleTestCase):
             mutate(brief["shipping"])
             with self.subTest(mutate=mutate), self.assertRaises(ValueError):
                 self.validate(brief)
+
+
+class ShippingProviderRepairWorkerTests(SimpleTestCase):
+    def test_blank_optional_contact_gets_one_targeted_correction(self):
+        for repair in ("omit", "source_backed_name"):
+            with self.subTest(repair=repair):
+                payload = claim_payload()
+                payload.update(test_mode=False, draft_only=True, brief_enabled=True,
+                               research=[source_fixture(text=TEXT + "\nAnother Packer")])
+                invalid = fixture_brief(URL, shipping=shipping_fixture())
+                invalid["shipping"]["providers"].append({
+                    "name": "Another Packer", "email": "", "service_type": "unknown",
+                    "published_capability": "", "contact_quote": " ", "source_refs": [URL],
+                })
+                corrected = deepcopy(invalid)
+                if repair == "omit":
+                    corrected["shipping"]["providers"].pop()
+                else:
+                    corrected["shipping"]["providers"][1]["contact_quote"] = "Another Packer"
+                prompts = []
+
+                def process(command, **kwargs):
+                    prompts.append(kwargs["input"])
+                    response = {"body": "No new quote is recorded.", "drafts": [],
+                                "brief": invalid if len(prompts) == 1 else corrected}
+                    (Path(kwargs["cwd"]) / "response.json").write_text(json.dumps(response), encoding="utf-8")
+                    return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+
+                with patch.object(worker.subprocess, "run", side_effect=process), \
+                        patch.object(worker, "_save_generation_diagnostics"):
+                    generated = worker.generate_reply(payload, "codex")
+                self.assertEqual(len(prompts), 2)
+                correction = prompts[1].split("VALIDATION CORRECTION:", 1)[1]
+                self.assertIn("shipping.providers[1].contact_quote: Text must not be blank.", correction)
+                self.assertEqual(generated["brief"], corrected)
+                self.assertEqual(generated["drafts"], [])
+
+    def test_nonblank_but_fabricated_contact_is_not_accepted_by_repair(self):
+        payload = claim_payload()
+        payload.update(test_mode=False, draft_only=True, brief_enabled=True,
+                       research=[source_fixture()])
+        invalid = fixture_brief(URL, shipping=shipping_fixture())
+        invalid["shipping"]["providers"][0]["contact_quote"] = " "
+        fabricated = deepcopy(invalid)
+        fabricated["shipping"]["providers"][0]["contact_quote"] = "Example Packers packing@example.test invented wording"
+        prompts = []
+
+        def process(command, **kwargs):
+            prompts.append(kwargs["input"])
+            response = {"body": "Prepared for review.", "drafts": [],
+                        "brief": invalid if len(prompts) == 1 else fabricated}
+            (Path(kwargs["cwd"]) / "response.json").write_text(json.dumps(response), encoding="utf-8")
+            return CompletedProcess(command, 0, '{"type":"turn.completed"}\n', "")
+
+        with patch.object(worker.subprocess, "run", side_effect=process), \
+                patch.object(worker, "_save_generation_diagnostics"), self.assertRaises(worker.WorkerError):
+            worker.generate_reply(payload, "codex")
+        self.assertEqual(len(prompts), 2)
 
 
 @override_settings(COORDINATE_DRAFT_WORKFLOW_ENABLED=True)
