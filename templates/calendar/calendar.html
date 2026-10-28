@@ -3,7 +3,7 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=artist-jump-20261027">
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012b">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=finite-tier-notes-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/research_queue.css' %}?v=queue-20261027">
@@ -1154,6 +1154,51 @@
         && (candidate.credible === true || needsManualReview(candidate));
     };
 
+    const candidateGroupItems = (type) => currentCandidates.filter((candidate) => type === "other"
+      ? !["exact_work", "related_work", "artprice_html", "liveart_web"].includes(candidate.match_type)
+      : candidate.match_type === type);
+
+    const updateBulkSelectionControls = () => {
+      const disabled = busy || Boolean(options.isParentBusy?.()) || pendingSourceRefresh;
+      candidateResults.querySelectorAll(".research-candidate-bulk").forEach((toolbar) => {
+        const items = candidateGroupItems(toolbar.dataset.group);
+        const eligible = items.filter(canSelectCandidate);
+        const selectedCount = eligible.filter((candidate) => selectedIds.has(String(candidate.id))).length;
+        toolbar.querySelector('[data-bulk-action="select"]').disabled = disabled
+          || selectedIds.size >= 25 || selectedCount === eligible.length;
+        toolbar.querySelector('[data-bulk-action="deselect"]').disabled = disabled
+          || !items.some((candidate) => selectedIds.has(String(candidate.id)));
+        toolbar.querySelector(".research-candidate-bulk-note").textContent = `${selectedCount} of ${eligible.length} eligible selected · ${selectedIds.size}/25 total across sources · applies to all pages`;
+      });
+    };
+
+    const changeCandidateGroupSelection = (type, select) => {
+      if (busy || options.isParentBusy?.() || pendingSourceRefresh) return;
+      const items = candidateGroupItems(type);
+      let changed = 0;
+      items.forEach((candidate) => {
+        const id = String(candidate.id);
+        if (select) {
+          if (canSelectCandidate(candidate) && !selectedIds.has(id) && selectedIds.size < 25) {
+            selectedIds.add(id);
+            changed += 1;
+          }
+        } else if (selectedIds.delete(id)) changed += 1;
+      });
+      if (changed) {
+        candidateResults.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+          checkbox.checked = selectedIds.has(checkbox.value);
+        });
+        markAnalysisPending();
+      }
+      const remaining = select ? items.filter((candidate) => canSelectCandidate(candidate) && !selectedIds.has(String(candidate.id))).length : 0;
+      setStatus(select
+        ? remaining ? `The 25-sale limit is shared across all sources; ${remaining} eligible sale${remaining === 1 ? " remains" : "s remain"} unselected in this section. Review your selection, then save selected evidence.`
+          : "All eligible sales in this section are selected. Save selected evidence to apply your changes."
+        : "All sales in this section are deselected. Save selected evidence to apply your changes.");
+      updateBulkSelectionControls();
+    };
+
     const textValue = (value) => value === null || value === undefined || value === "" ? "Not reported" : String(value);
     const describeSources = (data, saved) => {
       const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
@@ -1503,9 +1548,7 @@
         ["other", "Other candidate sold results", "Review the artwork identity and sale details before selecting a sale."],
       ];
       groups.forEach(([type, label, explanation]) => {
-        const items = currentCandidates.filter((candidate) => type === "other"
-          ? !["exact_work", "related_work", "artprice_html", "liveart_web"].includes(candidate.match_type)
-          : candidate.match_type === type);
+        const items = candidateGroupItems(type);
         if (!items.length) return;
         if (options.workspace) {
           const group = document.createElement("details");
@@ -1521,6 +1564,23 @@
           note.className = "liveart-group-note";
           note.textContent = explanation;
           body.appendChild(note);
+          const toolbar = document.createElement("div");
+          toolbar.className = "research-candidate-bulk";
+          toolbar.dataset.group = type;
+          toolbar.setAttribute("role", "group");
+          toolbar.setAttribute("aria-label", `${label} selection`);
+          [["Select all", "select"], ["Deselect all", "deselect"]].forEach(([text, action]) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = text;
+            button.dataset.bulkAction = action;
+            button.addEventListener("click", () => changeCandidateGroupSelection(type, action === "select"));
+            toolbar.appendChild(button);
+          });
+          const selectionNote = document.createElement("span");
+          selectionNote.className = "research-candidate-bulk-note";
+          toolbar.appendChild(selectionNote);
+          body.appendChild(toolbar);
           const pageSize = 10;
           const page = Math.min(candidatePages.get(type) || 0, Math.floor((items.length - 1) / pageSize));
           items.slice(page * pageSize, (page + 1) * pageSize).forEach((candidate) => body.appendChild(renderCandidateCard(candidate, true)));
@@ -1558,6 +1618,7 @@
         items.forEach((candidate) => candidateResults.appendChild(renderCandidateCard(candidate, true)));
       });
       candidateResults.dataset.initialized = "true";
+      updateBulkSelectionControls();
     };
     const addResultItem = (parent, label, value) => {
       const item = document.createElement("div");
@@ -1730,11 +1791,12 @@
       savedResults.appendChild(pending);
       saveDraft();
       candidateResults.querySelectorAll(".research-candidate-group").forEach((group) => {
-        const items = currentCandidates.filter((candidate) => candidate.match_type === group.dataset.group);
+        const items = candidateGroupItems(group.dataset.group);
         const count = items.filter((candidate) => selectedIds.has(String(candidate.id))).length;
         const label = group.querySelector("summary");
         label.textContent = label.textContent.replace(/ · \d+ selected$/, "") + (count ? ` · ${count} selected` : "");
       });
+      updateBulkSelectionControls();
     };
     costDefinitions.forEach(([name]) => {
       costFields[name].addEventListener("input", () => markAnalysisPending());
@@ -1746,6 +1808,7 @@
       });
     };
     const updateButtons = () => {
+      updateBulkSelectionControls();
       saveButton.disabled = busy || Boolean(options.isParentBusy?.()) || pendingSourceRefresh || (!hasResearch && !currentAnalysis);
       deleteButton.hidden = !currentAnalysis || currentAnalysis.saved === false;
       saveButton.textContent = options.workspace ? "Save selected evidence" : currentAnalysis && currentAnalysis.saved !== false ? "Update resale bid analysis" : "Save resale bid analysis";
