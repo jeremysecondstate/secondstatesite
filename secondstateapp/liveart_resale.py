@@ -260,8 +260,10 @@ def liveart_evidence_category_supported(candidate: Mapping[str, Any]) -> bool:
 def _sold_liveart_evidence(candidate: Mapping[str, Any]) -> bool:
     """Check the hard LiveArt sale requirements independently of artwork matching."""
 
-    if (candidate.get("provider") != "LiveArt" or candidate.get("status") != "sold"
+    if (candidate.get("provider") not in {"LiveArt", "Auction archive"} or candidate.get("status") != "sold"
             or not liveart_evidence_category_supported(candidate)):
+        return False
+    if candidate.get("provider") == "Auction archive" and candidate.get("entry_method") != "manual_web":
         return False
     raw_hammer = candidate.get("hammer_usd")
     if raw_hammer is None or isinstance(raw_hammer, bool):
@@ -299,7 +301,7 @@ def manual_review_eligible(candidate: Mapping[str, Any], calendar_lot: Any) -> b
 
 
 def resale_candidate_selectable(candidate: Mapping[str, Any]) -> bool:
-    if candidate.get("provider") == "LiveArt":
+    if candidate.get("provider") in {"LiveArt", "Auction archive"}:
         return _sold_liveart_evidence(candidate) and (
             candidate.get("credible") is True or candidate.get("manual_selectable") is True
         )
@@ -978,9 +980,11 @@ def build_scenarios_with_sources(
             "included_count": sum(1 for candidate in included_artprice_sales if belongs(candidate)),
         })
     source_summary = {
-        "liveart_selected_count": len(liveart_sales),
+        "liveart_selected_count": sum(item.get("provider") == "LiveArt" for item in liveart_sales),
+        "archive_selected_count": sum(item.get("provider") == "Auction archive" for item in liveart_sales),
+        "archive_converted_count": sum(item.get("provider") == "Auction archive" and item.get("price_mode") == "historical_fx" for item in liveart_sales),
         "liveart_duplicate_count": liveart_duplicate_count,
-        "liveart_web_selected_count": sum(item.get("entry_method") == "manual_web" for item in liveart_sales),
+        "liveart_web_selected_count": sum(item.get("provider") == "LiveArt" and item.get("entry_method") == "manual_web" for item in liveart_sales),
         "artprice_sold_count": artprice_sold_count if artprice_sold_count is not None else sum(
             1 for item in candidates if item.get("provider") == "Artprice"
         ),
@@ -1007,7 +1011,11 @@ def build_scenarios_with_sources(
     if not values:
         return merged, [], source_summary
 
-    if artprice_included_count and liveart_sales:
+    if source_summary["archive_selected_count"]:
+        source_label = "selected sold USD hammers from " + ", ".join(label for label, count in (
+            ("LiveArt", source_summary["liveart_selected_count"]), ("auction archives", source_summary["archive_selected_count"]),
+            ("saved Artprice", artprice_included_count)) if count)
+    elif artprice_included_count and liveart_sales:
         source_label = "selected LiveArt and saved Artprice sold USD hammers"
     elif artprice_included_count:
         source_label = "saved Artprice sold USD hammers"

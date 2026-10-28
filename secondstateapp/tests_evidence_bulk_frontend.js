@@ -170,6 +170,25 @@ test("Select all spans every page, respects the shared 25-sale cap, and stages o
   assert.equal(p.button("artprice_html", "select").disabled, true);
 });
 
+test("auction archive evidence has a separate selectable group and truthful source labels", () => {
+  const archive = liveart("archive", {id: "archive-web:338", provider: "Auction archive", match_type: "auction_archive",
+    entry_method: "manual_web", source_confirmed: true, price_basis: "hammer", hammer_currency: "USD", category: "prints_and_multiples",
+    credible: false, manual_selectable: true, hammer_usd: "1835.00",
+    fx_conversion: {calculation: "2500.00 CAD / 1.3624 = 1835.00 USD", rate_date: "2024-06-12", source_url: "https://bank.example/rate"}});
+  const p = workbench([liveart(1), archive]);
+  assert.match(p.group("auction_archive").querySelector("summary").textContent, /Auction archive sales/);
+  assert.equal(p.group("auction_archive").querySelector(".liveart-work-type").textContent, "Auction archive");
+  assert.match(p.group("auction_archive").querySelector(".liveart-price-line").textContent, /converted using historical FX/);
+  p.button("auction_archive", "select").dispatch("click");
+  assert.deepEqual(p.selected(), ["archive-web:338"]);
+  assert.equal(p.requests.length, 0);
+  vm.runInContext(declaration("describeSources"), p);
+  const description = p.run("describeSources({candidates: currentCandidates}, false)");
+  assert.match(description, /1 LiveArt sale/);
+  assert.match(description, /1 auction archive sale/);
+  assert.doesNotMatch(description, /2 LiveArt/);
+});
+
 test("Deselect all clears this section on all pages while retaining other sources and saved records", () => {
   const candidates = [liveart(1), ...Array.from({length: 17}, (_, i) => artprice(i + 1))];
   candidates[16].hammer_usd = "0";

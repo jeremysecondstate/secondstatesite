@@ -168,6 +168,37 @@ test("a paste without Category resets the prior drawing category to the print de
   assert.equal(p.confirmed.checked, false);
 });
 
+test("auction archive conversion requests original hammer and historical proof while preserving source identity", async () => {
+  const p = page();
+  p.fields.source_kind.value = "auction_archive";
+  await p.fields.source_kind.dispatch("change");
+  assert.equal(p.fields.price_mode.disabled, false);
+  p.fields.price_mode.value = "historical_fx";
+  p.fields.hammer_usd.value = "9999";
+  await p.fields.price_mode.dispatch("change");
+  assert.equal(p.fields.hammer_usd.disabled, true);
+  assert.equal(p.fields.hammer_usd.required, false);
+  assert.equal(p.fields.hammer_usd.value, "");
+  for (const key of ["original_hammer", "original_currency", "fx_rate", "fx_direction", "fx_date", "fx_source_url"]) assert.equal(p.fields[key].required, true, key);
+  assert.equal(p.confirmed.checked, false);
+  assert.equal(JSON.parse(p.storage.get("test-draft")).fields.source_kind, "auction_archive");
+  assert.equal(JSON.parse(p.storage.get("test-draft")).fields.price_mode, "historical_fx");
+  p.fields.source_kind.value = "liveart_web";
+  await p.fields.source_kind.dispatch("change");
+  assert.equal(p.fields.price_mode.value, "source_usd");
+  assert.equal(p.fields.hammer_usd.required, true);
+  assert.equal(p.fields.fx_rate.required, false);
+  assert.equal(p.fields.fx_rate.disabled, true);
+});
+
+test("historical conversion paste preserves the rate precision, direction and source URL", () => {
+  const parsed = parsePaste("Evidence source: auction_archive\nUSD price basis: historical_fx\nHistorical exchange rate: 1.3624\nExchange-rate direction: original_per_usd\nExchange-rate date: 2024-06-12\nExchange-rate source URL: https://bank.example/rate?date=2024-06-12");
+  assert.equal(parsed.source_kind, "auction_archive");
+  assert.equal(parsed.fx_rate, "1.3624");
+  assert.equal(parsed.fx_direction, "original_per_usd");
+  assert.equal(parsed.fx_source_url, "https://bank.example/rate?date=2024-06-12");
+});
+
 test("editing or filling a paste resets source confirmation and persists the new draft", async () => {
   const p = page();
   p.confirmed.checked = true;

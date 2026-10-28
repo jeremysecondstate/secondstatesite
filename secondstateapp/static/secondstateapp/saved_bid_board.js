@@ -114,7 +114,7 @@
     const notices = [...(data.notices || []), data.evidence_notice, data.message].filter(Boolean);
     notices.forEach(message => root.append(el("p", message, "ab-notice")));
     const source = board.evidence_snapshot?.source_summary || data.source_summary || {};
-    root.append(el("p", `${source.artprice_included_count || 0} Artprice + ${source.liveart_selected_count || 0} LiveArt · ${source.combined_comp_count || 0} unique sales used`, "ab-muted"));
+    root.append(el("p", `${source.artprice_included_count || 0} Artprice + ${source.liveart_selected_count || 0} LiveArt${source.archive_selected_count ? ` + ${source.archive_selected_count} auction archive` : ""} · ${source.combined_comp_count || 0} unique sales used`, "ab-muted"));
 
     const picks = el("section", null, "ab-shortlist sb-saved-shortlist");
     (data.shortlist || []).forEach(pick => {

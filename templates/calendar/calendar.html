@@ -424,12 +424,12 @@
 {{ calendar_data|json_script:"auction-calendar-data" }}
 {{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
 {{ oliver_house_names|json_script:"oliver-house-names" }}
-<script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=finite-tiers-20261026"></script>
-<script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=finite-tiers-20261026"></script>
+<script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=archive-fx-evidence-20261028"></script>
+<script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=archive-fx-evidence-20261028"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=artist-jump-20261027"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
-<script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=web-categories-20261027"></script>
+<script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-evidence-20261028"></script>
 <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261027"></script>
 <script>
 (() => {
@@ -1155,7 +1155,7 @@
     };
 
     const candidateGroupItems = (type) => currentCandidates.filter((candidate) => type === "other"
-      ? !["exact_work", "related_work", "artprice_html", "liveart_web"].includes(candidate.match_type)
+      ? !["exact_work", "related_work", "artprice_html", "liveart_web", "auction_archive"].includes(candidate.match_type)
       : candidate.match_type === type);
 
     const updateBulkSelectionControls = () => {
@@ -1203,8 +1203,9 @@
     const describeSources = (data, saved) => {
       const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
       const artpriceCount = candidates.filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html").length;
-      const webCount = candidates.filter((candidate) => candidate.entry_method === "manual_web").length;
-      const liveartCount = candidates.length - artpriceCount - webCount;
+      const archiveCount = candidates.filter((candidate) => candidate.provider === "Auction archive").length;
+      const webCount = candidates.filter((candidate) => candidate.provider === "LiveArt" && candidate.entry_method === "manual_web").length;
+      const liveartCount = candidates.length - artpriceCount - webCount - archiveCount;
       const parts = [];
       if (data?.search_category?.id === 2) {
         parts.push("LiveArt search filter: Prints & Multiples only.");
@@ -1229,6 +1230,7 @@
       }
       if (liveartCount) parts.push(`${liveartCount} LiveArt sale${liveartCount === 1 ? "" : "s"} retrieved ${formatAnalysisTimestamp(data?.retrieved_at || researchRetrievedAt)}.`);
       if (webCount) parts.push(`${webCount} LiveArt web sale${webCount === 1 ? "" : "s"} entered manually; no API units used to add them.`);
+      if (archiveCount) parts.push(`${archiveCount} auction archive sale${archiveCount === 1 ? "" : "s"} entered manually; sourced currency conversions are labeled separately.`);
       if (data?.data_units_spent != null) parts.push(`${data.data_units_spent} LiveArt Data Units used in ${saved ? "saved research" : "this search"}.`);
       if (candidates.length) parts.push("Only eligible USD hammer prices enter resale estimates; premiums and estimates are excluded.");
       return parts.join(" ");
@@ -1307,7 +1309,7 @@
         top.appendChild(label);
         const sourceBadge = document.createElement("span");
         sourceBadge.className = `liveart-work-type ${isArtprice ? "is-artprice" : "is-liveart"}`;
-        sourceBadge.textContent = isArtprice ? "Artprice HTML" : "LiveArt";
+        sourceBadge.textContent = isArtprice ? "Artprice HTML" : candidate.provider === "Auction archive" ? "Auction archive" : "LiveArt";
         top.appendChild(sourceBadge);
         if (candidate.match_type === "exact_work" || candidate.match_type === "related_work") {
           const relationship = document.createElement("span");
@@ -1406,7 +1408,7 @@
       price.className = "liveart-price-line";
       price.textContent = candidate.hammer_usd === null || candidate.hammer_usd === undefined
         ? "USD hammer unavailable — excluded from valuation"
-        : `${isArtprice ? "Artprice HTML USD hammer" : candidate.entry_method === "manual_web" ? "LiveArt web USD hammer · entered manually" : "Verified LiveArt USD hammer"}: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}${canSelectCandidate(candidate) ? "" : " — excluded from valuation"}`;
+        : `${isArtprice ? "Artprice HTML USD hammer" : candidate.provider === "Auction archive" ? candidate.fx_conversion ? "Auction archive USD hammer · converted using historical FX" : "Auction archive USD hammer · source reported" : candidate.entry_method === "manual_web" ? "LiveArt web USD hammer · entered manually" : "Verified LiveArt USD hammer"}: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}${canSelectCandidate(candidate) ? "" : " — excluded from valuation"}`;
       card.appendChild(price);
       const facts = document.createElement("div");
       facts.className = "liveart-facts";
@@ -1443,7 +1445,13 @@
         appendFact(facts, "Artwork category", candidate.category_label || candidate.category);
         appendFact(facts, "Source evidence", candidate.evidence_note);
         appendFact(facts, "Entered by", candidate.entered_by_name || candidate.entered_by);
-        appendFact(facts, "Entry method", "LiveArt website · staff transcription");
+        appendFact(facts, "Entry method", candidate.provider === "Auction archive" ? "Auction archive · staff transcription" : "LiveArt website · staff transcription");
+        if (candidate.fx_conversion) {
+          appendFact(facts, "Historical FX calculation", candidate.fx_conversion.calculation);
+          appendFact(facts, "Exchange-rate date", candidate.fx_conversion.rate_date);
+          const fxSource = providerLink(candidate.fx_conversion.source_url, "Historical exchange-rate source ↗");
+          if (fxSource) facts.appendChild(fxSource);
+        }
       }
       card.appendChild(facts);
       const notesValue = candidate.match_notes || candidate.exclusion_reasons;
@@ -1476,7 +1484,7 @@
         });
         card.appendChild(comparisonList);
       }
-      if (!isArtprice && !provider) {
+      if (!isArtprice && candidate.provider !== "Auction archive" && !provider) {
         const providerMissing = document.createElement("p");
         providerMissing.className = "liveart-missing-data";
         providerMissing.textContent = "LiveArt lot page link not provided; use the LiveArt lot ID above.";
@@ -1545,6 +1553,7 @@
         ["related_work", currentCandidates.some((candidate) => candidate.search_terms?.length) ? "LiveArt term search results" : "Similar sold works", "Compare the medium, edition, signature, size, and condition before selecting a sale."],
         ["artprice_html", "Saved Artprice HTML sales", "These sold records combine your saved HTML files. Overlapping sales count once. Review each date, price, source file, and missing detail."],
         ["liveart_web", "LiveArt web sales · entered manually", "These sales were entered from website research. Check the linked source and evidence before selecting a comparable."],
+        ["auction_archive", "Auction archive sales · entered manually", "These completed sales retain their original source. Converted USD hammers show the original amount and sourced historical exchange rate."],
         ["other", "Other candidate sold results", "Review the artwork identity and sale details before selecting a sale."],
       ];
       groups.forEach(([type, label, explanation]) => {

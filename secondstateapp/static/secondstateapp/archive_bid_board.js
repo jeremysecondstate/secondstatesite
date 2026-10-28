@@ -127,7 +127,7 @@
       selectedBid = data.detail?.bid ?? data.detail?.hammer ?? data.selected_bid ?? null;
       selectedCase = data.selected_case || data.detail?.case_key || selectedCase;
       const summary = data.source_summary || {};
-      sources.textContent = `${summary.artprice_included_count || 0} Artprice + ${summary.liveart_selected_count || 0} LiveArt · ${summary.combined_comp_count || 0} unique sales used`;
+      sources.textContent = `${summary.artprice_included_count || 0} Artprice + ${summary.liveart_selected_count || 0} LiveArt${summary.archive_selected_count ? ` + ${summary.archive_selected_count} auction archive` : ""} · ${summary.combined_comp_count || 0} unique sales used`;
       notice.textContent = data.increment_notice || "Bid increments are user assumptions. Confirm this sale’s actual house rules.";
       const costsUsed = data.assumptions;
       const taxBasis = {hammer: "hammer", hammer_premium: "hammer + premium", acquisition: "hammer + premium + acquisition costs"}[costsUsed.purchase_tax_basis];

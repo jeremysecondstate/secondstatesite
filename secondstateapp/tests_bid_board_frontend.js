@@ -150,3 +150,12 @@ test("saved viewer explains an exhausted finite range without asking for existin
   assert.match(context.document.body.textContent, /No available bid remains within the provided bid rules/);
   assert.doesNotMatch(context.document.body.textContent, /Save a starting hammer and resale case/);
 });
+
+test("live and saved Boards count auction archive evidence separately from LiveArt", async () => {
+  const data = board({source_summary: {artprice_included_count: 0, liveart_selected_count: 2, archive_selected_count: 1, combined_comp_count: 3}});
+  const live = await mount(data);
+  assert.match(live.root.textContent, /2 LiveArt \+ 1 auction archive · 3 unique sales used/);
+  const {context} = environment({ok: true, board: {analysis: data, assumptions: data.assumptions, summary: {qualifying_bid: "300.00", qualifies: true, detail}}});
+  await context.window.SavedBidBoard.open({id: 1, title: "Example", saved_bid_board_url: "/saved/"});
+  assert.match(context.document.body.textContent, /2 LiveArt \+ 1 auction archive · 3 unique sales used/);
+});

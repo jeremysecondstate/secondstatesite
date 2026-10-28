@@ -5,11 +5,10 @@
   else root.LiveArtManualEntry = api;
 })(typeof window === "undefined" ? globalThis : window, () => {
   "use strict";
-  const categories = {
-    prints_and_multiples: "Prints & Multiples",
-    works_on_paper: "Drawings / Works on paper",
-  };
+  const categories = {prints_and_multiples: "Prints & Multiples", works_on_paper: "Drawings / Works on paper"};
   const definitions = [
+    ["source_kind", "Evidence source", "select", true, 40],
+    ["price_mode", "USD price basis", "select", true, 40],
     ["artist", "Artist", "text", true, 200],
     ["title", "Title", "text", true, 500],
     ["sale_date", "Sale date", "date", true, 10],
@@ -27,6 +26,10 @@
     ["size", "Size", "text", false, 200],
     ["signature", "Signature", "text", false, 500],
     ["condition", "Condition", "text", false, 1000],
+    ["fx_rate", "Historical exchange rate", "number", false, 30],
+    ["fx_direction", "Exchange-rate direction", "select", false, 40],
+    ["fx_date", "Exchange-rate date", "date", false, 10],
+    ["fx_source_url", "Exchange-rate source URL", "url", false, 2000],
   ];
   const keys = new Map(definitions.flatMap(([key, label]) => [[key, key], [label.toLowerCase(), key]]));
   function parsePaste(text) {
@@ -45,7 +48,7 @@
       if (["hammer_usd", "original_hammer"].includes(key) && value && !/^\d+(?:\.\d{1,2})?$/.test(value)) {
         throw new Error(`${label}: use a plain amount such as 3305.00, without a currency symbol or commas.`);
       }
-      if (key === "sale_date" && value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("Sale date must use YYYY-MM-DD.");
+      if (["sale_date", "fx_date"].includes(key) && value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("Dates must use YYYY-MM-DD.");
       if (key === "category" && value) {
         const match = Object.entries(categories).find(([name, label]) => [name, label.toLowerCase()].includes(value.toLowerCase()));
         if (!match) throw new Error("Category must be Prints & Multiples or Drawings / Works on paper.");
@@ -63,11 +66,11 @@
     return node;
   };
   function mount(parent, options) {
-    const defaultValue = name => name === "artist" ? options.artist || "" : name === "category" ? "prints_and_multiples" : "";
+    const defaultValue = name => name === "artist" ? options.artist || "" : ({category: "prints_and_multiples", source_kind: "liveart_web", price_mode: "source_usd", fx_direction: "original_per_usd"}[name] || "");
     const details = el("details", null, "liveart-manual-entry");
-    details.append(el("summary", "Add a sale from LiveArt web"));
+    details.append(el("summary", "Add a sale from LiveArt web or an auction archive"));
     const body = el("div", null, "liveart-manual-body");
-    body.append(el("p", "Use a sale you checked on LiveArt’s website. No API search or API units are needed. Add it here, then select it below and save the evidence.", "liveart-group-note"));
+    body.append(el("p", "Use a completed sale with a documented hammer. Choose LiveArt web or the original auction archive. Archive currency conversions use your sourced historical rate and are calculated by the server. Add the sale, then select it below and save the evidence.", "liveart-group-note"));
     const paste = el("details", null, "liveart-manual-paste");
     paste.append(el("summary", "Quick paste · one sale"));
     const pasteLabel = el("label", "Paste labeled sale details");
@@ -76,7 +79,7 @@
     textarea.maxLength = 12000;
     textarea.rows = 9;
     textarea.spellcheck = false;
-    const template = definitions.filter(([, , , required]) => required).map(([key, label]) => `${label}: ${key === "category" ? categories.prints_and_multiples : defaultValue(key)}`).join("\n");
+    const template = definitions.filter(([key, , , required]) => required && !["source_kind", "price_mode"].includes(key)).map(([key, label]) => `${label}: ${key === "category" ? categories.prints_and_multiples : defaultValue(key)}`).join("\n");
     textarea.placeholder = template;
     pasteLabel.htmlFor = textarea.id;
     const pasteActions = el("div", null, "artprice-analysis-actions");
@@ -92,40 +95,65 @@
     const extra = el("details", null, "liveart-manual-extra");
     extra.append(el("summary", "Original price & artwork details (optional)"));
     const extraGrid = el("div", null, "liveart-manual-grid");
-    const fields = {};
+    const fields = {}, fieldGroups = {}, fieldLabels = {};
     definitions.forEach(([name, labelText, type, required, max]) => {
       const group = el("div", null, `artprice-analysis-field${type === "textarea" || type === "url" ? " is-wide" : ""}`);
       const label = el("label", labelText);
-      const input = el(["textarea", "select"].includes(type) ? type : "input");
-      if (type === "select") Object.entries(categories).forEach(([value, label]) => {
-        const option = el("option", label);
-        option.value = value;
-        input.append(option);
-      });
-      else if (type === "textarea") input.rows = 3;
-      else input.type = type;
+      const input = el(type === "textarea" ? "textarea" : type === "select" ? "select" : "input");
+      if (!["textarea", "select"].includes(type)) input.type = type;
+      else input.rows = 3;
+      if (type === "select") {
+        const choices = name === "category" ? Object.entries(categories) : name === "source_kind" ? [["liveart_web", "LiveArt web"], ["auction_archive", "Auction archive"]]
+          : name === "price_mode" ? [["source_usd", "Source-reported USD hammer"], ["historical_fx", "Convert original hammer using historical FX"]]
+          : [["original_per_usd", "Original currency units per 1 USD (divide)"], ["usd_per_original", "USD per 1 original currency unit (multiply)"]];
+        choices.forEach(([value, text]) => {const option = el("option", text); option.value = value; input.append(option);});
+        input.value = choices[0][0];
+      }
       input.id = `${options.idPrefix}manual-${name}`;
       input.name = name;
       input.required = required;
       input.maxLength = max;
       if (type === "number") { input.min = "0.01"; input.max = "1000000000000"; input.step = "0.01"; input.inputMode = "decimal"; }
+      if (name === "fx_rate") {input.min = "0.000000000001"; input.step = "any";}
       if (name === "original_currency") input.placeholder = "e.g. CHF";
       if (name === "provider_url") input.placeholder = "https://liveart.ai/…";
       input.value = defaultValue(name);
-      if (name === "evidence_note") input.placeholder = "Paste the source text showing the sold result, USD hammer and selected artwork category; note any discrepancies.";
+      if (name === "evidence_note") input.placeholder = "Paste the source text showing the sold result, USD hammer and print category; note any discrepancies.";
       label.htmlFor = input.id;
       fields[name] = input;
+      fieldGroups[name] = group;
+      fieldLabels[name] = label;
       group.append(label, input);
-      if (name === "hammer_usd") group.append(el("small", "The USD hammer shown by the source. Exclude buyer’s premium; do not enter an estimate or convert another currency yourself."));
+      if (name === "hammer_usd") group.append(el("small", "Enter a source-reported USD hammer. For archive conversion, leave this blank and supply the original hammer and historical rate below. Exclude premiums and estimates."));
       (required ? grid : extraGrid).append(group);
     });
     extra.append(extraGrid);
     body.append(grid, extra);
+    const updateMode = () => {
+      const archive = fields.source_kind.value === "auction_archive";
+      if (!archive) fields.price_mode.value = "source_usd";
+      fields.price_mode.disabled = !archive;
+      const converted = archive && fields.price_mode.value === "historical_fx";
+      fieldLabels.provider_url.textContent = archive ? "Auction archive URL" : "LiveArt URL";
+      fields.provider_url.placeholder = archive ? "https://auction-house.example/lot/…" : "https://liveart.ai/…";
+      fields.hammer_usd.required = !converted;
+      fields.hammer_usd.disabled = converted;
+      if (converted) { fields.hammer_usd.value = ""; extra.open = true; }
+      for (const key of ["original_hammer", "original_currency"]) fields[key].required = converted;
+      for (const key of ["fx_rate", "fx_direction", "fx_date", "fx_source_url"]) {
+        fieldGroups[key].hidden = !converted;
+        fields[key].required = converted;
+        fields[key].disabled = !converted;
+        if (!converted && key !== "fx_direction") fields[key].value = "";
+      }
+    };
+    fields.source_kind.addEventListener("change", () => {updateMode(); saveDraft();});
+    fields.price_mode.addEventListener("change", () => {updateMode(); saveDraft();});
     const confirmation = el("label", null, "liveart-manual-confirmation");
     const confirmed = el("input");
     confirmed.type = "checkbox";
     confirmed.required = true;
-    confirmation.append(confirmed, el("span", "I checked the source: this is a sold work in the selected artwork category by the named artist, and the USD price is hammer only (excluding buyer’s premium)."));
+    confirmation.append(confirmed, el("span", "I checked the source: this is a completed sold work in the selected artwork category by the named artist, the documented price is hammer only, and any conversion uses the cited historical exchange rate."));
     const actions = el("div", null, "artprice-analysis-actions");
     const addButton = el("button", "Add sale for review", "is-primary");
     addButton.type = "button";
@@ -147,11 +175,16 @@
       if (draft?.fields) Object.entries(fields).forEach(([key, input]) => { if (typeof draft.fields[key] === "string") input.value = draft.fields[key]; });
       if (typeof draft?.paste === "string") textarea.value = draft.paste;
     } catch (_) {}
+    updateMode();
     fillButton.addEventListener("click", () => {
       try {
         const values = parsePaste(textarea.value);
         Object.entries(fields).forEach(([key, input]) => { input.value = defaultValue(key); });
         Object.entries(values).forEach(([key, value]) => { fields[key].value = value; });
+        if (!fields.source_kind.value) fields.source_kind.value = "liveart_web";
+        if (!fields.price_mode.value) fields.price_mode.value = "source_usd";
+        if (!fields.fx_direction.value) fields.fx_direction.value = "original_per_usd";
+        updateMode();
         if (definitions.some(([name, , , required]) => !required && values[name])) extra.open = true;
         saveDraft();
         status.textContent = "Fields filled. Check the details and source confirmation, then add the sale for review.";
@@ -169,6 +202,8 @@
       try {
         const result = await options.onAdd(Object.fromEntries(Object.entries(fields).map(([key, input]) => [key, input.value.trim()])));
         Object.entries(fields).forEach(([key, input]) => { input.value = defaultValue(key); });
+        fields.source_kind.value = "liveart_web"; fields.price_mode.value = "source_usd"; fields.fx_direction.value = "original_per_usd";
+        updateMode();
         textarea.value = "";
         confirmed.checked = false;
         try { sessionStorage.removeItem(options.draftKey); } catch (_) {}
