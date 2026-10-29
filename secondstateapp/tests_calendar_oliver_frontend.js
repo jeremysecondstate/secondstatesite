@@ -680,3 +680,174 @@ test("a full catalog refresh preserves the selected artist while another house o
   assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "false");
   assert.equal(context.galleryArtistClear.hidden, true);
 });
+
+for (const view of ["catalog", "oliver"]) {
+  test(`${view} Bid Boards counts the full scoped day and replaces artist selection before pagination`, () => {
+    const lots = Array.from({length: 80}, (_, index) => lot(index + 1,
+      index % 2 ? "Phillips" : "Other", index % 2 === 1, {
+        artist: index % 2 ? "Max, Peter" : "Another artist", estimate_low: String(80 - index),
+        saved_bid_board: index % 5 === 0 ? null : {qualifies: [true, false, null][index % 3], qualifying_bid: null},
+        email_tray_selected: index % 7 === 0,
+      }));
+    const before = JSON.stringify(lots);
+    const context = page({[dayA]: lots}, view);
+    const matching = lots.filter(item => item.saved_bid_board && (view !== "oliver" || item.oliver_house)).reverse();
+    const filter = key => context.galleryFilters.children.find(button => button.dataset.galleryFilter === key);
+    context.galleryCatalog.querySelectorAll = () => [...context.galleryFilters.children, ...context.galleryHouseFilters.children];
+    context.gallerySort.value = "price_asc";
+    context.run('chooseGalleryArtist("max, peter")');
+    context.galleryVisibleCount = 72;
+    const button = filter("bidboards");
+    assert.equal(button.tag, "button");
+    assert.equal(button.type, "button");
+    assert.equal(button.children[0].textContent, "Bid Boards");
+    assert.equal(button.children[1].textContent, String(matching.length), "counts include saved boards outside the current artist selection");
+    assert.equal(button.getAttribute("aria-pressed"), "false");
+    button.click();
+    assert.equal(context.galleryFilter, "bidboards");
+    assert.equal(context.galleryVisibleCount, 24);
+    assert.equal(context.gallerySort.value, "price_asc");
+    assert.equal(filter("bidboards").getAttribute("aria-pressed"), "true");
+    assert.equal(filter("bidboards").focused, true, "filter replacement restores native keyboard focus");
+    assert.equal(context.galleryArtistClear.hidden, true);
+    assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "false");
+    assert.equal(context.gallerySendLaunch.hidden, true);
+    assert.match(context.galleryDescription.textContent, /qualifying, no qualifying bid, and unavailable/);
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), matching.slice(0, 24).map(item => item.id));
+    assert.equal(context.galleryMore.hidden, false);
+    context.galleryVisibleCount += 48;
+    context.run("renderGalleryCards()");
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), matching.map(item => item.id));
+    for (const card of context.galleryGrid.children) assert.equal(context.run("dayLots()")[card.index].id, card.id);
+    assert.equal(context.galleryMore.hidden, true);
+    filter("all").click();
+    assert.equal(context.galleryFilter, "all");
+    assert.equal(filter("bidboards").getAttribute("aria-pressed"), "false");
+    assert.equal(context.galleryVisibleCount, 24);
+    assert.equal(JSON.stringify(lots), before, "filtering does not modify outcomes, Email Tray or original lots");
+  });
+}
+
+test("Bid Boards preserves an empty filter through full catalog refresh and never counts unsaved research", () => {
+  const context = page({[dayA]: [
+    lot(1, "Other", false, {saved_bid_board: {qualifies: true}}),
+    lot(2, "Phillips", true, {saved_bid_board: null, email_tray_selected: true, artprice_url: "https://example.test/sale", saved_bid_board_url: "/saved/2/"}),
+    lot(3, "Phillips", true, {liveart_research: {selected_ids: ["source-sale"]}}),
+  ]});
+  for (const name of ["galleryDate", "gallerySummary", "galleryPrevious", "galleryNext", "galleryBrowserLaunch"]) context[name] = new Element();
+  context.document.getElementById("day-gallery-title").firstChild = new Element();
+  context.formatCalendarDay = day => day;
+  context.previousGalleryDay = () => undefined;
+  context.nextGalleryDay = () => undefined;
+  vm.runInContext(declaration("renderGalleryCatalog"), context);
+  context.run("renderGalleryFilters()");
+  context.galleryFilters.children.find(button => button.dataset.galleryFilter === "bidboards").click();
+  context.run("renderGalleryCatalog()");
+  assert.equal(context.galleryFilter, "bidboards");
+  const button = context.galleryFilters.children.find(button => button.dataset.galleryFilter === "bidboards");
+  assert.equal(button.children[1].textContent, "0");
+  assert.equal(button.getAttribute("aria-pressed"), "true");
+  assert.equal(context.galleryGrid.children.length, 1);
+  assert.match(context.galleryGrid.children[0].textContent, /No lots have a saved Bid Board.*this date/);
+  assert.equal(context.galleryResults.textContent, "0 watched lots");
+  assert.equal(context.galleryMore.hidden, true);
+});
+
+for (const view of ["catalog", "oliver"]) {
+  test(`${view} Bid Boards URL initializes and restores after Back from research`, () => {
+    const context = page({[dayA]: [
+      lot(1, "Other", false, {saved_bid_board: {qualifies: false, qualifying_bid: null}}),
+      lot(2, "Phillips", true, {saved_bid_board: {qualifies: null, qualifying_bid: null}}),
+      lot(3, "Phillips", true, {saved_bid_board: null}),
+    ]}, view);
+    for (const name of ["calendarLayout", "researchWorkspace", "researchTitle", "auctionCalendar",
+      "calendarPageShell", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle", "researchViewToggle"]) context[name] = new Element();
+    context.dayButtons = [];
+    context.researchLookButtons = [];
+    context.renderResearchDays = () => {};
+    context.renderGalleryCatalog = () => context.run("renderGalleryFilters(); renderGalleryArtists(); renderGalleryCards()");
+    context.renderResearchWorkspace = () => {};
+    const listeners = new Map();
+    context.window.addEventListener = (name, callback) => listeners.set(name, callback);
+    let pushes = 0;
+    const setLocation = url => {
+      const next = new URL(String(url));
+      context.window.location.href = next.href;
+      context.window.location.search = next.search;
+    };
+    context.window.history.replaceState = function(state, _title, url) {
+      this.state = state;
+      this.url = String(url);
+      setLocation(url);
+    };
+    context.window.history.pushState = function(state, _title, url) {
+      pushes += 1;
+      this.replaceState(state, _title, url);
+    };
+    vm.runInContext(["updateCalendarLocation", "setCalendarView", "openResearchWorkspace"].map(declaration).join("\n"), context);
+    vm.runInContext(between('  window.addEventListener("popstate"', '  researchPrevious.addEventListener("click"'), context);
+    context.initialParams = new URLSearchParams({view, day: dayA, filter: "bidboards"});
+    context.requestedView = view;
+    vm.runInContext(between('  galleryFilter = initialParams.get("artist")', '  const requestedSavedBoard ='), context);
+    assert.equal(context.galleryFilter, "bidboards", "the actual initial filter parser accepts bookmarked Bid Boards");
+    const galleryUrl = context.window.location.href;
+    assert.equal(new URL(galleryUrl).searchParams.get("filter"), "bidboards");
+    assert.equal(new URL(galleryUrl).searchParams.has("artist"), false);
+    context.run("openResearchWorkspace()");
+    assert.equal(new URL(context.window.location.href).searchParams.has("filter"), false);
+    setLocation(galleryUrl);
+    context.window.history.state = {};
+    listeners.get("popstate")();
+    assert.equal(context.activeView, view);
+    assert.equal(context.galleryFilter, "bidboards");
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), view === "oliver" ? [2] : [1, 2]);
+    assert.equal(new URL(context.window.location.href).searchParams.get("filter"), "bidboards");
+    assert.equal(context.restoringHistory, false);
+    assert.equal(context.document.getElementById("day-gallery-title").focused, true);
+    assert.equal(pushes, 1, "restoring the saved filter must not create another history entry");
+    context.run("renderGalleryFilters()");
+    context.galleryFilters.children.find(button => button.dataset.galleryFilter === "all").click();
+    assert.equal(new URL(context.window.location.href).searchParams.has("filter"), false);
+  });
+}
+
+test("saved-board events tolerate publisher mutations and update membership without rerendering existing-board preferences", () => {
+  const context = page({
+    [dayA]: [lot(1, "Phillips", true, {saved_bid_board: null}), lot(2, "Phillips", true, {saved_bid_board: null})],
+    [dayB]: [lot(3, "Phillips", true, {saved_bid_board: null})],
+  }, "catalog");
+  const listeners = new Map();
+  context.window.addEventListener = (name, callback) => listeners.set(name, callback);
+  vm.runInContext(between('  const savedBoardMembership =', '  const auctionCalendar ='), context);
+  const emit = (lotId, savedBoard) => listeners.get("archive-bid-board-saved")({detail: {lotId, savedBoard}});
+  const count = () => context.galleryFilters.children.find(button => button.dataset.galleryFilter === "bidboards").children[1].textContent;
+  context.galleryFilter = "bidboards";
+  context.run("renderGalleryFilters(); renderGalleryCards()");
+  const firstBoard = {qualifies: null, qualifying_bid: null, include_in_email: false};
+  context.data[dayA][1].saved_bid_board = firstBoard;
+  emit("2", firstBoard);
+  assert.equal(count(), "1");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [2]);
+  const cards = context.galleryGrid.children;
+  const controls = context.galleryFilters.children;
+  const updated = {qualifies: false, qualifying_bid: null, include_in_email: true};
+  context.data[dayA][1].saved_bid_board = updated;
+  emit(2, updated);
+  assert.equal(context.data[dayA][1].saved_bid_board, updated);
+  assert.equal(context.galleryGrid.children, cards, "preference/outcome updates must preserve active card controls and pending requests");
+  assert.equal(context.galleryFilters.children, controls, "unchanged membership must preserve filter focus");
+  emit(3, {qualifies: true, qualifying_bid: "100"});
+  assert.equal(count(), "1", "a different auction date cannot enter this day's count");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [2]);
+  context.data[dayA][1].saved_bid_board = null;
+  emit(2, null);
+  assert.equal(count(), "0");
+  assert.equal(context.galleryResults.textContent, "0 watched lots");
+  assert.equal(context.galleryGrid.children.some(card => card.id !== undefined), false);
+  context.galleryFilter = "all";
+  context.run("renderGalleryFilters(); renderGalleryCards()");
+  const unfilteredCards = context.galleryGrid.children;
+  emit(1, {qualifies: true, qualifying_bid: "300"});
+  assert.equal(count(), "1");
+  assert.equal(context.galleryGrid.children, unfilteredCards, "other gallery filters need count updates without replacing cards");
+});

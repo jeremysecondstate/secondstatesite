@@ -436,10 +436,21 @@
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
   const salesData = JSON.parse(document.getElementById("auction-calendar-sales-data").textContent);
   const oliverHouseNames = JSON.parse(document.getElementById("oliver-house-names").textContent);
+  // Board widgets update their shared lot before publishing the saved event.
+  const savedBoardMembership = new Map(Object.values(data).flat().map((lot) => [String(lot.id), Boolean(lot.saved_bid_board)]));
   window.addEventListener("archive-bid-board-saved", (event) => {
+    let membershipChanged = false;
     Object.values(data).flat().forEach((lot) => {
-      if (String(lot.id) === String(event.detail.lotId)) lot.saved_bid_board = event.detail.savedBoard;
+      if (String(lot.id) === String(event.detail.lotId)) {
+        membershipChanged ||= savedBoardMembership.get(String(lot.id)) !== Boolean(event.detail.savedBoard);
+        savedBoardMembership.set(String(lot.id), Boolean(event.detail.savedBoard));
+        lot.saved_bid_board = event.detail.savedBoard;
+      }
     });
+    if (membershipChanged && isGalleryView()) {
+      renderGalleryFilters();
+      if (galleryFilter === "bidboards") renderGalleryCards();
+    }
   });
   const auctionCalendar = document.querySelector(".auction-calendar");
   const calendarPageShell = document.querySelector(".calendar-page-shell");
@@ -3274,6 +3285,7 @@
     const lots = dayLots().map((lot, index) => ({lot, index}));
     const filtered = lots.filter(({lot}) => {
       if (galleryFilter === "tray") return Boolean(lot.email_tray_selected);
+      if (galleryFilter === "bidboards") return Boolean(lot.saved_bid_board);
       if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
       return galleryFilter === "all" || galleryHouseName(lot) === galleryFilter.slice(6);
     });
@@ -3325,6 +3337,7 @@
     const choices = [
       {key: "all", label: "All houses", count: houseCounts.size},
       {key: "tray", label: "Email Tray", count: lots.filter((lot) => lot.email_tray_selected).length},
+      {key: "bidboards", label: "Bid Boards", count: lots.filter((lot) => lot.saved_bid_board).length},
       ...Array.from(houseCounts, ([house, count]) => ({key: `house:${house}`, label: house, count})),
     ];
     galleryFilters.replaceChildren();
@@ -3453,6 +3466,7 @@
     if (!lots.length) {
       appendText(galleryGrid, "p", "day-gallery-empty", galleryFilter === "tray"
         ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Research, then add it to the tray."
+        : galleryFilter === "bidboards" ? "No lots have a saved Bid Board in this catalog on this date."
         : galleryFilter.startsWith("house:") ? `No lots from ${galleryFilter.slice(6)} on this date.`
         : activeView === "oliver" ? "No lots from Oliver’s auction houses on this date. Choose another watched day or switch to Gallery Catalog."
         : "No watched lots match this view.");
@@ -3463,7 +3477,8 @@
     galleryArtistClear.hidden = !artistSelected;
     galleryDescription.textContent = artistSelected ? `${selectedArtist?.name || "Artist"} · lots this day` : galleryFilter === "all"
       ? (activeView === "oliver" ? "A catalog from Oliver’s auction houses" : "A catalog across auction houses")
-      : galleryFilter === "tray" ? "Lots selected for the next email" : galleryFilter.slice(6);
+      : galleryFilter === "tray" ? "Lots selected for the next email"
+      : galleryFilter === "bidboards" ? "Saved Bid Boards · qualifying, no qualifying bid, and unavailable results" : galleryFilter.slice(6);
     galleryResults.textContent = lots.length
       ? `Showing ${Math.min(galleryVisibleCount, lots.length)} of ${lots.length} watched lot${lots.length === 1 ? "" : "s"}`
       : "0 watched lots";
@@ -4142,7 +4157,7 @@
     else url.searchParams.delete("view");
     if (selectedDay) url.searchParams.set("day", selectedDay);
     else url.searchParams.delete("day");
-    if (isGalleryView() && galleryFilter === "tray") url.searchParams.set("filter", "tray");
+    if (isGalleryView() && ["tray", "bidboards"].includes(galleryFilter)) url.searchParams.set("filter", galleryFilter);
     else url.searchParams.delete("filter");
     if (isGalleryView() && galleryFilter.startsWith("artist:")) url.searchParams.set("artist", galleryFilter.slice(7));
     else url.searchParams.delete("artist");
@@ -4231,7 +4246,7 @@
       const requestedIndex = dayLots().findIndex((lot) => lot.id === requestedLot);
       if (requestedIndex >= 0) researchIndex = requestedIndex;
       const view = params.get("view");
-      galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : params.get("filter") === "tray" ? "tray" : "all";
+      galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : ["tray", "bidboards"].includes(params.get("filter")) ? params.get("filter") : "all";
       setCalendarView(view);
       const focusTarget = view === "research" ? researchTitle
         : isGalleryView() ? document.getElementById("day-gallery-title") : calendarViewToggle;
@@ -4484,7 +4499,7 @@
     if (matchingIndex >= 0) researchIndex = matchingIndex;
   }
   if (validRequestedDay || initialDay) showDay(validRequestedDay ? requestedDay : initialDay);
-  galleryFilter = initialParams.get("artist") ? `artist:${initialParams.get("artist")}` : initialParams.get("filter") === "tray" ? "tray" : "all";
+  galleryFilter = initialParams.get("artist") ? `artist:${initialParams.get("artist")}` : ["tray", "bidboards"].includes(initialParams.get("filter")) ? initialParams.get("filter") : "all";
   setCalendarView(requestedView);
   const requestedSavedBoard = initialParams.get("saved_bid_board");
   if (requestedSavedBoard && window.SavedBidBoard) {
