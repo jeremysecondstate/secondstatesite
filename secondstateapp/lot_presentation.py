@@ -102,7 +102,7 @@ _ARTISTS = (
     ("Frink, Elisabeth",), ("Garcia, Jerry",), ("Gottlieb, Adolph",), ("Goya, Francisco de",),
     ("Haring, Keith",), ("Hirst, Damien",), ("Hockney, David",),
     ("Hundertwasser, Friedensreich", "Friedrich Hundertwasser", "Hundertwasser, Friedrich"),
-    ("Icart, Louis",), ("Katz, Alex",), ("Kelly, Ellsworth",), ("Kent, Rockwell",),
+    ("Icart, Louis",), ("Kahn, Wolf",), ("Katz, Alex",), ("Kelly, Ellsworth",), ("Kent, Rockwell",),
     ("Kollwitz, Käthe",), ("Kusama, Yayoi",), ("Lam, Wifredo",), ("Léger, Fernand",),
     ("Lewis, Martin",), ("Lichtenstein, Roy",), ("Liebermann, Max",), ("Magritte, René",),
     ("Matisse, Henri",), ("Max, Peter",), ("Megargee, Alonzo",), ("Miró, Joan",),
