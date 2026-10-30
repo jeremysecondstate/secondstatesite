@@ -91,6 +91,7 @@ def clean_display_text(value: object, *, strip_lot_markers: bool = False) -> str
 _ARTISTS = (
     ("Adams, Derrick",), ("Albers, Josef",), ("Alechinsky, Pierre",),
     ("Appel, Karel",), ("Arman",), ("Banksy",), ("Barnet, Will", "Will Barnett", "Barnett, Will"),
+    ("Baumann, Gustave",),
     ("Bearden, Romare Howard", "Romare Bearden", "Bearden, Romare"),
     ("Benton, Thomas Hart",), ("Botero, Fernando",), ("Braque, Georges",),
     ("Calder, Alexander", "Alexander (1898) Calder"), ("Catlett, Elizabeth",),
