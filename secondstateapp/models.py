@@ -5,8 +5,6 @@ from PIL import Image
 from io import BytesIO
 from django.core.files.base import ContentFile
 import os
-import uuid
-from django.utils import timezone
 
 
 class SoldPiece(models.Model):
@@ -502,85 +500,5 @@ class AuctionEmailBatchItem(models.Model):
         return f"{self.lot} in batch {self.batch_id}"
 
 
-class CoordinateCase(models.Model):
-    """Shared staff conversation; the website is the coordination system of record."""
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    title = models.CharField(max_length=160)
-    created_by = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
-    coordinator = models.CharField(max_length=80, default="manual-codex")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(default=timezone.now)
-    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
-    deleted_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
-    # Irreversible workspace removal retains delivery receipts and replay tombstones.
-    purged_at = models.DateTimeField(null=True, blank=True, db_index=True)
-
-    class Meta:
-        ordering = ["-updated_at", "id"]
-        constraints = [models.CheckConstraint(
-            condition=models.Q(purged_at__isnull=True) | models.Q(deleted_at__isnull=False),
-            name="coordinate_purged_requires_trash",
-        )]
-
-
-class CoordinateMessage(models.Model):
-    case = models.ForeignKey(CoordinateCase, on_delete=models.PROTECT, related_name="messages")
-    role = models.CharField(max_length=12, choices=[("staff", "Staff"), ("assistant", "Codex"), ("system", "System")])
-    body = models.TextField()
-    author = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
-    client_message_id = models.UUIDField(null=True, blank=True, unique=True)
-    in_reply_to = models.OneToOneField("self", null=True, blank=True, on_delete=models.PROTECT, related_name="worker_reply")
-    created_at = models.DateTimeField(auto_now_add=True)
-    deleted_at = models.DateTimeField(null=True, blank=True)
-    deleted_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
-
-    class Meta:
-        ordering = ["id"]
-
-
-class CoordinateJob(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    message = models.OneToOneField(CoordinateMessage, on_delete=models.PROTECT, related_name="job")
-    status = models.CharField(max_length=12, default="queued", choices=[
-        ("queued", "Queued"), ("processing", "Processing"), ("completed", "Completed"), ("retry", "Retry"),
-        ("cancelled", "Cancelled"),
-    ])
-    attempts = models.PositiveIntegerField(default=0)
-    claim_token = models.UUIDField(null=True, blank=True)
-    lease_expires_at = models.DateTimeField(null=True, blank=True)
-    available_at = models.DateTimeField(default=timezone.now)
-    last_error = models.CharField(max_length=300, blank=True)
-    worker_id = models.CharField(max_length=80, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    completion_digest = models.CharField(max_length=64, blank=True)
-
-    class Meta:
-        indexes = [models.Index(fields=["status", "available_at"], name="coordinate_pending_idx")]
-
-
-class CoordinateWorkerState(models.Model):
-    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
-    last_successful_check = models.DateTimeField(null=True, blank=True)
-
-
-class CoordinateActivity(models.Model):
-    case = models.ForeignKey(CoordinateCase, on_delete=models.PROTECT, related_name="activity")
-    job = models.ForeignKey(CoordinateJob, null=True, blank=True, on_delete=models.PROTECT, related_name="activity")
-    event = models.CharField(max_length=40)
-    details = models.JSONField(default=dict)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["id"]
-
-
-# Imported after the conversation models so Django registers the draft workflow.
-from .coordinate_models import CoordinateDraft, CoordinatePlan, CoordinateQuote, CoordinateResearch  # noqa: E402,F401
-from .coordinate_brief_models import CoordinateBrief  # noqa: E402,F401
-from .coordinate_intake_models import CoordinateDocument  # noqa: E402,F401
-from .coordinate_mail_models import CoordinateMailDelivery, CoordinateMailMessage, CoordinateMailThread  # noqa: E402,F401
-from .coordinate_outreach_models import CoordinateOutreachPolicy, CoordinateQuoteInquiry  # noqa: E402,F401
-from .inventory_models import InventoryCase, InventoryClaimRequest, InventoryJob, InventoryMessage, InventoryWorkerState  # noqa: E402,F401
+# Register the Calendar research queue models.
 from .research_queue_models import ResearchQueueItem, ResearchQueueOperation, ResearchQueueRun, ResearchQueueRunItem, ResearchQueueState  # noqa: E402,F401
