@@ -159,3 +159,87 @@ test("live and saved Boards count auction archive evidence separately from LiveA
   await context.window.SavedBidBoard.open({id: 1, title: "Example", saved_bid_board_url: "/saved/"});
   assert.match(context.document.body.textContent, /2 LiveArt \+ 1 auction archive · 3 unique sales used/);
 });
+
+function fiveCaseBoard() {
+  const cases = [
+    {key: "conservative", label: "Conservative", resale_hammer: "1040.00", origin: "evidence"},
+    {key: "working", label: "Working case", resale_hammer: "2200.00", origin: "evidence"},
+    {key: "upside_one_third", label: "Upside ⅓", resale_hammer: "4766.67", origin: "interpolated", basis: "One-third between working and optimistic resale assumptions."},
+    {key: "upside_two_thirds", label: "Upside ⅔", resale_hammer: "7333.33", origin: "interpolated", basis: "Two-thirds between working and optimistic resale assumptions."},
+    {key: "optimistic", label: "Optimistic", resale_hammer: "9900.00", origin: "evidence"},
+  ];
+  const cells = cases.map(c => ({...detail, bid: "2600.00", case_key: c.key, gross_resale_hammer: c.resale_hammer, all_in_acquisition: "3450.00"}));
+  return board({
+    cases, rows: [{bid: "2600.00", all_in_acquisition: "3450.00", cells}],
+    shortlist: cases.map((c, index) => ({case_key: c.key, label: `${c.label} ceiling`, bid: "2600.00", detail: cells[index]})),
+    selected_bid: "2600.00", selected_case: "upside_one_third", detail: cells[2],
+    profit_targets: [{minimum_profit: "100.00", ceilings: Object.fromEntries(cases.map(c => [c.key, "2600.00"]))}],
+  });
+}
+
+test("five cases render in order and intermediate cells remain selectable without new override inputs", async () => {
+  const data = fiveCaseBoard();
+  const {root, requests} = await mount(data);
+  const grid = root.querySelector(".ab-grid"), rows = grid.querySelectorAll("tr");
+  assert.equal(rows[0].children.length, 7);
+  assert.equal(rows[1].children.length, 7);
+  assert.deepEqual(rows[0].children.slice(2).map((th, index) => th.textContent.startsWith(data.cases[index].label)), [true, true, true, true, true]);
+  assert.match(rows[0].children[4].textContent, /Resale \$4,766\.67.*Interpolated assumption/);
+  assert.match(rows[0].children[5].textContent, /Resale \$7,333\.33.*Interpolated assumption/);
+  assert.equal(grid.classList.contains("ab-expanded-cases"), true);
+  assert.equal(root.querySelector(".ab-targets").querySelector("tr").children.length, 6);
+  assert.equal(root.querySelector(".ab-shortlist").children.length, 5);
+  assert.equal(root.querySelector(".ab-resale-fields").querySelectorAll("input").length, 3);
+  assert.match(root.querySelector(".ab-detail").textContent, /hammer · Upside ⅓/);
+  const intermediate = root.querySelectorAll(".ab-cell").find(cell => cell.dataset.caseKey === "upside_two_thirds");
+  assert.match(intermediate.attributes["aria-label"], /Upside ⅔/);
+  await intermediate.dispatch("click");
+  await new Promise(resolve => setImmediate(resolve));
+  const request = JSON.parse(requests.at(-1).options.body);
+  assert.equal(request.selected_case, "upside_two_thirds");
+  assert.equal(request.selected_bid, "2600.00");
+  assert.deepEqual(Object.keys(request.assumptions.resale_overrides), ["conservative", "working", "optimistic"]);
+});
+
+test("choosing an intermediate case preserves the grid's horizontal scroll after recalculation", async () => {
+  const {root} = await mount(fiveCaseBoard());
+  const previousWrap = root.querySelector(".ab-grid").parentElement;
+  previousWrap.scrollLeft = 480;
+  const intermediate = root.querySelectorAll(".ab-cell").find(cell => cell.dataset.caseKey === "upside_two_thirds");
+  await intermediate.dispatch("click");
+  await new Promise(resolve => setImmediate(resolve));
+  const refreshedWrap = root.querySelector(".ab-grid").parentElement;
+  assert.notEqual(refreshedWrap, previousWrap);
+  assert.equal(refreshedWrap.scrollLeft, 480);
+});
+
+test("saved five-case snapshots show intermediate labels, values and the saved selected cell", async () => {
+  const data = fiveCaseBoard();
+  const summary = {qualifying_bid: "2600.00", selected_bid: "2600.00", selected_case: "upside_one_third", qualifies: true, detail: data.detail};
+  const {context} = environment({ok: true, board: {analysis: data, assumptions: data.assumptions, summary}});
+  await context.window.SavedBidBoard.open({id: 1, title: "Example", saved_bid_board_url: "/saved/"});
+  const grid = context.document.body.querySelector(".ab-grid"), rows = grid.querySelectorAll("tr");
+  assert.equal(rows[0].children.length, 7);
+  assert.equal(rows[1].children.length, 7);
+  assert.match(rows[0].children[4].textContent, /Upside ⅓.*Resale \$4,766\.67/);
+  assert.match(rows[0].children[5].textContent, /Upside ⅔.*Resale \$7,333\.33/);
+  assert.match(context.document.body.querySelector(".sb-saved-selection").textContent, /Upside ⅓/);
+  assert.match(rows[1].children[4].textContent, /Selected/);
+  assert.equal(rows[1].children[4].classList.contains("sb-selected-cell"), true);
+  assert.doesNotMatch(context.document.body.textContent, /undefined/);
+});
+
+test("existing three-case saved snapshots keep their original three scenario columns", async () => {
+  const source = fiveCaseBoard(), keys = ["conservative", "working", "optimistic"];
+  const data = {...source, cases: source.cases.filter(c => keys.includes(c.key)),
+    rows: source.rows.map(row => ({...row, cells: row.cells.filter(cell => keys.includes(cell.case_key))})),
+    shortlist: source.shortlist.filter(pick => keys.includes(pick.case_key)), selected_case: "working"};
+  const {context} = environment({ok: true, board: {analysis: data, assumptions: data.assumptions,
+    summary: {qualifying_bid: "2600.00", selected_bid: "2600.00", selected_case: "working", qualifies: true}}});
+  await context.window.SavedBidBoard.open({id: 1, title: "Existing board", saved_bid_board_url: "/saved/"});
+  const grid = context.document.body.querySelector(".ab-grid"), rows = grid.querySelectorAll("tr");
+  assert.equal(rows[0].children.length, 5);
+  assert.equal(rows[1].children.length, 5);
+  assert.equal(grid.classList.contains("ab-expanded-cases"), false);
+  assert.doesNotMatch(grid.textContent, /Upside ⅓|Upside ⅔/);
+});

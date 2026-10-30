@@ -3,6 +3,7 @@
   "use strict";
   const cases = ["conservative", "working", "optimistic"];
   const labels = {conservative: "Conservative", working: "Working case", optimistic: "Optimistic"};
+  const labelForCase = (key, list = []) => labels[key] || list.find(c => (c.key || c.case_key) === key)?.label || key;
   const ceilings = {conservative: "Conservative ceiling", working: "Working-case ceiling", optimistic: "Optimistic stretch"};
   // Keep the server's rounded decimal strings exact even for a very large
   // theoretical break-even amount; Number can lose cents beyond 2^53.
@@ -133,7 +134,9 @@
       const taxBasis = {hammer: "hammer", hammer_premium: "hammer + premium", acquisition: "hammer + premium + acquisition costs"}[costsUsed.purchase_tax_basis];
       costSummary.textContent = `Costs assumed: ${pct(costsUsed.buyer_premium_pct)} buyer premium · ${pct(costsUsed.purchase_tax_pct)} tax on ${taxBasis} · ${pct(costsUsed.selling_commission_pct)} selling commission · ${money(costsUsed.acquisition_costs)} other acquisition + ${money(costsUsed.selling_costs)} other selling costs.`;
       const caseList = Array.isArray(data.cases) ? data.cases : cases.map(key => ({key, ...(data.cases?.[key] || {})}));
+      const displayKeys = caseList.map(c => c.key || c.case_key);
       caseList.forEach(c => {const key = c.key || c.case_key; if (basisTexts[key]) basisTexts[key].textContent = `${money(c.resale_hammer)} · ${c.basis || "No evidence available"}${c.origin === "manual" && !c.basis?.includes("Manual") ? " · Manual override" : ""}`;});
+      const gridScrollLeft = result.querySelector(".ab-grid")?.parentElement?.scrollLeft ?? 0;
       result.replaceChildren(); result.classList.remove("ab-stale"); result.removeAttribute("aria-label"); result.inert = saving; stale = false;
       fields.starting_hammer.removeAttribute("aria-describedby");
       notice.textContent += ` ${data.coverage_limit != null && data.empty_reason ? "No supported bid is available from this starting hammer." : data.assumptions.starting_basis === "current" ? "Current hammer is a reference; the grid starts at the next available bid." : "Opening hammer is available as the first bid."}`;
@@ -145,10 +148,11 @@
         const scenarioTitle = el("div", null, "ab-section-title");
         scenarioTitle.append(el("h3", "Resale scenarios"), el("small", "USD resale assumptions used to compare each bid"));
         const scenarioCards = el("div", null, "ab-scenarios");
+        scenarioCards.classList.toggle("ab-expanded-cases", caseList.length > 3);
         caseList.forEach(c => {
           const key = c.key || c.case_key, card = el("div", null, "ab-scenario-card");
-          card.append(el("span", labels[key] || c.label), el("strong", money(c.resale_hammer)));
-          card.append(el("small", c.origin === "manual" ? "Manual resale assumption" : c.resale_hammer != null ? "From selected sold evidence" : "Add eligible evidence or a manual resale assumption"));
+          card.append(el("span", labelForCase(key, caseList)), el("strong", money(c.resale_hammer)));
+          card.append(el("small", c.origin === "manual" ? "Manual resale assumption" : c.origin === "interpolated" ? "Between working and optimistic" : c.resale_hammer != null ? "From selected sold evidence" : "Add eligible evidence or a manual resale assumption"));
           if (c.basis && c.resale_hammer != null) card.append(el("p", c.basis));
           scenarioCards.append(card);
         });
@@ -176,9 +180,10 @@
       }
       const pickTitle = el("div", null, "ab-section-title"); pickTitle.append(el("span", "BIDS TO REVIEW", "ab-overline"), el("small", data.coverage_limit == null ? "Highest available bid meeting both minimums in each case" : "Highest supported bid meeting both minimums within the known tier limits"));
       const picks = el("div", null, "ab-shortlist");
+      picks.classList.toggle("ab-expanded-cases", (data.shortlist || []).length > 3);
       (data.shortlist || []).forEach(pick => {
         const key = pick.case_key || pick.key, button = el("button", null, "ab-pick"); button.type = "button";
-        button.append(el("span", pick.label || ceilings[key] || labels[key]), el("strong", pick.bid == null ? "No qualifying bid" : money(pick.bid)));
+        button.append(el("span", pick.label || ceilings[key] || labelForCase(key, caseList)), el("strong", pick.bid == null ? "No qualifying bid" : money(pick.bid)));
         button.disabled = pick.bid == null;
         button.setAttribute("aria-pressed", String(pick.bid === selectedBid && key === selectedCase));
         if (pick.detail) button.append(el("small", `${money(pick.detail.net_profit)} profit · ${pct(pick.detail.return_on_cost_pct)} return`));
@@ -193,11 +198,12 @@
       tableTitle.append(el("h3", "The bid × resale grid"), el("small", "Each cell: net profit / return on cost. ✓ meets both minimums."));
       const wrap = el("div", null, "ab-table-wrap"); wrap.tabIndex = 0; wrap.setAttribute("role", "region"); wrap.setAttribute("aria-label", "Bid by resale scenarios, scroll horizontally on small screens");
       const table = el("table", null, "ab-grid"), head = el("thead"), headRow = el("tr"), body = el("tbody");
-      ["Purchase hammer", "All-in cost", ...cases.map(key => labels[key])].forEach((label, i) => {
+      table.classList.toggle("ab-expanded-cases", displayKeys.length > 3);
+      ["Purchase hammer", "All-in cost", ...displayKeys.map(key => labelForCase(key, caseList))].forEach((label, i) => {
         const th = el("th", label); th.scope = "col";
         if (i > 1) {
-          const c = caseList.find(c => (c.key || c.case_key) === cases[i-2]);
-          th.append(el("small", `Resale ${money(c?.resale_hammer)}`), el("small", c?.origin === "manual" ? "Manual override" : c?.origin === "evidence" ? "Selected evidence" : "No resale evidence"));
+          const c = caseList.find(c => (c.key || c.case_key) === displayKeys[i-2]);
+          th.append(el("small", `Resale ${money(c?.resale_hammer)}`), el("small", c?.origin === "manual" ? "Manual override" : c?.origin === "interpolated" ? "Interpolated assumption" : c?.origin === "evidence" ? "Selected evidence" : "No resale evidence"));
           if (c?.basis) th.title = c.basis;
         }
         headRow.append(th);
@@ -207,13 +213,13 @@
         const tr = el("tr"); tr.classList.toggle("ab-active-row", row.bid === selectedBid);
         const th = el("th"); th.scope = "row"; th.append(el("strong", money(row.bid)), el("small", row.label || (row.is_reference ? "Current · reference" : "Available bid")));
         tr.append(th, el("td", money(row.all_in_acquisition ?? row.cells?.[0]?.all_in_acquisition)));
-        (row.cells || []).forEach(cell => {
-          const key = cell.case_key || cell.key, td = el("td");
-          if (cell.net_profit == null) {td.append(el("span", "No resale evidence", "ab-muted")); tr.append(td); return;}
+        displayKeys.forEach(key => {
+          const cell = row.cells?.find(value => (value.case_key || value.key) === key), td = el("td");
+          if (cell?.net_profit == null) {td.append(el("span", "No resale evidence", "ab-muted")); tr.append(td); return;}
           const button = el("button", null, "ab-cell"); button.type = "button";
           button.dataset.bid = row.bid; button.dataset.caseKey = key;
           button.setAttribute("aria-pressed", String(row.bid === selectedBid && key === selectedCase));
-          button.setAttribute("aria-label", `${money(row.bid)} hammer, ${labels[key]}, net ${money(cell.net_profit)}, return ${pct(cell.return_on_cost_pct)}, ${cell.qualifies ? "meets both minimums" : "below minimums"}${row.is_reference ? ", current reference only" : ""}`);
+          button.setAttribute("aria-label", `${money(row.bid)} hammer, ${labelForCase(key, caseList)}, net ${money(cell.net_profit)}, return ${pct(cell.return_on_cost_pct)}, ${cell.qualifies ? "meets both minimums" : "below minimums"}${row.is_reference ? ", current reference only" : ""}`);
           button.append(el("strong", money(cell.net_profit), Number(cell.net_profit) < 0 ? "ab-loss" : ""), el("small", `${pct(cell.return_on_cost_pct)} return ${cell.qualifies ? "✓" : "×"}`));
           button.addEventListener("click", () => choose(row.bid, key)); td.append(button); tr.append(td);
         }); body.append(tr);
@@ -225,16 +231,18 @@
       previous.addEventListener("click", () => {page = Math.max(0, page-1); persistDraft(false); update();}); next.addEventListener("click", () => {page++; persistDraft(false); update();});
       pagination.append(el("span", `Page ${page+1} of ${data.pagination?.page_count || 1} · ${data.rows.length} bid levels shown`), previous, next);
       result.append(tableTitle, wrap, pagination, el("p", data.calculation_basis, "ab-muted"));
+      wrap.scrollLeft = gridScrollLeft;
       if (data.detail) renderDetail(data.detail, data);
       const targets = el("details", null, "ab-disclosure"); targets.append(el("summary", "Compare more profit targets"));
       const targetWrap = el("div", null, "ab-table-wrap"), targetTable = el("table", null, "ab-targets"), targetHead = el("tr");
-      ["Minimum profit", ...cases.map(key => labels[key])].forEach(label => targetHead.append(el("th", label))); targetTable.append(targetHead);
-      (data.profit_targets || []).forEach(target => {const tr = el("tr"); tr.append(el("th", money(target.target_profit ?? target.minimum_profit))); cases.forEach(key => {const bid = target.ceilings?.[key]?.bid ?? target.ceilings?.[key], cell = el("td", bid == null || typeof bid === "object" ? "No available bid" : money(bid)); if (target.coverage_limited?.[key]) cell.append(el("small", "At known tier limit")); tr.append(cell);}); targetTable.append(tr);});
+      targetTable.classList.toggle("ab-expanded-cases", displayKeys.length > 3);
+      ["Minimum profit", ...displayKeys.map(key => labelForCase(key, caseList))].forEach(label => targetHead.append(el("th", label))); targetTable.append(targetHead);
+      (data.profit_targets || []).forEach(target => {const tr = el("tr"); tr.append(el("th", money(target.target_profit ?? target.minimum_profit))); displayKeys.forEach(key => {const bid = target.ceilings?.[key]?.bid ?? target.ceilings?.[key], cell = el("td", bid == null || typeof bid === "object" ? "No available bid" : money(bid)); if (target.coverage_limited?.[key]) cell.append(el("small", "At known tier limit")); tr.append(cell);}); targetTable.append(tr);});
       targetWrap.append(targetTable); targets.append(el("p", data.coverage_limit == null ? "Maximum available hammer with the return floor applied." : "Highest supported hammer with the return floor applied. Higher bids require additional verified tier rules.", "ab-muted"), targetWrap); result.append(targets);
     }
     function renderDetail(detail, data) {
       const panel = el("section", null, "ab-detail");
-      const title = el("div", null, "ab-section-title"); title.append(el("h3", `${money(detail.bid ?? detail.hammer)} hammer · ${labels[detail.case_key] || labels[selectedCase]}`));
+      const title = el("div", null, "ab-section-title"); title.append(el("h3", `${money(detail.bid ?? detail.hammer)} hammer · ${labelForCase(detail.case_key || selectedCase, Array.isArray(data.cases) ? data.cases : [])}`));
       const next = detail.one_more_bid;
       const nextAvailable = next?.bid != null && next.available !== false;
       const more = el("button", "One more bid →"); more.type = "button"; more.disabled = !nextAvailable;

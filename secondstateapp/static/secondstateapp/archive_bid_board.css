@@ -58,3 +58,10 @@ body:has(.sb-dialog[open]){overflow:hidden}
 .sb-evidence-list li{padding:10px 0;border-bottom:1px solid var(--ab-line)}
 .sb-evidence-list p{margin:4px 0 0}
 @media(max-width:620px){.sb-dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}.sb-dialog-inner{padding:18px 16px 24px}.sb-dialog-header{gap:12px}.sb-dialog-header h2{font-size:24px}.sb-saved-selection{padding:15px}.sb-saved-selection h3{font-size:24px}.sb-dialog .ab-metrics{gap:18px 12px}.sb-email-label{font-size:12px}.sb-view-button{min-height:40px}}
+
+/* Intermediate resale cases retain full cells inside the scrollable grid. */
+.ab-grid.ab-expanded-cases,.ab-targets.ab-expanded-cases{min-width:960px}
+.ab-grid.ab-expanded-cases th:first-child{width:14%}.ab-grid.ab-expanded-cases th:nth-child(2){width:12%}
+.ab-shortlist.ab-expanded-cases,.ab-scenarios.ab-expanded-cases{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:1000px){.ab-shortlist.ab-expanded-cases,.ab-scenarios.ab-expanded-cases{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.ab-shortlist.ab-expanded-cases,.ab-scenarios.ab-expanded-cases{grid-template-columns:1fr}}

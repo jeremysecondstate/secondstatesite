@@ -3,6 +3,7 @@
   "use strict";
   const caseKeys = ["conservative", "working", "optimistic"];
   const labels = {conservative: "Conservative", working: "Working case", optimistic: "Optimistic"};
+  const labelForCase = (key, list = []) => labels[key] || list.find(c => (c.key || c.case_key) === key)?.label || key;
   const parts = value => value == null || value === "" ? null : /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(value));
   const grouped = digits => new Intl.NumberFormat("en-US").format(BigInt(digits));
   const money = value => {const match = parts(value); return match ? `${match[1]}$${grouped(match[2])}.${(match[3] || "").padEnd(2, "0")}` : "Unavailable";};
@@ -97,7 +98,9 @@
     const data = board.analysis || {}, summary = board.summary || lot.saved_bid_board || {};
     const assumptions = board.assumptions || data.assumptions || {};
     const detail = summary.detail || data.detail;
-    const caseLabel = summary.selected_case_label || labels[summary.selected_case || data.selected_case] || "Saved case";
+    const caseList = Array.isArray(data.cases) ? data.cases : caseKeys.map(key => ({key, ...data.cases?.[key]}));
+    const displayKeys = caseList.map(c => c.key || c.case_key);
+    const caseLabel = summary.selected_case_label || labelForCase(summary.selected_case || data.selected_case, caseList) || "Saved case";
     const selected = el("section", null, "sb-saved-selection");
     selected.append(el("span", "SAVED BID · USD HAMMER", "ab-overline"));
     selected.append(el("h3", summary.qualifying_bid == null ? (summary.qualifies == null ? "Qualifying Bid: Unavailable" : "No qualifying bid") : `Qualifying Bid: ${money(summary.qualifying_bid)}`));
@@ -117,24 +120,25 @@
     root.append(el("p", `${source.artprice_included_count || 0} Artprice + ${source.liveart_selected_count || 0} LiveArt${source.archive_selected_count ? ` + ${source.archive_selected_count} auction archive` : ""} · ${source.combined_comp_count || 0} unique sales used`, "ab-muted"));
 
     const picks = el("section", null, "ab-shortlist sb-saved-shortlist");
+    picks.classList.toggle("ab-expanded-cases", (data.shortlist || []).length > 3);
     (data.shortlist || []).forEach(pick => {
       const item = el("div", null, "ab-pick");
-      item.append(el("span", pick.label || labels[pick.case_key]), el("strong", pick.bid == null ? (pick.reason === "Resale assumption unavailable" ? "Unavailable" : "No qualifying bid") : money(pick.bid)));
+      item.append(el("span", pick.label || labelForCase(pick.case_key || pick.key, caseList)), el("strong", pick.bid == null ? (pick.reason === "Resale assumption unavailable" ? "Unavailable" : "No qualifying bid") : money(pick.bid)));
       if (pick.detail) item.append(el("small", `${money(pick.detail.net_profit)} profit · ${pct(pick.detail.return_on_cost_pct)} return`));
       if (pick.coverage_limited) item.append(el("small", pick.reason || "Limited by known bid tiers; higher bids have not been evaluated."));
       else if (pick.bid == null) item.append(el("small", pick.reason || "No bid meets both minimums."));
       picks.append(item);
     });
     root.append(picks);
-    const caseList = Array.isArray(data.cases) ? data.cases : caseKeys.map(key => ({key, ...data.cases?.[key]}));
     if (data.rows?.length) {
       root.append(el("h3", "Saved bid × resale grid"));
       root.append(el("p", `Saved page ${(data.pagination?.page || 0) + 1} of ${data.pagination?.page_count || 1} · ${data.rows.length} bid levels captured. Each cell shows profit and return on cost; ✓ meets both saved minimums.`, "ab-muted"));
       const wrap = el("div", null, "ab-table-wrap"); wrap.tabIndex = 0; wrap.setAttribute("role", "region"); wrap.setAttribute("aria-label", "Saved bid and resale scenarios; scroll horizontally on small screens");
       const table = el("table", null, "ab-grid"), head = el("thead"), header = el("tr"), body = el("tbody");
-      ["Purchase hammer", "All-in cost", ...caseKeys.map(key => labels[key])].forEach((label, index) => {
+      table.classList.toggle("ab-expanded-cases", displayKeys.length > 3);
+      ["Purchase hammer", "All-in cost", ...displayKeys.map(key => labelForCase(key, caseList))].forEach((label, index) => {
         const th = el("th", label); th.scope = "col";
-        if (index > 1) th.append(el("small", `Resale ${money(caseList.find(c => (c.key || c.case_key) === caseKeys[index - 2])?.resale_hammer)}`));
+        if (index > 1) th.append(el("small", `Resale ${money(caseList.find(c => (c.key || c.case_key) === displayKeys[index - 2])?.resale_hammer)}`));
         header.append(th);
       });
       head.append(header);
@@ -142,7 +146,7 @@
         const tr = el("tr"); tr.classList.toggle("ab-active-row", row.bid === summary.selected_bid);
         const th = el("th", money(row.bid)); th.scope = "row"; if (row.label) th.append(el("small", row.label));
         tr.append(th, el("td", money(row.all_in_acquisition)));
-        caseKeys.forEach(key => {
+        displayKeys.forEach(key => {
           const cell = row.cells?.find(value => (value.case_key || value.key) === key), td = el("td");
           if (cell?.net_profit == null) td.append(el("span", "No resale evidence", "ab-muted"));
           else {
@@ -171,7 +175,7 @@
     if (detail) costs.append(metrics([["Selected bid · buyer premium", money(detail.buyer_premium)], ["Selected bid · purchase tax", money(detail.purchase_tax)], ["Selected bid · break-even resale", money(detail.break_even_resale)]]));
     if (assumptions.increment_mode === "tiers") (assumptions.tiers || []).forEach(tier => costs.append(el("p", `${tier.up_to == null ? "No upper limit" : `Up to ${money(tier.up_to)}`}: ${money(tier.increment)} increment`, "ab-muted")));
     if (data.increment_notice) costs.append(el("p", data.increment_notice, "ab-muted"));
-    caseList.forEach(c => costs.append(el("p", `${labels[c.key || c.case_key]}: ${money(c.resale_hammer)} · ${c.basis || "No resale evidence"}`, "ab-muted")));
+    caseList.forEach(c => costs.append(el("p", `${labelForCase(c.key || c.case_key, caseList)}: ${money(c.resale_hammer)} · ${c.basis || "No resale evidence"}`, "ab-muted")));
     root.append(costs);
 
     const evidence = el("details", null, "ab-disclosure"), records = board.evidence_snapshot?.selected_records || [];

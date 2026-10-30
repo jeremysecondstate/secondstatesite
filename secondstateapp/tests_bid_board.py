@@ -91,7 +91,8 @@ class BidBoardCalculationTests(SimpleTestCase):
         assumptions = self.assumptions(increment_mode="tiers", tiers=[{"up_to": "1300", "increment": "100"}],
                                        minimum_profit="100", resale_overrides={"conservative": "1200", "working": "5000"})
         board = build_board(assumptions)
-        conservative, working, optimistic = board["shortlist"]
+        picks = {pick["case_key"]: pick for pick in board["shortlist"]}
+        conservative, working, optimistic = (picks[key] for key in ("conservative", "working", "optimistic"))
         self.assertEqual(conservative["bid"], "1100.00")
         self.assertFalse(conservative["coverage_limited"])
         self.assertEqual(conservative["label"], "Conservative ceiling")
@@ -102,7 +103,10 @@ class BidBoardCalculationTests(SimpleTestCase):
         self.assertFalse(optimistic["coverage_limited"])
         self.assertTrue(any("Bids above this amount are not evaluated" in notice for notice in board["notices"]))
         target = next(item for item in board["profit_targets"] if item["minimum_profit"] == "100.00")
-        self.assertEqual(target["coverage_limited"], {"conservative": False, "working": True, "optimistic": False})
+        self.assertEqual(target["coverage_limited"], {
+            "conservative": False, "working": True, "upside_one_third": False,
+            "upside_two_thirds": False, "optimistic": False,
+        })
         with self.assertRaisesMessage(BidBoardError, "not an available bid"):
             build_board(assumptions, selected_bid="1400")
 
@@ -160,7 +164,7 @@ class BidBoardCalculationTests(SimpleTestCase):
         self.assertTrue(first["pagination"]["has_next"])
         last = build_board(assumptions, page=first["pagination"]["page_count"] - 1)
         self.assertTrue(any(Decimal(cell["net_profit"]) < 0 for row in last["rows"] for cell in row["cells"]))
-        optimistic = first["shortlist"][2]
+        optimistic = next(pick for pick in first["shortlist"] if pick["case_key"] == "optimistic")
         self.assertLess(Decimal(optimistic["conservative_downside"]["net_profit"]), 0)
         self.assertEqual(optimistic["detail"]["bid"], optimistic["conservative_downside"]["bid"])
 
@@ -186,6 +190,70 @@ class BidBoardCalculationTests(SimpleTestCase):
         self.assertIn("4100.00", [row["bid"] for row in result["rows"]])
         self.assertTrue(all("all_in_acquisition" in row for row in result["rows"]))
         self.assertIn("650.00", [target["minimum_profit"] for target in result["profit_targets"]])
+
+    def test_two_upside_stops_split_effective_resale_range_and_calculate_each_cell(self):
+        evidence = [
+            {"key": "downside", "resale_hammer": "800.00"},
+            {"key": "typical", "resale_hammer": "2200.00"},
+            {"key": "upside", "resale_hammer": "9900.00"},
+        ]
+        board = build_board(self.assumptions(), evidence, {"combined_comp_count": 3},
+                            selected_bid="1000", selected_case="upside_one_third")
+        keys = ["conservative", "working", "upside_one_third", "upside_two_thirds", "optimistic"]
+        self.assertEqual([case["key"] for case in board["cases"]], keys)
+        self.assertEqual([case["resale_hammer"] for case in board["cases"]],
+                         ["800.00", "2200.00", "4766.67", "7333.33", "9900.00"])
+        for case, fraction in zip(board["cases"][2:4], ("One-third", "Two-thirds")):
+            self.assertEqual(case["origin"], "interpolated")
+            self.assertIn(fraction, case["basis"])
+            self.assertIn("working and optimistic", case["basis"])
+        self.assertEqual(board["selected_case"], "upside_one_third")
+        self.assertEqual(board["detail"]["gross_resale_hammer"], "4766.67")
+        self.assertEqual(board["detail"]["net_profit"], "3766.67")
+        self.assertEqual([cell["case_key"] for cell in board["rows"][0]["cells"]], keys)
+        self.assertEqual(board["rows"][0]["cells"][2]["net_profit"], "3766.67")
+        self.assertEqual({pick["case_key"]: pick["bid"] for pick in board["shortlist"]}, {
+            "conservative": None, "working": "2200.00", "upside_one_third": "4700.00",
+            "upside_two_thirds": "7300.00", "optimistic": "9900.00",
+        })
+        target = next(item for item in board["profit_targets"] if item["minimum_profit"] == "500.00")
+        self.assertEqual(target["ceilings"]["upside_one_third"], "4200.00")
+        self.assertEqual(target["ceilings"]["upside_two_thirds"], "6800.00")
+
+    def test_upside_stops_use_manual_anchor_override_without_adding_editable_overrides(self):
+        board = build_board(self.assumptions(resale_overrides={"working": "3300"}), [
+            {"key": "typical", "resale_hammer": "2200.00"},
+            {"key": "upside", "resale_hammer": "9900.00"},
+        ])
+        by_case = {case["key"]: case for case in board["cases"]}
+        self.assertEqual(by_case["upside_one_third"]["resale_hammer"], "5500.00")
+        self.assertEqual(by_case["upside_two_thirds"]["resale_hammer"], "7700.00")
+        self.assertEqual(set(board["assumptions"]["resale_overrides"]), {"conservative", "working", "optimistic"})
+        with self.assertRaises(BidBoardError):
+            normalize_assumptions({"resale_overrides": {"upside_one_third": "5500"}})
+
+    def test_upside_stops_round_each_fraction_independently_to_cents(self):
+        for working, optimistic, expected in (
+            ("0.00", "0.01", ["0.00", "0.01"]),
+            ("0.01", "0.00", ["0.01", "0.00"]),
+            ("1000.00", "1000.02", ["1000.01", "1000.01"]),
+        ):
+            with self.subTest(working=working, optimistic=optimistic):
+                board = build_board({"resale_overrides": {"working": working, "optimistic": optimistic}})
+                self.assertEqual([case["resale_hammer"] for case in board["cases"][2:4]], expected)
+
+    def test_upside_stops_keep_missing_equal_and_reversed_anchors_explicit(self):
+        for overrides in ({}, {"working": "2200"}, {"optimistic": "9900"}):
+            with self.subTest(overrides=overrides):
+                board = build_board(self.assumptions(resale_overrides=overrides), selected_case="upside_two_thirds")
+                self.assertTrue(all(case["resale_hammer"] is None for case in board["cases"][2:4]))
+                self.assertIsNone(board["detail"])
+                self.assertTrue(all(pick["bid"] is None for pick in board["shortlist"][2:4]))
+        equal = build_board({"resale_overrides": {"working": "2200", "optimistic": "2200"}})
+        self.assertEqual([case["resale_hammer"] for case in equal["cases"][2:4]], ["2200.00", "2200.00"])
+        reversed_board = build_board({"resale_overrides": {"conservative": "1000", "working": "9900", "optimistic": "2200"}})
+        self.assertEqual([case["resale_hammer"] for case in reversed_board["cases"][2:4]], ["7333.33", "4766.67"])
+        self.assertTrue(any("not in ascending order" in notice for notice in reversed_board["notices"]))
 
 
 class BidBoardAPITests(TestCase):
@@ -252,6 +320,26 @@ class BidBoardAPITests(TestCase):
         self.assertEqual(loaded["assumptions"]["minimum_profit"], "650.00")
         self.assertEqual(loaded["selected_case"], "optimistic")
         self.assertEqual(loaded["selected_ids"], ["501"])
+
+    def test_interpolated_cell_selection_survives_save_and_reload(self):
+        for selected_case, expected_resale in (
+            ("upside_one_third", "4766.67"), ("upside_two_thirds", "7333.33"),
+        ):
+            with self.subTest(selected_case=selected_case):
+                response = self.post(
+                    action="save", selected_case=selected_case, selected_bid="1400",
+                    assumptions={"resale_overrides": {"working": "2200", "optimistic": "9900"}},
+                )
+                self.assertEqual(response.status_code, 200, response.content)
+                stored = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+                loaded = self.client.get(self.url).json()["analysis"]
+                for board in (response.json()["analysis"], stored.analysis, loaded):
+                    self.assertEqual(board["selected_case"], selected_case)
+                    self.assertEqual(board["selected_bid"], "1400.00")
+                    self.assertEqual(board["detail"]["gross_resale_hammer"], expected_resale)
+                    self.assertEqual(len(board["cases"]), 5)
+                self.assertEqual(response.json()["saved_board"]["selected_case"], selected_case)
+                self.assertEqual(set(stored.assumptions["resale_overrides"]), {"conservative", "working", "optimistic"})
 
     def test_finite_tiers_save_reload_and_keep_coverage_warning(self):
         self.save_research()
@@ -473,8 +561,10 @@ class BidBoardAPITests(TestCase):
         evidence = {"research_id": "session-proof", "selected_ids": [item["id"] for item in candidates]}
         result = self.post(**evidence).json()["analysis"]
         self.assertEqual(result["source_summary"]["combined_comp_count"], 12)
-        self.assertEqual([case["resale_hammer"] for case in result["cases"]], ["1600.00", "2550.00", "3410.00"])
-        self.assertTrue(all(case["origin"] == "evidence" for case in result["cases"]))
+        self.assertEqual([case["resale_hammer"] for case in result["cases"]],
+                         ["1600.00", "2550.00", "2836.67", "3123.33", "3410.00"])
+        self.assertEqual([case["origin"] for case in result["cases"]],
+                         ["evidence", "evidence", "interpolated", "interpolated", "evidence"])
         self.assertIsNone(result["assumptions"]["starting_hammer"])
         self.assertEqual(result["rows"], [])
         self.assertEqual(result["shortlist"], [])

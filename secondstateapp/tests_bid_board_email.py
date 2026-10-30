@@ -24,14 +24,14 @@ class SavedBidBoardEmailTests(TestCase):
             artprice_url="https://www.artprice.com/artist/1/picasso/lots/pasts",
         )
 
-    def saved_board(self, *, include=True, selected_bid="1800", **overrides):
+    def saved_board(self, *, include=True, selected_bid="1800", selected_case="working", **overrides):
         assumptions = {
             "starting_hammer": "1000", "starting_basis": "current", "buyer_premium_pct": "25",
             "acquisition_costs": "200", "minimum_profit": "500", "minimum_return_pct": "20",
             "resale_overrides": {"conservative": "800", "working": "3000", "optimistic": "7000"},
             **overrides,
         }
-        board = build_board(assumptions, selected_bid=selected_bid)
+        board = build_board(assumptions, selected_bid=selected_bid, selected_case=selected_case)
         return AuctionBidBoardAnalysis.objects.create(
             lot=self.lot, assumptions=board["assumptions"], analysis=board,
             evidence_snapshot={"selected_records": [{"id": "saved-evidence", "hammer_usd": "3000.00"}]},
@@ -85,6 +85,31 @@ class SavedBidBoardEmailTests(TestCase):
         self.assertIn("Does not meet both minimums", email.text_body)
         self.assertIn("Does not meet both minimums", email.html_body)
 
+    def test_interpolated_selected_case_and_five_columns_use_exact_saved_email_values(self):
+        record = self.saved_board(
+            selected_case="upside_one_third",
+            resale_overrides={"conservative": "800", "working": "2200", "optimistic": "9900"},
+        )
+        original = deepcopy(record.analysis)
+        with patch("secondstateapp.bid_board.build_board", side_effect=AssertionError("Must use saved snapshot")):
+            email = compose_auction_email([self.lot])
+        saved = email.lot_snapshots[self.lot.pk]["bid_board"]
+        self.assertEqual(saved["analysis"], {**original, "saved": True, "updated_at": record.updated_at.isoformat(),
+                                           "evidence_changed_since_save": False})
+        self.assertEqual(saved["summary"]["selected_case"], "upside_one_third")
+        self.assertEqual(saved["summary"]["qualifying_bid"], "3000.00")
+        self.assertEqual(len(saved["email"]["cases"]), 5)
+        self.assertTrue(all(len(row["cells"]) == 5 for row in saved["email"]["rows"]))
+        for body in (email.text_body, email.html_body):
+            self.assertIn("Upside ⅓", body)
+            self.assertIn("Upside ⅔", body)
+            self.assertIn("$4,766.67", body)
+            self.assertIn("$7,333.33", body)
+            self.assertIn("One-third between working and optimistic", body)
+        record.analysis["cases"][2]["resale_hammer"] = "1.00"
+        record.save(update_fields=["analysis"])
+        self.assertEqual(saved["analysis"]["cases"][2]["resale_hammer"], "4766.67")
+
     def test_saved_board_text_is_escaped_in_html(self):
         record = self.saved_board()
         record.analysis["cases"][0]["basis"] = '<script>alert("unsafe")</script>'
@@ -130,7 +155,7 @@ class SavedBidBoardEmailTests(TestCase):
     )
     @patch("secondstateapp.calendar_views.send_auction_email", return_value="test-message-id")
     def test_delivery_audit_freezes_included_board_at_send_time(self, send):
-        record = self.saved_board()
+        record = self.saved_board(selected_case="upside_two_thirds")
         batch = AuctionEmailBatch.objects.create()
         item = AuctionEmailBatchItem.objects.create(batch=batch, lot=self.lot, selected_by=self.staff)
         response = self.client.post(reverse("auction_email_send"), {"recipients": ["jeremy"]})
@@ -139,6 +164,8 @@ class SavedBidBoardEmailTests(TestCase):
         self.assertIn("$1,800.00", send.call_args.kwargs["html_body"])
         item.refresh_from_db()
         frozen = deepcopy(item.lot_snapshot["bid_board"])
+        self.assertEqual(frozen["summary"]["selected_case"], "upside_two_thirds")
+        self.assertEqual(len(frozen["analysis"]["cases"]), 5)
         record.analysis["selected_bid"] = "2000.00"
         record.include_in_email = False
         record.save(update_fields=("analysis", "include_in_email"))

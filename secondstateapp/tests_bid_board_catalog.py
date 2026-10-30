@@ -110,6 +110,50 @@ class SavedBidBoardCatalogTests(TestCase):
         self.assertEqual(summary["selected_bid"], "1200.00")
         self.assertEqual(summary["selected_case"], "conservative")
 
+    def test_legacy_three_case_snapshot_stays_frozen_until_explicit_resave(self):
+        record = self.save_board()
+        original_keys = {"conservative", "working", "optimistic"}
+        for field, key in (("cases", "key"), ("shortlist", "case_key")):
+            record.analysis[field] = [item for item in record.analysis[field] if item[key] in original_keys]
+        for row in record.analysis["rows"]:
+            row["cells"] = [cell for cell in row["cells"] if cell["case_key"] in original_keys]
+        for target in record.analysis["profit_targets"]:
+            for field in ("ceilings", "coverage_limited"):
+                target[field] = {key: value for key, value in target[field].items() if key in original_keys}
+        record.save(update_fields=["analysis"])
+        original = deepcopy(record.analysis)
+        saved_at = record.updated_at
+        with patch("secondstateapp.bid_board_views.build_board", side_effect=AssertionError("Must use saved snapshot")):
+            snapshot = self.client.get(self.saved_url).json()["board"]
+        self.assertEqual(snapshot["analysis"]["cases"], original["cases"])
+        self.assertEqual(snapshot["analysis"]["rows"], original["rows"])
+        preview = self.client.get(self.edit_url)
+        self.assertEqual(preview.status_code, 200, preview.content)
+        self.assertEqual(len(preview.json()["analysis"]["cases"]), 5)
+        record.refresh_from_db()
+        self.assertEqual(record.analysis, original)
+        self.assertEqual(record.updated_at, saved_at)
+        response = self.client.post(self.edit_url, '{"action":"save"}', content_type="application/json")
+        self.assertEqual(response.status_code, 200, response.content)
+        record.refresh_from_db()
+        self.assertEqual(len(record.analysis["cases"]), 5)
+        self.assertEqual(record.analysis["selected_case"], "working")
+
+    def test_interpolated_selected_case_summary_uses_its_saved_qualifying_bid(self):
+        record = self.save_board(
+            selected_case="upside_one_third", selected_bid="1400",
+            assumptions={"resale_overrides": {"working": "2200", "optimistic": "9900"}},
+        )
+        with patch("secondstateapp.bid_board_views.build_board", side_effect=AssertionError("Must use saved snapshot")):
+            snapshot = self.client.get(self.saved_url).json()["board"]
+        self.assertEqual(snapshot["summary"]["selected_case"], "upside_one_third")
+        self.assertEqual(snapshot["summary"]["selected_case_label"], "Upside ⅓")
+        self.assertEqual(snapshot["summary"]["selected_bid"], "1400.00")
+        self.assertEqual(snapshot["summary"]["qualifying_bid"], "3000.00")
+        self.assertEqual(snapshot["summary"]["detail"]["gross_resale_hammer"], "4766.67")
+        record.refresh_from_db()
+        self.assertEqual(snapshot["analysis"]["cases"], record.analysis["cases"])
+
     def test_nonqualifying_selection_is_not_presented_as_the_qualifying_ceiling(self):
         self.save_board(selected_bid="2000")
         summary = self.client.get(self.saved_url).json()["board"]["summary"]

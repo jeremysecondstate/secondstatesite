@@ -11,7 +11,8 @@ from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_HALF_UP
 CENT = Decimal("0.01")
 MAX_MONEY = Decimal("1000000000000")
 CASE_KEYS = ("conservative", "working", "optimistic")
-CASE_LABELS = dict(zip(CASE_KEYS, ("Conservative", "Working", "Optimistic")))
+BOARD_CASE_KEYS = ("conservative", "working", "upside_one_third", "upside_two_thirds", "optimistic")
+CASE_LABELS = dict(zip(BOARD_CASE_KEYS, ("Conservative", "Working", "Upside ⅓", "Upside ⅔", "Optimistic")))
 DEFAULT_TIERS = [
     {"up_to": "1000.00", "increment": "50.00"},
     {"up_to": "5000.00", "increment": "100.00"},
@@ -245,7 +246,7 @@ def build_board(assumptions, evidence_scenarios=None, source_summary=None, *, pa
     assumptions = normalize_assumptions(assumptions)
     if isinstance(page, bool) or not isinstance(page, int) or page < 0 or page > 100000000000000:
         raise BidBoardError("Choose a valid bid page.")
-    if selected_case not in CASE_KEYS:
+    if selected_case not in BOARD_CASE_KEYS:
         raise BidBoardError("Choose a valid resale case.")
     evidence = {scenario["key"]: scenario for scenario in evidence_scenarios or []}
     cases = []
@@ -262,9 +263,26 @@ def build_board(assumptions, evidence_scenarios=None, source_summary=None, *, pa
         notices.append("No eligible selected sale evidence. Manual resale assumptions, when supplied, are not evidence-derived.")
     elif count < 3:
         notices.append(f"Only {count} unique selected sale{'s' if count != 1 else ''}; these sensitivity cases use limited evidence.")
-    values = [Decimal(case["resale_hammer"]) for case in cases if case["resale_hammer"] is not None]
-    if len(values) == 3 and not values[0] <= values[1] <= values[2]:
+    anchor_values = [Decimal(case["resale_hammer"]) for case in cases if case["resale_hammer"] is not None]
+    if len(anchor_values) == 3 and not anchor_values[0] <= anchor_values[1] <= anchor_values[2]:
         notices.append("Manual resale cases are not in ascending order; review the assumptions.")
+    working, optimistic = cases[1]["resale_hammer"], cases[2]["resale_hammer"]
+    interpolated = []
+    for numerator, key, position in ((1, "upside_one_third", "One-third"), (2, "upside_two_thirds", "Two-thirds")):
+        resale = None
+        if working is not None and optimistic is not None:
+            # Derive each stop from the full span before rounding to cents.
+            # Reusing a rounded increment would drift away from equal thirds.
+            resale = money(Decimal(working) + (Decimal(optimistic) - Decimal(working)) * numerator / 3)
+        interpolated.append({
+            "key": key, "label": CASE_LABELS[key], "resale_hammer": resale,
+            "evidence_resale_hammer": None,
+            "origin": "interpolated" if resale is not None else "unavailable",
+            "basis": f"{position} between working and optimistic resale assumptions." if resale is not None
+                     else "Working and optimistic resale assumptions are both required.",
+        })
+    cases[2:2] = interpolated
+    values = [Decimal(case["resale_hammer"]) for case in cases if case["resale_hammer"] is not None]
     increment_notice = "Configured fixed increment; verify the auction house's bidding rules." if assumptions["increment_mode"] == "fixed" else "Configurable example tier schedule, not verified house rules. A crossing step lands on the tier boundary."
     coverage_limit = assumptions["tiers"][-1]["up_to"] if assumptions["increment_mode"] == "tiers" else None
     if coverage_limit is not None:
@@ -282,11 +300,11 @@ def build_board(assumptions, evidence_scenarios=None, source_summary=None, *, pa
         result["notices"].append(result["empty_reason"])
         return result
     by_case = {case["key"]: Decimal(case["resale_hammer"]) if case["resale_hammer"] is not None else None for case in cases}
-    for key in CASE_KEYS:
+    for key in BOARD_CASE_KEYS:
         resale = by_case[key]
         bid = ceiling(ladder, resale, assumptions) if resale is not None else None
         coverage_limited = bid is not None and bid == ladder.coverage_limit
-        label = f"{CASE_LABELS[key]} highest supported bid" if coverage_limited else {"conservative": "Conservative ceiling", "working": "Working-case ceiling", "optimistic": "Optimistic stretch"}[key]
+        label = f"{CASE_LABELS[key]} highest supported bid" if coverage_limited else {"conservative": "Conservative ceiling", "working": "Working-case ceiling", "upside_one_third": "Upside ⅓ ceiling", "upside_two_thirds": "Upside ⅔ ceiling", "optimistic": "Optimistic stretch"}[key]
         result["shortlist"].append({"case_key": key, "label": label, "bid": money(bid) if bid is not None else None, "coverage_limited": coverage_limited,
             "detail": detail_for(bid, resale, assumptions, ladder) if bid is not None else None,
             "conservative_downside": detail_for(bid, by_case["conservative"], assumptions, ladder) if bid is not None and by_case["conservative"] is not None else None,
