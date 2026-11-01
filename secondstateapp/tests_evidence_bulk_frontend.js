@@ -104,7 +104,7 @@ function workbench(candidates, selected = []) {
     },
     currentCandidates: candidates, selectedIds: new Set(selected), candidatePages: new Map(),
     options: {workspace: true, isParentBusy: () => context.parentBusy, onScenarioSummary: value => scenarios.push(value)},
-    parentBusy: false, busy: false, pendingSourceRefresh: false, currentSubjectMatches: [],
+    parentBusy: false, busy: false, manualEntryControl: null, pendingSourceRefresh: false, currentSubjectMatches: [],
     hasResearch: true, subjectNeedsChoice: false, hasUnsavedChanges: false, localRevision: 0,
     currentAnalysis: {updated_at: "saved-baseline"}, currentResearchId: "research-receipt",
     researchRetrievedAt: "retrieved-time", currentSearchInfo: {data_units_spent: 8},
@@ -168,6 +168,25 @@ test("Select all spans every page, respects the shared 25-sale cap, and stages o
   const thirdPage = p.group("artprice_html").querySelectorAll('input[type="checkbox"]');
   assert.deepEqual(thirdPage.filter(box => box.checked).map(box => box.value), ["artprice:21", "artprice:22", "artprice:23"]);
   assert.equal(p.button("artprice_html", "select").disabled, true);
+});
+
+test("auction archive evidence has a separate selectable group and truthful source labels", () => {
+  const archive = liveart("archive", {id: "archive-web:338", provider: "Auction archive", match_type: "auction_archive",
+    entry_method: "manual_web", source_confirmed: true, price_basis: "hammer", hammer_currency: "USD", category: "prints_and_multiples",
+    credible: false, manual_selectable: true, hammer_usd: "1835.00",
+    fx_conversion: {calculation: "2500.00 CAD / 1.3624 = 1835.00 USD", rate_date: "2024-06-12", source_url: "https://bank.example/rate"}});
+  const p = workbench([liveart(1), archive]);
+  assert.match(p.group("auction_archive").querySelector("summary").textContent, /Auction archive sales/);
+  assert.equal(p.group("auction_archive").querySelector(".liveart-work-type").textContent, "Auction archive");
+  assert.match(p.group("auction_archive").querySelector(".liveart-price-line").textContent, /converted using historical FX/);
+  p.button("auction_archive", "select").dispatch("click");
+  assert.deepEqual(p.selected(), ["archive-web:338"]);
+  assert.equal(p.requests.length, 0);
+  vm.runInContext(declaration("describeSources"), p);
+  const description = p.run("describeSources({candidates: currentCandidates}, false)");
+  assert.match(description, /1 LiveArt sale/);
+  assert.match(description, /1 auction archive sale/);
+  assert.doesNotMatch(description, /2 LiveArt/);
 });
 
 test("Deselect all clears this section on all pages while retaining other sources and saved records", () => {

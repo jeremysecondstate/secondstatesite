@@ -34,7 +34,8 @@ class ResearchQueueItem(models.Model):
 
     @property
     def outcome_label(self):
-        return {"researched": "Research saved", "triaged": "Triaged", "skipped": "Skipped", "valuation_unavailable": "Valuation unavailable"}.get(self.disposition, "Needs attention" if self.status == "needs_attention" else "")
+        disposition = self.latest_result.get("disposition", self.disposition) if self.status == "done" else self.disposition
+        return {"researched": "Research saved", "triaged": "Triaged", "skipped": "Skipped", "valuation_unavailable": "Valuation unavailable"}.get(disposition, "Needs attention" if self.status == "needs_attention" else "")
 
     @property
     def outcome_summary(self):

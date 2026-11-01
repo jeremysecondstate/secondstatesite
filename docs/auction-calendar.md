@@ -92,6 +92,8 @@ New HTML uploads and new LiveArt searches retain image links automatically. For 
 
 Stage changes preserve the lot and loaded controls. Per-lot browser drafts retain pending edits across navigation and reload, while saved sources, comparable selections and Bid Board assumptions use the database. Stage navigation never initiates a LiveArt search. Exact artwork identity does not establish that the impression, edition, size or condition matches; those fields remain independently reviewable. Links point to supplied auction lots or documented LiveArt record endpoints; missing links remain unavailable.
 
+If a completed search response is lost from the browser, **Recover pending research** checks this signed-in session for that lot's retained response. It restores candidates, query provenance and recorded Data Units for review without a new LiveArt API request or a save. Existing unsaved reviews are kept instead of replaced. An absent pending response does not prove that an earlier interrupted request consumed no Data Units; reconcile that uncertainty separately before repeating a paid query.
+
 The image viewer uses every validated image exposed by the current lot record. The present sync model stores one primary or saved image, so it does not invent reverse/detail images. A single image and a missing/failed image have explicit states. The expanded viewer uses a keyboard-accessible dialog.
 
 The source ledger displays normalized artwork, artist, USD hammer, medium, dimensions, edition, sale house/date, lot/location, signature, condition, file provenance and source URL when supplied. Unreported values remain visible as unavailable. Source HTML is parsed as data; its scripts and markup are never inserted into the page.
@@ -182,7 +184,7 @@ Choose **Add sale for review** after checking the populated fields and confirmat
 
 To correct a transcription, choose **Remove entered sale** on that manual record, then add the corrected sale and select it again. Choose **Save selected evidence** to persist the correction or removal. Removing a manual row leaves API and Artprice records, other selections and existing costs intact; the saved analysis changes only when saved.
 
-The server checks the matching artist, sold/hammer/USD/Prints & Multiples confirmation, source links, date and bounded positive amount. Repeated entries do not create another copy of the same sale; conflicting prices cannot silently replace an existing record. Manual records survive later API searches, and overlapping sales count once in the combined evidence. Existing Artprice source records and the 25-selected-sale limit continue to apply.
+Choose the source-verified artwork category: **Prints & Multiples** (the default), **Drawings / Works on paper** or **Mixed media**. The category is retained with the sale and shown alongside its source evidence; drawings and mixed-media works are never assigned the API print category ID. The server checks the matching artist, category confirmation, sold USD hammer, source links, date and bounded positive amount. Repeated entries do not create another copy of the same sale; conflicting prices or categories cannot silently replace an existing record. Manual records survive later API searches, and overlapping sales count once in the combined evidence. Existing Artprice source records and the 25-selected-sale limit continue to apply. API searches remain restricted to Prints & Multiples.
 
 ## LiveArt word and phrase searches
 
