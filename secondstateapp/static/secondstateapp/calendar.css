@@ -3657,14 +3657,15 @@ button.day-gallery-visual {
   }
 
   .day-gallery-filters {
-    flex: 1;
+    flex: 1 1 100%;
   }
 
   .day-gallery-filters .day-gallery-filter {
-    flex: 1;
+    flex: 1 1 auto;
     justify-content: center;
   }
 
+  #day-gallery-hide-attributed,
   .day-gallery-send-launch {
     width: 100%;
   }

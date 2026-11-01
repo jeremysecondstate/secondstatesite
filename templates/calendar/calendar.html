@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=attribution-flags-20261101">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=attribution-filter-20261101">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=finite-tier-notes-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
@@ -228,6 +228,7 @@
     <div class="day-gallery-tools">
       <div class="day-gallery-primary-actions">
         <div id="day-gallery-filters" class="day-gallery-filters" role="group" aria-label="Filter the day's lots"></div>
+        <button id="day-gallery-hide-attributed" class="day-gallery-filter" type="button" aria-pressed="false" aria-controls="day-gallery-grid day-gallery-artists day-gallery-house-filters" aria-describedby="day-gallery-attribution-status">Hide After &amp; Attributed</button>
         <button id="day-gallery-send-launch" class="day-gallery-send-launch" type="button" hidden>Send Email</button>
       </div>
       <label class="day-gallery-sort-label" for="day-gallery-sort">Sort lots
@@ -244,6 +245,7 @@
         </select>
       </label>
     </div>
+    <p id="day-gallery-attribution-status" class="day-gallery-sort-note" role="status" hidden></p>
     <details id="day-gallery-houses" class="day-gallery-section">
       <summary class="day-gallery-section-toggle">
         <span>
@@ -495,6 +497,8 @@
   const galleryDate = document.getElementById("day-gallery-date");
   const gallerySummary = document.getElementById("day-gallery-summary");
   const galleryFilters = document.getElementById("day-gallery-filters");
+  const galleryAttributionToggle = document.getElementById("day-gallery-hide-attributed");
+  const galleryAttributionStatus = document.getElementById("day-gallery-attribution-status");
   const galleryHouseFilters = document.getElementById("day-gallery-house-filters");
   const galleryHouses = document.getElementById("day-gallery-houses");
   const galleryHousesSummary = document.getElementById("day-gallery-houses-summary");
@@ -520,6 +524,7 @@
   let lotBrowserIndex = 0;
   let lotBrowserReturnFocus = null;
   let galleryFilter = "all";
+  let galleryHideAttributed = false;
   let galleryVisibleCount = 24;
   let galleryArtistsExpanded = false;
   let galleryArtistsDay = "";
@@ -3288,9 +3293,14 @@
   const galleryHouseName = (lot) => activeView === "oliver"
     ? (lot.oliver_house_name || lot.auction_house) : lot.auction_house;
 
+  const matchesGalleryAttribution = (lot) => !galleryHideAttributed
+    || !["After", "Attributed to"].includes(lot.attribution_label);
+  const galleryBrowsableLots = () => dayLots().filter(matchesGalleryAttribution);
+
   const visibleGalleryLots = () => {
     const lots = dayLots().map((lot, index) => ({lot, index}));
     const filtered = lots.filter(({lot}) => {
+      if (!matchesGalleryAttribution(lot)) return false;
       if (galleryFilter === "tray") return Boolean(lot.email_tray_selected);
       if (galleryFilter === "bidboards") return Boolean(lot.saved_bid_board);
       if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
@@ -3332,7 +3342,13 @@
   };
 
   const renderGalleryFilters = () => {
-    const lots = dayLots();
+    const lots = galleryBrowsableLots();
+    const hiddenCount = dayLots().length - lots.length;
+    galleryAttributionToggle.setAttribute("aria-pressed", String(galleryHideAttributed));
+    galleryAttributionStatus.hidden = !galleryHideAttributed;
+    galleryAttributionStatus.textContent = galleryHideAttributed
+      ? `${hiddenCount} After / Attributed work${hiddenCount === 1 ? "" : "s"} hidden for this day. Turn off “Hide After & Attributed” to show them. Saved selections are kept.`
+      : "";
     const houseCounts = new Map(activeView === "oliver" ? oliverHouseNames.map((name) => [name, 0]) : []);
     lots.forEach((lot) => {
       const house = galleryHouseName(lot);
@@ -3350,7 +3366,7 @@
     galleryFilters.replaceChildren();
     galleryHouseFilters.replaceChildren();
     gallerySendLaunch.hidden = galleryFilter !== "tray";
-    gallerySendLaunch.disabled = !lots.some((lot) => lot.email_tray_selected);
+    gallerySendLaunch.disabled = !dayLots().some((lot) => lot.email_tray_selected);
     choices.forEach(({key, label, count}) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -3407,6 +3423,7 @@
       view: "research", day: selectedDay, lot: String(lot.id), look: researchLook,
     }).toString();
     if (inOliverScope()) url.searchParams.set("scope", "oliver");
+    if (galleryHideAttributed) url.searchParams.set("hide_attributed", "1");
     return url.href;
   };
 
@@ -3471,7 +3488,9 @@
     galleryGrid.replaceChildren();
     lots.slice(0, galleryVisibleCount).forEach(({lot, index}) => galleryGrid.appendChild(galleryCard(lot, index)));
     if (!lots.length) {
-      appendText(galleryGrid, "p", "day-gallery-empty", galleryFilter === "tray"
+      appendText(galleryGrid, "p", "day-gallery-empty", galleryHideAttributed
+        ? "No lots match these filters. Try showing After & Attributed works or changing the selected filter."
+        : galleryFilter === "tray"
         ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Research, then add it to the tray."
         : galleryFilter === "bidboards" ? "No lots have a saved Bid Board in this catalog on this date."
         : galleryFilter.startsWith("house:") ? `No lots from ${galleryFilter.slice(6)} on this date.`
@@ -3494,7 +3513,7 @@
   };
 
   const renderGalleryArtists = () => {
-    const lots = dayLots();
+    const lots = galleryBrowsableLots();
     if (galleryArtistsDay !== selectedDay) {
       galleryArtistsExpanded = false;
       galleryArtistsDay = selectedDay;
@@ -4168,6 +4187,8 @@
     else url.searchParams.delete("filter");
     if (isGalleryView() && galleryFilter.startsWith("artist:")) url.searchParams.set("artist", galleryFilter.slice(7));
     else url.searchParams.delete("artist");
+    if (galleryHideAttributed) url.searchParams.set("hide_attributed", "1");
+    else url.searchParams.delete("hide_attributed");
     if (activeView === "research" && inOliverScope()) url.searchParams.set("scope", "oliver");
     else url.searchParams.delete("scope");
     if (activeView === "research") {
@@ -4193,6 +4214,8 @@
       else monthUrl.searchParams.delete("look");
       if (activeView === "research" && inOliverScope()) monthUrl.searchParams.set("scope", "oliver");
       else monthUrl.searchParams.delete("scope");
+      if (galleryHideAttributed) monthUrl.searchParams.set("hide_attributed", "1");
+      else monthUrl.searchParams.delete("hide_attributed");
       link.href = monthUrl;
     });
   };
@@ -4239,6 +4262,7 @@
     restoringHistory = true;
     try {
       const params = new URLSearchParams(window.location.search);
+      galleryHideAttributed = params.get("hide_attributed") === "1";
       researchScope = params.get("scope") === "oliver" ? "oliver" : "";
       activeView = ["catalog", "oliver", "research"].includes(params.get("view")) ? params.get("view") : "calendar";
       const day = params.get("day");
@@ -4334,6 +4358,12 @@
   galleryArtistsMore.addEventListener("click", () => {
     galleryArtistsExpanded = !galleryArtistsExpanded;
     renderGalleryArtists();
+  });
+  galleryAttributionToggle.addEventListener("click", () => {
+    galleryHideAttributed = !galleryHideAttributed;
+    galleryVisibleCount = 24;
+    renderGalleryCatalog();
+    updateCalendarLocation();
   });
   gallerySort.addEventListener("change", () => {
     galleryVisibleCount = 24;
@@ -4488,6 +4518,7 @@
   const initialDay = "{{ initial_day|escapejs }}";
   researchDaySelect.addEventListener("change", () => showDay(researchDaySelect.value));
   const initialParams = new URLSearchParams(window.location.search);
+  galleryHideAttributed = initialParams.get("hide_attributed") === "1";
   const requestedView = initialParams.get("view");
   const requestedDay = initialParams.get("day");
   const validRequestedDay = requestedDay && /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)

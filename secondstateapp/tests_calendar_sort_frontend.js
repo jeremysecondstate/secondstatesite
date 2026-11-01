@@ -21,6 +21,7 @@ function catalog(lots, sort = "price_asc", filter = "all") {
     data: {"2026-10-22": lots.map(lot => ({currency: "USD", ...lot}))}, selectedDay: "2026-10-22", galleryFilter: filter,
     galleryVisibleCount: 24,
     activeView: "catalog",
+    galleryHideAttributed: false,
     gallerySort: {value: sort, addEventListener(type, callback) { this[type] = callback; }},
     gallerySortNote: {}, galleryDescription: {}, galleryResults: {}, galleryMore: {},
     galleryArtistClear: {},
