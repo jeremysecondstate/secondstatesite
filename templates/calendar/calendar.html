@@ -1173,7 +1173,7 @@
       if (candidate.entry_method !== "manual_web") return String(candidate.category_id) === "2";
       if (candidate.source_confirmed !== true || candidate.price_basis !== "hammer" || candidate.hammer_currency !== "USD") return false;
       return candidate.category === "prints_and_multiples" ? String(candidate.category_id) === "2"
-        : candidate.category === "works_on_paper" && candidate.category_id == null;
+        : ["works_on_paper", "mixed_media"].includes(candidate.category) && candidate.category_id == null;
     };
     const canSelectCandidate = (candidate) => {
       const hammer = Number(candidate?.hammer_usd);

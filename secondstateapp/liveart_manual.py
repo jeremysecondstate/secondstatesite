@@ -18,6 +18,7 @@ MAX_MANUAL_SALES = 50
 MANUAL_CATEGORIES = {
     "prints_and_multiples": "Prints & Multiples",
     "works_on_paper": "Drawings / Works on paper",
+    "mixed_media": "Mixed media",
 }
 ENTRY_FIELDS = {
     "artist", "title", "sale_date", "auction_house", "lot_number", "hammer_usd",
@@ -87,7 +88,7 @@ def normalize_manual_entry(entry: object, *, confirmed: object, calendar_lot, us
         raise ValueError("Confirm that you checked the source, artwork category and sold USD hammer.")
     category = _text(entry, "category", required=True)
     if category not in MANUAL_CATEGORIES:
-        raise ValueError("Choose Prints & Multiples or Drawings / Works on paper, as verified on the source.")
+        raise ValueError("Choose Prints & Multiples, Drawings / Works on paper or Mixed media, as verified on the source.")
     source_kind = entry.get("source_kind", "liveart_web")
     price_mode = entry.get("price_mode", "source_usd")
     if not isinstance(source_kind, str) or not isinstance(price_mode, str) or source_kind not in {"liveart_web", "auction_archive"} or price_mode not in {"source_usd", "historical_fx"}:

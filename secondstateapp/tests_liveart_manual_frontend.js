@@ -34,6 +34,9 @@ test("category paste accepts only supported names and labels", () => {
     assert.equal(parsePaste(`Category: ${value}`).category, "works_on_paper");
   }
   assert.equal(parsePaste("Category: Prints & Multiples").category, "prints_and_multiples");
+  for (const value of ["mixed_media", "Mixed media"]) {
+    assert.equal(parsePaste(`Category: ${value}`).category, "mixed_media");
+  }
   for (const value of ["painting", "2", "drawing maybe"]) {
     assert.throws(() => parsePaste(`Category: ${value}`), /Category must be/);
   }
@@ -369,6 +372,17 @@ test("Workbench sends the explicit drawing category without substituting prints"
   assert.equal(request.entry.category_id, undefined);
 });
 
+test("Workbench sends the explicit mixed-media category without substituting prints", async () => {
+  const p = integration();
+  await p.entryOptions.onAdd({...sample, category: "mixed_media", medium: "Cotton-pulp relief with collage"});
+  const request = JSON.parse(p.requests[0].options.body);
+  assert.equal(request.entry.category, "mixed_media");
+  assert.equal(request.entry.medium, "Cotton-pulp relief with collage");
+  assert.equal(request.entry.price_basis, "hammer");
+  assert.equal(request.entry.currency, "USD");
+  assert.equal(request.entry.category_id, undefined);
+});
+
 test("evidence checkboxes accept verified manual drawings while keeping API categories print-only", () => {
   const template = fs.readFileSync(path.join(__dirname, "../templates/calendar/calendar.html"), "utf8");
   const start = template.indexOf("    const legacyManualReview = (candidate) => {");
@@ -379,6 +393,9 @@ test("evidence checkboxes accept verified manual drawings while keeping API cate
     category: "works_on_paper", category_id: null, source_confirmed: true,
     price_basis: "hammer", hammer_currency: "USD", credible: false, manual_selectable: true};
   assert.equal(context.canSelect(drawing), true);
+  assert.equal(context.canSelect({...drawing, category: "mixed_media"}), true);
+  assert.equal(context.canSelect({...drawing, category: "mixed_media", entry_method: "api"}), false);
+  assert.equal(context.canSelect({...drawing, category: "mixed_media", category_id: 2}), false);
   assert.equal(context.canSelect({...drawing, category: "prints_and_multiples", category_id: 2}), true);
   assert.equal(context.canSelect({provider: "LiveArt", status: "sold", hammer_usd: "1000", category_id: 2, credible: true}), true);
   for (const change of [{category_id: 2}, {entry_method: "api"}, {source_confirmed: false},

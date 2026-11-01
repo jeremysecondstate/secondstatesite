@@ -5,7 +5,7 @@
   else root.LiveArtManualEntry = api;
 })(typeof window === "undefined" ? globalThis : window, () => {
   "use strict";
-  const categories = {prints_and_multiples: "Prints & Multiples", works_on_paper: "Drawings / Works on paper"};
+  const categories = {prints_and_multiples: "Prints & Multiples", works_on_paper: "Drawings / Works on paper", mixed_media: "Mixed media"};
   const definitions = [
     ["source_kind", "Evidence source", "select", true, 40],
     ["price_mode", "USD price basis", "select", true, 40],
@@ -51,7 +51,7 @@
       if (["sale_date", "fx_date"].includes(key) && value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("Dates must use YYYY-MM-DD.");
       if (key === "category" && value) {
         const match = Object.entries(categories).find(([name, label]) => [name, label.toLowerCase()].includes(value.toLowerCase()));
-        if (!match) throw new Error("Category must be Prints & Multiples or Drawings / Works on paper.");
+        if (!match) throw new Error("Category must be Prints & Multiples, Drawings / Works on paper or Mixed media.");
         value = match[0];
       }
       values[key] = value;
@@ -118,7 +118,7 @@
       if (name === "original_currency") input.placeholder = "e.g. CHF";
       if (name === "provider_url") input.placeholder = "https://liveart.ai/…";
       input.value = defaultValue(name);
-      if (name === "evidence_note") input.placeholder = "Paste the source text showing the sold result, USD hammer and print category; note any discrepancies.";
+      if (name === "evidence_note") input.placeholder = "Paste the source text showing the sold result, USD hammer and artwork category; note any discrepancies.";
       label.htmlFor = input.id;
       fields[name] = input;
       fieldGroups[name] = group;

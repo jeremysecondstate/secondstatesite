@@ -254,7 +254,7 @@ def liveart_evidence_category_supported(candidate: Mapping[str, Any]) -> bool:
         return False
     if candidate.get("category") == "prints_and_multiples":
         return is_prints_and_multiples(candidate)
-    return candidate.get("category") == "works_on_paper" and candidate.get("category_id") is None
+    return candidate.get("category") in ("works_on_paper", "mixed_media") and candidate.get("category_id") is None
 
 
 def _sold_liveart_evidence(candidate: Mapping[str, Any]) -> bool:

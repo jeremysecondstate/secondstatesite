@@ -257,6 +257,79 @@ class ManualLiveArtEvidenceTests(TestCase):
                 board = self.client.post(self.board_url, json.dumps({"action": "save", "selected_ids": [research["added_id"]]}), content_type="application/json")
                 self.assertEqual(board.status_code, 400, board.content)
 
+    @patch("secondstateapp.calendar_views.LiveArtClient")
+    @patch("secondstateapp.calendar_views._research_liveart_lot")
+    def test_mixed_media_category_persists_through_evidence_and_board_without_relabeling(self, paid_lookup, client_class):
+        first = self.added()
+        self.save(first)
+        board = self.client.post(self.board_url, json.dumps({"action": "save"}), content_type="application/json")
+        self.assertEqual(board.status_code, 200, board.content)
+        AuctionBidBoardAnalysis.objects.filter(lot=self.lot).update(include_in_email=True)
+        subject_medium = self.lot.medium
+        mixed_media = {**self.entry, "category": "mixed_media", "title": "Paper relief", "lot_number": "73",
+                   "medium": "Cotton-pulp relief with collage", "edition": "", "signature": "Signed",
+                   "evidence_note": "LiveArt Mixed media; sold; USD hammer 3305 excluding premium."}
+        research = self.added(entry=mixed_media, selected_ids=[first["added_id"]])
+        candidate = next(row for row in research["candidates"] if row["id"] == research["added_id"])
+        self.assertEqual(candidate["category"], "mixed_media")
+        self.assertEqual(candidate["category_label"], "Mixed media")
+        self.assertIsNone(candidate["category_id"])
+        self.assertEqual(candidate["medium"], "Cotton-pulp relief with collage")
+        self.assertEqual(candidate["original_currency"], "CHF")
+        self.assertTrue(candidate["manual_selectable"])
+        self.assertFalse(candidate["selected"])
+        selected = [first["added_id"], candidate["id"]]
+        response = self.post(action="save", research_id=research["research_id"], selected_ids=selected, assumptions={})
+        self.assertEqual(response.status_code, 200, response.content)
+        reloaded = self.client.get(self.url).json()["analysis"]
+        self.assertEqual(set(reloaded["selected_ids"]), set(selected))
+        saved_mixed_media = next(row for row in reloaded["candidates"] if row["id"] == candidate["id"])
+        self.assertEqual(saved_mixed_media["category"], "mixed_media")
+        self.assertIsNone(saved_mixed_media["category_id"])
+        self.assertTrue(saved_mixed_media["manual_selectable"])
+        board = self.client.post(self.board_url, json.dumps({"action": "save"}), content_type="application/json")
+        self.assertEqual(board.status_code, 200, board.content)
+        self.assertEqual(board.json()["analysis"]["source_summary"]["combined_comp_count"], 2)
+        self.assertEqual(board.json()["analysis"]["cases"][1]["resale_hammer"], "3305.00")
+        saved_board = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+        self.assertTrue(saved_board.include_in_email)
+        record = next(row for row in saved_board.evidence_snapshot["selected_records"] if row["id"] == candidate["id"])
+        self.assertEqual(record["category"], "mixed_media")
+        self.assertIsNone(record["category_id"])
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.medium, subject_medium)
+        paid_lookup.assert_not_called()
+        client_class.assert_not_called()
+
+    def test_mixed_media_entry_keeps_all_sale_and_attestation_requirements(self):
+        mixed_media = {**self.entry, "category": "mixed_media", "medium": "Cotton-pulp relief with collage"}
+        for change in ({"category": "painting"}, {"category": ""}, {"category": {}},
+                       {"category_id": 2}, {"status": "unsold"}, {"price_basis": "premium_inclusive"},
+                       {"currency": "CHF"}, {"artist": "Pablo Picasso"}, {"sale_date": ""},
+                       {"sale_date": (date.today() + timedelta(days=3)).isoformat()}, {"hammer_usd": "0"}):
+            with self.subTest(change=change):
+                self.assertEqual(self.add(entry={**mixed_media, **change}).status_code, 400)
+        self.assertEqual(self.add(entry=mixed_media, confirmed=False).status_code, 400)
+
+    def test_saved_mixed_media_eligibility_is_rechecked_before_selection(self):
+        research = self.added(entry={**self.entry, "category": "mixed_media", "medium": "Cotton-pulp relief with collage"})
+        self.save(research)
+        saved = LiveArtResaleAnalysis.objects.get(lot=self.lot)
+        original = copy.deepcopy(saved.candidates)
+        for change in ({"entry_method": "api"}, {"source_confirmed": False}, {"category_id": 2},
+                       {"category": "painting"}, {"category": {}}, {"price_basis": "premium_inclusive"}, {"hammer_currency": "CHF"},
+                       {"sale_date": None}, {"sale_date": "bad-date"},
+                       {"sale_date": (date.today() + timedelta(days=3)).isoformat()}, {"artist": "Pablo Picasso"}):
+            with self.subTest(change=change):
+                saved.candidates = [{**original[0], **change}]
+                saved.save(update_fields=["candidates"])
+                reloaded = self.client.get(self.url).json()["analysis"]
+                self.assertFalse(reloaded["candidates"][0]["manual_selectable"])
+                self.assertNotIn(research["added_id"], reloaded["selected_ids"])
+                self.assertEqual(self.post(action="save", selected_ids=[research["added_id"]], assumptions={}).status_code, 400)
+                board = self.client.post(self.board_url, json.dumps({"action": "save", "selected_ids": [research["added_id"]]}), content_type="application/json")
+                self.assertEqual(board.status_code, 400, board.content)
+
     def test_duplicate_sale_cannot_silently_keep_a_conflicting_category(self):
         first = self.added()
         response = self.add(entry={**self.entry, "category": "works_on_paper"}, research_id=first["research_id"])
