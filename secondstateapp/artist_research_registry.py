@@ -3,6 +3,7 @@
 from functools import lru_cache
 import json
 from pathlib import Path
+import re
 from urllib.parse import parse_qs, urlsplit
 
 from django.conf import settings
@@ -15,6 +16,8 @@ from catalogapp.artprice_artist_links import (
 )
 from catalogapp.bookmark_watchlist import parse_netscape_bookmarks, repeatedly_decode
 from catalogapp.artprice_link_backfill import _validate_records
+
+from .liveart_artist import liveart_artist_search_name
 
 
 def _signature(path: Path) -> tuple[str, int, int]:
@@ -45,6 +48,42 @@ def _invaluable_name(url: str) -> str:
         return repeatedly_decode(parse_qs(parsed.query).get("artistName", [""])[0])
     except ValueError:
         return ""
+
+
+def _liveart_artist(value: str) -> tuple[str, str] | None:
+    if (
+        not value or value != value.strip() or len(value) > 2000
+        or "\\" in value or any(character.isspace() or ord(character) < 32 for character in value)
+    ):
+        return None
+    try:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme != "https" or parsed.hostname != "www.liveart.ai"
+            or parsed.username is not None or parsed.password is not None
+            or parsed.port not in {None, 443} or parsed.query or parsed.fragment
+        ):
+            return None
+    except ValueError:
+        return None
+    match = re.fullmatch(r"/artists/([A-Za-z0-9]+)/([A-Za-z0-9][A-Za-z0-9-]*)/?", parsed.path)
+    if match is None:
+        return None
+    return match.group(1), match.group(2).replace("-", " ")
+
+
+@lru_cache(maxsize=8)
+def _liveart_registry(bookmarks_signature):
+    records = []
+    for bookmark in parse_netscape_bookmarks(_read_text(bookmarks_signature)):
+        if not any(folder.casefold() == "liveart" for folder in bookmark.folder_path):
+            continue
+        parsed = _liveart_artist(bookmark.url)
+        if parsed is None:
+            continue
+        title = re.sub(r"\s*[-\u2013\u2014]\s*LiveArt\s*$", "", bookmark.title, flags=re.IGNORECASE)
+        records.append((parsed[0], bookmark.url, (title, parsed[1])))
+    return tuple(records)
 
 
 @lru_cache(maxsize=8)
@@ -132,4 +171,30 @@ def artist_research_urls(name: str) -> tuple[str, str]:
         str(name or "").strip(),
         _signature(docs / "artist-links.html"),
         _signature(docs / "artprice-artist-links.json"),
+    )
+
+
+@lru_cache(maxsize=4096)
+def _liveart_lookup(name, bookmarks_signature):
+    matches = {}
+    name = liveart_artist_search_name(name)
+    key = artist_identity_key(name)
+    if not key:
+        return ""
+    for identity, url, aliases in _liveart_registry(bookmarks_signature):
+        normalized_aliases = tuple(liveart_artist_search_name(alias) for alias in aliases)
+        # Full names need an exact normalized or explicitly verified alias;
+        # do not infer a different middle initial from a provider's shorter name.
+        if any(key == artist_identity_key(alias) or (
+            len(key.split()) == 1 and _name_matches(name, alias)
+        ) for alias in normalized_aliases):
+            matches.setdefault(identity, url)
+    return next(iter(matches.values())) if len(matches) == 1 else ""
+
+
+def artist_liveart_url(name: str) -> str:
+    """Return one unambiguous saved LiveArt artist URL without a provider lookup."""
+    return _liveart_lookup(
+        str(name or "").strip(),
+        _signature(Path(settings.BASE_DIR) / "docs" / "artist-links.html"),
     )

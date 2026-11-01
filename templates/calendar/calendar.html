@@ -821,6 +821,11 @@
         : "Search this artist's sales by artwork title.";
       actionLinks.appendChild(searchLink);
     }
+    if (lot.artist_liveart_url) {
+      const liveartLink = externalLink(lot.artist_liveart_url, "lot-artist-liveart-link", "LiveArt ↗");
+      liveartLink.setAttribute("aria-label", `Open ${lot.artist || "artist"} on LiveArt (opens in a new tab)`);
+      actionLinks.appendChild(liveartLink);
+    }
     const form = document.createElement("form");
     const idPrefix = options.idPrefix ? `${options.idPrefix}-` : "";
     const inputId = `${idPrefix}artprice-link-${lot.id}`;
@@ -3472,6 +3477,11 @@
     actions.appendChild(quickLook);
     if (lot.url) actions.appendChild(externalLink(lot.url, "day-gallery-auction-link", "Auction ↗"));
     if (lot.artist_invaluable_url) actions.appendChild(externalLink(lot.artist_invaluable_url, "day-gallery-auction-link", "Invaluable ↗"));
+    if (lot.artist_liveart_url) {
+      const liveartLink = externalLink(lot.artist_liveart_url, "day-gallery-auction-link lot-artist-liveart-link", "LiveArt ↗");
+      liveartLink.setAttribute("aria-label", `Open ${lot.artist || "artist"} on LiveArt (opens in a new tab)`);
+      actions.appendChild(liveartLink);
+    }
     caption.appendChild(actions);
     card.append(visual, caption);
     return card;
