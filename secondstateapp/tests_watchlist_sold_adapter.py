@@ -66,6 +66,46 @@ class InvaluableSoldAdapterTests(SimpleTestCase):
                 lot = self.detail(f'<div><h1>Calder lithograph</h1><strong>Sold: </strong>{value}<div>October 14, 2026</div></div>')
                 self.assertIsNone(lot.sold_price)
 
+    def live_result(self, status="Sold", amount="$34,000 USD", *, amount_attrs="", wrapper="", extra=""):
+        body = (
+            '<div class="bid-info-inner bid-info-top-radius">'
+            f'<div class="bid-status mb-4"><strong class="sold-passed-status mb-2">{status}</strong></div>'
+            '<div class="mb-4 bid-status"><p class="my-2">Est: $30,000 USD - $50,000 USD</p>'
+            f'<p class="m-0"><b class="text-large mr-2" {amount_attrs}>{amount}</b>'
+            f'<span class="bid-count"></span>{extra}</p></div></div>'
+        )
+        return self.detail(f'<section {wrapper}>{body}</section>', currentBid=15000, bidCount=2)
+
+    def test_live_detail_sold_status_reads_result_after_estimate(self):
+        lot = self.live_result()
+        self.assertEqual((lot.sold_price, lot.sold_currency), (34000, "USD"))
+        self.assertEqual((lot.current_bid, lot.bid_count), (15000, 2))
+
+    def test_live_detail_requires_explicit_sold_status_and_one_amount(self):
+        for status in ("Passed", "Unsold", "Current bid", "Sold: Log in to view", ""):
+            with self.subTest(status=status):
+                self.assertIsNone(self.live_result(status=status).sold_price)
+        self.assertIsNone(self.live_result(extra='<b class="text-large">$35,000 USD</b>').sold_price)
+
+    def test_live_detail_rejects_gated_range_hidden_and_related_results(self):
+        for amount in ("Log in to view", "$30,000 USD - $50,000 USD", "Current bid: $34,000 USD", "$0 USD"):
+            with self.subTest(amount=amount):
+                self.assertIsNone(self.live_result(amount=amount).sold_price)
+        for attrs in ("hidden", 'aria-hidden="true"'):
+            with self.subTest(attrs=attrs):
+                self.assertIsNone(self.live_result(amount_attrs=attrs).sold_price)
+        for wrapper in ('class="related-lots"', 'class="lot-card"', "hidden"):
+            with self.subTest(wrapper=wrapper):
+                self.assertIsNone(self.live_result(wrapper=wrapper).sold_price)
+
+    def test_live_detail_does_not_borrow_estimate_when_result_is_missing(self):
+        lot = self.detail(
+            '<div class="bid-info-inner"><div class="bid-status">'
+            '<strong class="sold-passed-status">Sold</strong></div>'
+            '<div class="bid-status"><p class="my-2"><b class="text-large">$34,000 USD</b></p></div></div>'
+        )
+        self.assertIsNone(lot.sold_price)
+
     def test_login_prompt_in_related_lot_does_not_mark_main_result(self):
         lot = self.detail('<article class="lot-card"><strong>Sold: </strong><button>Log in to view</button></article>')
         self.assertNotIn("sold_price_login", lot.ambiguities)

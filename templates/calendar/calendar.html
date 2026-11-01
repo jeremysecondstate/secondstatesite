@@ -2,10 +2,11 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}">
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=archive-20261012b">
-  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=starting-hammer-20261016">
-  <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=web-evidence-20261025">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=attribution-filter-20261101">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
+  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=finite-tier-notes-20261027">
+  <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
+  <link rel="stylesheet" href="{% static 'secondstateapp/research_queue.css' %}?v=queue-20261027">
 {% endblock %}
 
 {% block main_class %}calendar-page-shell{% endblock %}
@@ -31,6 +32,11 @@
       {{ synced_lot_count }} synced lot{{ synced_lot_count|pluralize }}
     </div>
   </header>
+
+  <nav class="research-queue-navigation" aria-label="LiveArt research queue">
+    <a class="research-queue-link" href="{% url 'auction_research_queue' %}">LiveArt Queue · <span data-research-queue-count>{{ research_queue_count }}</span></a>
+    <p>Save lots across dates, then tell the LiveArt Worker: “Process my LiveArt queue”.</p>
+  </nav>
 
   <section class="email-tray-card" aria-labelledby="email-tray-title">
     <div class="email-tray-heading">
@@ -222,6 +228,7 @@
     <div class="day-gallery-tools">
       <div class="day-gallery-primary-actions">
         <div id="day-gallery-filters" class="day-gallery-filters" role="group" aria-label="Filter the day's lots"></div>
+        <button id="day-gallery-hide-attributed" class="day-gallery-filter" type="button" aria-pressed="false" aria-controls="day-gallery-grid day-gallery-artists day-gallery-house-filters" aria-describedby="day-gallery-attribution-status">Hide After &amp; Attributed</button>
         <button id="day-gallery-send-launch" class="day-gallery-send-launch" type="button" hidden>Send Email</button>
       </div>
       <label class="day-gallery-sort-label" for="day-gallery-sort">Sort lots
@@ -238,6 +245,7 @@
         </select>
       </label>
     </div>
+    <p id="day-gallery-attribution-status" class="day-gallery-sort-note" role="status" hidden></p>
     <details id="day-gallery-houses" class="day-gallery-section">
       <summary class="day-gallery-section-toggle">
         <span>
@@ -273,7 +281,10 @@
       </div>
     </details>
     <div class="day-gallery-count" aria-live="polite">
-      <span id="day-gallery-description">A catalog across auction houses</span>
+      <div class="day-gallery-result-heading">
+        <span id="day-gallery-description" tabindex="-1">A catalog across auction houses</span>
+        <button id="day-gallery-artist-clear" type="button" hidden>All artists</button>
+      </div>
       <span id="day-gallery-results">0 lots</span>
     </div>
     <p id="day-gallery-sort-note" class="day-gallery-sort-note" hidden>Sorted by auction estimate in USD, using the low estimate (high estimate if unavailable). Conversions use recent daily reference rates. Lots without a USD estimate appear last.</p>
@@ -295,6 +306,7 @@
         <label class="research-day-label" for="research-day-select">Watched day</label>
         <select id="research-day-select" aria-label="Choose watched day"></select>
         <a class="research-tray-link" href="{% url 'auction_email_tray' %}">Email Tray · <span data-email-tray-count>{{ email_selected_count }}</span></a>
+        <a class="research-tray-link" href="{% url 'auction_research_queue' %}">LiveArt Queue · <span data-research-queue-count>{{ research_queue_count }}</span></a>
         <span id="research-workspace-count" aria-live="polite"></span>
         <button id="research-previous" type="button" aria-label="Previous research lot">← Previous</button>
         <button id="research-next" type="button" aria-label="Next research lot">Next →</button>
@@ -414,21 +426,33 @@
 {{ calendar_data|json_script:"auction-calendar-data" }}
 {{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
 {{ oliver_house_names|json_script:"oliver-house-names" }}
-<script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=finite-tiers-20261026"></script>
-<script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=finite-tiers-20261026"></script>
+<script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=archive-fx-evidence-20261028"></script>
+<script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=archive-fx-evidence-20261028"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
-<script src="{% static 'secondstateapp/calendar_artists.js' %}?v=arrival-20261023"></script>
+<script src="{% static 'secondstateapp/calendar_artists.js' %}?v=artist-jump-20261027"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
-<script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=web-evidence-20261025"></script>
+<script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-modes-20261028"></script>
+<script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261027"></script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
   const salesData = JSON.parse(document.getElementById("auction-calendar-sales-data").textContent);
   const oliverHouseNames = JSON.parse(document.getElementById("oliver-house-names").textContent);
+  // Board widgets update their shared lot before publishing the saved event.
+  const savedBoardMembership = new Map(Object.values(data).flat().map((lot) => [String(lot.id), Boolean(lot.saved_bid_board)]));
   window.addEventListener("archive-bid-board-saved", (event) => {
+    let membershipChanged = false;
     Object.values(data).flat().forEach((lot) => {
-      if (String(lot.id) === String(event.detail.lotId)) lot.saved_bid_board = event.detail.savedBoard;
+      if (String(lot.id) === String(event.detail.lotId)) {
+        membershipChanged ||= savedBoardMembership.get(String(lot.id)) !== Boolean(event.detail.savedBoard);
+        savedBoardMembership.set(String(lot.id), Boolean(event.detail.savedBoard));
+        lot.saved_bid_board = event.detail.savedBoard;
+      }
     });
+    if (membershipChanged && isGalleryView()) {
+      renderGalleryFilters();
+      if (galleryFilter === "bidboards") renderGalleryCards();
+    }
   });
   const auctionCalendar = document.querySelector(".auction-calendar");
   const calendarPageShell = document.querySelector(".calendar-page-shell");
@@ -473,6 +497,8 @@
   const galleryDate = document.getElementById("day-gallery-date");
   const gallerySummary = document.getElementById("day-gallery-summary");
   const galleryFilters = document.getElementById("day-gallery-filters");
+  const galleryAttributionToggle = document.getElementById("day-gallery-hide-attributed");
+  const galleryAttributionStatus = document.getElementById("day-gallery-attribution-status");
   const galleryHouseFilters = document.getElementById("day-gallery-house-filters");
   const galleryHouses = document.getElementById("day-gallery-houses");
   const galleryHousesSummary = document.getElementById("day-gallery-houses-summary");
@@ -487,6 +513,7 @@
   const gallerySort = document.getElementById("day-gallery-sort");
   const gallerySortNote = document.getElementById("day-gallery-sort-note");
   const galleryDescription = document.getElementById("day-gallery-description");
+  const galleryArtistClear = document.getElementById("day-gallery-artist-clear");
   const galleryResults = document.getElementById("day-gallery-results");
   const galleryGrid = document.getElementById("day-gallery-grid");
   const galleryMore = document.getElementById("day-gallery-more");
@@ -497,6 +524,7 @@
   let lotBrowserIndex = 0;
   let lotBrowserReturnFocus = null;
   let galleryFilter = "all";
+  let galleryHideAttributed = false;
   let galleryVisibleCount = 24;
   let galleryArtistsExpanded = false;
   let galleryArtistsDay = "";
@@ -717,6 +745,13 @@
       label.textContent = lot.artist;
     }
     item.appendChild(label);
+    if (lot.attribution_label) {
+      const attribution = document.createElement("span");
+      attribution.className = "lot-attribution-badge";
+      attribution.textContent = lot.attribution_label;
+      attribution.title = "Auction catalog credit";
+      item.appendChild(attribution);
+    }
   };
 
   const formatAnalysisMoney = (value, currency = "USD") => {
@@ -785,6 +820,11 @@
         ? "Title search across all artists. Select the correct artist in Artprice."
         : "Search this artist's sales by artwork title.";
       actionLinks.appendChild(searchLink);
+    }
+    if (lot.artist_liveart_url) {
+      const liveartLink = externalLink(lot.artist_liveart_url, "lot-artist-liveart-link", "LiveArt ↗");
+      liveartLink.setAttribute("aria-label", `Open ${lot.artist || "artist"} on LiveArt (opens in a new tab)`);
+      actionLinks.appendChild(liveartLink);
     }
     const form = document.createElement("form");
     const idPrefix = options.idPrefix ? `${options.idPrefix}-` : "";
@@ -1092,6 +1132,7 @@
     let loaded = false;
     let loadPromise = null;
     let busy = false;
+    let manualEntryControl = null;
     let refreshQueued = false;
     let hasUnsavedChanges = false;
     let currentSubjectMatches = [];
@@ -1136,12 +1177,58 @@
         && (candidate.credible === true || needsManualReview(candidate));
     };
 
+    const candidateGroupItems = (type) => currentCandidates.filter((candidate) => type === "other"
+      ? !["exact_work", "related_work", "artprice_html", "liveart_web", "auction_archive"].includes(candidate.match_type)
+      : candidate.match_type === type);
+
+    const updateBulkSelectionControls = () => {
+      const disabled = busy || Boolean(options.isParentBusy?.()) || pendingSourceRefresh;
+      candidateResults.querySelectorAll(".research-candidate-bulk").forEach((toolbar) => {
+        const items = candidateGroupItems(toolbar.dataset.group);
+        const eligible = items.filter(canSelectCandidate);
+        const selectedCount = eligible.filter((candidate) => selectedIds.has(String(candidate.id))).length;
+        toolbar.querySelector('[data-bulk-action="select"]').disabled = disabled
+          || selectedIds.size >= 25 || selectedCount === eligible.length;
+        toolbar.querySelector('[data-bulk-action="deselect"]').disabled = disabled
+          || !items.some((candidate) => selectedIds.has(String(candidate.id)));
+        toolbar.querySelector(".research-candidate-bulk-note").textContent = `${selectedCount} of ${eligible.length} eligible selected · ${selectedIds.size}/25 total across sources · applies to all pages`;
+      });
+    };
+
+    const changeCandidateGroupSelection = (type, select) => {
+      if (busy || options.isParentBusy?.() || pendingSourceRefresh) return;
+      const items = candidateGroupItems(type);
+      let changed = 0;
+      items.forEach((candidate) => {
+        const id = String(candidate.id);
+        if (select) {
+          if (canSelectCandidate(candidate) && !selectedIds.has(id) && selectedIds.size < 25) {
+            selectedIds.add(id);
+            changed += 1;
+          }
+        } else if (selectedIds.delete(id)) changed += 1;
+      });
+      if (changed) {
+        candidateResults.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+          checkbox.checked = selectedIds.has(checkbox.value);
+        });
+        markAnalysisPending();
+      }
+      const remaining = select ? items.filter((candidate) => canSelectCandidate(candidate) && !selectedIds.has(String(candidate.id))).length : 0;
+      setStatus(select
+        ? remaining ? `The 25-sale limit is shared across all sources; ${remaining} eligible sale${remaining === 1 ? " remains" : "s remain"} unselected in this section. Review your selection, then save selected evidence.`
+          : "All eligible sales in this section are selected. Save selected evidence to apply your changes."
+        : "All sales in this section are deselected. Save selected evidence to apply your changes.");
+      updateBulkSelectionControls();
+    };
+
     const textValue = (value) => value === null || value === undefined || value === "" ? "Not reported" : String(value);
     const describeSources = (data, saved) => {
       const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
       const artpriceCount = candidates.filter((candidate) => candidate.provider === "Artprice" || candidate.match_type === "artprice_html").length;
-      const webCount = candidates.filter((candidate) => candidate.entry_method === "manual_web").length;
-      const liveartCount = candidates.length - artpriceCount - webCount;
+      const archiveCount = candidates.filter((candidate) => candidate.provider === "Auction archive").length;
+      const webCount = candidates.filter((candidate) => candidate.provider === "LiveArt" && candidate.entry_method === "manual_web").length;
+      const liveartCount = candidates.length - artpriceCount - webCount - archiveCount;
       const parts = [];
       if (data?.search_category?.id === 2) {
         parts.push("LiveArt search filter: Prints & Multiples only.");
@@ -1166,6 +1253,7 @@
       }
       if (liveartCount) parts.push(`${liveartCount} LiveArt sale${liveartCount === 1 ? "" : "s"} retrieved ${formatAnalysisTimestamp(data?.retrieved_at || researchRetrievedAt)}.`);
       if (webCount) parts.push(`${webCount} LiveArt web sale${webCount === 1 ? "" : "s"} entered manually; no API units used to add them.`);
+      if (archiveCount) parts.push(`${archiveCount} auction archive sale${archiveCount === 1 ? "" : "s"} entered manually; sourced currency conversions are labeled separately.`);
       if (data?.data_units_spent != null) parts.push(`${data.data_units_spent} LiveArt Data Units used in ${saved ? "saved research" : "this search"}.`);
       if (candidates.length) parts.push("Only eligible USD hammer prices enter resale estimates; premiums and estimates are excluded.");
       return parts.join(" ");
@@ -1244,7 +1332,7 @@
         top.appendChild(label);
         const sourceBadge = document.createElement("span");
         sourceBadge.className = `liveart-work-type ${isArtprice ? "is-artprice" : "is-liveart"}`;
-        sourceBadge.textContent = isArtprice ? "Artprice HTML" : "LiveArt";
+        sourceBadge.textContent = isArtprice ? "Artprice HTML" : candidate.provider === "Auction archive" ? "Auction archive" : "LiveArt";
         top.appendChild(sourceBadge);
         if (candidate.match_type === "exact_work" || candidate.match_type === "related_work") {
           const relationship = document.createElement("span");
@@ -1343,7 +1431,7 @@
       price.className = "liveart-price-line";
       price.textContent = candidate.hammer_usd === null || candidate.hammer_usd === undefined
         ? "USD hammer unavailable — excluded from valuation"
-        : `${isArtprice ? "Artprice HTML USD hammer" : candidate.entry_method === "manual_web" ? "LiveArt web USD hammer · entered manually" : "Verified LiveArt USD hammer"}: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}${canSelectCandidate(candidate) ? "" : " — excluded from valuation"}`;
+        : `${isArtprice ? "Artprice HTML USD hammer" : candidate.provider === "Auction archive" ? candidate.fx_conversion ? "Auction archive USD hammer · converted using historical FX" : "Auction archive USD hammer · source reported" : candidate.entry_method === "manual_web" ? "LiveArt web USD hammer · entered manually" : "Verified LiveArt USD hammer"}: ${formatAnalysisMoney(candidate.hammer_usd, "USD")}${canSelectCandidate(candidate) ? "" : " — excluded from valuation"}`;
       card.appendChild(price);
       const facts = document.createElement("div");
       facts.className = "liveart-facts";
@@ -1379,7 +1467,13 @@
       if (candidate.entry_method === "manual_web") {
         appendFact(facts, "Source evidence", candidate.evidence_note);
         appendFact(facts, "Entered by", candidate.entered_by_name || candidate.entered_by);
-        appendFact(facts, "Entry method", "LiveArt website · staff transcription");
+        appendFact(facts, "Entry method", candidate.provider === "Auction archive" ? "Auction archive · staff transcription" : "LiveArt website · staff transcription");
+        if (candidate.fx_conversion) {
+          appendFact(facts, "Historical FX calculation", candidate.fx_conversion.calculation);
+          appendFact(facts, "Exchange-rate date", candidate.fx_conversion.rate_date);
+          const fxSource = providerLink(candidate.fx_conversion.source_url, "Historical exchange-rate source ↗");
+          if (fxSource) facts.appendChild(fxSource);
+        }
       }
       card.appendChild(facts);
       const notesValue = candidate.match_notes || candidate.exclusion_reasons;
@@ -1412,7 +1506,7 @@
         });
         card.appendChild(comparisonList);
       }
-      if (!isArtprice && !provider) {
+      if (!isArtprice && candidate.provider !== "Auction archive" && !provider) {
         const providerMissing = document.createElement("p");
         providerMissing.className = "liveart-missing-data";
         providerMissing.textContent = "LiveArt lot page link not provided; use the LiveArt lot ID above.";
@@ -1481,12 +1575,11 @@
         ["related_work", currentCandidates.some((candidate) => candidate.search_terms?.length) ? "LiveArt term search results" : "Similar sold works", "Compare the medium, edition, signature, size, and condition before selecting a sale."],
         ["artprice_html", "Saved Artprice HTML sales", "These sold records combine your saved HTML files. Overlapping sales count once. Review each date, price, source file, and missing detail."],
         ["liveart_web", "LiveArt web sales · entered manually", "These sales were entered from website research. Check the linked source and evidence before selecting a comparable."],
+        ["auction_archive", "Auction archive sales · entered manually", "These completed sales retain their original source. Converted USD hammers show the original amount and sourced historical exchange rate."],
         ["other", "Other candidate sold results", "Review the artwork identity and sale details before selecting a sale."],
       ];
       groups.forEach(([type, label, explanation]) => {
-        const items = currentCandidates.filter((candidate) => type === "other"
-          ? !["exact_work", "related_work", "artprice_html", "liveart_web"].includes(candidate.match_type)
-          : candidate.match_type === type);
+        const items = candidateGroupItems(type);
         if (!items.length) return;
         if (options.workspace) {
           const group = document.createElement("details");
@@ -1502,6 +1595,23 @@
           note.className = "liveart-group-note";
           note.textContent = explanation;
           body.appendChild(note);
+          const toolbar = document.createElement("div");
+          toolbar.className = "research-candidate-bulk";
+          toolbar.dataset.group = type;
+          toolbar.setAttribute("role", "group");
+          toolbar.setAttribute("aria-label", `${label} selection`);
+          [["Select all", "select"], ["Deselect all", "deselect"]].forEach(([text, action]) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = text;
+            button.dataset.bulkAction = action;
+            button.addEventListener("click", () => changeCandidateGroupSelection(type, action === "select"));
+            toolbar.appendChild(button);
+          });
+          const selectionNote = document.createElement("span");
+          selectionNote.className = "research-candidate-bulk-note";
+          toolbar.appendChild(selectionNote);
+          body.appendChild(toolbar);
           const pageSize = 10;
           const page = Math.min(candidatePages.get(type) || 0, Math.floor((items.length - 1) / pageSize));
           items.slice(page * pageSize, (page + 1) * pageSize).forEach((candidate) => body.appendChild(renderCandidateCard(candidate, true)));
@@ -1539,6 +1649,7 @@
         items.forEach((candidate) => candidateResults.appendChild(renderCandidateCard(candidate, true)));
       });
       candidateResults.dataset.initialized = "true";
+      updateBulkSelectionControls();
     };
     const addResultItem = (parent, label, value) => {
       const item = document.createElement("div");
@@ -1711,11 +1822,12 @@
       savedResults.appendChild(pending);
       saveDraft();
       candidateResults.querySelectorAll(".research-candidate-group").forEach((group) => {
-        const items = currentCandidates.filter((candidate) => candidate.match_type === group.dataset.group);
+        const items = candidateGroupItems(group.dataset.group);
         const count = items.filter((candidate) => selectedIds.has(String(candidate.id))).length;
         const label = group.querySelector("summary");
         label.textContent = label.textContent.replace(/ · \d+ selected$/, "") + (count ? ` · ${count} selected` : "");
       });
+      updateBulkSelectionControls();
     };
     costDefinitions.forEach(([name]) => {
       costFields[name].addEventListener("input", () => markAnalysisPending());
@@ -1727,6 +1839,7 @@
       });
     };
     const updateButtons = () => {
+      updateBulkSelectionControls();
       saveButton.disabled = busy || Boolean(options.isParentBusy?.()) || pendingSourceRefresh || (!hasResearch && !currentAnalysis);
       deleteButton.hidden = !currentAnalysis || currentAnalysis.saved === false;
       saveButton.textContent = options.workspace ? "Save selected evidence" : currentAnalysis && currentAnalysis.saved !== false ? "Update resale bid analysis" : "Save resale bid analysis";
@@ -1744,6 +1857,7 @@
         subjectResults.querySelectorAll(".liveart-subject-choice").forEach((button) => {
           button.disabled = button.dataset.canChoose !== "true";
         });
+        manualEntryControl?.syncModeControls?.();
       }
       updateButtons();
     };
@@ -2060,12 +2174,14 @@
       subjectNeedsChoice = Boolean(payload.requires_subject_choice);
       sourceMeta.textContent = describeSources(payload, false);
       renderCandidates(payload.subject_matches || []);
-      const webGroup = candidateResults.querySelector('[data-group="liveart_web"]');
-      if (webGroup) webGroup.open = true;
+      const addedCandidate = currentCandidates.find((candidate) => String(candidate.id) === String(payload.added_id));
+      const groupType = addedCandidate?.match_type === "auction_archive" ? "auction_archive" : "liveart_web";
+      const addedGroup = candidateResults.querySelector(`[data-group="${groupType}"]`);
+      if (addedGroup) addedGroup.open = true;
       markAnalysisPending("Website evidence changes are not saved yet. Review the selected sales, then save selected evidence to use them on the Bid Board.");
       setStatus(payload.message || "Website evidence updated for review. No LiveArt API request was made.", "success");
     };
-    if (window.LiveArtManualEntry) window.LiveArtManualEntry.mount(section, {
+    if (window.LiveArtManualEntry) manualEntryControl = window.LiveArtManualEntry.mount(section, {
       artist: lot.artist || lot.artist_watchlist_name || "",
       idPrefix: `${options.idPrefix || ""}liveart-${lot.id}-`,
       draftKey: archiveDraftKey(lot.id, "manual-sale"),
@@ -2543,6 +2659,7 @@
         if (researchTab === "bids") bidBoard?.refresh?.();
       };
       tabs.addEventListener("keydown", (event) => {
+        if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
         event.preventDefault();
         const keys = Object.keys(panels);
@@ -3149,10 +3266,17 @@
   const galleryHouseName = (lot) => activeView === "oliver"
     ? (lot.oliver_house_name || lot.auction_house) : lot.auction_house;
 
+  const matchesGalleryAttribution = (lot) => !galleryHideAttributed
+    || !["After", "Attributed to"].includes(lot.attribution_label);
+  const galleryBrowsableLots = () => dayLots().filter(matchesGalleryAttribution);
+
   const visibleGalleryLots = () => {
     const lots = dayLots().map((lot, index) => ({lot, index}));
     const filtered = lots.filter(({lot}) => {
+      if (!matchesGalleryAttribution(lot)) return false;
       if (galleryFilter === "tray") return Boolean(lot.email_tray_selected);
+      if (galleryFilter === "bidboards") return Boolean(lot.saved_bid_board);
+      if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
       return galleryFilter === "all" || galleryHouseName(lot) === galleryFilter.slice(6);
     });
     if (gallerySort.value === "artist") {
@@ -3191,7 +3315,13 @@
   };
 
   const renderGalleryFilters = () => {
-    const lots = dayLots();
+    const lots = galleryBrowsableLots();
+    const hiddenCount = dayLots().length - lots.length;
+    galleryAttributionToggle.setAttribute("aria-pressed", String(galleryHideAttributed));
+    galleryAttributionStatus.hidden = !galleryHideAttributed;
+    galleryAttributionStatus.textContent = galleryHideAttributed
+      ? `${hiddenCount} After / Attributed work${hiddenCount === 1 ? "" : "s"} hidden for this day. Turn off “Hide After & Attributed” to show them. Saved selections are kept.`
+      : "";
     const houseCounts = new Map(activeView === "oliver" ? oliverHouseNames.map((name) => [name, 0]) : []);
     lots.forEach((lot) => {
       const house = galleryHouseName(lot);
@@ -3203,12 +3333,13 @@
     const choices = [
       {key: "all", label: "All houses", count: houseCounts.size},
       {key: "tray", label: "Email Tray", count: lots.filter((lot) => lot.email_tray_selected).length},
+      {key: "bidboards", label: "Bid Boards", count: lots.filter((lot) => lot.saved_bid_board).length},
       ...Array.from(houseCounts, ([house, count]) => ({key: `house:${house}`, label: house, count})),
     ];
     galleryFilters.replaceChildren();
     galleryHouseFilters.replaceChildren();
     gallerySendLaunch.hidden = galleryFilter !== "tray";
-    gallerySendLaunch.disabled = !lots.some((lot) => lot.email_tray_selected);
+    gallerySendLaunch.disabled = !dayLots().some((lot) => lot.email_tray_selected);
     choices.forEach(({key, label, count}) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -3226,6 +3357,7 @@
         galleryFilter = key;
         galleryVisibleCount = 24;
         renderGalleryFilters();
+        renderGalleryArtists();
         renderGalleryCards();
         updateCalendarLocation();
         Array.from(galleryCatalog.querySelectorAll("[data-gallery-filter]"))
@@ -3264,13 +3396,14 @@
       view: "research", day: selectedDay, lot: String(lot.id), look: researchLook,
     }).toString();
     if (inOliverScope()) url.searchParams.set("scope", "oliver");
+    if (galleryHideAttributed) url.searchParams.set("hide_attributed", "1");
     return url.href;
   };
 
   const galleryCard = (lot, index) => {
     const card = document.createElement("article");
     card.dataset.galleryLotId = String(lot.id);
-    card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}`;
+    card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}${lot.attribution_label ? " has-attribution" : ""}`;
     const visual = document.createElement("div");
     visual.className = "day-gallery-visual";
     const researchUrl = galleryResearchUrl(lot);
@@ -3304,6 +3437,7 @@
       window.SavedBidBoard.mountSummary(savedBoard, {lot, csrfToken});
       caption.appendChild(savedBoard);
     }
+    if (window.ResearchQueue) caption.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
     const actions = document.createElement("div");
     actions.className = "day-gallery-actions";
     const quickLook = externalLink(researchUrl, "day-gallery-quick-look", "Research this lot ↗");
@@ -3311,6 +3445,11 @@
     actions.appendChild(quickLook);
     if (lot.url) actions.appendChild(externalLink(lot.url, "day-gallery-auction-link", "Auction ↗"));
     if (lot.artist_invaluable_url) actions.appendChild(externalLink(lot.artist_invaluable_url, "day-gallery-auction-link", "Invaluable ↗"));
+    if (lot.artist_liveart_url) {
+      const liveartLink = externalLink(lot.artist_liveart_url, "day-gallery-auction-link lot-artist-liveart-link", "LiveArt ↗");
+      liveartLink.setAttribute("aria-label", `Open ${lot.artist || "artist"} on LiveArt (opens in a new tab)`);
+      actions.appendChild(liveartLink);
+    }
     caption.appendChild(actions);
     card.append(visual, caption);
     return card;
@@ -3327,15 +3466,23 @@
     galleryGrid.replaceChildren();
     lots.slice(0, galleryVisibleCount).forEach(({lot, index}) => galleryGrid.appendChild(galleryCard(lot, index)));
     if (!lots.length) {
-      appendText(galleryGrid, "p", "day-gallery-empty", galleryFilter === "tray"
+      appendText(galleryGrid, "p", "day-gallery-empty", galleryHideAttributed
+        ? "No lots match these filters. Try showing After & Attributed works or changing the selected filter."
+        : galleryFilter === "tray"
         ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Research, then add it to the tray."
+        : galleryFilter === "bidboards" ? "No lots have a saved Bid Board in this catalog on this date."
         : galleryFilter.startsWith("house:") ? `No lots from ${galleryFilter.slice(6)} on this date.`
         : activeView === "oliver" ? "No lots from Oliver’s auction houses on this date. Choose another watched day or switch to Gallery Catalog."
         : "No watched lots match this view.");
     }
-    galleryDescription.textContent = galleryFilter === "all"
+    const artistSelected = galleryFilter.startsWith("artist:");
+    const selectedArtist = artistSelected
+      ? window.CalendarArtists.summarize(dayLots()).find((artist) => artist.key === galleryFilter.slice(7)) : null;
+    galleryArtistClear.hidden = !artistSelected;
+    galleryDescription.textContent = artistSelected ? `${selectedArtist?.name || "Artist"} · lots this day` : galleryFilter === "all"
       ? (activeView === "oliver" ? "A catalog from Oliver’s auction houses" : "A catalog across auction houses")
-      : galleryFilter === "tray" ? "Lots selected for the next email" : galleryFilter.slice(6);
+      : galleryFilter === "tray" ? "Lots selected for the next email"
+      : galleryFilter === "bidboards" ? "Saved Bid Boards · qualifying, no qualifying bid, and unavailable results" : galleryFilter.slice(6);
     galleryResults.textContent = lots.length
       ? `Showing ${Math.min(galleryVisibleCount, lots.length)} of ${lots.length} watched lot${lots.length === 1 ? "" : "s"}`
       : "0 watched lots";
@@ -3344,7 +3491,7 @@
   };
 
   const renderGalleryArtists = () => {
-    const lots = dayLots();
+    const lots = galleryBrowsableLots();
     if (galleryArtistsDay !== selectedDay) {
       galleryArtistsExpanded = false;
       galleryArtistsDay = selectedDay;
@@ -3355,20 +3502,26 @@
     galleryArtistList.replaceChildren();
     galleryArtistSummary.textContent = `${artists.length} artist${artists.length === 1 ? "" : "s"} · ${lots.length} watched lot${lots.length === 1 ? "" : "s"}`;
     visibleArtists.forEach((artist) => {
-      const card = document.createElement("li");
+      const item = document.createElement("li");
+      const card = document.createElement("button");
+      card.type = "button";
       card.className = "day-gallery-artist-card";
-      appendText(card, "h4", "day-gallery-artist-name", artist.name);
-      const count = document.createElement("p");
+      card.setAttribute("aria-pressed", String(galleryFilter === `artist:${artist.key}`));
+      card.setAttribute("aria-controls", "day-gallery-grid");
+      card.setAttribute("aria-label", `Show ${artist.count} ${artist.count === 1 ? "lot" : "lots"} by ${artist.name}`);
+      card.addEventListener("click", () => chooseGalleryArtist(artist.key));
+      appendText(card, "span", "day-gallery-artist-name", artist.name);
+      const count = document.createElement("span");
       count.className = "day-gallery-artist-total";
       appendText(count, "strong", "", String(artist.count));
       appendText(count, "span", "", artist.count === 1 ? "lot" : "lots");
       card.appendChild(count);
-      const auctionTime = document.createElement("p");
+      const auctionTime = document.createElement("span");
       auctionTime.className = "day-gallery-artist-time";
       appendText(auctionTime, "span", "", "Listed auction");
       appendText(auctionTime, "span", "", artist.earliestTime === null ? "Time TBA" : artist.timeLabel);
       card.appendChild(auctionTime);
-      const arrival = document.createElement("p");
+      const arrival = document.createElement("span");
       arrival.className = "day-gallery-artist-time day-gallery-artist-arrival";
       appendText(arrival, "span", "", "Est. lot arrival");
       appendText(arrival, "span", "", artist.arrivalTime === null
@@ -3378,13 +3531,33 @@
         : `Assumes the listed auction time is the start, plus ${artist.arrivalLotNumber} minutes at one minute per lot.`;
       card.appendChild(arrival);
       if (artist.arrivalTime !== null) {
-        appendText(card, "p", "day-gallery-artist-lot", [`Lot ${artist.arrivalLotNumber}`, artist.arrivalHouse].filter(Boolean).join(" · "));
+        appendText(card, "span", "day-gallery-artist-lot", [`Lot ${artist.arrivalLotNumber}`, artist.arrivalHouse].filter(Boolean).join(" · "));
       }
-      galleryArtistList.appendChild(card);
+      card.setAttribute("aria-description", [
+        `Listed auction: ${artist.earliestTime === null ? "Time TBA" : artist.timeLabel}.`,
+        `Estimated lot arrival: ${artist.arrivalTime === null ? "Unavailable" : window.CalendarArtists.formatArrival(artist, galleryArtists.dataset.timeZone)}.`,
+        artist.arrivalTime === null ? "" : `Lot ${artist.arrivalLotNumber}, ${artist.arrivalHouse}.`,
+      ].filter(Boolean).join(" "));
+      item.appendChild(card);
+      galleryArtistList.appendChild(item);
     });
     galleryArtistsMore.hidden = artists.length <= 12;
     galleryArtistsMore.setAttribute("aria-expanded", String(galleryArtistsExpanded));
     galleryArtistsMore.textContent = galleryArtistsExpanded ? "Show fewer artists" : `Show all ${artists.length} artists`;
+  };
+
+  const chooseGalleryArtist = (key) => {
+    galleryFilter = key ? `artist:${key}` : "all";
+    galleryVisibleCount = 24;
+    renderGalleryFilters();
+    renderGalleryArtists();
+    renderGalleryCards();
+    updateCalendarLocation();
+    galleryDescription.focus({preventScroll: true});
+    galleryDescription.scrollIntoView({
+      block: "start",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
   };
 
   const renderGalleryCatalog = () => {
@@ -3404,7 +3577,8 @@
     galleryNext.disabled = !nextGalleryDay();
     galleryBrowserLaunch.disabled = !lots.length;
     const availableHouses = activeView === "oliver" ? new Set(oliverHouseNames) : houses;
-    if (galleryFilter !== "all" && galleryFilter !== "tray" && !availableHouses.has(galleryFilter.slice(6))) galleryFilter = "all";
+    if (galleryFilter.startsWith("house:") && !availableHouses.has(galleryFilter.slice(6))) galleryFilter = "all";
+    if (galleryFilter.startsWith("artist:") && !lots.some((lot) => window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7))) galleryFilter = "all";
     renderGalleryFilters();
     renderGalleryArtists();
     renderGalleryCards();
@@ -3739,6 +3913,7 @@
     dialog.addEventListener("close", () => expand.focus({preventScroll: true}));
     dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
     gallery.addEventListener("keydown", (event) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
       event.preventDefault(); event.stopPropagation();
       showImage(event.key === "Home" ? 0 : event.key === "End" ? images.length - 1 : activeImage + (event.key === "ArrowRight" ? 1 : -1));
@@ -3822,6 +3997,7 @@
     }
     if (lot.artprice_url) actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
     overview.appendChild(actionLinks);
+    if (window.ResearchQueue) overview.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
     content.appendChild(overview);
     const workflow = document.createElement("section");
     workflow.className = "lot-browser-workflow";
@@ -3897,6 +4073,7 @@
       actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
     }
     copy.appendChild(actionLinks);
+    if (window.ResearchQueue) copy.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
     lotBrowserCard.appendChild(copy);
 
     const workflow = document.createElement("section");
@@ -3985,8 +4162,12 @@
     else url.searchParams.delete("view");
     if (selectedDay) url.searchParams.set("day", selectedDay);
     else url.searchParams.delete("day");
-    if (isGalleryView() && galleryFilter === "tray") url.searchParams.set("filter", "tray");
+    if (isGalleryView() && ["tray", "bidboards"].includes(galleryFilter)) url.searchParams.set("filter", galleryFilter);
     else url.searchParams.delete("filter");
+    if (isGalleryView() && galleryFilter.startsWith("artist:")) url.searchParams.set("artist", galleryFilter.slice(7));
+    else url.searchParams.delete("artist");
+    if (galleryHideAttributed) url.searchParams.set("hide_attributed", "1");
+    else url.searchParams.delete("hide_attributed");
     if (activeView === "research" && inOliverScope()) url.searchParams.set("scope", "oliver");
     else url.searchParams.delete("scope");
     if (activeView === "research") {
@@ -4005,12 +4186,15 @@
       const monthUrl = new URL(link.href);
       monthUrl.searchParams.delete("day");
       monthUrl.searchParams.delete("lot");
+      monthUrl.searchParams.delete("artist");
       if (isGalleryView() || activeView === "research") monthUrl.searchParams.set("view", activeView);
       else monthUrl.searchParams.delete("view");
       if (activeView === "research") monthUrl.searchParams.set("look", researchLook);
       else monthUrl.searchParams.delete("look");
       if (activeView === "research" && inOliverScope()) monthUrl.searchParams.set("scope", "oliver");
       else monthUrl.searchParams.delete("scope");
+      if (galleryHideAttributed) monthUrl.searchParams.set("hide_attributed", "1");
+      else monthUrl.searchParams.delete("hide_attributed");
       link.href = monthUrl;
     });
   };
@@ -4057,6 +4241,7 @@
     restoringHistory = true;
     try {
       const params = new URLSearchParams(window.location.search);
+      galleryHideAttributed = params.get("hide_attributed") === "1";
       researchScope = params.get("scope") === "oliver" ? "oliver" : "";
       activeView = ["catalog", "oliver", "research"].includes(params.get("view")) ? params.get("view") : "calendar";
       const day = params.get("day");
@@ -4071,7 +4256,7 @@
       const requestedIndex = dayLots().findIndex((lot) => lot.id === requestedLot);
       if (requestedIndex >= 0) researchIndex = requestedIndex;
       const view = params.get("view");
-      galleryFilter = params.get("filter") === "tray" ? "tray" : "all";
+      galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : ["tray", "bidboards"].includes(params.get("filter")) ? params.get("filter") : "all";
       setCalendarView(view);
       const focusTarget = view === "research" ? researchTitle
         : isGalleryView() ? document.getElementById("day-gallery-title") : calendarViewToggle;
@@ -4090,6 +4275,7 @@
     updateCalendarLocation();
   }));
   researchWorkspace.querySelector(".research-concept-switch").addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault(); event.stopPropagation();
     const index = researchLookButtons.indexOf(document.activeElement);
@@ -4148,9 +4334,16 @@
     if (catalogEmailForm.getAttribute("aria-busy") === "true") event.preventDefault();
   });
   galleryArtistSort.addEventListener("change", renderGalleryArtists);
+  galleryArtistClear.addEventListener("click", () => chooseGalleryArtist(""));
   galleryArtistsMore.addEventListener("click", () => {
     galleryArtistsExpanded = !galleryArtistsExpanded;
     renderGalleryArtists();
+  });
+  galleryAttributionToggle.addEventListener("click", () => {
+    galleryHideAttributed = !galleryHideAttributed;
+    galleryVisibleCount = 24;
+    renderGalleryCatalog();
+    updateCalendarLocation();
   });
   gallerySort.addEventListener("change", () => {
     galleryVisibleCount = 24;
@@ -4239,6 +4432,7 @@
         actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
       }
       item.appendChild(actionLinks);
+      if (window.ResearchQueue) item.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
       appendArtpriceEditor(item, lot, actionLinks);
       appendArtpriceAnalysis(item, lot);
       list.appendChild(item);
@@ -4304,6 +4498,7 @@
   const initialDay = "{{ initial_day|escapejs }}";
   researchDaySelect.addEventListener("change", () => showDay(researchDaySelect.value));
   const initialParams = new URLSearchParams(window.location.search);
+  galleryHideAttributed = initialParams.get("hide_attributed") === "1";
   const requestedView = initialParams.get("view");
   const requestedDay = initialParams.get("day");
   const validRequestedDay = requestedDay && /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
@@ -4322,7 +4517,7 @@
     if (matchingIndex >= 0) researchIndex = matchingIndex;
   }
   if (validRequestedDay || initialDay) showDay(validRequestedDay ? requestedDay : initialDay);
-  galleryFilter = initialParams.get("filter") === "tray" ? "tray" : "all";
+  galleryFilter = initialParams.get("artist") ? `artist:${initialParams.get("artist")}` : ["tray", "bidboards"].includes(initialParams.get("filter")) ? initialParams.get("filter") : "all";
   setCalendarView(requestedView);
   const requestedSavedBoard = initialParams.get("saved_bid_board");
   if (requestedSavedBoard && window.SavedBidBoard) {

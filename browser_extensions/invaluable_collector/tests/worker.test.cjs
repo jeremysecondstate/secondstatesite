@@ -37,11 +37,11 @@ async function start(h) {
   assert.equal((await h.send({ type: "configure", urls: [PAGE], window: WINDOW })).ok, true);
   assert.equal((await h.send({ type: "start" })).ok, true);
 }
-function capture(h, nonce) {
+function capture(h, nonce, id = "1", total = 1) {
   const run = h.shared.secondstateCollectorRun;
   return { type: "capture", nonce, page_url: run.target.url, snapshot: {
-    source_url: run.target.url, captured_at: new Date().toISOString(), results: [{ page: 0, nbPages: 1, nbHits: 1, hitsPerPage: 1,
-      hits: [{ lotRef: "ref1", objectID: "1", lotTitle: "A print", artistName: "Josef Albers", dateTimeUTCUnix: 1792929600 }] }] } };
+    source_url: run.target.source_url, captured_at: new Date().toISOString(), results: [{ page: run.target.page, nbPages: total, nbHits: total, hitsPerPage: 1,
+      hits: [{ lotRef: `ref${id}`, objectID: id, lotTitle: "A print", artistName: "Josef Albers", dateTimeUTCUnix: 1792929600 }] }] } };
 }
 test("worker opens one normal tab and rejects UI controls from site content", async () => {
   const h = harness(); await start(h);
@@ -89,4 +89,41 @@ test("expired timeout and closed owned tab pause while keeping local captures", 
   await h.send({ type: "resume" }); h.listeners.removed(42);
   const closed = await h.send({ type: "status" });
   assert.equal(closed.run.status, "paused"); assert.match(closed.run.note, /closed/);
+});
+
+test("later pages stay in one document and require the exact expected page and new nonce", async () => {
+  const h = harness(); await start(h); const source = h.source();
+  const first = await h.send({ type: "hello", page_url: source.url }, source);
+  assert.equal(first.expected_page, 0);
+  const firstCapture = capture(h, first.nonce, "1", 2);
+  assert.equal((await h.send(firstCapture, source)).ok, true);
+  assert.equal(h.navigations.length, 1, "no ?page navigation for Load more");
+  const second = await h.send({ type: "hello", page_url: source.url }, source);
+  assert.equal(second.expected_page, 1);
+  assert.notEqual(second.nonce, first.nonce);
+  assert.equal(new URL(second.source_url).searchParams.get("page"), "2");
+  assert.equal((await h.send(firstCapture, source)).ok, false, "prior nonce cannot satisfy the next page");
+  assert.equal((await h.send({ type: "hello", page_url: source.url }, h.source("foreign-document"))).ok, false);
+  assert.equal((await h.send(capture(h, second.nonce, "2", 2), source)).ok, true);
+  assert.equal(h.shared.secondstateCollectorRun.snapshots.length, 2);
+  assert.equal(h.shared.secondstateCollectorRun.status, "complete");
+  assert.equal(h.navigations.length, 1);
+});
+
+test("resume reloads page zero and keeps prior captures for sequential recapture", async () => {
+  const h = harness(); await start(h); const source = h.source();
+  const first = await h.send({ type: "hello", page_url: source.url }, source);
+  await h.send(capture(h, first.nonce, "1", 2), source);
+  assert.equal(h.shared.secondstateCollectorRun.target.page, 1);
+  await h.send({ type: "pause" }); await h.send({ type: "resume" });
+  assert.equal(h.shared.secondstateCollectorRun.target.page, 0);
+  assert.equal(h.shared.secondstateCollectorRun.snapshots.length, 1);
+  assert.equal(h.navigations[1].kind, "reload");
+  assert.equal((await h.send({ type: "hello", page_url: source.url }, source)).ok, false);
+  const fresh = h.source("doc-2");
+  const hello = await h.send({ type: "hello", page_url: fresh.url }, fresh);
+  assert.equal(hello.expected_page, 0);
+  assert.equal((await h.send(capture(h, hello.nonce, "1", 2), fresh)).ok, true);
+  assert.equal(h.shared.secondstateCollectorRun.snapshots.length, 1);
+  assert.equal(h.shared.secondstateCollectorRun.target.page, 1);
 });

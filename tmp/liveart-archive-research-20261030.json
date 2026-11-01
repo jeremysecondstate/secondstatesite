@@ -1,0 +1,456 @@
+{
+  "researched_at": "2026-10-30",
+  "scope": "Public web and original auction archives only; no LiveArt paid queries/browser/queue or saves used.",
+  "accepted_comparables": [
+    {
+      "work": "La Veillee",
+      "house": "De Vuyst",
+      "sale": 181,
+      "date": "2022-03-12",
+      "lot": 390,
+      "edition": "31/45",
+      "catalogue_year": 1981,
+      "medium_as_catalogued": "vernis mou",
+      "image_cm": [
+        19.5,
+        29.4
+      ],
+      "hammer_eur": 850,
+      "hammer_usd_from_parent_authorized_liveart": 934,
+      "basis": "Original results PDF explicitly headed Result. Hammerprice; lot390=850.00. Parent independently verified LiveArt hammer value and exact selected-work image match. Original catalogue medium/year differs from target but image match and size/edition confirm same work.",
+      "source": "https://connect.invaluable.com/devuyst/auction-lot/delvaux-paul-la-veillee-1981_31B4A22AEE",
+      "original_result_source": "https://de-vuyst.com/en/attachment/download/007a4d74-9717-4044-8481-f91376f706b1",
+      "original_sale_source": "https://de-vuyst.com/en/auctions/contemporary-modern-and-old-masters-1",
+      "local_result_pdf": "C:/dev/secondstatesite/tmp/devuyst181-hammer-results.pdf",
+      "verification": "Extracted full one-page table and rendered PNG checked: C:/dev/secondstatesite/tmp/devuyst181-hammer-page.png."
+    },
+    {
+      "work": "La Veillee",
+      "house": "Kohn Marc-Arthur",
+      "date": "2015-12-16",
+      "lot": 12,
+      "edition": "40/45",
+      "medium_as_catalogued": "lithograph",
+      "dimensions_as_catalogued_cm": [
+        28,
+        37
+      ],
+      "hammer_eur_from_parent_authorized_liveart": 1800,
+      "hammer_usd_from_parent_authorized_liveart": 1967,
+      "basis": "Parent independently verified authorized LiveArt hammer price/date and exact selected-work image match. Public Gazette original-lot listing confirms signed pencil40/45; no independently public original hammer source located.",
+      "source": "https://www.gazette-drouot.com/lots/5590422-paul-delvaux-1897-1994--la---",
+      "liveart_lot_id": 231688163
+    },
+    {
+      "work": "Francoise",
+      "house": "Kohn Marc-Arthur",
+      "date": "2015-12-16",
+      "lot": 33,
+      "edition": "60/75",
+      "medium_as_catalogued": "Lithograph on Japan",
+      "dimensions_as_catalogued_cm": [
+        37,
+        27
+      ],
+      "hammer_usd_from_parent_authorized_liveart": 874,
+      "basis": "Parent authorized LiveArt API supplied hammer and browser verified same portrait, signature, reversed23-7-80 date and edition60/75. Source paper differs Japan vs current Rives; record discrepancy rather than infer different work. Public original catalogue confirms exact edition and description, but public result gated.",
+      "source": "https://www.gazette-drouot.com/en/lots/5590443-paul-delvaux-1897-1994--francoise---"
+    },
+    {
+      "work": "Francoise",
+      "house": "Kohn Marc-Arthur",
+      "date": "2015-12-16",
+      "lot": 34,
+      "edition": "27/75",
+      "medium_as_catalogued": "Lithograph on Rives",
+      "dimensions_as_catalogued_cm": [
+        45,
+        31
+      ],
+      "hammer_usd_from_parent_authorized_liveart": 983,
+      "basis": "Parent authorized LiveArt API supplied hammer and browser verified exact portrait/signature/reversed23-7-80 date. Public original catalogue independently confirms Rives27/75 dimensions and title; public result gated.",
+      "source": "https://www.gazette-drouot.com/en/lots/5590444-paul-delvaux-1897-1994--francoise---"
+    },
+    {
+      "work": "Selected Les Derniers beaux jours scene",
+      "alternate_title": "L apparition",
+      "house": "Venator & Hanstein",
+      "date_from_parent": "2014-03-29",
+      "edition": "of45",
+      "medium": "colored etching on BFK Rives",
+      "image_cm": [
+        37,
+        29.7
+      ],
+      "hammer_eur_from_parent_authorized_liveart": 850,
+      "hammer_usd_from_parent_authorized_liveart": 1168,
+      "liveart_id_from_parent": "jg4iYz",
+      "basis": "Parent explicitly confirmed exact man-house-forest-nude image in LiveArt browser and read listed hammer. Public primary price/lot number not independently found.",
+      "original_sale_context": "Sale131 moderne contemporary graphics,29March2014; calendar independently corroborated by public art-market sale notice.",
+      "calendar_source": "https://kunstmarkt.com/pagesprz/kunst/_d309399-/show_praesenz.html?_q=+",
+      "limitation": "Original current catalogue131 and guessed historical PDF131 returned404; no invented lot number or premium arithmetic.",
+      "lot": 915,
+      "sale": 131,
+      "edition_from_parent": "33/45",
+      "original_archive_access": "Current original archive expressly says auctions1-174 are not available as online catalogues; sale131 falls within that range. Original lot915 unavailable online, without asserting no sale history.",
+      "original_archive_access_source": "https://www.venator-hanstein.de/services/katalogarchiv"
+    },
+    {
+      "work": "Selected Les Derniers beaux jours scene",
+      "alternate_title": "L apparition",
+      "house": "De Vuyst",
+      "date_from_parent": "2008-05-10",
+      "edition": "3/45",
+      "catalogue_year": 1978,
+      "medium": "Etching hand-colored with watercolor",
+      "image_cm": [
+        37,
+        29.8
+      ],
+      "hammer_eur_from_parent_authorized_liveart": 2200,
+      "hammer_usd_from_parent_authorized_liveart": 3403,
+      "liveart_id_from_parent": "J9iLU3",
+      "basis": "Parent explicitly confirmed exact man-house-forest-nude image and hammer in authorized LiveArt browser. Original2008 primary catalogue/result not independently located in bounded pass.",
+      "limitation": "Parent provided auction lot94; direct original2008 online source not established yet.",
+      "lot": 94,
+      "sale": 138,
+      "literature_from_indexed_original": "Paul Delvaux Oeuvres sur papier, Centre culturel de la Communaute francaise de Belgique Paris1980, cf65c.",
+      "original_indexed_description_source": "https://www.invaluable.com/artist/delvaux-paul-jjsutbeepg/sold-at-auction-prices/?page=53",
+      "sale138_independent_source": "https://anet.be/awlijst/2015-10/Anet/awa.pdf",
+      "archived_original_homepage": "https://web.archive.org/web/20080510id_/http://www.de-vuyst.com/Homepage.asp?T=NL",
+      "archived_original_catalogue": "https://web.archive.org/web/20080601id_/http://www.de-vuyst.com/catalogus/catalog.asp?T=NL",
+      "original_identity_corroboration": "Public-indexed original description identifies L Apparition1948-1978,3/45,37x29.8cm, watercolor by Delvaux andCharlesVanDeun with authenticitystamp; Paris1980 Oeuvres sur papier catalogue65c. Direct Invaluable page currently zero lots, so exact lotURL unavailable.",
+      "original_hammer_audit": "Not independently recovered after reasonable original, archive and hosting-service alternatives. Archived lot94 capture is a different older auction (Mario Cravo Neto imagepath125), explicitly excluded. D-index captures404; exactresults138.pdf no Wayback snapshot; results-file CDX timed out; current housearchive andiCollector searches supplied no2008lot/result. EUR2200 remains parentLiveArt evidence."
+    }
+  ],
+  "identity": {
+    "La Veillee": {
+      "title": "La Veill\u00e9e",
+      "date": "April 1980",
+      "target_edition": "1/45",
+      "target_image_cm": [
+        19.5,
+        29
+      ],
+      "prior_listing": {
+        "house": "Kohn Marc-Arthur",
+        "date": "2021-06-28",
+        "lot": 20,
+        "edition": "1/45",
+        "medium_as_catalogued": "lithograph",
+        "dimensions_cm": [
+          53.5,
+          39.5
+        ],
+        "result": null,
+        "source": "https://www.gazette-drouot.com/en/lots/15386870-paul-delvaux-antheit-1897---"
+      },
+      "note": "Same number as target suggests earlier offering of same sheet; no sale price found. Other archives call same title/image dimensions etching or soft varnish, so medium inconsistency needs visual confirmation."
+    },
+    "Francoise": {
+      "title": "Fran\u00e7oise",
+      "date": "1980-07-23",
+      "target_edition": "60/75",
+      "target_medium": "lithograph on Rives",
+      "prior_listing": {
+        "house": "Kohn Marc-Arthur",
+        "date": "2021-06-28",
+        "lot": 26,
+        "edition": "60/75",
+        "medium": "Lithograph on Rives",
+        "dimensions_cm": [
+          45,
+          31
+        ],
+        "result": null,
+        "source": "https://www.gazette-drouot.com/en/lots/15386876-paul-delvaux-antheit-1897---"
+      },
+      "other_prior_listing": {
+        "house": "Kohn Marc-Arthur",
+        "date": "2021-06-28",
+        "lot": 24,
+        "edition": "32/75",
+        "medium": "Lithograph on Japan",
+        "dimensions_cm": [
+          45,
+          31
+        ],
+        "source": "https://www.gazette-drouot.com/en/auctions/115957-modern-and-contemporary-art"
+      }
+    },
+    "Les Derniers beaux jours": {
+      "date": "1978-1979",
+      "target_medium": "watercolor-enhanced etching on Japanese paper",
+      "target_edition": "E/A",
+      "image_cm": [
+        38,
+        30
+      ],
+      "sheet_cm": [
+        76,
+        56
+      ],
+      "dedication": "Tam et Paul to Renaud 8-8-1980 (verified by parent original browser)",
+      "source": "https://www.gazette-drouot.com/en/auctions/186535-modern-paintings-and-sculptures--7c-primitive-art?modeDiapo=false&page=2",
+      "note": "Single plate; same-title series portfolios or other scenes must not be treated as exact image matches.",
+      "alternate_title_resolution": {
+        "title": "L apparition",
+        "status": "Parent visually confirmed exact selected scene under this alternate title in two LiveArt browser records; current Kohn uses series title Les Derniers beaux jours.",
+        "series_context": "Official Yokohama Museum2017 checklist places L Apparition in L Orage,1978-79 from1948 plate. Do not use series title alone to merge illustrations.",
+        "museum_source": "https://yokohama.art.museum/static/file/exhibition/listofworks2017_December25_March04.pdf",
+        "suite_archive_source": "https://www.pba-auctions.com/lot/100288/11248517-paul-delvaux-1897-1994-les-derniers-beaux-jours-le-laid-et"
+      }
+    }
+  },
+  "leads": [
+    {
+      "work": "La Veill\u00e9e",
+      "house": "Veritas",
+      "date": "2018-02-28",
+      "sale": 74,
+      "lot": 149,
+      "edition": "29/45",
+      "medium": "Etching on paper",
+      "image_cm": [
+        19,
+        29
+      ],
+      "estimate_eur": [
+        1000,
+        1500
+      ],
+      "result": null,
+      "source": "https://veritas.art/wp-content/uploads/2017/11/Leilao74_2PAG.pdf",
+      "next": "Find original sale74 result; catalog confirms title dimensions and45 edition, but result not yet located.",
+      "original_lot_source": "https://veritas.art/en/lot/la-veillee-907987133/",
+      "result_access": "Hammer Price: Register to access this information",
+      "status": "Resolved as public-result unavailable. Public lot API provided identity only; no auth bypass attempted."
+    },
+    {
+      "work": "Fran\u00e7oise",
+      "house": "Cornette de Saint Cyr",
+      "dates": [
+        "2020-03-29",
+        "2020-04-29",
+        "2020-11-15"
+      ],
+      "lots": [
+        284,
+        284,
+        11
+      ],
+      "edition": "69/75",
+      "medium": "Vernis mou",
+      "estimate_eur": [
+        500,
+        700
+      ],
+      "result": null,
+      "source": "https://www.lotsearch.net/artist/paul-delvaux/archive?order=DESC&orderBy=dollarBasedPrice-hammerPrice&page=20&perPage=80",
+      "next": "Original auction archive may resolve sale/unsold; medium inconsistency with target; no accepted value."
+    },
+    {
+      "work": "Les Derniers beaux jours",
+      "house": "Bernaerts",
+      "date": "2026-10-08",
+      "medium": "Etching heightened with watercolour",
+      "image_cm": [
+        39,
+        30
+      ],
+      "frame_cm": [
+        90,
+        69
+      ],
+      "price_eur": 950,
+      "price_basis": "Original detail expressly Hamerprijs950; original public results AJAX also Hamerprijs950.",
+      "source": "https://findartinfo.com/artist/paul-delvaux/11EABC0B7A007854AD5FC4B301B9DA2D",
+      "next": "Resolved; no further work.",
+      "lot": 1561,
+      "edition": "13/20",
+      "original_result_eur": 950,
+      "original_source": "https://www.bernaerts.eu/veilingen/veilingen-detail?verkocht=0&veil=c1114&item=806&zitting=5",
+      "original_image_source": "https://www.bernaerts.eu/catalog/image_out/c1114/1561.jpg",
+      "local_image": "C:/dev/secondstatesite/tmp/bernaerts20261008-lot1561.jpg",
+      "status": "Excluded as exact-work comparable: title-page illustration, with central title text/table and fireplace, differs from target woods/man at house/nude."
+    },
+    {
+      "work": "Les Derniers beaux jours",
+      "house": "Horta",
+      "date": "2025-12-08",
+      "lot": 68,
+      "edition": "EA",
+      "medium": "watercolor-enhanced etching on Japan",
+      "image_cm": [
+        38.5,
+        30
+      ],
+      "estimate_eur": [
+        500,
+        700
+      ],
+      "result": null,
+      "source": "https://www.horta.be/UserFiles/upload/sales_catalogues_thumbnails/Catalogue_horta_2025-12-08__decembre_2025_d_art_et_antiquites.pdf",
+      "next": "No further basis research needed for exact-work workflow.",
+      "original_result_eur": 550,
+      "original_result_label": "Resultat",
+      "original_result_source": "https://www.horta.be/default.asp?sCode=DESCRIPTION-FR&sale=356&lot=68&id=210662&page_nbr=1",
+      "image_identity": "PDF thumbnail shows title-page composition, framed Les Derniers Beaux Jours central text, red drape/standing figure lower left. Parent target comparison pending.",
+      "image_evidence": "C:/dev/secondstatesite/tmp/horta20251208-page8.png",
+      "price_basis_status": "Not yet accepted as hammer: result label alone; terms https://www.horta.be/Conditions-Generales add fees separately but do not explicitly define published results.",
+      "status": "Excluded as exact comparable: parent target image is man leaning left at porch, nude woman lower right in green woods; Horta image is title page."
+    },
+    {
+      "work": "Les Derniers beaux jours",
+      "house": "Horta",
+      "date": "2023-05",
+      "lot": 70,
+      "price_eur": 600,
+      "price_basis": "Yearbook title-only entry; hammer basis/image unverified",
+      "source": "https://www.horta.be/UserFiles/upload/Yearbook/Horta_Yearbook_2025.pdf",
+      "next": "Match May2023 catalog lot70 and verify result basis."
+    },
+    {
+      "work": "L apparition",
+      "house": "Ferraton",
+      "date": "2016-04-16",
+      "lot": 198,
+      "edition": "33/45",
+      "medium": "black etching on Rives hand-colored by Delvaux and Charles Van Deun",
+      "image_cm": [
+        37,
+        29.5
+      ],
+      "sheet_cm": [
+        65,
+        49.5
+      ],
+      "estimate_eur": [
+        800,
+        1200
+      ],
+      "source": "https://www.bibliorare.com/wp-content/uploads/catalogue/pdf/ferraton-16-04-2016-cat.pdf",
+      "status": "Specific access limitation resolved: original ferraton.be redirects to unrelated mail domain; surviving official auctioneer catalogue hosted on Bibliorare is searchable, and same-sale Bibliorare page has actual Results PDF link. That resultPDF and catalogue511 failed repeatedly via web/Python with timeouts; no price read. No evidence establishing sold or unsold.",
+      "catalogue_source": "https://www.bibliorare.com/wp-content/uploads/catalogue/pdf/ferraton-16-04-2016-cat.pdf",
+      "same_sale_verified_page": "https://www.bibliorare.com/lot/162042/",
+      "sale_page": "https://www.bibliorare.com/catalogue/511/",
+      "actual_results_link": "https://www.bibliorare.com/wp-content/uploads/catalogue/pdf/ferraton-15-04-2016-result.pdf",
+      "result_access": "Web open/click and Python HTTPS/HTTP overIPv4 timed out. Filename15Apr but confirmed link attached to16Apr2016 sale; contents unread, so not inferred to be correct table.",
+      "image_access": "Original catalogue says all illustrations on ferraton.be, now unavailable. No image verified. Same33/45 impression as Venator possible only, not established.",
+      "next": "No further reasonable currently accessible public sources found; no invented value or missing-history conclusion."
+    }
+  ],
+  "exclusions": [
+    {
+      "work": "La Veill\u00e9e",
+      "source": "https://www.christies.com/en/lot/lot-4935437",
+      "reason": "1940 oil painting100.3x90.4cm; unrelated medium/date/size."
+    },
+    {
+      "work": "La Veill\u00e9e",
+      "house": "Dewit",
+      "date": "2026-11-11",
+      "lot": 481,
+      "edition": "13/45",
+      "medium": "Soft varnish",
+      "image_cm": [
+        19.5,
+        29.4
+      ],
+      "source": "https://www.gazette-drouot.com/en/lots/35593778-paul-delvaux-1897-1994-----",
+      "reason": "Future auction, no actual sold result."
+    },
+    {
+      "work": "Les Derniers beaux jours, Jules Contemple",
+      "house": "Carlo Bonte",
+      "date": "2026-10-15",
+      "lot": 2139,
+      "edition": "17/20",
+      "dimensions_cm": [
+        38,
+        30
+      ],
+      "price_eur": 400,
+      "source": "https://www.carlobonte.be/auction-lot/paul-delvaux-1897-1994-les-derniers-beaux-jours-j_56bcc27ee8",
+      "reason": "Original archive says Sold \u20ac400 and separate29% buyer premium, but named Jules Contemple plate identity not yet matched to target; do not accept title-only."
+    },
+    {
+      "work": "Les Derniers beaux jours / Le Laid / L Orage",
+      "source": "https://www.pba-auctions.com/lot/100288/11248517-paul-delvaux-1897-1994-les-derniers-beaux-jours-le-laid-et",
+      "reason": "Sixteen-etching suite9/20, not single target plate; no per-sheet division."
+    },
+    {
+      "work": "Les Derniers beaux jours",
+      "source": "https://www.maisonjules.be/auction-lot/paul-delvaux-1897-1994-8-etchings-and-watercol_4F81A8CB52",
+      "reason": "Eight-plate suite14/20; no per-sheet division."
+    },
+    {
+      "work": "Les Derniers beaux jours",
+      "house": "Horta",
+      "date": "2025-12-08",
+      "lot": 68,
+      "result_eur": 550,
+      "reason": "Different illustration confirmed by parent target image: Horta title page vs target man leaning at porch and nude woman lower right in woodland. Same suite only.",
+      "source": "https://www.horta.be/default.asp?sCode=DESCRIPTION-FR&sale=356&lot=68&id=210662&page_nbr=1"
+    },
+    {
+      "work": "Les Derniers beaux jours",
+      "house": "Bernaerts",
+      "date": "2026-10-08",
+      "lot": 1561,
+      "edition": "13/20",
+      "hammer_eur": 950,
+      "image_cm": [
+        39,
+        30
+      ],
+      "reason": "Original full-resolution image shows title-page composition with framed title on red tablecloth beneath mantle. Target depicts dressed man at house left and nude woman in green woods right. Different illustration from same suite; no exact comp.",
+      "source": "https://www.bernaerts.eu/veilingen/veilingen-detail?verkocht=0&veil=c1114&item=806&zitting=5",
+      "image_source": "https://www.bernaerts.eu/catalog/image_out/c1114/1561.jpg"
+    },
+    {
+      "work": "Francoise",
+      "house": "De Vuyst",
+      "date": "2008-05-10",
+      "lot": 96,
+      "hammer_usd_from_parent_authorized_liveart": 1701,
+      "medium_as_parent_API": "etching",
+      "image_cm": [
+        29.8,
+        19.3
+      ],
+      "reason": "Image and edition absent in parent API; original2008 catalogue/result not found in bounded public archive searches. Current DeVuyst auction archive starts2022. Not accepted without corroborated identity."
+    }
+  ],
+  "search_log": [
+    "Opened both target Invaluable URLs through web tool; inaccessible. Parent browser owns original listing verification.",
+    "Searched title variants with and without accents, lithograph/etching/vernis mou, sold/adjug\u00e9/r\u00e9sultat, exact edition, title plus houses Kohn, Veritas, Cornette, Bernaerts.",
+    "Found Gazette Kohn Dec16 2015 catalog: La Veill\u00e9e lot12 40/45; Fran\u00e7oise lot33 Japan60/75 and lot34 Rives27/75; Les Derniers lot41EA. All sale results behind Gazette login, so not accepted as sold.",
+    "Found Kohn Jun28 2021 exact edition prior offerings; Gazette Results link redirects to login. No price inferred.",
+    "Original Veritas previous auction archive opens at https://veritas.art/en/auctions/previous/ (4330 lines) but find timed out; needs followup on sale74.",
+    "Original Bernaerts current homepage https://www.bernaerts.eu/en/ shows Oct8 2026 Works on Paper and link to live.bernaerts.eu; no result yet inspected.",
+    "No currency conversion performed. No price-inclusive totals backed out.",
+    "Followup after parent authorized LiveArt reads: primary De Vuyst sale181 source and explicit hammer results found. EUR850 lot390 independently verified and table rendered for visual QA.",
+    "Parent browser independently image-matched both La Veillee comps, Kohn2015 40/45 and DeVuyst2022 31/45. Cataloguing medium/year differences do not invalidate exact-image matches.",
+    "Public Veritas WP lot-list endpoint read only to obtain original sale74 lot149 page; page expressly gates hammer behind registration. Stopped; no login/access bypass.",
+    "Horta original public catalog search GET sale356 lot68 gives Resultat550; original full description and PDF thumbnail located. Parent exact-image check pending and explicit published hammer basis not yet established.",
+    "Bernaerts original live.bernaerts.eu returns403 via web tool. Original homepage/catalog PDF archive accessible, but recent result unresolved; aggregator EUR950 not accepted without basis/image checks.",
+    "No browser use, paid queries, queue writes, sends, or saves. Only research log and temporary evidence artifacts written.",
+    "Third pass: re-opened original Gazette Kohn2015 lots33 and34 independently; confirmed Japan60/75 37x27cm and Rives27/75 45x31cm. Parent image-matched both and supplied authorized LiveArt hammerUSD874/983; accepted with original-source public-result limitation.",
+    "Resolved Bernaerts original site dynamic public read: results page uses GET /tags/voltooide_search.php?search_mode=2&search_data=10-2026. It identifies c1114 session5 Works on PaperII Oct8 2026. Its public grid GET /tags/veilingen_ajax.php with search_mode4/search_dataDelvaux displays lot1561 Hamerprijs950. Full public detail confirmed title/date13/20 39x30cm; full image inspected and excludes exact target.",
+    "DeVuyst May10 2008 Franfoise lot96 bounded exact-title/date/house searches found no original catalogue/result. Current original DeVuyst archive only recent2022 onward; parent image unavailable. Left excluded for uncorroborated identity.",
+    "No new browser, LiveArt paid/API queries, or queue mutations performed; research JSON plus temporary public-source evidence only.",
+    "Final bounded pass sought exact target scene using alternate title L Apparition plus1978/LePaysdesMiroirs. Official Yokohama museum checklist independently distinguishes L Apparition from L Orage suite vs same-title1980 nude-portrait etching.",
+    "Parent discovered and exact-image confirmed L Apparition Venator2014 EUR850/USD1168 and DeVuyst2008 3/45 EUR2200/USD3403. Recorded parent-authorized price evidence; no claim that public originals independently confirmed hammer.",
+    "Venator primary Katalog129 PDF search snippet announces Mar28/29 2014 sales; art-market public notice establishes sale130/131 and modern-print sale131 Mar29. Current primary catalogue131 and historical131 PDF404. No further requests made.",
+    "Ferraton2016 lot198 L Apparition1978 33/45 description/dimensions found in public catalogue; actual result and image unverified, therefore lead only.",
+    "No browser or paid LiveArt queries, no queue mutation. Final research-only log updated.",
+    "Final resolution pass opened original Venator Katalogarchiv: explicit published statement that auction catalogues1-174 are not available online; can be inspected on request. Source https://www.venator-hanstein.de/services/katalogarchiv . Venator131 lot915 primary original therefore unavailable in current public archive.",
+    "Ferraton original https://www.ferraton.be redirects to https://www.inboxxa.com/service/mail/ferraton.be . Did not use unrelated domain.",
+    "Read original auctioneer Ferraton Apr16 2016 catalogue through Bibliorare web text:198 L Apparition1978 33/45 watercolorRives37x29.5 sheet65x49.5 estimate800-1200. Catalogue indicates all illustrations on ferraton.be; current PDF provides text, no verified targetimage.",
+    "Found same-sale Bibliorare Dali lot180 page162042 showing16Apr2016sale and actual linked resultsPDF ferraton-15-04-2016-result.pdf . Following results link and catalogue511 via web and independent Python resultedtimeouts; HTTPS/HTTPIPv4 retries also timed out. Searches for exacttarget/title/resultfilename yielded no indexed lot198 actual price. Therefore no actual sold/unsold outcome established. This is access limitation, not absence of history.",
+    "Parent supplied exact auction numbers Venator2014 lot915 and DeVuyst2008 lot94, recorded separately from earlier LiveArt list indices.",
+    "Delegated originalDeVuyst2008 audit completed: archived originalHomepage and catalogue independently establishMay10sale138; indexed original description corroborates3/45 dimensions andliterature65c. Original exact lot94 archived capture belongs olderMarioCravoNeto sale125 and excluded; no matching original hammer recovered. All descendants terminal before handoff."
+  ],
+  "status": "Research complete. Six parent-verified exact-image hammer comparables across three selectedworks recorded; DeVuyst2022 LaVeillee EUR850 independently original-hammer verified. Other parentLiveArt prices retain explicit original-public-access limitations. Ferraton2016lot198 sold/unsold outcome remains unestablished despite verified catalogue and linked butunresponsive resultPDF; no missing-history assertion. Distinct archive alternatives exhausted and all research agents terminal."
+}

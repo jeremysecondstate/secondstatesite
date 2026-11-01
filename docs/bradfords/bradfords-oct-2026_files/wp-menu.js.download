@@ -1,0 +1,43 @@
+jQuery( function($){
+	// function for closing menu when click outside assigned selector
+	jQuery.fn.clickOutside = function (callback) {
+		var $me = this;
+		$(document).on('mouseup tap',function (e) {
+			if (!$me.is(e.target) && $me.has(e.target).length === 0) {
+				callback.apply($me);
+			}
+		});
+	};
+
+
+	$('.menu-item').on( 'click', function(e){
+		e.stopPropagation();
+		if( $( this ).hasClass( 'menu-item-has-children' ) ){
+			// Open sub-menu on first click
+			if( !$(this).hasClass( 'show' ) ){
+				e.preventDefault();
+			}
+
+			// Remove show class from menu item and add class to current menu item
+			$('.menu-item-has-children').not( $(this) ).removeClass( 'show' );
+			$(this).toggleClass( 'show' );
+
+			// Remove show class from all submenu and toggle show class to current items sub menu
+			$('.menu-item-has-children').not( $(this) ).find( 'ul.sub-menu' ).removeClass( 'show' );
+			$(this).find( 'ul.sub-menu' ).toggleClass( 'show' );
+		}else{
+			$('.menu-item').removeClass( 'show' );
+			$( 'ul.sub-menu' ).removeClass( 'show' );
+		}
+	});
+
+
+	// Close menu on click outside
+	$('#menu-primary-menu').clickOutside(function () {
+		$('.menu-item').removeClass('show');
+		$('.menu-item .sub-menu').removeClass('show');
+	});
+
+
+
+});

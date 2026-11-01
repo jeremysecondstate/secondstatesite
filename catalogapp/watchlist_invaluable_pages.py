@@ -14,7 +14,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from bs4 import BeautifulSoup, Comment
 
-from catalogapp.bookmark_watchlist import BookmarkEntry, canonicalize_bookmark_url, source_for_url
+from catalogapp.bookmark_watchlist import (
+    BookmarkEntry, canonicalize_bookmark_url, expand_invaluable_bulk_entries,
+    invaluable_search_artists, source_for_url,
+)
 from catalogapp.watchlist_adapters import InvaluableAdapter
 from catalogapp.watchlist_cache import WatchlistCache
 from catalogapp.watchlist_models import NormalizedLot, lot_within_horizon, parse_lot_datetime
@@ -93,8 +96,9 @@ def _snapshot_data(payload: object, observed_at: datetime, *, bundled: bool = Fa
         raise ValueError("the snapshot must contain a JSON object")
     page_url = _public_url(str(payload.get("source_url", "")))
     parts = urlsplit(page_url)
+    source_artists = invaluable_search_artists(page_url) if bundled else (_search_artist(page_url),)
     if (not page_url or source_for_url(page_url) != "Invaluable"
-            or parts.path.rstrip("/").casefold() != "/search" or not _search_artist(page_url)):
+            or parts.path.rstrip("/").casefold() != "/search" or not any(source_artists)):
         raise ValueError("the snapshot needs an Invaluable artist-search source_url")
     if bundled and (parts.scheme != "https" or parts.netloc not in {"www.invaluable.com", "invaluable.com"}):
         raise ValueError("bundled snapshots need an HTTPS Invaluable artist-search source_url")
@@ -121,6 +125,7 @@ def _snapshot_data(payload: object, observed_at: datetime, *, bundled: bool = Fa
         url_page = next(iter(url_pages), "1")
         if not re.fullmatch(r"[0-9]+", url_page) or int(url_page) != page + 1:
             raise ValueError("the bundled result does not match its source URL page")
+        source_artist_keys = {InvaluableAdapter._artist_match_key(artist) for artist in source_artists}
         ids, refs = set(), set()
         for hit in result["hits"]:
             for field in _CAPTURE_PUBLIC_FIELDS.intersection(hit):
@@ -137,6 +142,8 @@ def _snapshot_data(payload: object, observed_at: datetime, *, bundled: bool = Fa
                         or isinstance(identity, (int, float)) and not math.isfinite(identity)))):
                 raise ValueError("a bundled hit has an invalid lot identity, artist or title")
             identity = str(identity or ref).strip()
+            if InvaluableAdapter._artist_match_key(hit["artistName"]) not in source_artist_keys:
+                raise ValueError("a bundled hit's artistName does not match its source URL artist set")
             if not identity or identity in ids or ref in refs:
                 raise ValueError("a bundled page contains duplicate or missing lot identities")
             ids.add(identity)
@@ -201,7 +208,8 @@ def _saved_inputs(paths: list[Path], observed_at: datetime, errors: list[str], n
                 # A later capture of the same displayed page replaces the old
                 # page. Different pages remain independent partial evidence.
                 sorts = tuple(sorted(value.casefold() for key, value in parse_qsl(urlsplit(url).query) if key.casefold() == "sort"))
-                key = (window, InvaluableAdapter._artist_match_key(_search_artist(url)),
+                key = (window, tuple(sorted({InvaluableAdapter._artist_match_key(artist)
+                                             for artist in invaluable_search_artists(url)})),
                        _search_scope(url, ignore_date_controls=True), sorts, result["page"])
                 fingerprint = json.dumps(result, sort_keys=True, ensure_ascii=True)
                 unit = _SavedInput(label, snapshot, True, window)
@@ -435,7 +443,7 @@ def import_saved_invaluable_pages(
     Only normalized lot fields are retained; HTML and account data stay local.
     """
     chosen = []
-    for entry in entries:
+    for entry in expand_invaluable_bulk_entries(entries):
         url = _public_url(entry.url)
         if entry.source == "Invaluable" and url and source_for_url(url) == "Invaluable" and entry.artist:
             chosen.append(entry)
@@ -489,14 +497,22 @@ def import_saved_invaluable_pages(
                 errors.append(f"{label}: {exc}; no lots were imported from this file.")
                 continue
         artist = _search_artist(page_url)
-        matching_entries = [entry for entry in by_artist.get(adapter._artist_match_key(artist), [])
-                            if _search_scope(entry.url, ignore_date_controls=saved.window is not None)
-                            == _search_scope(page_url, ignore_date_controls=saved.window is not None)]
-        if not matching_entries:
+        source_artists = invaluable_search_artists(page_url) if saved.window is not None else (artist,)
+        matching_by_artist = {}
+        for source_artist in source_artists:
+            artist_key = adapter._artist_match_key(source_artist)
+            matches = [entry for entry in by_artist.get(artist_key, [])
+                       if _search_scope(entry.url, ignore_date_controls=saved.window is not None)
+                       == _search_scope(page_url, ignore_date_controls=saved.window is not None)]
+            if matches:
+                matching_by_artist[artist_key] = matches
+        if not matching_by_artist:
             errors.append(f"{label}: its artist, category, or search-query filters do not match a selected Invaluable bookmark.")
             continue
         if is_snapshot:
-            scoped_hits = [hit for hit in catalog_result["hits"] if _hit_matches_category(hit, page_url)]
+            scoped_hits = [hit for hit in catalog_result["hits"]
+                           if adapter._artist_match_key(str(hit.get("artistName", ""))) in matching_by_artist
+                           and _hit_matches_category(hit, page_url)]
             unmatched += len(catalog_result["hits"]) - len(scoped_hits)
             cards = adapter.parse_search_page(json.dumps({"results": [{"hits": scoped_hits}]}), page_url, artist)
         else:
@@ -517,9 +533,10 @@ def import_saved_invaluable_pages(
             continue
         seen_files += 1
         for card in cards:
+            matching_entries = matching_by_artist.get(adapter._artist_match_key(card.artist), [])
             url = _public_url(card.lot_url)
             if (not url or source_for_url(url) != "Invaluable" or not adapter._lot_href.search(urlsplit(url).path)
-                    or not card.title or adapter._artist_match_key(card.artist) != adapter._artist_match_key(artist)):
+                    or not card.title or not matching_entries):
                 unmatched += 1
                 continue
             card.lot_url = url

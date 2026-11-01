@@ -64,6 +64,77 @@ class ManualLiveArtEvidenceTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         return response.json()["analysis"]
 
+    def archive_entry(self, **changes):
+        return {**self.entry, "source_kind": "auction_archive", "price_mode": "historical_fx",
+                "auction_house": "Heffel", "lot_number": "338", "hammer_usd": "",
+                "provider_url": "https://www.heffel.ca/Online/LotDetails/338/",
+                "lot_url": "https://www.heffel.ca/Online/LotDetails/338/",
+                "evidence_note": "Closed session explicitly documents a final bid CAD2500, excluding premium.",
+                "original_hammer": "2500", "original_currency": "CAD", "fx_rate": "1.3624",
+                "fx_direction": "original_per_usd", "fx_date": self.entry["sale_date"],
+                "fx_source_url": "https://www.bankofcanada.ca/valet/observations/FXUSDCAD/json?start_date=2024-06-12&end_date=2024-06-12",
+                **changes}
+
+    @patch("secondstateapp.calendar_views.LiveArtClient")
+    @patch("secondstateapp.calendar_views._research_liveart_lot")
+    def test_archive_conversion_is_server_calculated_retained_and_included_in_median_board(self, paid_lookup, client_class):
+        web = self.added()
+        archive = self.added(entry=self.archive_entry(), research_id=web["research_id"], selected_ids=[web["added_id"]])
+        candidate = next(item for item in archive["candidates"] if item["id"] == archive["added_id"])
+        self.assertEqual(candidate["provider"], "Auction archive")
+        self.assertEqual(candidate["match_type"], "auction_archive")
+        self.assertEqual(candidate["hammer_usd"], "1835.00")
+        self.assertEqual(candidate["original_hammer"], "2500.00")
+        self.assertTrue(candidate["manual_selectable"])
+        self.assertEqual(candidate["fx_conversion"]["rate"], "1.3624")
+        self.assertEqual(candidate["fx_conversion"]["calculation"], "2500.00 CAD / 1.3624 = 1835.00 USD (rounded half up)")
+        response = self.post(action="save", research_id=archive["research_id"], selected_ids=[web["added_id"], archive["added_id"]], assumptions={})
+        self.assertEqual(response.status_code, 200, response.content)
+        analysis = self.client.get(self.url).json()["analysis"]
+        self.assertEqual(analysis["source_summary"]["liveart_selected_count"], 1)
+        self.assertEqual(analysis["source_summary"]["archive_selected_count"], 1)
+        self.assertEqual(analysis["source_summary"]["archive_converted_count"], 1)
+        self.assertEqual(analysis["source_summary"]["combined_comp_count"], 2)
+        self.assertEqual(next(item for item in analysis["candidates"] if item["provider"] == "Auction archive")["fx_conversion"], candidate["fx_conversion"])
+        board = self.client.post(self.board_url, json.dumps({"action": "save"}), content_type="application/json")
+        self.assertEqual(board.status_code, 200, board.content)
+        self.assertEqual(board.json()["analysis"]["cases"][1]["resale_hammer"], "2570.00")
+        saved = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+        saved_archive = next(item for item in saved.evidence_snapshot["selected_records"] if item["provider"] == "Auction archive")
+        self.assertEqual(saved_archive["fx_conversion"], candidate["fx_conversion"])
+        self.assertIn("auction archives", board.json()["analysis"]["cases"][1]["basis"])
+        paid_lookup.assert_not_called()
+        client_class.assert_not_called()
+
+    def test_archive_source_usd_and_multiplication_conversion(self):
+        result = self.added(entry=self.archive_entry(fx_direction="usd_per_original", fx_rate="0.734", hammer_usd="1835.00"))
+        self.assertEqual(next(item for item in result["candidates"] if item["id"] == result["added_id"])["hammer_usd"], "1835.00")
+        result = self.added(entry=self.archive_entry(price_mode="source_usd", hammer_usd="1835", fx_rate="", fx_date="", fx_source_url=""))
+        candidate = next(item for item in result["candidates"] if item["id"] == result["added_id"])
+        self.assertEqual(candidate["provider"], "Auction archive")
+        self.assertIsNone(candidate["fx_conversion"])
+
+    def test_archive_conversion_rejects_missing_or_ambiguous_proof_and_disagreement(self):
+        changes = [{field: ""} for field in ("original_hammer", "original_currency", "fx_rate", "fx_date", "fx_source_url")]
+        changes += [{"fx_rate": value} for value in ("0", "-1", "NaN", "1e2", "1.1234567890123", {})]
+        changes += [{"fx_date": "2024-06-13"}, {"fx_date": "2024-06-01"}, {"fx_direction": "unclear"},
+                    {"fx_source_url": "javascript:alert(1)"}, {"hammer_usd": "3000"}, {"original_currency": "USD"},
+                    {"source_kind": "liveart_web"}, {"source_kind": {}}, {"price_basis": "premium_inclusive"}]
+        for change in changes:
+            with self.subTest(change=change):
+                response = self.add(entry=self.archive_entry(**change))
+                self.assertEqual(response.status_code, 400, response.content)
+        self.assertFalse(LiveArtResaleAnalysis.objects.exists())
+
+    def test_archive_and_liveart_transcriptions_of_same_sale_are_not_double_counted(self):
+        web = self.added()
+        archive = self.added(entry={**self.entry, "source_kind": "auction_archive", "provider_url": self.entry["lot_url"]},
+                             research_id=web["research_id"])
+        self.assertTrue(archive["duplicate"])
+        self.assertEqual(archive["added_id"], web["added_id"])
+        self.assertEqual(len(archive["candidates"]), 1)
+        self.assertEqual(archive["candidates"][0]["provider"], "LiveArt")
+
     @patch("secondstateapp.calendar_views.LiveArtClient")
     @patch("secondstateapp.calendar_views._research_liveart_lot")
     def test_manual_sale_saves_and_feeds_bid_board_without_api_calls(self, paid_lookup, client_class):

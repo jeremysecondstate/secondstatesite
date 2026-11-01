@@ -18,7 +18,7 @@ function hit(id, day = "2026-10-25T12:00:00Z", extras = {}) {
 }
 function message(run, hits = [hit("1")], total = hits.length, perPage = hits.length || 1) {
   return { nonce: run.target.nonce, page_url: run.target.url,
-    snapshot: { source_url: run.target.url, captured_at: LATER,
+    snapshot: { source_url: run.target.source_url, captured_at: LATER,
       results: [{ page: run.target.page, nbHits: total, nbPages: Math.ceil(total / perPage), hitsPerPage: perPage, hits }] } };
 }
 test("bookmark normalization excludes unrelated/private URLs and coalesces encoding and sort variants", () => {
@@ -41,9 +41,54 @@ test("stale recognized bookmark date filters are removed while the artist and pr
   const url = new URL(watch.url);
   assert.equal(url.hostname, "www.invaluable.com");
   assert.equal(url.searchParams.get("Fine Art"), "Prints");
-  assert.equal(url.searchParams.get("query"), "fine art");
+  assert.equal(globalThis.SecondStateInvaluableSnapshot.searchSpec(watch.url).query, "fine art");
+  assert.equal(url.searchParams.get("query"), "fine%20art");
   assert.equal(url.searchParams.has("dateTimeUTCUnix[max]"), false);
   assert.equal(url.searchParams.has("dateType"), false);
+});
+test("bulk bookmarks take precedence over individual links and preserve the working URL encodings", () => {
+  const first = `${URL_A}&artistName=James%2520Rizzi`;
+  const second = "https://www.invaluable.com/search?artistName=Jim%2520Dine&artistName=Yayoi%2520Kusama&Fine%20Art=Prints&query=fine%2520art&sort=endDateAsc";
+  const reordered = new URL(first);
+  reordered.searchParams.delete("artistName");
+  reordered.searchParams.append("artistName", "James Rizzi");
+  reordered.searchParams.append("artistName", "Josef Albers");
+  const watches = rules.normalizeWatches([URL_A, first, URL_B, second, reordered.href]);
+  assert.equal(watches.length, 2);
+  assert.equal(watches[0].artist, "Bulk 1 · 2 artists");
+  assert.deepEqual(watches[0].artists, ["James Rizzi", "Josef Albers"]);
+  assert.deepEqual(new URL(watches[0].url).searchParams.getAll("artistName"), ["Josef%20Albers", "James%20Rizzi"]);
+  assert.equal(rules.sameSearch(watches[0].url, reordered.href), true);
+  assert.equal(watches[1].artist, "Bulk 2 · 2 artists");
+  assert.equal(rules.normalizeWatches([URL_A, URL_B]).length, 2);
+});
+test("a bulk capture retains distinct lot artists and rejects foreign or unattributed records", () => {
+  const run = pending([`${URL_A}&artistName=James%2520Rizzi`]);
+  const payload = message(run, [hit("1"), hit("2", undefined, { artistName: "James Rizzi" })]);
+  const accepted = rules.acceptCapture(run, payload, 42, LATER);
+  assert.deepEqual(accepted.snapshots[0].results[0].hits.map(item => item.artistName), ["Josef Albers", "James Rizzi"]);
+  const foreign = message(run, [hit("1", undefined, { artistName: "Banksy" })]);
+  assert.throws(() => rules.acceptCapture(run, foreign, 42, LATER), /could not be verified/);
+  const missing = message(run); delete missing.snapshot.results[0].hits[0].artistName;
+  assert.throws(() => rules.acceptCapture(run, missing, 42, LATER), /could not be verified/);
+});
+test("bulk pagination continues beyond the old 25-page cap and stops explicitly at its own limit", () => {
+  let run = pending([`${URL_A}&artistName=James%2520Rizzi`]);
+  for (let page = 0; page < 32; page += 1) {
+    run = rules.acceptCapture(run, message(run, [hit(String(page))], 32, 1), 42, LATER);
+    run = rules.prepareTarget(run, `page-${page + 1}`, NOW);
+  }
+  assert.equal(run.status, "complete");
+  assert.equal(run.snapshots.length, 32);
+  assert.equal(run.progress[0].captured_lots, 32);
+  let limited = pending([`${URL_A}&artistName=James%2520Rizzi`]);
+  limited.progress[0].next_page = rules.MAX_BULK_PAGES - 1;
+  limited = rules.prepareTarget(limited, "last-page", NOW);
+  limited = rules.acceptCapture(limited, message(limited, [hit("last")], rules.MAX_BULK_PAGES + 1, 1), 42, LATER);
+  assert.equal(limited.status, "paused");
+  assert.equal(limited.progress[0].status, "partial");
+  assert.match(limited.note, /100-page limit/);
+  assert.throws(() => rules.pageURL(limited.watches[0], rules.MAX_BULK_PAGES), /page limit/);
 });
 test("unrelated tab, nonce, artist, page, and earlier capture are rejected without mutating the run", () => {
   const run = pending(); const original = JSON.stringify(run); const item = message(run);
@@ -87,6 +132,18 @@ test("changing result totals and duplicate lot identities across pages stop capt
   assert.throws(() => rules.acceptCapture(run, message(run, [hit("1")], 2, 1), 42, LATER), /more than one/);
   const accepted = rules.acceptCapture(run, message(run, [hit("2")], 2, 1), 42, LATER);
   assert.equal(accepted.progress[0].captured_lots, 2);
+});
+
+test("same visible search cannot authorize a different snapshot page", () => {
+  let run = pending(); run = rules.acceptCapture(run, message(run, [hit("1")], 2, 1), 42, LATER);
+  run = rules.prepareTarget(run, "next-page", NOW);
+  const wrongSource = message(run, [hit("2")], 2, 1);
+  wrongSource.snapshot.source_url = run.target.url;
+  assert.throws(() => rules.acceptCapture(run, wrongSource, 42, LATER), /does not match/);
+  const wrongResult = message(run, [hit("2")], 2, 1);
+  wrongResult.snapshot.results[0].page = 0;
+  assert.throws(() => rules.acceptCapture(run, wrongResult, 42, LATER), /could not be verified/);
+  assert.equal(run.snapshots.length, 1);
 });
 test("source sort dates beyond the window do not skip later pages with potentially different effective end dates", () => {
   const run = pending();

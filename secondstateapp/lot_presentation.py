@@ -91,6 +91,7 @@ def clean_display_text(value: object, *, strip_lot_markers: bool = False) -> str
 _ARTISTS = (
     ("Adams, Derrick",), ("Albers, Josef",), ("Alechinsky, Pierre",),
     ("Appel, Karel",), ("Arman",), ("Banksy",), ("Barnet, Will", "Will Barnett", "Barnett, Will"),
+    ("Baumann, Gustave",),
     ("Bearden, Romare Howard", "Romare Bearden", "Bearden, Romare"),
     ("Benton, Thomas Hart",), ("Botero, Fernando",), ("Braque, Georges",),
     ("Calder, Alexander", "Alexander (1898) Calder"), ("Catlett, Elizabeth",),
@@ -101,7 +102,7 @@ _ARTISTS = (
     ("Frink, Elisabeth",), ("Garcia, Jerry",), ("Gottlieb, Adolph",), ("Goya, Francisco de",),
     ("Haring, Keith",), ("Hirst, Damien",), ("Hockney, David",),
     ("Hundertwasser, Friedensreich", "Friedrich Hundertwasser", "Hundertwasser, Friedrich"),
-    ("Icart, Louis",), ("Katz, Alex",), ("Kelly, Ellsworth",), ("Kent, Rockwell",),
+    ("Icart, Louis",), ("Kahn, Wolf",), ("Katz, Alex",), ("Kelly, Ellsworth",), ("Kent, Rockwell",),
     ("Kollwitz, Käthe",), ("Kusama, Yayoi",), ("Lam, Wifredo",), ("Léger, Fernand",),
     ("Lewis, Martin",), ("Lichtenstein, Roy",), ("Liebermann, Max",), ("Magritte, René",),
     ("Matisse, Henri",), ("Max, Peter",), ("Megargee, Alonzo",), ("Miró, Joan",),
@@ -224,3 +225,70 @@ def artist_sort_key(value: object) -> str:
     """
     _, name, _ = _attribution_parts(artist_display_name(value))
     return _name_key(name)
+
+
+_ATTRIBUTION_WARNING = re.compile(r"\b(after|attributed\s+to)\b", re.IGNORECASE)
+_FRENCH_ATTRIBUTION = r"(?:d['’‘ʼ]?\s*apr[eè]s|attribu[eé]e?\s+[aà])"
+_ATTRIBUTION_TITLE_MARKER = re.compile(rf"\b(?:after|attributed\s+to|{_FRENCH_ATTRIBUTION})\b", re.IGNORECASE)
+_FRENCH_CREDIT_PREFIX = re.compile(rf"^(?P<lead>\(?\s*)(?P<marker>{_FRENCH_ATTRIBUTION})(?=\s|\)|:|$)", re.IGNORECASE)
+_FRENCH_CREDIT_SUFFIX = re.compile(rf"(?P<lead>\(\s*|,\s*)(?P<marker>{_FRENCH_ATTRIBUTION})(?P<tail>\s*\)?)$", re.IGNORECASE)
+_CREDIT_BIOGRAPHY = re.compile(r"\s*\([^)]*\b\d{4}\b[^)]*\)\s*")
+
+
+def _attribution_credit(value: object) -> tuple[str, str]:
+    """Read explicit credit markers without changing the supplied artist text."""
+    text = clean_display_text(value, strip_lot_markers=True)
+    text = " ".join(_CREDIT_BIOGRAPHY.sub(" ", text).split())
+    # Translate only explicit credit-position markers, never the stored source.
+    def translate_marker(match):
+        label = "After" if match["marker"].casefold().startswith("d") else "Attributed to"
+        return match["lead"] + label + match.groupdict().get("tail", "")
+    text = _FRENCH_CREDIT_PREFIX.sub(translate_marker, text)
+    text = _FRENCH_CREDIT_SUFFIX.sub(translate_marker, text)
+    wrapped = re.fullmatch(r"\(\s*((?:after|attributed\s+to)\b.+)\s*\)", text, re.IGNORECASE)
+    if wrapped:
+        text = wrapped[1].strip()
+    text = re.sub(r"^\(\s*(after|attributed\s+to)\s*\)\s*:?\s*", r"\1 ", text, flags=re.IGNORECASE)
+    text = re.sub(r"^(after|attributed\s+to)\s*:\s*", r"\1 ", text, flags=re.IGNORECASE)
+    prefix, name, suffix = _attribution_parts(text)
+    marker = _ATTRIBUTION_WARNING.search(prefix + " " + suffix)
+    label = "Attributed to" if marker and marker[1].casefold().startswith("attributed") else "After" if marker else ""
+    return label, name
+
+
+def _credit_name_key(value: object) -> tuple[str, ...]:
+    _, name = _attribution_credit(value)
+    # Use only a complete supplied name or its existing curated display alias.
+    # Sorted tokens permit explicit surname-first labels, not fuzzy matching.
+    return tuple(sorted(re.findall(r"\w+", _name_key(artist_display_name(name)))))
+
+
+def artist_attribution_label(*artists: object, title: object = "") -> str:
+    """Flag explicit After/Attributed-to credits, including bound title credits.
+
+    Inspect the raw auction artist before a canonical watchlist label can hide
+    its qualifier. A title contributes only a structured credit naming that
+    same artist; ordinary work titles such as After the Party remain unflagged.
+    """
+    for artist in artists:
+        label, _ = _attribution_credit(artist)
+        if label:
+            return label
+    text = clean_display_text(title, strip_lot_markers=True)
+    if not _ATTRIBUTION_TITLE_MARKER.search(text):
+        return ""
+    names = {_credit_name_key(artist) for artist in artists if clean_display_text(artist)}
+    names.discard(())
+    if not names:
+        return ""
+    candidates = [text, *str(title or "").splitlines()]
+    candidates.extend(re.split(r"\s+[—–-]\s+|[:;]", text))
+    candidates.extend(match[1] for match in re.finditer(r"\(([^()]*)\)", text))
+    # A catalog can write After Picasso, Pablo, Title or Picasso, Pablo, after.
+    for comma in re.finditer(",", text):
+        candidates.extend((text[:comma.start()], text[comma.end():]))
+    for candidate in dict.fromkeys(candidates):
+        label, name = _attribution_credit(candidate)
+        if label and _credit_name_key(name) in names:
+            return label
+    return ""

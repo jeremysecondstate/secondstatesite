@@ -38,13 +38,17 @@ async function pauseRun(state, note, status) {
   await chrome.alarms.clear(ALARM);
   return next;
 }
-async function navigate(state) {
+async function navigate(state, loadPage = true) {
   let next = rules.prepareTarget(state, crypto.randomUUID(), new Date().toISOString());
   if (next.status === "complete") { await save(next); await chrome.alarms.clear(ALARM); return next; }
   next.target.deadline_at = Date.now() + TIMEOUT_MS;
-  next.target.previous_document_id = state.document_id || null;
+  if (loadPage) next.target.previous_document_id = state.document_id || null;
+  else next.target.document_id = state.document_id;
   await save(next);
   await chrome.alarms.create(ALARM, { when: next.target.deadline_at });
+  // Later pages are requested by the site's visible Load more control in this
+  // same document. The bridge learns the one permitted page from its hello.
+  if (!loadPage) return next;
   try {
     if (Number.isInteger(next.tab_id)) {
       // Updating a tab URL makes a normal top-level browser navigation.
@@ -70,7 +74,7 @@ function trustedUI(sender) {
 function sourceMessageAllowed(sender, message, state) {
   return sender.id === chrome.runtime.id && sender.frameId === 0 && sender.tab?.id === state?.tab_id
     && state.status === "running" && state.target
-    && rules.sameSearch(sender.url, state.target.url) && rules.sameSearch(message.page_url, state.target.url);
+    && rules.sameScope(sender.url, state.target.url) && rules.sameScope(message.page_url, state.target.url);
 }
 async function handle(message, sender) {
   if (!message || typeof message !== "object") throw new Error("Invalid collector message.");
@@ -83,7 +87,8 @@ async function handle(message, sender) {
       state.target.document_id = sender.documentId;
       state.document_id = sender.documentId;
       await save(state);
-      return { ok: true, nonce: state.target.nonce };
+      return { ok: true, nonce: state.target.nonce, expected_page: state.target.page,
+        source_url: globalThis.SecondStateInvaluableSnapshot.searchSpec(state.target.source_url || state.target.url).sourceURL };
     }
     if (message.nonce !== state.target.nonce || sender.documentId !== state.target.document_id) return { ok: false, ignored: true };
     if (message.type === "blocked") {
@@ -91,10 +96,11 @@ async function handle(message, sender) {
       return { ok: true, ...publicView(state) };
     }
     try {
+      const previousIndex = state.target.index;
       state = rules.acceptCapture(state, message, sender.tab.id, new Date().toISOString());
       await save(state);
       await chrome.alarms.clear(ALARM);
-      if (state.status === "running") state = await navigate(state);
+      if (state.status === "running") state = await navigate(state, state.current_index !== previousIndex);
       return { ok: true, ...publicView(state) };
     } catch (error) {
       state = await pauseRun(state, `Capture paused: ${error.message}`);
@@ -114,6 +120,9 @@ async function handle(message, sender) {
       if (!state) throw new Error("Import artist bookmarks and set the date window first.");
       if (state.status === "running") return { ok: true, ...publicView(state) };
       if (state.status === "complete") throw new Error("This run is finished. Export it or reset for a new run.");
+      // Reload starts the site's results at page zero, even when a page query
+      // parameter is supplied. Recapture prior pages before continuing a run.
+      if (state.progress[state.current_index]) state.progress[state.current_index].next_page = 0;
       state = await navigate(state);
       return { ok: true, ...publicView(state) };
     case "pause":

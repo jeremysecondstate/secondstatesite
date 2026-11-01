@@ -3,7 +3,7 @@
 .liveart-manual-body { padding-top: 12px; }
 .liveart-manual-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; margin: 16px 0; }
 .liveart-manual-grid .is-wide { grid-column: 1 / -1; }
-.liveart-manual-entry .artprice-analysis-field { min-width: 0; }
+.liveart-manual-entry .artprice-analysis-field { min-width: 0; align-content: start; }
 .liveart-manual-entry label { display: block; margin-bottom: 6px; }
 .liveart-manual-entry :is(input:not([type="checkbox"]), textarea) { box-sizing: border-box; width: 100%; min-width: 0; }
 .liveart-manual-entry textarea { resize: vertical; padding: 10px; font: inherit; line-height: 1.5; }

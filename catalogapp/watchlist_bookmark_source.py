@@ -20,8 +20,10 @@ from catalogapp.artprice_artist_links import ArtpriceMatchResult, parse_artprice
 from catalogapp.bookmark_watchlist import (
     BookmarkEntry,
     DEFAULT_ALLOWED_DOMAINS,
+    INVALUABLE_INTAKE_BULK_TITLES,
     parse_bookmarks_html,
     parse_netscape_bookmarks,
+    select_invaluable_intake_entries,
 )
 
 
@@ -103,10 +105,15 @@ def _browser_entries(payload: object) -> list[BookmarkEntry]:
                 raise ValueError("The browser Bookmarks file contains an unreadable folder. Try again after the browser saves it.")
             name = _clean_label(node.get("name"), "Unfiled")
             pending.extend((child, (*folder_path, name), depth + 1) for child in reversed(children))
-        elif node.get("type") == "url" and _public_bookmark_url(node.get("url")):
+        elif node.get("type") == "url":
+            title = _clean_label(node.get("name"))
+            if not _public_bookmark_url(node.get("url")):
+                if title.upper() in INVALUABLE_INTAKE_BULK_TITLES:
+                    raise ValueError(f"{title.upper()} must contain a valid multi-artist Invaluable search.")
+                continue
             entries.append(BookmarkEntry(
                 folder_path=folder_path,
-                title=_clean_label(node.get("name")),
+                title=title,
                 url=node["url"].strip(),
             ))
     return entries
@@ -191,7 +198,9 @@ def load_bookmark_source(
 
     paths = bookmark_source_paths(path) or (Path(path),)
     raw_entries = [entry for source_path in paths for entry in _read_bookmark_entries(source_path)]
-    html = _public_html(raw_entries)
+    # Validate reserved intake names before sanitization can discard a damaged
+    # URL and accidentally leave only archived searches available.
+    html = _public_html(select_invaluable_intake_entries(raw_entries))
     entries = parse_bookmarks_html(html)
     names = [entry.artist for entry in entries if entry.artist]
     if artist_names is not None:

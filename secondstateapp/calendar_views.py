@@ -35,7 +35,7 @@ from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
 
 from .artprice_max_bid import ArtpriceAnalysisError, _artprice_image_url, _artprice_lot_url, analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity, merge_artprice_sources
 from .artprice_research_links import artprice_research_links
-from .artist_research_registry import artist_research_urls
+from .artist_research_registry import artist_liveart_url, artist_research_urls
 from .auction_email import (
     AuctionEmailConfigurationError,
     compose_auction_email,
@@ -57,8 +57,9 @@ from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfiguration
 from .liveart_manual import MAX_MANUAL_SALES, find_existing_sale, is_manual_web, normalize_manual_entry, retained_manual_candidates
 from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, manual_review_eligible, normalize_candidate, resale_candidate_selectable, safe_artwork_reference
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
-from .lot_presentation import artist_display_name, artist_sort_key, clean_display_text
+from .lot_presentation import artist_attribution_label, artist_display_name, artist_sort_key, clean_display_text
 from .oliver_houses import is_oliver_house, oliver_house_name, oliver_house_names
+from .research_queue import selected_queue_state
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -230,7 +231,7 @@ def _sale_json(group: dict) -> dict:
     }
 
 
-def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None) -> dict:
+def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None, research_queue_state: dict | None = None) -> dict:
     selected_lot_ids = selected_lot_ids or set()
     image_url = _calendar_image_url(lot.image_url)
     canonical_oliver_house = oliver_house_name(lot.auction_house)
@@ -245,6 +246,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "id": lot.pk,
         "artist": artist_display_name(source_artist),
         "artist_source": source_artist,
+        "attribution_label": artist_attribution_label(lot.artist, source_artist, title=lot.title),
         "artist_sort_key": artist_sort_key(source_artist),
         "title": clean_display_text(lot.title, strip_lot_markers=True) or "Untitled lot",
         "auction_house": clean_display_text(lot.auction_house or lot.source or "Auction"),
@@ -274,6 +276,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "won_by_us": lot.won_by_us,
         "artist_artprice_url": artist_artprice_url,
         "artist_invaluable_url": artist_invaluable_url,
+        "artist_liveart_url": artist_liveart_url(source_artist),
         **artprice_research_links(lot.artist_watchlist_name or lot.artist, lot.title, artist_artprice_url),
         "artprice_url": lot.artprice_url,
         "artprice_update_url": reverse("auction_lot_artprice_link", args=(lot.pk,)),
@@ -284,6 +287,9 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "saved_bid_board": saved_board_summary(getattr(lot, "bid_board_analysis", None)),
         "saved_bid_board_url": reverse("auction_lot_saved_bid_board", args=(lot.pk,)),
         "bid_board_email_url": reverse("auction_lot_bid_board_email", args=(lot.pk,)),
+        "research_queue_selected": lot.pk in (research_queue_state or {}),
+        "research_queue_status": (research_queue_state or {}).get(lot.pk, {}).get("status", ""),
+        "research_queue_update_url": reverse("research_queue_selection", args=(lot.pk,)),
         "email_tray_selected": lot.pk in selected_lot_ids,
         "email_tray_update_url": reverse("auction_email_lot_selection", args=(lot.pk,)),
         "ended": not lot.active,
@@ -348,6 +354,7 @@ def auction_calendar(request):
     selected_lot_ids = {
         item.lot_id for item in active_email_batch.items.all()
     } if active_email_batch else set()
+    research_queue_state = selected_queue_state()
 
     month_lots = list(
         AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=range_start, event_at__lt=range_end)
@@ -381,7 +388,7 @@ def auction_calendar(request):
         weeks.append(week_items)
 
     calendar_data = {
-        day.isoformat(): [_lot_json(lot, zone, selected_lot_ids) for lot in lots]
+        day.isoformat(): [_lot_json(lot, zone, selected_lot_ids, research_queue_state) for lot in lots]
         for day, lots in sorted(lots_by_day.items())
     }
     calendar_sales_data = {
@@ -422,7 +429,7 @@ def auction_calendar(request):
             .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
             .order_by("event_at", "auction_house", "artist", "id")
         )
-        calendar_data[day_iso] = [_lot_json(lot, zone, selected_lot_ids) for lot in day_lots]
+        calendar_data[day_iso] = [_lot_json(lot, zone, selected_lot_ids, research_queue_state) for lot in day_lots]
         calendar_sales_data[day_iso] = [_sale_json(group) for group in _group_lots(day_lots, zone)]
 
     in_month_days = sorted(day for day in lots_by_day if selected_month <= day < following_month)
@@ -460,6 +467,7 @@ def auction_calendar(request):
         "synced_lot_count": AuctionWatchLot.objects.filter(superseded_by__isnull=True).count(),
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),
+        "research_queue_count": len(research_queue_state),
         "email_recipient_names": ", ".join(choice["name"] for choice in email_recipients),
         "email_recipient_choices": email_recipients,
         "email_last_sent_batch": last_sent_batch,

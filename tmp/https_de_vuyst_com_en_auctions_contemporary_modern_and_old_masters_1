@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="OWo4Ux1ZQ3KN2hXhvwcnUmWdfif6iRElCbaZvX8t">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <meta name="generator" content="Brigada - https://brigada.be" >
+    <meta name="google-site-verification" content="" />
+
+    <title>
+                    Contemporary, Modern and Old Masters | Kunstgalerij De Vuyst
+            </title>
+
+    <!-- Google Tag Manager -->
+<script>
+    (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-TMK28SGN');
+</script>
+<!-- End Google Tag Manager -->
+
+    <meta name="title" content="title"><meta property="og:title" content="title"><meta name="description" content="intro"><meta property="og:description" content="intro"><meta property="og:image" content="https://de-vuyst-production.ams3.digitaloceanspaces.com/public/files/a6c5fdac-1d45-433f-a0a3-13869e4568b9/og_image_logo-galerij.jpg?X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=DO801TM49L2XPET9RFZ2%2F20261030%2Fams3%2Fs3%2Faws4_request&X-Amz-Date=20261030T124832Z&X-Amz-SignedHeaders=host&X-Amz-Expires=300&X-Amz-Signature=a571959e0c063f5bbd42f366c1e7b663e35371bd1408d19aa76d33142f370831"><meta property="og:type" content="website"><meta property="og:url" content="https://de-vuyst.com/en/auctions/contemporary-modern-and-old-masters-1">
+    <link rel="alternate" href="https://de-vuyst.com/nl/veilingen/hedendaagse-moderne-en-oude-meesters-1" hreflang="nl">
+    <link rel="alternate" href="https://de-vuyst.com/en/auctions/contemporary-modern-and-old-masters-1" hreflang="en">
+    <link rel="alternate" href="https://de-vuyst.com/fr/ventes/art-contemporain-moderne-et-maitres-anciens-1" hreflang="fr">
+
+
+    <link rel="icon" href="https://de-vuyst.com/favicon.ico" type="image/x-icon"/>
+    <link rel="shortcut icon" href="https://de-vuyst.com/favicon.ico" type="image/x-icon"/>
+    <link rel="icon" sizes="192x192" href="https://de-vuyst.com/img/touch-icon.png">
+    <link rel="apple-touch-icon" href="https://de-vuyst.com/img/touch-icon.png">
+    <meta name="theme-color" content="#ffffff">
+
+    <!-- Preload fonts -->
+    <link rel="preload" as="font" href="https://de-vuyst.com/fonts/open-sans/open-sans-light.woff2"
+        type="font/woff2" crossorigin="anonymous">
+    <link rel="preload" as="font" href="https://de-vuyst.com/fonts/open-sans/open-sans-bold.woff2"
+        type="font/woff2" crossorigin="anonymous">
+    <link rel="preload" as="font" href="https://de-vuyst.com/fonts/prata/prata-regular.woff2"
+        type="font/woff2" crossorigin="anonymous">
+
+    <!-- Vendor Styles -->
+        <!-- Styles -->
+    <link href="/css/app.css?id=a9296ffd4a70a0a938b4" rel="stylesheet" media="screen" type="text/css">
+    <link href="/css/print.css?id=de27dc7639a540047de5" rel="stylesheet" media="print" type="text/css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
+            <style >[wire\:loading], [wire\:loading\.delay], [wire\:loading\.inline-block], [wire\:loading\.inline], [wire\:loading\.block], [wire\:loading\.flex], [wire\:loading\.table], [wire\:loading\.grid], [wire\:loading\.inline-flex] {display: none;}[wire\:loading\.delay\.shortest], [wire\:loading\.delay\.shorter], [wire\:loading\.delay\.short], [wire\:loading\.delay\.long], [wire\:loading\.delay\.longer], [wire\:loading\.delay\.longest] {display:none;}[wire\:offline] {display: none;}[wire\:dirty]:not(textarea):not(input):not(select) {display: none;}input:-webkit-autofill, select:-webkit-autofill, textarea:-webkit-autofill {animation-duration: 50000s;animation-name: livewireautofill;}@keyframes livewireautofill { from {} }</style>
+    <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.8.2/dist/alpine.min.js" defer></script>
+            <link rel="canonical" href="https://de-vuyst.com/en/auctions/contemporary-modern-and-old-masters-1" />
+    </head>
+<body id="">
+    <!-- Google Tag Manager (noscript) -->
+<noscript>
+    <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TMK28SGN" height="0" width="0"
+        style="display:none;visibility:hidden"></iframe>
+</noscript>
+<!-- End Google Tag Manager (noscript) -->
+    
+
+    <header class="header">
+    <div class="container">
+        <div class="header-top">
+            <ul class="top-nav js-nav-list list-unstyled mb-0"><li class=""><a class="text-light">About us</a><ul><li class=""><a class="text-light" href="https://de-vuyst.com/en/history">History</a></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/our-team">Team</a></li><li class=""><a class="text-light">Contemporary</a></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/bookshop">Bookshop</a></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/petit-paris">Coffeehouse</a></li></ul></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/news">News</a></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/contact">Contact</a></li></ul>
+                            <a
+                    class="header__login"
+                    href="https://de-vuyst.com/en/login"
+                >
+                    Log in
+                </a>
+                        <div class="lang-switcher">
+        <button type="button">
+        en
+        <i aria-hidden="true" class="far fa-angle-down"></i>
+    </button>
+    <ul class="list-unstyled">
+                    <li class="active">
+                <a href="/en/auctions/contemporary-modern-and-old-masters-1">
+                    <span>
+                        en
+                    </span>
+                </a>
+            </li>
+                    <li class="">
+                <a href="/nl/veilingen/hedendaagse-moderne-en-oude-meesters-1">
+                    <span>
+                        nl
+                    </span>
+                </a>
+            </li>
+                    <li class="">
+                <a href="/fr/ventes/art-contemporain-moderne-et-maitres-anciens-1">
+                    <span>
+                        fr
+                    </span>
+                </a>
+            </li>
+            </ul>
+</div>        </div>
+        <div class="header-bottom">
+            <div class="d-flex align-items-center header__logo-block">
+                <a href="https://de-vuyst.com/en" class="header__logo-link">
+                    <img
+                        class="header__logo"
+                        src="https://de-vuyst.com/img/logo.svg"
+                        alt="Kunstgalerij De Vuyst logo"
+                        width="190"
+                        height="43"
+                    >
+                    <span class="visually-hidden">
+                        Back to homepage
+                    </span>
+                </a>
+                <img
+                    class="header__logo-fine-art ms-2"
+                    src="https://de-vuyst.com/img/logo-fine-art.svg"
+                    alt="Kunstgalerij De Vuyst logo"
+                    width="100"
+                    height="34"
+                >
+            </div>
+            <button
+                type="button"
+                id="hamburger-icon"
+                class="d-xl-none js-toggle-nav"
+            >
+                <span class="nav-bar"></span>
+                <span class="nav-bar"></span>
+                <span class="nav-bar"></span>
+                <span class="nav-bar"></span>
+                <span class="visually-hidden">
+                    Open the menu
+                </span>
+            </button>
+            <div class="js-offcanvas offcanvas">
+                <nav>
+                    <ul class="navbar-nav js-nav-list list-unstyled mb-0"><li class="active"><a class="">Auctions</a><ul><li class="active"><a class="" href="https://de-vuyst.com/en/auctions">Upcoming auctions</a></li><li class=""><a class="" href="https://de-vuyst.com/en/auctions/auction-results">Auction results</a></li><li class=""><a class="" href="https://de-vuyst.com/en/subscription">Subsciptions</a></li><li class=""><a class="" href="https://de-vuyst.com/en/live-online-bidding">Live online bidding</a></li></ul></li><li class=""><a class="" href="https://de-vuyst.com/en/gallery">Gallery</a></li><li class=""><a class="" href="https://de-vuyst.com/en/exhibitions">Exhibitions</a></li><li class=""><a class="">Buying and selling</a><ul><li class=""><a class="" href="https://de-vuyst.com/en/how-to-buy">How to buy?</a></li><li class=""><a class="" href="https://de-vuyst.com/en/how-to-sell">How to sell</a></li><li class=""><a class="" href="https://de-vuyst.com/en/estimate">Estimations</a></li><li class=""><a class="" href="https://de-vuyst.com/en/transportation">Transportation</a></li><li class=""><a class="" href="https://de-vuyst.com/en/terms-and-conditions">Terms and conditions</a></li></ul></li><li class=""><a target="_blank" class="" href="https://kunstgalerijdevuyst-icons.kmoshops.be/">Icons</a></li></ul>
+                </nav>
+                <div class="d-xl-none">
+                <ul class="top-nav js-nav-list list-unstyled mb-0"><li class=""><a class="text-light">About us</a><ul><li class=""><a class="text-light" href="https://de-vuyst.com/en/history">History</a></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/our-team">Team</a></li><li class=""><a class="text-light">Contemporary</a></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/bookshop">Bookshop</a></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/petit-paris">Coffeehouse</a></li></ul></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/news">News</a></li><li class=""><a class="text-light" href="https://de-vuyst.com/en/contact">Contact</a></li></ul>
+                                            <a
+                            class="header__login"
+                            href="https://de-vuyst.com/en/login"
+                        >
+                            Log in
+                        </a>
+                                        <div class="lang-switcher">
+        <button type="button">
+        en
+        <i aria-hidden="true" class="far fa-angle-down"></i>
+    </button>
+    <ul class="list-unstyled">
+                    <li class="active">
+                <a href="/en/auctions/contemporary-modern-and-old-masters-1">
+                    <span>
+                        en
+                    </span>
+                </a>
+            </li>
+                    <li class="">
+                <a href="/nl/veilingen/hedendaagse-moderne-en-oude-meesters-1">
+                    <span>
+                        nl
+                    </span>
+                </a>
+            </li>
+                    <li class="">
+                <a href="/fr/ventes/art-contemporain-moderne-et-maitres-anciens-1">
+                    <span>
+                        fr
+                    </span>
+                </a>
+            </li>
+            </ul>
+</div>                </div>
+                <div id="app">
+    <global-search :translations="{&quot;panel_text&quot;:&quot;Search results&quot;,&quot;close_search&quot;:&quot;Close&quot;,&quot;search_label&quot;:&quot;What are you looking for ?&quot;,&quot;no_results&quot;:&quot;No results&quot;}"
+        app_id=2WTAHVB925
+        api_key=960d7b516f29234212f74ba49b50b6c3
+        route="https://de-vuyst.com/en/search"
+        locale="en"
+        index_name="global_search">
+    </global-search>
+</div>
+            </div>
+        </div>
+    </div>
+</header>
+
+    
+    
+    <main id="app">
+        <section class="hero--detail">
+    <div class="container">
+        <div class="d-md-flex align-items-center justify-content-between">
+                            <div class="pt-2 breadcrumbs">
+                    <ul class="">
+                    <li class="">
+                <a
+                                        href="https://de-vuyst.com/en"
+                >
+                    Home
+                </a>
+                                    &gt;
+                            </li>
+                    <li class="">
+                <a
+                                        href="https://de-vuyst.com/en/auctions/auction-results"
+                >
+                    Auction results
+                </a>
+                                    &gt;
+                            </li>
+                    <li class="">
+                <a
+                                            class="active"
+                                        href="https://de-vuyst.com/en/auctions/contemporary-modern-and-old-masters-1"
+                >
+                    Contemporary, Modern and Old Masters
+                </a>
+                            </li>
+            </ul>
+
+    <script type="application/ld+json">
+        {"@context":"https:\/\/schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"item":{"@id":"https:\/\/de-vuyst.com\/en\/auctions\/auction-results","name":"Auction results"}},{"@type":"ListItem","position":2,"item":{"@id":"https:\/\/de-vuyst.com\/en\/auctions\/contemporary-modern-and-old-masters-1","name":"Contemporary, Modern and Old Masters"}}]}    </script>
+                </div>
+            
+            <a
+                class="btn btn--link"
+                href="https://de-vuyst.com/en/auctions/auction-results"
+            >
+                <i aria-hidden="true" class="fal fa-long-arrow-left"></i>
+                Back to overview
+            </a>
+        </div>
+
+        <div class="row justify-content-between block--top">
+            <div class="col-md-6 col-lg-5 pb-8">
+                <div class="d-flex flex-column">
+                    <h1 class="hero--detail__title mb-5 order-2">Contemporary, Modern and Old Masters</h1>
+
+                    <div class="d-flex align-items-center order-1">
+                                                    <p class="mb-0 me-1 fw-bold text-primary">
+                                Auction 181
+                            </p>
+                        
+                                                    <p class="mb-0 me-1 fw-bold text-primary">-</p>
+                        
+                                                    <time
+                                datetime="12 March 2022"
+                                class="fw-bold text-primary"
+                            >
+                                12 March 2022
+                            </time>
+                                            </div>
+                </div>
+
+                                    <p>
+                        Viewing days
+                        <time datetime="2 March 2022">
+                            2 March 2022
+                        </time>
+                        until
+                        <time datetime="9 March 2022">
+                            9 March 2022
+                        </time>
+                    </p>
+                
+                                    <div><h4><em><a href="" target="_self">Newsflash: remarkable results</a></em></h4></div>
+                
+                            </div>
+
+                            <div class="col-md-6 col-lg-5 hero__cta-wrapper">
+                                            <article class="px-2 py-6 hero__cta">
+                            <h2 class="mb-2">
+                                Sell in our auctions?
+                            </h2>
+                            <p class="mb-3">
+                                Find out if your work of art is suitable for our auctions. Submit a request and get an estimate.
+                            </p>
+                            <div class="d-flex align-items-center">
+                                <a class="btn--primary me-2" href="https://de-vuyst.com/en/estimate">
+                                    Ask for an estimate
+                                </a>
+                            </div>
+                        </article>
+                                    </div>
+                    </div>
+    </div>
+</section>
+
+    <div class="block block--top--sm bg-white ">
+    <div class="container js-items-container">
+                            <div class="row align-items-md-center mb-6 js-content-block">
+                    <div class="col-md-9">
+                                                    <div class="d-md-flex align-items-center tabs-group js-tabs-block">
+    <button
+        class="me-4 mb-4 mb-md-0 btn btn--tab js-toggle-tab active-tab"
+        type="button"
+        name="works-view"
+    >
+        Catalogue
+    </button>
+    <button
+        class="me-4 btn btn--tab js-toggle-tab"
+        type="button"
+        name="info-view"
+    >
+        Practical information
+    </button>
+</div>                                            </div>
+                    <div class="col-md-3 d-flex justify-content-end">
+                                                                            <a
+                                class="btn btn--link btn--sm"
+                                href="https://de-vuyst.com/en/attachment/download/007a4d74-9717-4044-8481-f91376f706b1"
+                            >
+                                <i aria-hidden="true" class="far fa-long-arrow-down"></i>
+                                Results PDF (hammer price)
+                            </a>
+                                            </div>
+                </div>
+                <div id="works-view" class="results-auction-block">
+                    <h2 class="h3">Overview</h2>
+                    <div wire:id="GySX51Mo3TcSOI8uTFVT" wire:initial-data="{&quot;fingerprint&quot;:{&quot;id&quot;:&quot;GySX51Mo3TcSOI8uTFVT&quot;,&quot;name&quot;:&quot;auction-view-show&quot;,&quot;locale&quot;:&quot;en&quot;,&quot;path&quot;:&quot;en\/auctions\/contemporary-modern-and-old-masters-1&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;v&quot;:&quot;acj&quot;},&quot;effects&quot;:{&quot;listeners&quot;:[&quot;itemAdded&quot;,&quot;itemRemoved&quot;],&quot;path&quot;:&quot;https:\/\/de-vuyst.com\/en\/auctions\/contemporary-modern-and-old-masters-1?&quot;},&quot;serverMemo&quot;:{&quot;children&quot;:[],&quot;errors&quot;:[],&quot;htmlHash&quot;:&quot;a5ec34ac&quot;,&quot;data&quot;:{&quot;auction&quot;:null,&quot;filters&quot;:null,&quot;type&quot;:&quot;auction&quot;,&quot;display&quot;:&quot;grid-view&quot;,&quot;search&quot;:&quot;&quot;,&quot;availableArtists&quot;:null,&quot;availableArtworks&quot;:{&quot;all&quot;:&quot;All works&quot;,&quot;highlight&quot;:&quot;Highlights&quot;},&quot;artists&quot;:[],&quot;amount&quot;:12,&quot;works&quot;:&quot;all&quot;,&quot;view&quot;:&quot;works&quot;,&quot;locale&quot;:&quot;en&quot;,&quot;item&quot;:[],&quot;amountOptions&quot;:[{&quot;value&quot;:12,&quot;text&quot;:&quot;12 items&quot;},{&quot;value&quot;:24,&quot;text&quot;:&quot;24 items&quot;},{&quot;value&quot;:48,&quot;text&quot;:&quot;48 items&quot;}],&quot;page&quot;:1,&quot;filtersDisabled&quot;:&quot;1&quot;,&quot;readyToLoad&quot;:false,&quot;itemsLoading&quot;:false,&quot;currentUrl&quot;:null,&quot;paginationDropdown&quot;:1,&quot;loadingComponent&quot;:&quot;livewire.loading-component&quot;,&quot;paginators&quot;:{&quot;page&quot;:1}},&quot;dataMeta&quot;:{&quot;models&quot;:{&quot;item&quot;:{&quot;class&quot;:&quot;App\\Models\\Auction&quot;,&quot;id&quot;:5,&quot;relations&quot;:[&quot;translations&quot;,&quot;translation&quot;,&quot;translation.catalog&quot;,&quot;translation.press&quot;],&quot;connection&quot;:&quot;mysql&quot;}}},&quot;checksum&quot;:&quot;9a33bd96dab8160d65981d223d8277a108bd23adeb95dc9d4b98f6124fbf64ca&quot;}}" wire:init="ready" class="d-flex justify-content-center py-3">
+    <div class="d-flex justify-content-center">
+        <i aria-hidden="true" class="far fa-spinner infinite-rotate"></i>
+        <span class="visually-hidden">Image loading</span>
+    </div>
+</div>
+
+<!-- Livewire Component wire-end:GySX51Mo3TcSOI8uTFVT -->                </div>
+                <div id="info-view" class="hide-view">
+                    <div class="container py-3 pa--media-text-block">
+                    <div class="row flex-row-reverse">
+                <div class="col-md-6 img-container">
+                    <div class="h-100 d-flex flex-column justify-content-center">
+                        <div>
+                                                            <picture>
+            <source
+                media="(min-width: 465px)"
+                srcset="https://de-vuyst-production.ams3.digitaloceanspaces.com/public/files/fdee65b1-9dcf-4855-b327-3049654fb377/half_width_tenoonstelling-kijkdagen-33.JPG?X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&amp;X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=DO801TM49L2XPET9RFZ2%2F20261030%2Fams3%2Fs3%2Faws4_request&amp;X-Amz-Date=20261030T124832Z&amp;X-Amz-SignedHeaders=host&amp;X-Amz-Expires=300&amp;X-Amz-Signature=acbb82a2b86a8c1ef7926d75813728d996e7ce34b167dae61b616cbbd1dc2f40"
+            >
+            <img
+                class="w-100  img-lazyload lazyload "
+                                    src="data:,"
+                    data-src="https://de-vuyst-production.ams3.digitaloceanspaces.com/public/files/fdee65b1-9dcf-4855-b327-3049654fb377/full_width_mobile_tenoonstelling-kijkdagen-33.JPG?X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&amp;X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=DO801TM49L2XPET9RFZ2%2F20261030%2Fams3%2Fs3%2Faws4_request&amp;X-Amz-Date=20261030T124832Z&amp;X-Amz-SignedHeaders=host&amp;X-Amz-Expires=300&amp;X-Amz-Signature=5a18553434c3fbfe9e6b63e0e4c42c8737a61df144449a9c5c99a7bcf9f130b3"
+                                alt=""
+            />
+        </picture>
+                                                                </div>
+                                            </div>
+                </div>
+                <div class="col-md-6 mt-4 mt-md-0">
+                    <div class="">
+                        <div>
+                            <div class="mb-3 description">
+                                                                    <h2>Collect your purchases</h2><p>From Wednesday until Saturday between 10 - 12 AM and 2 - 6 PM.</p><p>No purchases can be retrieved during the auction.</p><p>The gallery will be closed the day after the auction.</p><p><br></p><h2>Transportation</h2><p>Do you wish to arrange transportation of your purchases? Find out more <a href="https://de-vuyst.com/en/transportation" rel="noopener noreferrer nofollow">on this page</a>.</p><p></p>
+                                                            </div>
+                                                                                                                                            </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+                </div>
+                    </div>
+</div>
+        
+
+            </main>
+    <footer class="footer">
+    <div class="footer-top py-5">
+        <div class="container">
+            <div class="row justify-content-between">
+                <div class="col-md-6 col-lg-3 mb-4 mb-lg-0">
+                    <h2 class="h4 mb-1">Address</h2>
+                                            <p class="mb-1">
+                            Kerkstraat 22-54<br>
+                            9160 Lokeren - BE
+                        </p>
+                                        <ul class=" list-unstyled  social-media__list">
+            <li class="social-media__element">
+    <a class="js-track social-media__link"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-category="Social"
+        data-action="hit"
+        data-label="facebook"
+        href="https://www.facebook.com/Devuystfineartdesign/"
+    >
+                    <i class="fab fa-facebook"></i>
+            <span class="visually-hidden">facebook</span>
+            </a>
+</li>
+            <li class="social-media__element">
+    <a class="js-track social-media__link"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-category="Social"
+        data-action="hit"
+        data-label="instagram"
+        href="https://www.instagram.com/devuystfineartdesign/"
+    >
+                    <i class="fab fa-instagram"></i>
+            <span class="visually-hidden">instagram</span>
+            </a>
+</li>
+    </ul>
+
+<script src="https://de-vuyst.com/js/vendor/SocialMediaButtons/tracking.js"></script>
+
+<script type="application/ld+json">
+    {"@context":"https:\/\/schema.org","@type":"Organization","url":"https:\/\/de-vuyst.com","logo":"","name":"Kunstgalerij De Vuyst"}
+</script>
+                    <a
+                        href="https://de-vuyst.com/en/contact"
+                        class="btn--primary btn--primary-dark"
+                    >Contact</a>
+                </div>
+                <div class="col-md-6 col-lg-3 mb-4 mb-lg-0">
+                    <h2 class="h4 mb-1">
+                        Opening hours
+                    </h2>
+                    <p>Wednesday to Saturday<br>10 - 12 a.m. and 2 - 5 p.m.<br>Closed on Sundays, Mondays and Tuesdays</p>
+                </div>
+                <div class="col-md-6 col-lg-3 mb-4 mb-md-0">
+                    <h2 class="h4 mb-1">
+                        Viewing days
+                    </h2>
+                    <p>Wednesday till wednesday <br>10 a.m. - 7 p.m. <br>Week before auction</p>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                                            <div class="laravel-subscribe">
+                            <h2 class="h4 mb-1">
+                                Newsletter
+                            </h2>
+                            <p class="mb-1">
+                                Stay informed about our auctions and exhibitions
+                            </p>
+                            <a
+                                href="https://de-vuyst.com/en/subscribe-newsletter"
+                                class="btn--primary btn--primary-dark"
+                            >Subscribe</a>
+                        </div>
+                                    </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <div class="container">
+            <span>&copy; 2026 Kunstgalerij De Vuyst</span>
+            <ul class="list-unstyled d-flex align-items-center flex-wrap mb-0"><li class=""><a class="" href="https://de-vuyst.com/en/cookie-policy">Cookie policy</a></li><li class=""><a class="" href="https://de-vuyst.com/en/privacy-policy">Disclaimer</a></li></ul>
+            <a
+                href="javascript:void(0);"
+                onclick="cookiefirst_show_settings();"
+                class=""
+            >
+                Personalize cookies
+            </a>
+            <a
+                href="https://brigada.be"
+                target="_blank"
+                class="codedor float-end"
+                rel="noopener"
+            >
+                Crafted by Brigada
+            </a>
+        </div>
+    </div>
+</footer>
+    <!-- Vendor Scripts -->
+        <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <!-- Scripts -->
+                <script src="/js/masonry.js?id=aedef8dd325af85af81e"></script>
+            <script src="/js/slider.js?id=3ba0b4624555c5d709d3"></script>
+            <script src="/js/view-switcher.js?id=5f8e37d8c643c4be3978"></script>
+            <script src="/vendor/livewire/livewire.js?id=90730a3b0e7144480175" data-turbo-eval="false" data-turbolinks-eval="false" ></script><script data-turbo-eval="false" data-turbolinks-eval="false" >window.livewire = new Livewire();window.Livewire = window.livewire;window.livewire_app_url = '';window.livewire_token = 'OWo4Ux1ZQ3KN2hXhvwcnUmWdfif6iRElCbaZvX8t';window.deferLoadingAlpine = function (callback) {window.addEventListener('livewire:load', function () {callback();});};let started = false;window.addEventListener('alpine:initializing', function () {if (! started) {window.livewire.start();started = true;}});document.addEventListener("DOMContentLoaded", function () {if (! started) {window.livewire.start();started = true;}});</script>
+    <script src="/js/app.js?id=1bc17d3361ba5c14d3df"></script>
+
+    <script>
+        window.addEventListener('push-to-datalayer', (event) => {
+            window.dataLayer = window.dataLayer || []
+            window.dataLayer.push(event.detail)
+        })
+    </script>
+</body>
+</html>

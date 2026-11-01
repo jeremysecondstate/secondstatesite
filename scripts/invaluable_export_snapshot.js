@@ -31,8 +31,71 @@
     "houseName", "location", "lotDescription", "lotNumber", "lotRef", "lotTitle", "objectID",
     "photoPath", "soldPrice", "soldCurrencyCode", "stateName", "subcategoryName", "supercategoryName",
   ];
+  const HIGHLIGHT_TEXT_FIELDS = new Set([
+    "categoryName", "lotDescription", "lotTitle", "subcategoryName", "supercategoryName",
+  ]);
   const text = (value) => String(value ?? "").trim().replace(/\s+/g, " ");
   const artistKey = (value) => text(value).normalize("NFKC").toLowerCase();
+
+  function highlightText(highlight) {
+    // Algolia may return these public strings only in _highlightResult when
+    // attributesToRetrieve omits them. Parse text, never HTML or page code.
+    if (!highlight || typeof highlight !== "object" || Array.isArray(highlight)
+        || typeof highlight.value !== "string"
+        || !["none", "partial", "full"].includes(highlight.matchLevel)
+        || !Array.isArray(highlight.matchedWords)
+        || highlight.matchedWords.some((word) => typeof word !== "string")
+        || (highlight.fullyHighlighted !== undefined && typeof highlight.fullyHighlighted !== "boolean")) return null;
+    let activeTag = null;
+    let invalid = false;
+    const plain = highlight.value.replace(/<\/?(?:em|ais-highlight-0000000000)>/g, (tag) => {
+      if (tag.startsWith("</")) {
+        if (activeTag !== tag.slice(2, -1)) invalid = true;
+        activeTag = null;
+      } else {
+        if (activeTag !== null) invalid = true;
+        activeTag = tag.slice(1, -1);
+      }
+      return "";
+    });
+    if (invalid || activeTag !== null || /[<>]/.test(plain)) return null;
+    const entities = { amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", nbsp: "\u00a0" };
+    const decoded = plain.replace(/&(#(?:[xX][0-9a-fA-F]+|[0-9]+)|[A-Za-z][A-Za-z0-9]*);/g, (entity, name) => {
+      if (!name.startsWith("#")) {
+        if (!Object.hasOwn(entities, name.toLowerCase())) { invalid = true; return entity; }
+        return entities[name.toLowerCase()];
+      }
+      const hex = name[1].toLowerCase() === "x";
+      const point = Number.parseInt(name.slice(hex ? 2 : 1), hex ? 16 : 10);
+      if (!Number.isSafeInteger(point) || point <= 0 || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) {
+        invalid = true; return entity;
+      }
+      return String.fromCodePoint(point);
+    });
+    // Decode once. Encoded markup and control characters are not artist proof.
+    if (invalid || /[<>\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(decoded)) return null;
+    return text(decoded);
+  }
+
+  function hitArtist(hit, spec, selectedByKey) {
+    const direct = hit.artistName;
+    if (direct !== undefined && (typeof direct !== "string" || !text(direct))) return { reason: "hit_artist_invalid" };
+    const highlights = hit._highlightResult;
+    if (highlights !== undefined && highlights !== null && (typeof highlights !== "object" || Array.isArray(highlights))) {
+      return { reason: "hit_artist_highlight_invalid" };
+    }
+    let highlighted;
+    if (highlights && Object.hasOwn(highlights, "artistName")) {
+      highlighted = highlightText(highlights.artistName);
+      if (!highlighted) return { reason: "hit_artist_highlight_invalid" };
+      if (direct !== undefined && artistKey(direct) !== artistKey(highlighted)) return { reason: "hit_artist_conflict" };
+    }
+    const name = direct ?? highlighted;
+    if (name === undefined) return spec.artists.length > 1
+      ? { reason: "bulk_hit_artist_missing" } : { artist: spec.artists[0] };
+    const artist = selectedByKey.get(artistKey(name));
+    return artist ? { artist } : { reason: "hit_artist_not_selected" };
+  }
 
   function decodeRepeated(value) {
     let current = text(value);
@@ -68,18 +131,19 @@
       if (["artistname", "artist"].includes(key)) artists.add(item);
       else if (["query", "keyword", "q"].includes(key)) queries.add(item);
       else if (CATEGORIES.has(key)) {
-        if (categories.has(key) && categories.get(key) !== item) throw new Error("Conflicting category filters.");
-        categories.set(key, item);
+        if (!categories.has(key)) categories.set(key, new Set());
+        categories.get(key).add(item);
       } else if (key === "sort") sorts.add(item.toLowerCase());
       else if (key === "page") pages.add(item);
       else if (["view", "pagesize", "page_size", "hitsperpage", "perpage", "fbclid", "gclid", "ref", "referrer"].includes(key)
           || key.startsWith("utm_")) continue;
       else throw new Error("This search has unsupported URL filters. Use the bookmarked artist search.");
     }
-    if (artists.size !== 1 || queries.size > 1 || sorts.size > 1 || pages.size > 1) {
-      throw new Error("Use one artist and consistent search filters.");
+    if (!artists.size || artists.size > 250 || queries.size > 1 || sorts.size > 1 || pages.size > 1) {
+      throw new Error("Use one or more artists (up to 250) and consistent search filters.");
     }
-    const artist = [...artists][0];
+    const selectedArtists = [...artists].sort();
+    const artist = selectedArtists.length === 1 ? selectedArtists[0] : `${selectedArtists.length} artists`;
     const query = [...queries][0] || "";
     const sort = [...sorts][0] || "";
     if (!Object.hasOwn(SORTS, sort)) throw new Error("Choose a supported Sort By option, such as Ending Soon.");
@@ -87,17 +151,18 @@
     if (!/^\d+$/.test(pageText) || Number(pageText) < 1) throw new Error("The results page number is invalid.");
     const page = Number(pageText) - 1;
     const source = new URL("/search", url.origin);
-    source.searchParams.set("artistName", artist);
+    for (const name of selectedArtists) source.searchParams.append("artistName", name);
     if (query) source.searchParams.set("query", query);
     if (sort) source.searchParams.set("sort", sort);
     if (page) source.searchParams.set("page", String(page + 1));
-    const facets = [[`artistName:${artist}`]];
-    for (const [key, item] of categories) {
-      source.searchParams.set(CATEGORIES.get(key), item);
-      facets.push([`${CATEGORIES.get(key)}:${item}`]);
+    const facets = [selectedArtists.map((name) => `artistName:${name}`)];
+    for (const [key, values] of [...categories].sort(([a], [b]) => a.localeCompare(b))) {
+      const items = [...values].sort();
+      for (const item of items) source.searchParams.append(CATEGORIES.get(key), item);
+      facets.push(items.map((item) => `${CATEGORIES.get(key)}:${item}`));
     }
     source.searchParams.sort();
-    return { artist, query, page, index: SORTS[sort], facets, origin: url.origin, sourceURL: source.href };
+    return { artist, artists: selectedArtists, query, page, index: SORTS[sort], facets, origin: url.origin, sourceURL: source.href };
   }
 
   function requestParams(request) {
@@ -140,7 +205,7 @@
           || Object.entries(params).some(([key, value]) => !SAFE_PARAMS.has(key) && !emptyOption(value))) return [];
       const actualFacets = facetKey(params.facetFilters || []);
       const exact = actualFacets === facetKey(spec.facets);
-      const zeroOnly = !exact && actualFacets === facetKey([[`artistName:${spec.artist}`]]);
+      const zeroOnly = !exact && actualFacets === facetKey([spec.artists.map((name) => `artistName:${name}`)]);
       return exact || zeroOnly ? [{ index, params, zeroOnly }] : [];
     });
   }
@@ -168,6 +233,9 @@
 
   function makeSnapshot({ pageURL, requestURL, method, body, payload, capturedAt, status = 200, contentType = "application/json" }) {
     const spec = searchSpec(pageURL);
+    const selectedByKey = new Map(spec.artists.map((name) => [artistKey(name), name]));
+    // Ambiguous spellings of the same artist cannot establish per-hit identity.
+    if (selectedByKey.size !== spec.artists.length) return null;
     const endpoint = invaluableURL(requestURL, pageURL);
     if (endpoint.origin !== spec.origin || endpoint.pathname.replace(/\/$/, "") !== "/catResults"
         || method !== "POST" || status !== 200 || !contentType.toLowerCase().includes("json")) return null;
@@ -175,21 +243,128 @@
     for (const { index, params, zeroOnly } of matchingRequests(body, spec)) {
       const result = payload.results[index];
       if (!validResult(result, params) || (zeroOnly && result.nbHits !== 0)) continue;
-      if (result.hits.some((hit) => hit.artistName && artistKey(hit.artistName) !== artistKey(spec.artist))) continue;
-      const hits = result.hits.map((hit) => {
+      const artists = result.hits.map((hit) => hitArtist(hit, spec, selectedByKey));
+      if (artists.some((item) => item.reason)) continue;
+      const hits = result.hits.map((hit, hitIndex) => {
         const publicHit = {};
         for (const key of PUBLIC_FIELDS) {
           const value = hit[key];
           if (typeof value === "string" || (typeof value === "number" && Number.isFinite(value))) publicHit[key] = value;
+          else if (value === undefined && HIGHLIGHT_TEXT_FIELDS.has(key)) {
+            const fallback = highlightText(hit._highlightResult?.[key]);
+            if (fallback !== null) publicHit[key] = fallback;
+          }
         }
         if (!publicHit.lotTitle) publicHit.lotTitle = text(hit.title);
-        publicHit.artistName = spec.artist;
+        publicHit.artistName = artists[hitIndex].artist;
         return publicHit;
       });
       return { source_url: spec.sourceURL, captured_at: capturedAt,
         results: [{ page: result.page, nbPages: result.nbPages, nbHits: result.nbHits, hitsPerPage: result.hitsPerPage, hits }] };
     }
     return null;
+  }
+
+  function inspectCapture(envelope = {}) {
+    // Diagnostic output is deliberately bounded and contains no request/response
+    // values except public pagination counts. Never return bodies, headers,
+    // URLs, search text, artist names, telemetry values, or lot descriptions.
+    const report = { accepted: false, reasons: [], requests: [] };
+    const add = (list, code) => { if (!list.includes(code)) list.push(code); };
+    const count = (value) => Number.isSafeInteger(value) && value >= 0 ? value : null;
+    const parameterName = (name) => /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name) ? name : "unrecognized_parameter";
+    let spec;
+    try { spec = searchSpec(envelope.pageURL); }
+    catch { add(report.reasons, "page_scope_invalid"); return report; }
+    try {
+      const endpoint = invaluableURL(envelope.requestURL, envelope.pageURL);
+      if (endpoint.origin !== spec.origin || endpoint.pathname.replace(/\/$/, "") !== "/catResults") add(report.reasons, "endpoint_mismatch");
+    } catch { add(report.reasons, "endpoint_invalid"); }
+    if (envelope.method !== "POST") add(report.reasons, "method_not_post");
+    if ((envelope.status ?? 200) !== 200) add(report.reasons, "status_not_200");
+    if (typeof (envelope.contentType ?? "application/json") !== "string"
+        || !(envelope.contentType ?? "application/json").toLowerCase().includes("json")) add(report.reasons, "content_type_not_json");
+    const body = envelope.body;
+    if (!body || body.isCatalogPageRequest !== false) add(report.reasons, "catalog_request_type_mismatch");
+    if (!Array.isArray(body?.requests)) { add(report.reasons, "requests_missing"); return report; }
+    if (!Array.isArray(envelope.payload?.results)) add(report.reasons, "results_missing");
+    const selectedByKey = new Map(spec.artists.map((name) => [artistKey(name), name]));
+    if (selectedByKey.size !== spec.artists.length) add(report.reasons, "ambiguous_artist_selection");
+    for (const [index, request] of body.requests.slice(0, 10).entries()) {
+      const reasons = [];
+      const params = requestParams(request);
+      const detail = { index, matched: false, zero_only: false, reasons, unknown_params: [],
+        requested: { page: null, hitsPerPage: null, artist_count: null }, result: null };
+      report.requests.push(detail);
+      if (request?.indexName !== spec.index) add(reasons, "sort_mismatch");
+      if (!params) { add(reasons, "request_params_invalid"); continue; }
+      const page = Number(params.page || 0);
+      const pageSize = Number(params.hitsPerPage);
+      detail.requested.page = count(page);
+      detail.requested.hitsPerPage = count(pageSize);
+      if (page !== spec.page) add(reasons, "page_mismatch");
+      if (!Number.isSafeInteger(pageSize) || pageSize <= 0 || pageSize > 1000) add(reasons, "page_size_invalid");
+      if ((params.query || "") !== spec.query) add(reasons, "query_mismatch");
+      if (text(params.filters) !== FILTERS) add(reasons, "upcoming_filter_mismatch");
+      detail.unknown_params = [...new Set(Object.entries(params)
+        .filter(([key, value]) => !SAFE_PARAMS.has(key) && !emptyOption(value))
+        .map(([key]) => parameterName(key)))].sort().slice(0, 20);
+      if (detail.unknown_params.length) add(reasons, "unsupported_request_params");
+      const actualFacets = facetKey(params.facetFilters || []);
+      const artistFacets = [spec.artists.map((name) => `artistName:${name}`)];
+      if (actualFacets === null) add(reasons, "facets_invalid");
+      else {
+        const groups = (params.facetFilters || []).map((group) => typeof group === "string" ? [group] : group);
+        const actualArtistGroups = groups.filter((group) => group.some((item) => item.startsWith("artistName:")));
+        detail.requested.artist_count = new Set(actualArtistGroups.flat().filter((item) => item.startsWith("artistName:"))).size;
+        const exact = actualFacets === facetKey(spec.facets);
+        detail.zero_only = !exact && actualFacets === facetKey(artistFacets);
+        if (!exact && !detail.zero_only) {
+          if (facetKey(actualArtistGroups) !== facetKey(artistFacets)) add(reasons, "artist_group_mismatch");
+          const actualCategories = groups.filter((group) => !group.some((item) => item.startsWith("artistName:")));
+          const expectedCategories = spec.facets.slice(1);
+          if (facetKey(actualCategories) !== facetKey(expectedCategories)) add(reasons, "category_group_mismatch");
+        }
+      }
+      detail.matched = reasons.length === 0 && body.isCatalogPageRequest === false;
+      const result = envelope.payload?.results?.[index];
+      if (!result || typeof result !== "object" || !Array.isArray(result.hits)) { add(reasons, "result_missing"); continue; }
+      detail.result = { page: count(result.page), nbPages: count(result.nbPages), nbHits: count(result.nbHits),
+        hitsPerPage: count(result.hitsPerPage), hits_count: result.hits.length };
+      const metadataValid = ["page", "nbPages", "nbHits", "hitsPerPage"].every((name) => count(result[name]) !== null)
+        && result.hitsPerPage > 0;
+      if (!metadataValid) add(reasons, "result_metadata_invalid");
+      else {
+        if (result.page !== page) add(reasons, "result_page_mismatch");
+        if (result.hitsPerPage !== pageSize) add(reasons, "result_page_size_mismatch");
+        if (result.nbPages !== Math.ceil(result.nbHits / result.hitsPerPage)) add(reasons, "pagination_total_mismatch");
+        if ((result.nbHits && result.page >= result.nbPages) || (!result.nbHits && result.page !== 0)) add(reasons, "result_page_out_of_range");
+        if (result.hits.length !== Math.min(result.hitsPerPage, Math.max(0, result.nbHits - result.page * result.hitsPerPage))) add(reasons, "hit_count_mismatch");
+      }
+      if (detail.zero_only && result.nbHits !== 0) add(reasons, "category_missing_nonzero_result");
+      const identities = new Set();
+      for (const hit of result.hits.slice(0, 1001)) {
+        if (!hit || typeof hit !== "object" || Array.isArray(hit)
+            || typeof hit.lotRef !== "string" || !text(hit.lotRef)
+            || typeof (hit.lotTitle || hit.title) !== "string" || !text(hit.lotTitle || hit.title)
+            || (hit.objectID !== undefined && typeof hit.objectID !== "string"
+              && !(typeof hit.objectID === "number" && Number.isFinite(hit.objectID)))) { add(reasons, "invalid_hit_identity_or_title"); continue; }
+        const identity = text(hit.objectID || hit.lotRef);
+        if (!identity || identities.has(identity)) add(reasons, "duplicate_or_empty_hit_identity");
+        identities.add(identity);
+        const attribution = hitArtist(hit, spec, selectedByKey);
+        if (attribution.reason) add(reasons, attribution.reason);
+      }
+    }
+    if (body.requests.length > 10) add(report.reasons, "diagnostic_request_limit");
+    try { report.accepted = makeSnapshot(envelope) !== null; }
+    catch { add(report.reasons, "capture_validation_error"); }
+    if (!report.accepted) {
+      if (!report.requests.some((item) => item.matched)) add(report.reasons, "no_matching_request");
+      for (const detail of report.requests) for (const reason of detail.reasons) add(report.reasons, reason);
+      if (!report.reasons.length) add(report.reasons, "capture_rejected");
+    }
+    return report;
   }
 
   function snapshotIsCurrent(capture, currentURL) {
@@ -306,7 +481,7 @@
 
   // The companion extension loads this same validator before Invaluable's own
   // scripts. Core-only mode installs no panel and makes no network requests.
-  const core = { searchSpec, matchingRequests, makeSnapshot, snapshotIsCurrent, snapshotFromCandidate, observeCatalog };
+  const core = { searchSpec, matchingRequests, makeSnapshot, inspectCapture, snapshotIsCurrent, snapshotFromCandidate, observeCatalog };
   if (globalThis.__SECONDSTATE_SNAPSHOT_CORE_ONLY__ === true) {
     delete globalThis.__SECONDSTATE_SNAPSHOT_CORE_ONLY__;
     globalThis.SecondStateInvaluableSnapshot = Object.freeze(core);

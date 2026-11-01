@@ -1,0 +1,184 @@
+<!DOCTYPE html> <html lang="fr"> <head> <meta charset="utf-8"> <title>Catalogues</title> <!-- Google tag (gtag.js) -->
+<!-- No consent, no connection -->
+ <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-BZW2B3ZX2V'); </script> <!-- End Google --> <!-- SEO Meta Tags--> <meta content="salle de vente,auction,auctioneer,veilingzaal,Bruxelles,Brussels,Art,Autiquités" name="keywords" /> <meta content="Ventes aux enchères d'Art et Antiquités à Bruxelles" name="description" /> <meta name="author" content="Juan Regout"> <!-- Viewport--> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"> <!-- Favicon and Touch Icons--> <link rel="stylesheet" href="fonts/font-awesome/css/font-awesome.css"/> <link rel="icon" type="image/png" sizes="32x32" href="UserFiles/Images/logo_32px.png"> <link rel="icon" type="image/x-icon" sizes="16x16" href="favicon.ico"> <meta name="msapplication-TileColor" content="#ffffff"> <meta name="theme-color" content="#ffffff"> <!-- Vendor Styles including: Font Icons, Plugins, etc.--> <link rel="stylesheet" media="screen" href="UserFiles/templates/Cartzilla/dist/css/vendor.css"> <!-- Main Theme Styles + Bootstrap--> <link rel="stylesheet" media="screen" id="main-styles" href="UserFiles/templates/Cartzilla/dist/css/theme.css"> <link rel="stylesheet" href="UserFiles/site.css"> <!-- JavaScript libraries, plugins and custom scripts--> <script src="UserFiles/templates/Cartzilla/dist/js/vendor.min.js"></script> 
+ <script src="js/site.js"></script> </head> <!-- Body--> <body> <header class="bg-light box-shadow-sm"> <div class="topbar topbar-dark bg-dark"> <div class="container"> <!-- Topbar content --> <span id="topbar-login"><i class="fa fa-sign-in fa-fw"></i> <a href="default.asp?sCode=LOGIN-fr" id="a-topbar-login" class="passive"> Mon Catalogue  <span>Se connecter</span></a></span> <span id="countdown-basic"> </span> <span id="LangSwitcher"> <a href="#" id="hrefFR" class="passive">Français</a><span class="passive"> | </span> <a href="#" id="hrefNL" class="passive">Nederlands</a><span class="passive"> | </span> <a href="#" id="hrefEN" class="passive">English</a> </span> </div> </div> <!-- Navbar 1 Level (Light)--> <div class="navbar-sticky bg-light"> <div class="navbar navbar-expand-lg navbar-light"> <div class="container"><a class="navbar-brand d-none d-sm-block mr-4 order-lg-1" href="default.asp?sCode=HOME-fr" style="min-width: 7rem;"><img src="UserFiles/Images/Logo-Horta.svg" alt="Horta" width="200" height="50" class="logo-large"/></a> <a class="navbar-brand d-sm-none mr-2 order-lg-1" href="default.asp?sCode=HOME-fr" style="min-width: 4.625rem;"><img src="UserFiles/Images/Logo-Horta.svg" alt="Horta" width="100" height="50"/></a> <div class="navbar-toolbar d-flex align-items-center order-lg-3"> <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse"><img class="navbar-toggler-icon" src="UserFiles/Images/hamburger.svg"></button> </div> <div class="collapse navbar-collapse mr-auto order-lg-2" id="navbarCollapse"> <!--Primary menu--> <!--menu-->
+<ul class="nav navbar-nav">
+  <li class="nav-item topfirst level1 li-item2947 HOME-FR"><a href="/bienvenue" class="nav-link image-menu level1 a-item2947 HOME-FR"><i class="fa fa-home fa-lg"></i>Bienvenue <span class="caret"></span> <span class="caret"></span></a></li>
+  <li class="nav-item level1 li-item2936 CALENDAR-FR"><a href="/Calendrier" class="nav-link image-menu level1 a-item2936 CALENDAR-FR"><i class="fa fa-calendar fa-lg"></i>Calendrier <span class="caret"></span> <span class="caret"></span></a></li>
+  <li class="nav-item level1 li-item2934 CATALOGS-FR"><a href="/catalogues" class="nav-link image-menu level1 a-item2934 CATALOGS-FR"><i class="fa fa-book fa-lg"></i>Catalogues <span class="caret"></span> <span class="caret"></span></a></li>
+  <li class="nav-item level1 li-item3177 dropdown BUYSELL-FR"><a href="#" class="nav-link image-menu level1 a-item3177 dropdown-toggle"  data-rel="submenu1" data-toggle="dropdown" BUYSELL-FR"><i class="fa fa-gavel fa-lg"></i>Acheter &amp; Vendre <span class="caret"></span> <span class="caret"></span></a>
+    <ul class="dropdown-menu column1" id="submenu1">
+      <li class="level2 nav-item li-item2957 THESALE-FR"><a href="/Comment-Acheter" class="level2 a-item2957 THESALE-FR dropdown-item " >Comment acheter <span class="caret"></span> <span class="caret"></span></a></li>
+      <li class="level2 nav-item li-item2960 ESTIMATION-FR"><a href="/Comment-Vendre" class="level2 a-item2960 ESTIMATION-FR dropdown-item " >Comment vendre <span class="caret"></span></a></li>
+    </ul>
+  </li>
+  <li class="nav-item level1 li-item2949 dropdown SUB-MENU-INFO-FR"><a href="#" class="nav-link image-menu level1 a-item2949 dropdown-toggle"  data-rel="submenu2" data-toggle="dropdown" SUB-MENU-INFO-FR"><i class="fa fa-info-circle fa-lg"></i>Informations <span class="caret"></span></a>
+    <ul class="dropdown-menu column2" id="submenu2">
+      <li class="level2 nav-item li-item2951 CONDITIONS-BUY-FR"><a href="/Conditions-Generales" class="level2 a-item2951 CONDITIONS-BUY-FR dropdown-item " >Conditions Générales <span class="caret"></span></a></li>
+      <li class="level2 nav-item li-item2952 SUBSCRIPTION-FR"><a href="/Les-catalogues-et-abonnements" class="level2 a-item2952 SUBSCRIPTION-FR dropdown-item " >Les catalogues et abonnements</a></li>
+      <li class="level2 nav-item li-item3111 DOWNLOAD-FR"><a href="/Telecharger" class="level2 a-item3111 DOWNLOAD-FR dropdown-item " >À télécharger</a></li>
+      <li class="level2 nav-item li-item2993 VIDEO-FR"><a href="/Reportages-Video" class="level2 a-item2993 VIDEO-FR dropdown-item " >Reportages vidéo</a></li>
+      <li class="level2 nav-item li-item3120 PRIVACY-POLICY-FR"><a href="/donnees-personnelles" class="level2 a-item3120 PRIVACY-POLICY-FR dropdown-item " >Politique de confidentialité</a></li>
+      <li class="level2 nav-item li-item3159 COOKIEPOLICY-FR"><a href="default.asp?iId=GIDJHM" class="level2 a-item3159 COOKIEPOLICY-FR dropdown-item " >Gestion des cookies</a></li>
+    </ul>
+  </li>
+  <li class="nav-item level1 li-item2995 MY-CATALOG-FR"><a href="/mon-catalogue" class="nav-link image-menu level1 a-item2995 MY-CATALOG-FR"><i class="fa fa-sign-in fa-lg"></i>Mon Catalogue</a></li>
+  <li class="nav-item level1 li-item2994 toplast CONTACT-FR"><a href="/Contactez-nous" class="nav-link image-menu level1 a-item2994 CONTACT-FR"><i class="fa fa-comment"></i>Contact</a></li>
+</ul>
+
+<input type=hidden id="sCode" value="CATALOG"/>
+<input type=hidden id="sLang" value="FR"/>
+          <!--menu/-->
+ <!--Primary menu end--> </div> </div> </div> </div> </header>  <!-- Page Title--> <section class="container-fluid page-title-overlap bg-accent pt-2" id="page-title-2991"> <div class="bg-secondary py-4"> <div class="container d-lg-flex justify-content-between py-2 py-lg-3"> <div class="pr-lg-4 text-center text-lg-left" id="page-title"> <h1 class="h3 mb-1" id="page-title-h1">Catalogues</h1> </div> </div> </div> </section> <!-- Page Content--> 
+<section class="container section-Catalog">
+<div class="cz-gallery bg-light box-shadow-lg rounded-lg p-lg-5 p-md-4 p-sm-3 p-2">
+
+<input type="hidden" id="displayQuery" value=" Décembre 2025 : d´Art et Antiquités > 68"/>
+
+
+
+
+    
+    <div class="row d-flex justify-content-between" id="div-pages-top">
+      <div class="pl-3">
+        
+        <a class="btn btn-icon nav-link-style bg-dark text-light disabled opacity-100 mr-2" href="#"><i class="czi-view-list"></i></a> <a class="btn btn-icon nav-link-style bg-light text-dark opacity-100" href="default.asp?sCode=CATALOG-FR&page_nbr=0&mosaic=1"><i class="czi-view-grid"></i></a>
+        
+      </div>
+      <nav aria-label="Page navigation">
+        
+      </nav>
+    </div>
+    
+      <!-- LOT -->
+      <div class="row list-new-lot">
+        <div class="col-12 col-sm-12 col-md-4 col-lg-3 text-center">
+          <div class="catalogue_div_img_table"> <a href="default.asp?sCode=DESCRIPTION-FR&sale=356&lot=68&id=210662&page_nbr=1" name="210662"><div class="comingsoonNo"><p>photo plus disponible<br/><i class="fa fa-camera-retro fa-2x"></i></p></div></a></div>
+        </div>
+        <div class="col-12 col-sm-12 col-md-8 col-lg-9">
+          <div class="row">
+            <div class="col-12 text-sm-left col-sm-12 text-md-left col-md-12 col-lg-10">
+              <h4 class="list-lot-date">Lot n&deg; 68<span> date de vente : 08-12-25</span></h4>
+              <h4 class="list-title">Paul DELVAUX École belge (1897-1994)<br/></h4>
+              <h4 class="list-description">Estampe, eau-forte rehaussée à l&rsquo;aquarelle sur papier Japon: &quot;Les derniers beaux jours&quot;.<br/>Signée hors plaque: P. Delvaux, justification de tirage EA, cachet à froid à la lampe à huile et mention &quot;rehaussé à l&rsquo;aquarelle par P. Delvaux et Ch. Van Deun&quot;.<br/>Dim.: 38,5 x 30 cm. </h4>
+            </div>
+            <div class="col-12 col-sm-12 col-md-12 col-lg-2 text-lg-center pt-1 py-sm-0 h-100">
+              <div class="row h-100">
+                <div class="col-10 col-sm-10 col-md-11 col-lg-12 catalog-col-estimation pl-sm-3 pl-3">
+                  <h6> R&eacute;sultat : <span class='money'>550</span></h6>
+                </div>
+                <div class="col-2 col-sm-2 col-md-1 col-lg-12 text-center  text-lg-right pt-lg-5">
+                  
+                  <a href="default.asp?sCode=LOGIN-FR&add=210662">
+                  
+                  <i class="fa fa-plus-square fa-lg" title="Add to my catalog"></i></a>
+                  
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <hr/>
+      <!-- END LOT -->
+      
+  </div>
+</section>
+<script>
+$("li.catalogs-fr").addClass("active");
+</script>
+ <!-- Footer--> <footer class="bg-dark pt-5">
+<div class="container">
+	<div class="row pb-2">
+		<div class="col-md-4 col-sm-6">
+			<div class="widget widget-links widget-light pb-2 mb-4 widget-footer">
+				<h3 class="widget-title text-light">Contactez-nous</h3>
+
+				<ul class="ulAddress list list-icons widget-list font-size-md text-light opacity-90">
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-map-marker fa-fw"></i>&nbsp;Avenue de Roodebeek 70-74<br />
+						<span style=" padding-left:24px;">B - 1030 Bruxelles, Belgique</span>
+					</li>
+					<li class="widget-list-item">
+						<span style=" padding-left:24px;">Direction: Dominique de Villegas</span>
+					</li>
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-phone-square fa-fw"></i>&nbsp;+32 2 741 60 60
+					</li>
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-envelope-o fa-fw"></i>&nbsp;<a href="#" class="cryptedmail" data-name="info" data-domain="horta" data-tld="be"></a>
+
+
+					</li>
+					<li class="widget-list-item">
+						<i class="fa fa-bar-chart fa-fw"></i>&nbsp;TVA: BE 0471.388.227
+					</li>
+					<li class="widget-list-item">
+						<i class="fa fa-university fa-fw"></i>&nbsp;IBAN BE95 7340 1117 9358
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="col-md-3 col-sm-6">
+			<div class="widget widget-links widget-light pb-2 mb-4 widget-footer">
+				<h3 class="widget-title text-light">Suivez-nous</h3>
+
+				<ul class="ulAddress list list-icons widget-list font-size-md text-light opacity-90">
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-instagram fa-fw"></i><a class="widget-list-link" href="https://www.instagram.com/hotel_de_ventes_horta/" style="display:inline;" target="_blank">Suivez Horta sur Instagram</a>
+					</li>
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-street-view fa-fw"></i><a class="widget-list-link" href="default.asp?sCode=GMVT-FR" style="display:inline;">Horta sur Google Street Virtual Tour</a>
+					</li>
+					<li class="widget-list-item">
+						<i class="fa fa-facebook-official fa-fw"></i><a class="widget-list-link" href="https://www.facebook.com/hoteldeventeshorta?fref=ts" style="display:inline;" target="_blank">Suivez Horta sur Facebook</a>
+					</li>
+					<li class="widget-list-item">
+						<img height="16" src="/UserFiles/Images/icon-drouot.png" width="16" /><a class="widget-list-link" href="https://drouot.com/fr/auctioneer/922/hotel-de-ventes-horta" style="display:inline;" target="_blank">Drouot Digital</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="col-md-5 col-sm-6">
+			<div class="widget widget-links widget-light pb-2 mb-4 widget-footer">
+				<p class="d-none d-sm-none d-md-block" style="text-align: center; max-width:400px; margin-left:auto; margin-right:auto;">
+					<iframe class="mj-w-res-iframe" frameborder="0" height="310" marginheight="0" marginwidth="0" scrolling="no" src="https://xylg.mj.am/wgt/xylg/p3k/form?c=9db23641 " width="450px !important"></iframe><script type="text/javascript" src=https://app.mailjet.com/pas-nc-embedded-v1.js></script>
+				</p>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="pt-5 bg-darker">
+	<div class="container">
+		<table border="0" cellspacing="5" class="foot-tabel">
+			<tbody>
+				<tr>
+					<td valign="top">
+					<p>
+						<a href="http://www.auctions-in-belgium.be/default.asp?sCode=CALBYSDV-FR&amp;MemberID=19" target="_blank"><img alt="Lot 1" class="rounded-circle" src="/UserFiles/Images/logo_veilingzalen_200.jpg" style="width: 120px; height: 120px; float: left; margin-right: 10px;" /></a>
+					</p>
+					</td>
+					<td valign="top">
+					<p>
+						&nbsp;
+					</p>
+
+					<p>
+						Membre de la Chambre Royale Belgo-Luxembourgeoise des Salles de Ventes
+					</p>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<div class="pb-4 font-size-xs text-light opacity-50 text-center text-md-right">
+			Hôtel de Ventes Horta © 2026
+		</div>
+	</div>
+</div>
+</footer>
+
+ <!-- Toolbar for handheld devices--> <div class="cz-handheld-toolbar"> <div class="d-table table-fixed w-100"> <a class="d-table-cell cz-handheld-toolbar-item" href="#navbarCollapse" data-toggle="collapse" onClick="window.scrollTo(0, 0)"> <span class="cz-handheld-toolbar-icon"><i class="czi-menu"></i></span> <span class="cz-handheld-toolbar-label">Menu</span></a> </div> </div> <!-- Back To Top Button--> <a class="btn-scroll-top" href="#top" data-scroll><span class="btn-scroll-top-tooltip text-muted font-size-sm mr-2">Top</span><i class="btn-scroll-top-icon czi-arrow-up"> </i></a>  <!-- JavaScript libraries, plugins and custom scripts--> <script src="js/currencyFormatter/currencyFormatter.js" ></script> <script src="UserFiles/templates/Cartzilla/dist/js/theme.min.js"></script> <script src="UserFiles/templates/Cartzilla/dist/js/prism.min.js"></script> <script type="text/javascript" id="cookieinfo" src="js/cookieinfo.min.js" data-bg="#1c2535" data-fg="#FFFFFF" data-link="#F1D600" data-cookie="CookiesPreferences" data-expires=";max-age=7890000" //90 days data-text-align="left" data-message="<p class='cookiesfr'>Ce site utilise des Cookies pour améliorer votre expérience. </p> <p class='cookiesnl'>Deze site gebruikt cookies om uw surfervaring gemakkelijker en aangenamer te maken. Door « Ik begrijp het » te klikken, geeft u aan dat u akkoord gaat met ons </p> <p class='cookiesen'>This website uses cookies to improve your experience. By clicking « Got it », you indicate that you agree with our </p>" data-linkmsg="<p class='cookiesfr'><a href='default.asp?sCode=COOKIEPOLICY-FR#tab2'>Vous pouvez consulter notre politique de Cookies et en modifier les paramètres</a></p> <p class='cookiesnl'><a href='default.asp?sCode=COOKIEPOLICY-FR#tab2'>persoonlijke gegevens en cookiebeheerbeleid</a></p> <p class='cookiesen'><a href='default.asp?sCode=COOKIEPOLICY-FR#tab2'>privacy and cookies policy</a></p>" data-moreinfo="" data-scriptmsg="" data-close-text="<p class='cookiesfr'>Autoriser tous les Cookies</p><p class='cookiesnl'>Ik begrijp het!</p><p class='cookiesen'>Got it!</p>" > </script>   </body> </html> 

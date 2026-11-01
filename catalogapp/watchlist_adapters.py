@@ -152,6 +152,24 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         r"aquatint|mezzotint|monotype|print|multiple|mixograf\w*|gicl(?:ee|ée))\b",
         re.IGNORECASE,
     )
+    _catalog_plural_print_terms = re.compile(
+        r"\b(etching|engraving|lithograph|linocut|screenprint|serigraph|woodcut|woodblock|"
+        r"aquatint|mezzotint|monotype|gicl(?:ee|ée))s\b",
+        re.IGNORECASE,
+    )
+    _catalog_pastel_terms = re.compile(
+        r"\bpastel\s+on\s+(?:paper|board|cardboard|canvas|vellum)\b", re.IGNORECASE,
+    )
+    _catalog_mixed_drawing_terms = re.compile(
+        r"^\s*(?:\([^)]*\)\s*)?(?:original\s+)?"
+        r"(?P<media>(?:graphite|charcoal|pastel|watercolou?r|gouache|ink|pencil)\b"
+        r"(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+)"
+        r"(?:graphite|charcoal|pastel|watercolou?r|gouache|ink|pencil)\b)+)"
+        r"\s+on\s+(?:paper|board|cardboard|canvas|vellum)\b", re.IGNORECASE,
+    )
+    _catalog_medium_sections = re.compile(
+        r"\b(?:provenance|condition|keywords|biography|about\s+the\s+artist)\b", re.IGNORECASE,
+    )
 
     def with_catalog_end(self, end: datetime) -> "InvaluableAdapter":
         """Scope this refresh without mutating the shared adapter instance."""
@@ -520,9 +538,14 @@ class InvaluableAdapter(BookmarkSourceAdapter):
         facet_filters: list[list[str]] = []
         if artist_name:
             facet_filters.append([f"artistName:{artist_name}"])
+        category_filters: dict[str, set[str]] = {}
         for key, value in query_items:
             if key.casefold() in self._category_facets and value.strip():
-                facet_filters.append([f"{key}:{value.strip()}"])
+                # Repeated selections within one category are alternatives,
+                # e.g. Fine Art -> Prints OR Drawings OR Mixed Media.
+                category_filters.setdefault(key.casefold(), set()).add(value.strip())
+        for key, values in sorted(category_filters.items()):
+            facet_filters.append([f"{key.title()}:{value}" for value in sorted(values)])
 
         filters = self._catalog_filters
         if self.catalog_end is not None:
@@ -628,8 +651,7 @@ class InvaluableAdapter(BookmarkSourceAdapter):
     ) -> dict[str, Any]:
         title = self._text_value(hit, "lotTitle", "title")
         description = self._text_value(hit, "lotDescription", "description")
-        medium_match = self._print_terms.search(f"{title} {description}")
-        medium = medium_match.group(0).capitalize() if medium_match else "Print"
+        medium = self._catalog_medium(title, description)
         catalog_ref = self._text_value(hit, "catalogRef")
         location = self._text_value(hit, "location")
         if not location:
@@ -657,6 +679,33 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             "saleUrl": urljoin(page_url, f"/catalog/{catalog_ref}") if catalog_ref else "",
             "imageUrl": self._catalog_image_url(hit),
         }
+
+    @classmethod
+    def _catalog_medium(cls, title: str, description: str) -> str:
+        """Extract extra catalog media without expanding the print scope check."""
+        primary = cls._catalog_medium_sections.split(description, maxsplit=1)[0]
+        mixed_drawing = cls._catalog_mixed_drawing_terms.match(primary)
+        # An opening material declaration describes this lot. A later print
+        # reference can describe a separate work, while an explicit print title
+        # must retain the existing print-process precedence.
+        if mixed_drawing and not (
+            cls._print_terms.search(title) or cls._catalog_plural_print_terms.search(title)
+        ):
+            return mixed_drawing.group("media").capitalize()
+        match = cls._print_terms.search(f"{title} {description}")
+        if match:
+            return match.group(0).capitalize()
+        # Added terms must describe the lot, rather than its artist's biography,
+        # provenance, condition report, or search keywords.
+        declared = re.search(r"\bmedium\s*:\s*([^.;\n]+)", primary, re.IGNORECASE)
+        match = cls._catalog_plural_print_terms.search(title)
+        if not match and declared:
+            match = cls._catalog_plural_print_terms.search(declared.group(1))
+        if match:
+            return match.group(1).capitalize()
+        if cls._catalog_pastel_terms.search(f"{title} {primary}"):
+            return "Pastel"
+        return "Print"
 
     @classmethod
     def _catalog_image_url(cls, hit: dict[str, Any]) -> str:
@@ -960,6 +1009,24 @@ class InvaluableAdapter(BookmarkSourceAdapter):
             sold = cls._posted_sold_money(value, currency)
             if sold.low is not None:
                 return sold
+        # The live-auction detail uses a colonless Sold status and puts the
+        # estimate before the result in the following bid-status block. Keep
+        # this structural match narrow so an estimate or another lot's price
+        # cannot supply a result.
+        for block in node.select(".bid-info-inner"):
+            labels = block.select(":scope > .bid-status > strong.sold-passed-status")
+            if len(labels) != 1 or labels[0].get_text(" ", strip=True).casefold() != "sold":
+                continue
+            label = labels[0]
+            result_block = label.parent.find_next_sibling()
+            if result_block is None or "bid-status" not in result_block.get("class", []):
+                continue
+            amounts = result_block.select(":scope > p.m-0 > b.text-large")
+            if len(amounts) != 1 or any(cls._sold_node_excluded(item, node) for item in (label, amounts[0])):
+                continue
+            sold = cls._posted_sold_money(amounts[0].get_text(" ", strip=True))
+            if sold.low is not None:
+                return sold
         for text in cls._sold_label_texts(node):
             sold = cls._posted_sold_money(text)
             if sold.low is not None:
@@ -1141,6 +1208,12 @@ class HeritageAdapter(BookmarkSourceAdapter):
         # Birth/death years belong to the source description, not artist identity.
         artist = re.sub(r"\s*\((?:b\.?\s*)?\d{4}[^)]*\)\s*$", "", artist, flags=re.I).strip()
         description = copy(node)
+        if description.find("br"):
+            # Source line wrapping is HTML whitespace, not a field boundary.
+            # Preserve only the rendered breaks between artist, title and medium.
+            for text in description.find_all(string=True):
+                if not isinstance(text, Comment):
+                    text.replace_with(re.sub(r"\s+", " ", str(text)))
         for br in description.find_all("br"):
             br.replace_with("\n")
         lines = [" ".join(line.split()) for line in description.get_text().splitlines() if line.strip()]

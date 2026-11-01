@@ -1,0 +1,687 @@
+<!DOCTYPE html> <html lang="fr"> <head> <meta charset="utf-8"> <title>Bienvenue sur le site de l'Hôtel de Ventes Horta </title> <!-- Google tag (gtag.js) -->
+<!-- No consent, no connection -->
+ <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-BZW2B3ZX2V'); </script> <!-- End Google --> <!-- SEO Meta Tags--> <meta content="salle de vente,auction,auctioneer,veilingzaal,Bruxelles,Brussels,Art,Autiquités" name="keywords" /> <meta content="Ventes aux enchères d'Art et Antiquités à Bruxelles" name="description" /> <meta name="author" content="Juan Regout"> <!-- Viewport--> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"> <!-- Favicon and Touch Icons--> <link rel="stylesheet" href="fonts/font-awesome/css/font-awesome.css"/> <link rel="icon" type="image/png" sizes="32x32" href="UserFiles/Images/logo_32px.png"> <link rel="icon" type="image/x-icon" sizes="16x16" href="favicon.ico"> <meta name="msapplication-TileColor" content="#ffffff"> <meta name="theme-color" content="#ffffff"> <!-- Vendor Styles including: Font Icons, Plugins, etc.--> <link rel="stylesheet" media="screen" href="UserFiles/templates/Cartzilla/dist/css/vendor.css"> <!-- Main Theme Styles + Bootstrap--> <link rel="stylesheet" media="screen" id="main-styles" href="UserFiles/templates/Cartzilla/dist/css/theme.css"> <link rel="stylesheet" href="UserFiles/site.css"> <!-- JavaScript libraries, plugins and custom scripts--> <script src="UserFiles/templates/Cartzilla/dist/js/vendor.min.js"></script> 
+<input type="hidden" id="dsCountDown_endDate" value="11 9,  2026 19::00">
+<!-- 14691,45 min -->
+
+<link href="js/book/book.css" rel="stylesheet" media="screen" />
+<script src="js/book/book.js"></script>
+<script src="js/dsCountDown/dscountdown.js"></script> 
+<link rel='stylesheet' href='js/dsCountDown/dscountdown.css' type='text/css' media='all' />
+
+
+
+ <script src="js/site.js"></script> </head> <!-- Body--> <body> <header class="bg-light box-shadow-sm"> <div class="topbar topbar-dark bg-dark"> <div class="container"> <!-- Topbar content --> <span id="topbar-login"><i class="fa fa-sign-in fa-fw"></i> <a href="default.asp?sCode=LOGIN-fr" id="a-topbar-login" class="passive"> Mon Catalogue  <span>Se connecter</span></a></span> <span id="countdown-basic"> </span> <span id="LangSwitcher"> <a href="#" id="hrefFR" class="passive">Français</a><span class="passive"> | </span> <a href="#" id="hrefNL" class="passive">Nederlands</a><span class="passive"> | </span> <a href="#" id="hrefEN" class="passive">English</a> </span> </div> </div> <!-- Navbar 1 Level (Light)--> <div class="navbar-sticky bg-light"> <div class="navbar navbar-expand-lg navbar-light"> <div class="container"><a class="navbar-brand d-none d-sm-block mr-4 order-lg-1" href="default.asp?sCode=HOME-fr" style="min-width: 7rem;"><img src="UserFiles/Images/Logo-Horta.svg" alt="Horta" width="200" height="50" class="logo-large"/></a> <a class="navbar-brand d-sm-none mr-2 order-lg-1" href="default.asp?sCode=HOME-fr" style="min-width: 4.625rem;"><img src="UserFiles/Images/Logo-Horta.svg" alt="Horta" width="100" height="50"/></a> <div class="navbar-toolbar d-flex align-items-center order-lg-3"> <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse"><img class="navbar-toggler-icon" src="UserFiles/Images/hamburger.svg"></button> </div> <div class="collapse navbar-collapse mr-auto order-lg-2" id="navbarCollapse"> <!--Primary menu--> <!--menu-->
+<ul class="nav navbar-nav">
+  <li class="nav-item level1 active li-item2947 HOME-FR"><a href="#" class="nav-link image-menu level1 active a-item2947 HOME-FR"><i class="fa fa-home fa-lg"></i>Bienvenue <span class="caret"></span> <span class="caret"></span></a></li>
+  <li class="nav-item level1 li-item2936 CALENDAR-FR"><a href="/Calendrier" class="nav-link image-menu level1 a-item2936 CALENDAR-FR"><i class="fa fa-calendar fa-lg"></i>Calendrier <span class="caret"></span> <span class="caret"></span></a></li>
+  <li class="nav-item level1 li-item2934 CATALOGS-FR"><a href="/catalogues" class="nav-link image-menu level1 a-item2934 CATALOGS-FR"><i class="fa fa-book fa-lg"></i>Catalogues <span class="caret"></span> <span class="caret"></span></a></li>
+  <li class="nav-item level1 li-item3177 dropdown BUYSELL-FR"><a href="#" class="nav-link image-menu level1 a-item3177 dropdown-toggle"  data-rel="submenu1" data-toggle="dropdown" BUYSELL-FR"><i class="fa fa-gavel fa-lg"></i>Acheter &amp; Vendre <span class="caret"></span> <span class="caret"></span></a>
+    <ul class="dropdown-menu column1" id="submenu1">
+      <li class="level2 nav-item li-item2957 THESALE-FR"><a href="/Comment-Acheter" class="level2 a-item2957 THESALE-FR dropdown-item " >Comment acheter <span class="caret"></span> <span class="caret"></span></a></li>
+      <li class="level2 nav-item li-item2960 ESTIMATION-FR"><a href="/Comment-Vendre" class="level2 a-item2960 ESTIMATION-FR dropdown-item " >Comment vendre <span class="caret"></span></a></li>
+    </ul>
+  </li>
+  <li class="nav-item level1 li-item2949 dropdown SUB-MENU-INFO-FR"><a href="#" class="nav-link image-menu level1 a-item2949 dropdown-toggle"  data-rel="submenu2" data-toggle="dropdown" SUB-MENU-INFO-FR"><i class="fa fa-info-circle fa-lg"></i>Informations <span class="caret"></span></a>
+    <ul class="dropdown-menu column2" id="submenu2">
+      <li class="level2 nav-item li-item2951 CONDITIONS-BUY-FR"><a href="/Conditions-Generales" class="level2 a-item2951 CONDITIONS-BUY-FR dropdown-item " >Conditions Générales <span class="caret"></span></a></li>
+      <li class="level2 nav-item li-item2952 SUBSCRIPTION-FR"><a href="/Les-catalogues-et-abonnements" class="level2 a-item2952 SUBSCRIPTION-FR dropdown-item " >Les catalogues et abonnements</a></li>
+      <li class="level2 nav-item li-item3111 DOWNLOAD-FR"><a href="/Telecharger" class="level2 a-item3111 DOWNLOAD-FR dropdown-item " >À télécharger</a></li>
+      <li class="level2 nav-item li-item2993 VIDEO-FR"><a href="/Reportages-Video" class="level2 a-item2993 VIDEO-FR dropdown-item " >Reportages vidéo</a></li>
+      <li class="level2 nav-item li-item3120 PRIVACY-POLICY-FR"><a href="/donnees-personnelles" class="level2 a-item3120 PRIVACY-POLICY-FR dropdown-item " >Politique de confidentialité</a></li>
+      <li class="level2 nav-item li-item3159 COOKIEPOLICY-FR"><a href="default.asp?iId=GIDJHM" class="level2 a-item3159 COOKIEPOLICY-FR dropdown-item " >Gestion des cookies</a></li>
+    </ul>
+  </li>
+  <li class="nav-item level1 li-item2995 MY-CATALOG-FR"><a href="/mon-catalogue" class="nav-link image-menu level1 a-item2995 MY-CATALOG-FR"><i class="fa fa-sign-in fa-lg"></i>Mon Catalogue</a></li>
+  <li class="nav-item level1 li-item2994 toplast CONTACT-FR"><a href="/Contactez-nous" class="nav-link image-menu level1 a-item2994 CONTACT-FR"><i class="fa fa-comment"></i>Contact</a></li>
+</ul>
+
+<input type=hidden id="sCode" value="HOME"/>
+<input type=hidden id="sLang" value="FR"/>
+          <!--menu/-->
+ <!--Primary menu end--> </div> </div> </div> </div> </header> <section class="container-fluid no-gutters" id="section-slideshow">
+
+<link rel="stylesheet" type="text/css" href="js/TouchCarousel/touchcarousel/touchcarousel.css" />
+<link rel="stylesheet" type="text/css" href="js/TouchCarousel/touchcarousel/black-and-white-skin/black-and-white-skin.css" />
+<script src="js/TouchCarousel/touchcarousel/jquery.touchcarousel-1.2.js"></script>
+
+<div id="touchcarousel-1" class="touchcarousel black-and-white">
+  <ul class="touchcarousel-container">
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 121<br/>Hendrick VAN BALEN École flamande (1575-1632).&nbsp;<br></h3>
+          <p>Huile sur panneau (avec sa pr&eacute;paration au dos): Vierge à l&#39;Enfant et saint Jean-Baptiste entour&eacute;s d&#39;angelots à la fontaine.
+Par Hendrick van Balen. 
+Avec inscription manuscrite au dos &quot;original de van Balen&quot;.
+Dim.: 49,5 x 75 cm.
+Voir illustration.&nb...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217737" class="learn-more position1">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611121.jpg" alt="Lot 121 Hendrick VAN BALEN École flamande (1575-1632)." class="touchcarousel-img" width="477"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 187<br/>Marina B.&nbsp;<br></h3>
+          <p>Bijoux: Parure en or jaune se composant d&#39;un colli...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217803" class="learn-more position2">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611187.jpg" alt="Lot 187 Marina B." class="touchcarousel-img" width="210"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 154<br/>Emile CLAUS École belge (1849-1924)&nbsp;<br></h3>
+          <p>Huile sur toile: Paysage ensoleill&eacute; avec moulin en arrière-plan.
+Sign&eacute;e à deux reprises: Em. Claus et Émile Claus, titr&eacute;e, monogramm&eacute;e E.C et dat&eacute;e September A.C. au dos.
+On y joint un rapport de nettoyage.
+Dim.: 60 x 74 cm.
+Voir illustration.&nbsp;...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217770" class="learn-more position3">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611154.jpg" alt="Lot 154 Emile CLAUS École belge (1849-1924)" class="touchcarousel-img" width="387"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 103<br/>Joaillerie.&nbsp;<br></h3>
+          <p>Bijou: Bague en or blanc agr&eacute;ment&eacute;e d&#39;un rubis de +/- 3,21 carats et de diamants taille baguette pour +/- 2 carats.
+On y joint la copie d&#39;un certificat stipulant rubis naturel non chauff&eacute;.
+Tour de doigt: +/- 52.
+Voir illustration.&nbsp;...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217719" class="learn-more position4">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611103.jpg" alt="Lot 103 Joaillerie." class="touchcarousel-img" width="640"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 120<br/>Andries Cornelis LENS École flamande (1739-1822).&nbsp;<br></h3>
+          <p>Huile sur toile (rentoil&eacute;e): Bacchanale.
+Par Andri...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217736" class="learn-more position5">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611120.jpg" alt="Lot 120 Andries Cornelis LENS École flamande (1739-1822)." class="touchcarousel-img" width="252"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 164<br/>Joaillerie.&nbsp;<br></h3>
+          <p>Bijoux: Parure en or jaune, &eacute;mail et diamants taille ancienne, se composant d&#39;un collier, d&#39;une paire de boucles d&#39;oreilles, d&#39;un bracelet et d&#39;une bague.
+Poids brut: +/- 179 grammes.
+Tour de doigt: +/- 55.
+Voir illustration.&nbsp;...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217780" class="learn-more position6">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611164.jpg" alt="Lot 164 Joaillerie." class="touchcarousel-img" width="324"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 101<br/>Anto CARTE École belge (1886-1954)&nbsp;<br></h3>
+          <p>Huile sur toile: Le violoncelliste.
+Sign&eacute;e: Anto C...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217717" class="learn-more position7">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611101.jpg" alt="Lot 101 Anto CARTE École belge (1886-1954)" class="touchcarousel-img" width="254"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 107<br/>Joaillerie.&nbsp;<br></h3>
+          <p>Bijou: Bague en or blanc agr&eacute;ment&eacute;e d&#39;un saphir de +/- 7,51 carats et de diamants taille brillant pour +/- 1,30 carat.
+On y joint un certificat Gubelin stipulant Ceylan non chauff&eacute; et un commentaire du laboratoire.
+Tour de doigt: +/- 51.
+Voir illustr...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217723" class="learn-more position8">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611107.jpg" alt="Lot 107 Joaillerie." class="touchcarousel-img" width="640"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 160<br/>Edgard TYTGAT École belge (1879-1957).&nbsp;<br></h3>
+          <p>Huile sur toile: &quot;Int&eacute;rieur à Dongelberg&quot;.
+Sign&eacute;e, situ&eacute;e et dat&eacute;e: Edgard Tytgat Dongelberg 1914, contresign&eacute;e et titr&eacute;e au dos.
+(petits manques de peinture).
+Dim.: 49 x 65 cm.
+Voir illustration.&nbsp;...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217776" class="learn-more position9">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611160.jpg" alt="Lot 160 Edgard TYTGAT École belge (1879-1957)." class="touchcarousel-img" width="424"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 109<br/>Travail français 19e.&nbsp;<br></h3>
+          <p>Meuble: Commode galb&eacute;e dite &quot;La pip&eacute;e aux oiseaux&quot; en placage de bois de violette marquet&eacute; de quadrillage, &agrave; deux tiroirs sans traverse avec rehauts de bronzes au d&eacute;cor de putti, de feuillage fleuri et d&a...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217725" class="learn-more position10">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611109.jpg" alt="Lot 109 Travail français 19e." class="touchcarousel-img" width="432"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 142<br/>Baron Raymond DE MEESTER DE BETZENBROECK École belge (1904-1995).&nbsp;<br></h3>
+          <p>Sculpture en bronze &agrave; patine fonc&eacute;e:...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217758" class="learn-more position11">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611142.jpg" alt="Lot 142 Baron Raymond DE MEESTER DE BETZENBROECK École belge (1904-1995)." class="touchcarousel-img" width="272"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 177<br/>Jean-L&eacute;on GOUWELOOS École belge (1868-1943).&nbsp;<br></h3>
+          <p>Huile sur toile: Nu aux chinoiseries.
+Sign&eacute;e: Jean Gouweloos.
+Note: L’œuvre aurait appartenu au musicien Isaac Albenitz.
+On y joint des documents dont une copie de coupure de presse de septembre 1903 mentionnant que le tableau a &eacute;t&eacute; refus&eacute; au Salon p...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217793" class="learn-more position12">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611177.jpg" alt="Lot 177 Jean-L&eacute;on GOUWELOOS École belge (1868-1943)." class="touchcarousel-img" width="516"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 143<br/>Victor ROUSSEAU École belge (1865-1954).&nbsp;<br></h3>
+          <p>Sculpture en bronze à patine fonc&eacute;e: &quot;Les ing&eacute;nues...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217759" class="learn-more position13">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611143.jpg" alt="Lot 143 Victor ROUSSEAU École belge (1865-1954)." class="touchcarousel-img" width="274"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 97<br/>Jo DELAHAUT École belge (1911-1992).&nbsp;<br></h3>
+          <p>Huile sur toile: &quot;Repère&quot;.
+Sign&eacute;e et dat&eacute;e: Jo Del...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217713" class="learn-more position14">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611097.jpg" alt="Lot 97 Jo DELAHAUT École belge (1911-1992)." class="touchcarousel-img" width="224"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 146<br/>Alb&eacute;ric COLLIN École belge (1886-1962).&nbsp;<br></h3>
+          <p>Sculpture en bronze à patine brune: Groupe de trois antilopes.
+Sign&eacute;e: Alb&eacute;ric Collin, mention EA et cachet cire perdue Valsuani.
+Dim.: H.: 32 L.: 53 cm.
+Voir illustration.&nbsp;...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217762" class="learn-more position15">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611146.jpg" alt="Lot 146 Alb&eacute;ric COLLIN École belge (1886-1962)." class="touchcarousel-img" width="580"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 232<br/>CHEN Jiang Hong École chinoise (1963)&nbsp;<br></h3>
+          <p>Huiles sur toile formant pendants: Compositions.<br/>Sign&eacute;es et dat&eacute;es: Chen Jiang Hong 2005.<br/>Dim.: 60 x 60 cm.<br/>Voir illustration.&nbsp;...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217848" class="learn-more position16">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611232.jpg" alt="Lot 232 CHEN Jiang Hong École chinoise (1963)" class="touchcarousel-img" width="644"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 184<br/>Firmin BAES École belge (1874-1943).&nbsp;<br></h3>
+          <p>Pastel sur toile: &quot;La Laiti&egrave;re&quot;.<br/>Sign...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217800" class="learn-more position17">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611184.jpg" alt="Lot 184 Firmin BAES École belge (1874-1943)." class="touchcarousel-img" width="254"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 95<br/>Juliette WYTSMAN École belge (1866-1925)&nbsp;<br></h3>
+          <p>Huile sur toile: Paysage ensoleill&eacute;.
+Sign&eacute;e: Juliette Wytsman.
+Dim.: 60 x 80 cm.
+Voir illustration.&nbsp;...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217711" class="learn-more position18">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611095.jpg" alt="Lot 95 Juliette WYTSMAN École belge (1866-1925)" class="touchcarousel-img" width="426"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 179<br/>Louis VAN LINT École belge (1909-1986).&nbsp;<br></h3>
+          <p>Huile sur toile: &quot;Cordes à linge&quot;.
+Sign&eacute;e et dat&eacute;e: L. Van Lint 46, titr&eacute;e et num&eacute;ro d&#39;inventaire 86 au dos.
+Provenance: Atelier de l&#39;artiste.
+R&eacute;f&eacute;rence: Oeuvre reprise dans le catalogue raisonn&eacute; de l&#39;artiste sous le num&eacute;ro LVLP0232.
+Dim.: 46 x 56 cm...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217795" class="learn-more position19">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611179.jpg" alt="Lot 179 Louis VAN LINT École belge (1909-1986)." class="touchcarousel-img" width="375"  height="320" /> </div>
+    </li>
+    
+    <li class="touchcarousel-item">
+      <div class="grid-block fade">
+        <div class="grid-caption">
+          <h3>Lot 140<br/>Jules Leleu, travail français d’&eacute;poque Art D&eacute;co.&nbsp;<br></h3>
+          <p>Meuble: Bar-argentier en placage de kosipo à un ab...</p>
+          
+          <p><a href="default.asp?sCode=HIGHLIGHT-FR&id=217756" class="learn-more position20">Learn more</a></p>
+          
+        </div>
+        
+        <img src="photos_auctioneers_web/2026/11/pdf/HOR2611140.jpg" alt="Lot 140 Jules Leleu, travail français d’&eacute;poque Art D&eacute;co." class="touchcarousel-img" width="241"  height="320" /> </div>
+    </li>
+    
+  </ul>
+</div>
+<input type=hidden id="containerWidth" value="7846px"/>
+
+</section> <!-- Page Title--> <section class="container-fluid page-title-overlap bg-accent pt-2" id="page-title-2947"> <div class="bg-secondary py-4"> <div class="container d-lg-flex justify-content-between py-2 py-lg-3"> <div class="pr-lg-4 text-center text-lg-left" id="page-title"> <h1 class="h3 mb-1" id="page-title-h1">Bienvenue sur le site de l'Hôtel de Ventes Horta </h1> </div> </div> </div> </section> <!-- Page Content--> <section class="container section-home-page">
+<div class="bg-light box-shadow-lg rounded-lg p-4">
+	<div class="row" style="padding-top: 2rem;">
+		<div class="col-lg-6 col-md-12">
+			<p style="text-align: center;">
+				&nbsp;
+			</p>
+
+			<h2 style="text-align: center;"><strong>VENTES AUX ENCHÈRES<br />
+			D'ART &amp; ANTIQUITÉS</strong></h2>
+
+			<h3><span style="color:#bb9459;">9 &amp; 10&nbsp;NOVEMBRE À 19H</span></h3>
+
+			<p style="text-align: center;">
+				L'Hôtel de Ventes Horta, le rendez-vous mensuel à Bruxelles pour&nbsp;une nouvelle sélection d'objets d'art qui passera sous le marteau.&nbsp;<br />
+				<br />
+				<a href="default.asp?sCode=CATALOG-FR&amp;sale=359"><span style="font-size: 18px; letter-spacing: 0em; text-align: center;">Voir le catalogue&nbsp;</span>➜</a>
+			</p>
+		</div>
+
+		<div class="col-lg-6 col-md-12" style="text-align: center;">
+						<p style="text-align: center; text-transform: uppercase;font-weight: 700; color: #cdb18d; font-size: 16px; line-height: 1.65;" class=videoexpo>
+				
+Présentation vidéo de l'exposition
+
+			</p>
+
+
+
+			<div class="embed-responsive embed-responsive-16by9" style="background-color:black;">
+				<video controls="controls" height="540" poster="UserFiles/Media/expo_2026-11.jpg" width="960"><source src="/UserFiles/Media/Expo_2026-11.mp4" type="video/mp4" /></video>
+			</div>
+
+
+
+
+			<p style="text-align: center;"> 
+				
+			</p>
+
+		</div>
+	</div>
+
+	<p>
+		&nbsp;
+	</p>
+
+	<div class="row" style="padding-top: 4rem;">
+		<div class="col-lg-6 col-md-12">
+			<p style="text-align: center;">
+				<span style="color:#000000;"><span style="font-size:20px;"><span style="font-weight: 700; letter-spacing: 0em;">JOURNÉES D’ÉVALUATIONS</span></span></span>
+			</p>
+
+			<p style="text-align: center;">
+				<span style="font-weight: 700; color: rgb(187, 148, 89); text-align: center;"><span style="font-size: 18px;">Lundi 2&nbsp;novembre - </span></span><span style="text-align: center; color: rgb(187, 148, 89); font-size: 18px; font-weight: 700;">Bruxelles</span>
+			</p>
+
+			<p style="text-align: center;">
+				<span style="font-weight: 700; text-align: center;">Tableaux, objets d'art, sculptures &amp; argenterie </span><span style="background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;">de 10h à 12h et de 14h à 17h</span>
+			</p>
+
+			<p style="margin: 0in; font-family: Arial; font-size: 12pt; color: rgb(75, 86, 107); text-align: center;">
+				<span lang="fr" style="font-weight:bold;background:white">Bijoux&nbsp;</span><span lang="fr-BE" style="background:white">de 10h à 12h&nbsp;</span>
+			</p>
+
+			<p style="margin: 0in; font-family: Arial; font-size: 12pt; color: rgb(75, 86, 107); text-align: center;">
+				<span style="font-weight:bold;background:white">Instruments de musique</span><span style="background:white"> de 16h à 17h</span>
+			</p>
+
+			<p style="text-align: center;">
+				&nbsp;
+			</p>
+
+			<p style="margin: 0in; font-family: Arial; font-size: 12pt; color: rgb(75, 86, 107); text-align: center;">
+				&nbsp;
+			</p>
+
+			<p style="margin: 0in; font-family: Arial; font-size: 12pt; color: rgb(75, 86, 107); text-align: center;">
+				&nbsp;
+			</p>
+
+			<p style="text-align: center;">
+				<span style="color:#bb9459;"><strong><span style="font-size:18px;"><span style="letter-spacing: 0em;">Vendredi 30&nbsp;</span></span></strong></span><span style="color: rgb(187, 148, 89); font-size: 18px; font-weight: 700; text-align: center;">octobre&nbsp;</span><span style="color:#bb9459;"><strong><span style="font-size:18px;"><span style="letter-spacing: 0em;">- Knokke</span></span></strong></span>
+			</p>
+
+			<p style="list-style: disc; text-align: center;">
+				<span style="letter-spacing: 0em;"><strong>Tableaux, objets d'art &amp;&nbsp;sculptures</strong>&nbsp;de 10h à 12h&nbsp;</span>
+			</p>
+
+			<p style="list-style: disc; text-align: center;">
+				&nbsp;
+			</p>
+
+			<p style="list-style: disc; text-align: center;">
+				&nbsp;
+			</p>
+		</div>
+
+		<div class="col-lg-6 col-md-12">
+			<p style="text-align: center;">
+				<strong><span style="color: rgb(0, 0, 0);"><span style="font-size: 20px;">JOURNÉES D’EXPOSITION</span></span></strong>
+			</p>
+
+			<p style="text-align: center;">
+				<span style="color: rgb(187, 148, 89);"><span style="font-weight: 700;"><span style="font-size: 18px;">mardi 3, mercredi 4 et&nbsp;jeudi 5&nbsp;novembre</span></span></span><br />
+				de 10h à 12h et de 14h à 17h<br />
+				<br />
+				<span style="color: rgb(187, 148, 89);"><span style="font-weight: 700;"><span style="font-size: 18px;">vendredi 6, samedi 7&nbsp;et&nbsp;dimanche 8&nbsp;novembre</span></span></span><br />
+				de 10h à 19h
+			</p>
+		</div>
+	</div>
+
+	<div class="row" style="padding-top: 35px;">
+		<div class="col-lg-6 col-md-12">
+			<table border="2" cellpadding="15" cellspacing="1" style="border-collapse:collapse;border-color:#e0bf8d;width:100%;">
+				<tbody>
+					<tr>
+						<td>
+						<h2><span style="font-weight: 700;"><span style="font-size: 20px;">COMMENT AVOIR UNE&nbsp;ESTIMATION&nbsp;&amp; VENDRE ?</span></span></h2>
+
+						<h3 style="margin-bottom: 0.5rem; font-weight: bold; color: rgb(105, 105, 105); font-size: 28px; padding-top: 1rem; padding-bottom: 0rem; text-align: left;"><span style="color: rgb(187, 148, 89);">1.</span>&nbsp;<span style="font-size: 18px;">Chez Horta</span></h3>
+
+						<p>
+							Nos priseurs sont à votre disposition en nos locaux à Bruxelles et à Knokke pour évaluer vos œuvres d’art, soit par examen des pièces elle-même, soit sur base de photos.
+						</p>
+
+						<h3 style="margin-bottom: 0.5rem; font-weight: bold; color: rgb(105, 105, 105); font-size: 28px; padding-top: 1rem; padding-bottom: 0rem; text-align: left;"><span style="color: rgb(187, 148, 89);">2.</span>&nbsp;<span style="font-size: 18px;">Par mail</span></h3>
+
+						<p>
+							<span style="letter-spacing: 0em;">Envoyez</span><span style="letter-spacing: 0em;">&nbsp;</span><span style="letter-spacing: 0em;">des&nbsp;</span><span style="letter-spacing: 0em;">photos et les dimensions&nbsp;à</span><span style="color: rgb(102, 102, 102); text-align: center;">&nbsp;<a href="#" class="cryptedmail" data-name="info" data-domain="horta" data-tld="be"></a>
+
+</span><br />
+							<span style="letter-spacing: 0em;">(pour beaucoup de photos&nbsp;</span><span style="letter-spacing: 0em;">veuillez privilégier&nbsp;<a href="https://www.swisstransfer.com/fr-be" style="color: rgb(51, 51, 51); text-decoration-line: underline;">Swisstransfer.com</a>)</span>
+						</p>
+
+						<p>
+							<span style="letter-spacing: 0em;">Les <strong>estimations de vin</strong> se font uniquement par mail à&nbsp;</span><a href="#" class="cryptedmail" data-name="vin" data-domain="horta" data-tld="be"></a>
+
+
+
+						</p>
+
+						<h3 style="margin-bottom: 0.5rem; font-weight: bold; color: rgb(105, 105, 105); font-size: 28px; padding-top: 1rem; padding-bottom: 0rem; text-align: left;"><span style="letter-spacing: 0em;"><span style="color: rgb(187, 148, 89);">3.</span>&nbsp;<span style="font-size: 18px;">À domicile</span></span></h3>
+
+						<p>
+							<span style="letter-spacing: 0em;">Estimation à domicile possible uniquement sur rendez-vous.<br />
+							Avec envoi au préalable de photos sur&nbsp;</span><span style="color: rgb(102, 102, 102); text-align: center;"><a href="#" class="cryptedmail" data-name="info" data-domain="horta" data-tld="be"></a>
+
+.</span><br />
+							&nbsp;
+						</p>
+
+						<p>
+							<a href="default.asp?sCode=ESTIMATION-FR" style="color: rgb(51, 51, 51); text-decoration-line: underline; background-color: rgb(255, 255, 255); letter-spacing: 0em; text-align: center;" target="_blank"><span style="color: rgb(102, 102, 102);">Détails sur la&nbsp;vente&nbsp;</span></a>&nbsp;➜
+						</p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+
+			<div align="center" style="padding-top: 2rem; padding-bottom: 1rem;">
+				<span style="color: rgb(187, 148, 89);"><span style="font-weight: 700;">Visionnez notre Year Book 2026 !</span></span>
+			</div>
+
+			<p style="text-align: center;">
+				<a href="UserFiles/upload/FlipBook/Horta_YB2026/index.html" style="color: rgb(193, 171, 143); text-decoration-line: underline; background-color: rgb(255, 255, 255); font-size: 13px;" title="Year Book 2026"><img src="/UserFiles/upload/flipbook/horta_yb2026/files/shot.png" style="height: 350px; width: 247px;" /></a>
+			</p>
+
+			<p>
+				&nbsp;
+			</p>
+		</div>
+
+		<div class="col-md-12 col-lg-6">
+			<table border="2" cellpadding="15" cellspacing="1" style="border-collapse:collapse;border-color:#e0bf8d;width:100%;">
+				<tbody>
+					<tr>
+						<td>
+						<h2><span style="font-weight: 700;"><span style="font-size: 20px;">COMMENT ENCHÉRIR &amp; ACHETER ?</span></span></h2>
+
+						<h3 style="margin-bottom: 0.5rem; font-weight: bold; color: rgb(105, 105, 105); font-size: 28px; padding-top: 1rem; padding-bottom: 0rem; text-align: left;"><span style="font-size: 20px;"><span style="color: rgb(187, 148, 89);"><span style="font-size: 28px;">1.</span></span>&nbsp;<span style="font-size: 18px;">En salle</span></span></h3>
+
+						<p>
+							Vous êtes les bienvenus chez Horta pour enchérir sur le ou les lots de votre choix. Vous pouvez assister qu'à une partie de la vente si vous le désirez.
+						</p>
+
+						<h3 style="margin-bottom: 0.5rem; font-weight: bold; color: rgb(105, 105, 105); font-size: 28px; padding-top: 1rem; padding-bottom: 0rem; text-align: left;"><span style="font-size: 20px;"><span style="font-size: 18px;"><span style="color: rgb(187, 148, 89);"><span style="font-size: 28px;">2.</span></span>&nbsp;Par ordre d'achat</span></span></h3>
+
+						<p>
+							Un ordre d'achat est un enchère écrite laissée à l'avance.<br />
+							Vous indiquez votre prix maximum pour le lot. Le commissaire-priseur enchérit alors en votre nom jusqu'à votre prix maximum.
+						</p>
+
+						<p>
+							<span style="letter-spacing: 0em; text-align: center;">Téléchargez le document d'</span><a href="UserFiles/Files/forms/Horta_ordre_d_achat.pdf" style="color: rgb(51, 51, 51); text-decoration-line: underline; background-color: rgb(255, 255, 255); letter-spacing: 0em; text-align: center;" target="_blank"><span style="color: rgb(102, 102, 102);">ordre d'achat</span></a><span style="text-align: center; color: rgb(102, 102, 102);">&nbsp;à déposer ou renvoyer par email sur <a href="#" class="cryptedmail" data-name="info" data-domain="horta" data-tld="be"></a>
+
+</span>
+						</p>
+
+						<h3 style="margin-bottom: 0.5rem; font-weight: bold; color: rgb(105, 105, 105); font-size: 28px; padding-top: 1rem; padding-bottom: 0rem; text-align: left;"><span style="font-size: 20px;"><span style="font-size: 18px;"><span style="color: rgb(187, 148, 89);"><span style="font-size: 28px;">3.</span></span>&nbsp;Par téléphone</span></span></h3>
+
+						<p>
+							Vous ne savez pas être présent lors de la vente ? Pas de soucis !<br />
+							Dites-nous sur quels lots vous voulez enchérir. Et nous vous appelerons en temps et en heure pour faire les enchères avec vous par&nbsp;téléphone.
+						</p>
+
+						<p>
+							<span style="text-align: center; color: rgb(102, 102, 102);">Téléchargez le document pour votre&nbsp;</span><a href="UserFiles/Files/forms/Horta_Demande_d_Enchere_Telephonique.pdf" style="color: rgb(51, 51, 51); text-decoration-line: underline; background-color: rgb(255, 255, 255); letter-spacing: 0em; text-align: center;" target="_blank"><span style="color: rgb(102, 102, 102);">enchère&nbsp;téléphonique</span></a><span style="text-align: center; color: rgb(102, 102, 102);">&nbsp;à déposer ou renvoyer par email sur <a href="#" class="cryptedmail" data-name="info" data-domain="horta" data-tld="be"></a>
+
+</span>
+						</p>
+
+						<h3 style="margin-bottom: 0.5rem; font-weight: bold; color: rgb(105, 105, 105); font-size: 28px; padding-top: 1rem; padding-bottom: 0rem; text-align: left;"><span style="font-size: 20px;"><span style="font-size: 18px;"><span style="color: rgb(187, 148, 89);"><span style="font-size: 28px;">4.</span></span>&nbsp;Par Drouot</span></span></h3>
+
+						<p>
+							Vous pouvez enchérir directement depuis chez vous via la plateforme internet Drouot Live.<br />
+							N'oubliez pas de vous inscrire au préalable !
+						</p>
+
+						<p>
+							🌐&nbsp;<span style="text-align: center; color: rgb(102, 102, 102);">&nbsp;</span><a href="https://drouot.com/fr/auctioneer/922/hotel-de-ventes-horta" style="color: rgb(51, 51, 51); text-decoration-line: underline; background-color: rgb(255, 255, 255); letter-spacing: 0em; text-align: center;" target="_blank"><span style="color: rgb(102, 102, 102);">Live bidding Drouot.com</span></a><br />
+							<br />
+							<a href="default.asp?sCode=THESALE-FR" style="color: rgb(51, 51, 51); text-decoration-line: underline; background-color: rgb(255, 255, 255); letter-spacing: 0em; text-align: center;" target="_blank"><span style="color: rgb(102, 102, 102);">Détails sur l'achat&nbsp;&nbsp;</span></a>➜
+						</p>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+
+			<div align="center" class="div-logo-colaboration">
+				&nbsp;
+			</div>
+		</div>
+	</div>
+</div>
+</section>
+
+<div>
+	&nbsp;
+</div>
+ <!-- Footer--> <footer class="bg-dark pt-5">
+<div class="container">
+	<div class="row pb-2">
+		<div class="col-md-4 col-sm-6">
+			<div class="widget widget-links widget-light pb-2 mb-4 widget-footer">
+				<h3 class="widget-title text-light">Contactez-nous</h3>
+
+				<ul class="ulAddress list list-icons widget-list font-size-md text-light opacity-90">
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-map-marker fa-fw"></i>&nbsp;Avenue de Roodebeek 70-74<br />
+						<span style=" padding-left:24px;">B - 1030 Bruxelles, Belgique</span>
+					</li>
+					<li class="widget-list-item">
+						<span style=" padding-left:24px;">Direction: Dominique de Villegas</span>
+					</li>
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-phone-square fa-fw"></i>&nbsp;+32 2 741 60 60
+					</li>
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-envelope-o fa-fw"></i>&nbsp;<a href="#" class="cryptedmail" data-name="info" data-domain="horta" data-tld="be"></a>
+
+
+					</li>
+					<li class="widget-list-item">
+						<i class="fa fa-bar-chart fa-fw"></i>&nbsp;TVA: BE 0471.388.227
+					</li>
+					<li class="widget-list-item">
+						<i class="fa fa-university fa-fw"></i>&nbsp;IBAN BE95 7340 1117 9358
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="col-md-3 col-sm-6">
+			<div class="widget widget-links widget-light pb-2 mb-4 widget-footer">
+				<h3 class="widget-title text-light">Suivez-nous</h3>
+
+				<ul class="ulAddress list list-icons widget-list font-size-md text-light opacity-90">
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-instagram fa-fw"></i><a class="widget-list-link" href="https://www.instagram.com/hotel_de_ventes_horta/" style="display:inline;" target="_blank">Suivez Horta sur Instagram</a>
+					</li>
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-street-view fa-fw"></i><a class="widget-list-link" href="default.asp?sCode=GMVT-FR" style="display:inline;">Horta sur Google Street Virtual Tour</a>
+					</li>
+					<li class="widget-list-item">
+						<i class="fa fa-facebook-official fa-fw"></i><a class="widget-list-link" href="https://www.facebook.com/hoteldeventeshorta?fref=ts" style="display:inline;" target="_blank">Suivez Horta sur Facebook</a>
+					</li>
+					<li class="widget-list-item">
+						<img height="16" src="/UserFiles/Images/icon-drouot.png" width="16" /><a class="widget-list-link" href="https://drouot.com/fr/auctioneer/922/hotel-de-ventes-horta" style="display:inline;" target="_blank">Drouot Digital</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="col-md-5 col-sm-6">
+			<div class="widget widget-links widget-light pb-2 mb-4 widget-footer">
+				<p class="d-none d-sm-none d-md-block" style="text-align: center; max-width:400px; margin-left:auto; margin-right:auto;">
+					<iframe class="mj-w-res-iframe" frameborder="0" height="310" marginheight="0" marginwidth="0" scrolling="no" src="https://xylg.mj.am/wgt/xylg/p3k/form?c=9db23641 " width="450px !important"></iframe><script type="text/javascript" src=https://app.mailjet.com/pas-nc-embedded-v1.js></script>
+				</p>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="pt-5 bg-darker">
+	<div class="container">
+		<table border="0" cellspacing="5" class="foot-tabel">
+			<tbody>
+				<tr>
+					<td valign="top">
+					<p>
+						<a href="http://www.auctions-in-belgium.be/default.asp?sCode=CALBYSDV-FR&amp;MemberID=19" target="_blank"><img alt="Lot 1" class="rounded-circle" src="/UserFiles/Images/logo_veilingzalen_200.jpg" style="width: 120px; height: 120px; float: left; margin-right: 10px;" /></a>
+					</p>
+					</td>
+					<td valign="top">
+					<p>
+						&nbsp;
+					</p>
+
+					<p>
+						Membre de la Chambre Royale Belgo-Luxembourgeoise des Salles de Ventes
+					</p>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<div class="pb-4 font-size-xs text-light opacity-50 text-center text-md-right">
+			Hôtel de Ventes Horta © 2026
+		</div>
+	</div>
+</div>
+</footer>
+
+ <!-- Toolbar for handheld devices--> <div class="cz-handheld-toolbar"> <div class="d-table table-fixed w-100"> <a class="d-table-cell cz-handheld-toolbar-item" href="#navbarCollapse" data-toggle="collapse" onClick="window.scrollTo(0, 0)"> <span class="cz-handheld-toolbar-icon"><i class="czi-menu"></i></span> <span class="cz-handheld-toolbar-label">Menu</span></a> </div> </div> <!-- Back To Top Button--> <a class="btn-scroll-top" href="#top" data-scroll><span class="btn-scroll-top-tooltip text-muted font-size-sm mr-2">Top</span><i class="btn-scroll-top-icon czi-arrow-up"> </i></a>  <!-- JavaScript libraries, plugins and custom scripts--> <script src="js/currencyFormatter/currencyFormatter.js" ></script> <script src="UserFiles/templates/Cartzilla/dist/js/theme.min.js"></script> <script src="UserFiles/templates/Cartzilla/dist/js/prism.min.js"></script> <script type="text/javascript" id="cookieinfo" src="js/cookieinfo.min.js" data-bg="#1c2535" data-fg="#FFFFFF" data-link="#F1D600" data-cookie="CookiesPreferences" data-expires=";max-age=7890000" //90 days data-text-align="left" data-message="<p class='cookiesfr'>Ce site utilise des Cookies pour améliorer votre expérience. </p> <p class='cookiesnl'>Deze site gebruikt cookies om uw surfervaring gemakkelijker en aangenamer te maken. Door « Ik begrijp het » te klikken, geeft u aan dat u akkoord gaat met ons </p> <p class='cookiesen'>This website uses cookies to improve your experience. By clicking « Got it », you indicate that you agree with our </p>" data-linkmsg="<p class='cookiesfr'><a href='default.asp?sCode=COOKIEPOLICY-FR#tab2'>Vous pouvez consulter notre politique de Cookies et en modifier les paramètres</a></p> <p class='cookiesnl'><a href='default.asp?sCode=COOKIEPOLICY-FR#tab2'>persoonlijke gegevens en cookiebeheerbeleid</a></p> <p class='cookiesen'><a href='default.asp?sCode=COOKIEPOLICY-FR#tab2'>privacy and cookies policy</a></p>" data-moreinfo="" data-scriptmsg="" data-close-text="<p class='cookiesfr'>Autoriser tous les Cookies</p><p class='cookiesnl'>Ik begrijp het!</p><p class='cookiesen'>Got it!</p>" > </script>   </body> </html> 

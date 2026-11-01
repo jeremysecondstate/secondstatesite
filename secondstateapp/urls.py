@@ -1,4 +1,4 @@
-from django.urls import include, path
+from django.urls import path
 
 from . import (
     bid_board_views,
@@ -6,14 +6,13 @@ from . import (
     capital_dashboard_views,
     catalog_api_views,
     ordering_views,
+    research_queue_views,
     upload_safe_views,
     watchlist_shared_views,
     views,
 )
 
 urlpatterns = [
-    path("inventory/", include("secondstateapp.inventory_urls")),
-    path("coordinate/", include("secondstateapp.coordinate_urls")),
     path("", views.home, name="home"),
     path("about/", views.about, name="about"),
     path("contact/", views.contact, name="contact"),
@@ -26,6 +25,11 @@ urlpatterns = [
     path("u/<str:username>/", views.public_profile, name="public_profile"),
     path("capital-dashboard/", capital_dashboard_views.capital_dashboard, name="capital_dashboard"),
     path("calendar/", calendar_views.auction_calendar, name="auction_calendar"),
+    path("calendar/research-queue/", research_queue_views.auction_research_queue, name="auction_research_queue"),
+    path("calendar/research-queue/selection/<int:lot_id>/", research_queue_views.research_queue_selection, name="research_queue_selection"),
+    path("calendar/research-queue/selection/<int:lot_id>/", research_queue_views.research_queue_selection, name="auction_research_queue_selection"),
+    path("calendar/research-queue/items/<int:lot_id>/", research_queue_views.auction_research_queue_item, name="auction_research_queue_item"),
+    path("calendar/research-queue/worker/", research_queue_views.research_queue_worker, name="research_queue_worker"),
     path("calendar/usd-prices/", calendar_views.auction_calendar_usd_prices, name="auction_calendar_usd_prices"),
     path("calendar/sync/", calendar_views.sync_auction_calendar, name="auction_calendar_sync"),
     path("calendar/watchlist/", watchlist_shared_views.shared_artist_watchlist, name="shared_artist_watchlist"),

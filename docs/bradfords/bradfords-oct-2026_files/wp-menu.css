@@ -1,0 +1,194 @@
+.navbar-primary .nav-link,
+.navbar-primary .menu-item {
+    font-family: 'Montserrat',sans-serif;
+}
+
+.wp-default-menu {
+    /*position: relative;*/
+}
+
+.wp-default-menu > .menu-item {
+    margin-right: 1.5rem;
+    position: static;
+}
+
+.wp-default-menu > .menu-item a {
+    font-size: 1rem;
+    padding: 0;
+    color: #515a5a;
+    font-weight: 500;
+    position: relative;
+    border: 0;
+    letter-spacing: 1px;
+    display: block;
+    z-index: 1;
+}
+.wp-default-menu > .menu-item > a:hover,
+.wp-default-menu .sub-menu a:hover {
+    text-decoration: none;
+}
+
+.wp-default-menu > .menu-item > a:before {
+    content: "";
+    height: 0;
+    width: 0;
+    position: absolute;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: auto;
+    border-bottom: 3px solid #515a5a;
+    transition: all .3s ease-in-out;
+    display: block;
+    border-top: 0 solid transparent;
+    border-right: 0 solid transparent;
+    border-left: 0 solid transparent;
+}
+
+.wp-default-menu .sub-menu {
+    padding: 6.25rem 12.5rem;
+    background-color: #efefef;
+    border: 0;
+    margin: 0;
+    width: 100%;
+    border-radius: 0;
+    top: 100%;
+    left: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: none;
+    max-height: none;
+    position: absolute;
+    display: none;
+	
+	/* fix for disappearing menu in Safari */
+	transform: translateZ(0);
+    will-change: transform;
+}
+
+.wp-default-menu .sub-menu.show {
+    display: flex;
+}
+
+.wp-default-menu .sub-menu li{
+    list-style-type: none;
+}
+.wp-default-menu .sub-menu a {
+    color: #515a5a;
+    width: auto;
+    padding: 0.25rem 0 0.5rem;
+    position: relative;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+.wp-default-menu .sub-menu a:before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    border-bottom: 3px solid #3C4F57;
+    height: 0;
+    top: auto;
+    display: block;
+    transition: all .3s cubic-bezier(.23, .67, .83, .67);
+}
+
+.wp-default-menu .sub-menu li:hover a:before {
+    width: 100%;
+}
+
+@media (min-width: 992px) {
+    .wp-default-menu > .menu-item:hover > a:before {
+        width: 100%;
+    }
+
+    .wp-default-menu .sub-menu a {
+        background-color: transparent;
+    }
+}
+
+@media only screen and (max-width: 1200px) {
+    .wp-default-menu > .menu-item {
+        margin-right: 1rem;
+    }
+
+    .wp-default-menu > .menu-item a {
+        font-size: .8rem;
+    }
+
+    .wp-default-menu .sub-menu {
+        padding: 5rem 9.375rem;
+    }
+}
+@media only screen and (min-width: 1600px) {
+    .wp-default-menu > .menu-item {
+      margin-right: 24px;
+    }
+}
+
+@media only screen and (max-width: 991px){
+    .wp-default-menu {
+        display: flex;
+        flex-direction: column;
+        padding-left: 0;
+        margin-bottom: 0;
+        list-style: none;
+    }
+    .wp-default-menu > .menu-item {
+        margin-right: 0.5rem;
+    }
+    .wp-default-menu > .menu-item a {
+        color: #fff;
+        position: relative;
+        border: 0;
+        padding: 0.75rem 0;
+        display: block;
+        z-index: 1;
+        font-size: 1rem;
+        font-weight: 400;
+    }
+    .wp-default-menu .sub-menu a:before{
+        display: none;
+    }
+    .wp-default-menu .sub-menu {
+        border: 0;
+        margin: 0;
+        width: 100%;
+        border-radius: 0;
+        top: auto;
+        padding: 2.5%;
+        flex-direction: column;
+        align-items: flex-start;
+        background-color: transparent;
+        position: static;
+        float: none;
+    }
+    .wp-default-menu .sub-menu a{
+        padding: 0.25rem 1.5rem;
+    }
+    .wp-default-menu > .menu-item.menu-item-has-children > a::after {
+        display: inline-block;
+        margin-left: 0.255em;
+        vertical-align: 0.255em;
+        content: "";
+        border-top: 0.3em solid;
+        border-right: 0.3em solid transparent;
+        border-bottom: 0;
+        border-left: 0.3em solid transparent;
+    }
+}
+.text-dark .menu-item a {
+    color: #000 !important;
+}
+.text-dark .menu-item > a::before {
+    border-color: #000 !important;
+}
+.text-white .menu-item a {
+    color: #fff !important;
+}
+.text-white .menu-item > a::before {
+    border-color: #fff !important;
+}

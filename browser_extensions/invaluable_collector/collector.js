@@ -15,7 +15,7 @@ function render(run) {
   byId("run-status").textContent = run?.status || "No run";
   byId("message").textContent = run?.note || "Import your bookmarks to begin.";
   byId("message").classList.remove("error");
-  byId("counts").textContent = run ? `${run.progress.filter((row) => row.status === "captured").length} of ${run.watches.length} artists captured · ${run.snapshot_count} pages · ${run.lot_count} lot records · ${(run.bytes / 1048576).toFixed(2)} of 7 MB` : "";
+  byId("counts").textContent = run ? `${run.progress.filter((row) => row.status === "captured").length} of ${run.watches.length} searches captured · ${run.snapshot_count} pages · ${run.lot_count} lot records · ${(run.bytes / 1048576).toFixed(2)} of 7 MB` : "";
   byId("progress").replaceChildren();
   for (const row of run?.progress || []) {
     const tr = document.createElement("tr"); tr.dataset.status = row.status;
@@ -49,17 +49,22 @@ byId("bookmarks").addEventListener("change", async () => {
     const file = byId("bookmarks").files[0];
     if (!file) return;
     if (file.size > 16 * 1024 * 1024) throw new Error("The bookmark export exceeds 16 MB.");
-    // Extract only anchor href attributes. Never parse the supplied document's
+    // Extract only anchor URLs and labels. Never parse the supplied document's
     // resource tags, execute its markup, or insert it into the visible page.
     const html = await file.text();
-    const hrefs = [];
+    const entries = [];
     const decoder = document.createElement("textarea");
-    for (const match of html.matchAll(/<a\b(?:[^>"']|"[^"]*"|'[^']*')*?\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) {
+    for (const match of html.matchAll(/<a\b(?:[^>"']|"[^"]*"|'[^']*')*?\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')(?:[^>"']|"[^"]*"|'[^']*')*>([\s\S]*?)<\/a\s*>/gi)) {
       decoder.innerHTML = match[1] ?? match[2];
-      hrefs.push(decoder.value);
+      const url = decoder.value;
+      decoder.innerHTML = match[3].replace(/<[^>]*>/g, "");
+      entries.push({ url, title: decoder.value });
     }
-    selectedURLs = rules.normalizeWatches(hrefs).map((entry) => entry.url);
-    byId("bookmark-note").textContent = `${selectedURLs.length} supported Invaluable artist searches selected. Sorted by ending soon. Saved source date filters are removed; Studio applies your chosen import window.`;
+    const watches = rules.normalizeWatches(rules.selectIntakeBookmarks(entries));
+    selectedURLs = watches.map((entry) => entry.url);
+    const artistCount = new Set(watches.flatMap((entry) => entry.artists)).size;
+    const hasBulk = watches.some((entry) => entry.artists.length > 1);
+    byId("bookmark-note").textContent = `${selectedURLs.length} ${hasBulk ? "bulk " : ""}searches covering ${artistCount} artists selected.${hasBulk ? " Individual links and older bulk lists are skipped when the four named lists are present." : ""} Sorted by ending soon. Studio applies your chosen date window.`;
     render(currentRun);
   } catch (error) { selectedURLs = []; render(currentRun); showError(error); }
 });

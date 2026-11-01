@@ -86,6 +86,10 @@ class Element {
   addEventListener(name, callback) { (this.events[name] ||= []).push(callback); }
   async dispatch(name, event = {}) { for (const callback of this.events[name] || []) await callback({target: this, ...event}); }
   contains(node) { return this === node || this.children.some(child => child.contains?.(node)); }
+  querySelectorAll(selector) {
+    const tags = selector.split(",").map(tag => tag.trim());
+    return descendants(this).filter(node => tags.includes(node.tagName));
+  }
   focus() { this.focused = true; }
   checkValidity() { return this.valid; }
   reportValidity() { this.reported = true; return this.valid; }
@@ -119,6 +123,37 @@ test("draft restoration retains typed evidence but never restores verification c
   assert.equal(p.paste.value, pasteText());
   assert.equal(p.confirmed.checked, false);
   assert.equal(p.confirmed.required, true);
+});
+
+test("auction archive conversion requests original hammer and historical proof while preserving source identity", async () => {
+  const p = page();
+  p.fields.source_kind.value = "auction_archive";
+  await p.fields.source_kind.dispatch("change");
+  assert.equal(p.fields.price_mode.disabled, false);
+  p.fields.price_mode.value = "historical_fx";
+  p.fields.hammer_usd.value = "9999";
+  await p.fields.price_mode.dispatch("change");
+  assert.equal(p.fields.hammer_usd.disabled, true);
+  assert.equal(p.fields.hammer_usd.required, false);
+  assert.equal(p.fields.hammer_usd.value, "");
+  for (const key of ["original_hammer", "original_currency", "fx_rate", "fx_direction", "fx_date", "fx_source_url"]) assert.equal(p.fields[key].required, true, key);
+  assert.equal(p.confirmed.checked, false);
+  assert.equal(JSON.parse(p.storage.get("test-draft")).fields.source_kind, "auction_archive");
+  assert.equal(JSON.parse(p.storage.get("test-draft")).fields.price_mode, "historical_fx");
+  p.fields.source_kind.value = "liveart_web";
+  await p.fields.source_kind.dispatch("change");
+  assert.equal(p.fields.price_mode.value, "source_usd");
+  assert.equal(p.fields.hammer_usd.required, true);
+  assert.equal(p.fields.fx_rate.required, false);
+  assert.equal(p.fields.fx_rate.disabled, true);
+});
+
+test("historical conversion paste preserves the rate precision, direction and source URL", () => {
+  const parsed = parsePaste("Evidence source: auction_archive\nUSD price basis: historical_fx\nHistorical exchange rate: 1.3624\nExchange-rate direction: original_per_usd\nExchange-rate date: 2024-06-12\nExchange-rate source URL: https://bank.example/rate?date=2024-06-12");
+  assert.equal(parsed.source_kind, "auction_archive");
+  assert.equal(parsed.fx_rate, "1.3624");
+  assert.equal(parsed.fx_direction, "original_per_usd");
+  assert.equal(parsed.fx_source_url, "https://bank.example/rate?date=2024-06-12");
 });
 
 test("editing or filling a paste resets source confirmation and persists the new draft", async () => {
@@ -209,29 +244,42 @@ test("a repeated source uses the existing sale and tells the user it was already
   assert.equal(p.fields.title.value, "");
 });
 
-function integration({response = {}, failure = null, busy = false} = {}) {
+function integration({response = {}, failure = null, busy = false, withForm = false} = {}) {
   const template = fs.readFileSync(path.join(__dirname, "../templates/calendar/calendar.html"), "utf8");
   const start = template.indexOf("    const applyManualResearch = (payload) => {");
   const end = template.indexOf("    registerLotInstance(liveartAnalysisInstances", start);
   assert(start !== -1 && end > start, "Production manual entry integration must be present");
   const requests = [];
   const originalCandidates = [{id: "old-api", provider: "LiveArt"}];
-  const webGroup = {};
+  const webGroup = {open: false};
+  const archiveGroup = {open: false};
+  const storage = new Map();
   const context = vm.createContext({
     window: {LiveArtManualEntry: {mount(_section, options) { context.entryOptions = options; }}},
     document: {createElement: tag => new Element(tag)},
-    section: {}, lot: {id: 3588, artist: sample.artist, liveart_analysis_url: "/calendar/lots/3588/liveart-analysis/"},
+    section: withForm ? new Element("section") : {}, lot: {id: 3588, artist: sample.artist, liveart_analysis_url: "/calendar/lots/3588/liveart-analysis/"},
     options: {idPrefix: "research-"},
     archiveDraftKey: (id, key) => `${id}:${key}`, csrfToken: "local-csrf", load: async () => {},
-    loaded: true, busy, pendingSourceRefresh: false, currentResearchId: "previous-token",
+    loaded: true, busy, pendingSourceRefresh: false, refreshQueued: false, currentResearchId: "previous-token",
+    manualEntryControl: null,
+    sessionStorage: {getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key)},
     selectedIds: new Set(["old-api"]), currentCandidates: originalCandidates,
     researchRetrievedAt: "old-time", hasResearch: true, currentSearchInfo: {}, subjectNeedsChoice: false,
     setBusy(value) { context.busy = value; },
     async requestAnalysisJson(url, options) { requests.push({url, options}); if (failure) throw failure; return response; },
     sourceMeta: {}, describeSources: () => "Sources", renderCandidates(matches) { context.renderedMatches = matches; },
-    candidateResults: {querySelector: () => webGroup},
+    candidateResults: {querySelectorAll: () => [], querySelector: selector => selector === '[data-group="liveart_web"]' ? webGroup
+      : selector === '[data-group="auction_archive"]' ? archiveGroup : null},
+    subjectResults: {querySelectorAll: () => []}, updateButtons() {},
     markAnalysisPending(message) { context.pendingMessage = message; }, setStatus(message, tone) { context.statusMessage = message; context.statusTone = tone; },
   });
+  if (withForm) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "static/secondstateapp/liveart_manual_entry.js"), "utf8"), context);
+    const busyStart = template.indexOf("    const syncBusyControls = () => {");
+    const busyEnd = template.indexOf("    const applyAnalysis =", busyStart);
+    assert(busyStart >= 0 && busyEnd > busyStart, "Production busy-state integration must be present");
+    vm.runInContext(template.slice(busyStart, busyEnd), context);
+  }
   vm.runInContext(template.slice(start, end), context);
   const mountRemove = (candidate, confirmed = true) => {
     const removeStart = template.indexOf('      if (candidate.entry_method === "manual_web") {');
@@ -243,7 +291,17 @@ function integration({response = {}, failure = null, busy = false} = {}) {
     vm.runInContext(template.slice(removeStart, removeEnd), context);
     return context.top.children[0];
   };
-  return Object.assign(context, {requests, originalCandidates, webGroup, mountRemove});
+  const mountedNodes = withForm ? descendants(context.section) : [];
+  return Object.assign(context, {
+    requests, originalCandidates, webGroup, archiveGroup, mountRemove, storage,
+    run: expression => vm.runInContext(expression, context),
+    fields: Object.fromEntries(mountedNodes.filter(node => node.name).map(node => [node.name, node])),
+    formBody: mountedNodes.find(node => node.className === "liveart-manual-body"),
+    formExtra: mountedNodes.find(node => node.className === "liveart-manual-extra"),
+    formConfirmed: mountedNodes.find(node => node.type === "checkbox"),
+    formAdd: mountedNodes.find(node => node.tagName === "button" && node.textContent === "Add sale for review"),
+    formStatus: mountedNodes.find(node => node.attributes.role === "status"),
+  });
 }
 
 test("Workbench add submits current selections/token to manual analysis without an API search or automatic save", async () => {
@@ -265,9 +323,48 @@ test("Workbench add submits current selections/token to manual analysis without 
   assert.equal(p.currentResearchId, "new-token");
   assert.deepEqual([...p.selectedIds], ["old-api"]);
   assert.equal(p.webGroup.open, true);
+  assert.equal(p.archiveGroup.open, false, "adding a LiveArt sale does not open the archive section");
   assert.match(p.pendingMessage, /not saved yet/);
   assert.equal(p.busy, false);
   assert.equal(result, payload);
+});
+
+test("adding the first archive sale opens its collapsed section without opening the LiveArt section", async () => {
+  const payload = {
+    candidates: [{id: "old-api", provider: "LiveArt"},
+      {id: "old-web", provider: "LiveArt", match_type: "liveart_web", entry_method: "manual_web"},
+      {id: 42, provider: "Auction archive", match_type: "auction_archive", entry_method: "manual_web"}],
+    selected_ids: ["old-api"], research_id: "archive-token", added_id: "42", subject_matches: [],
+  };
+  const p = integration({response: payload});
+  assert.equal(p.archiveGroup.open, false);
+  await p.entryOptions.onAdd({...sample, source_kind: "auction_archive"});
+  assert.equal(p.archiveGroup.open, true);
+  assert.equal(p.webGroup.open, false);
+  assert.deepEqual([...p.selectedIds], ["old-api"], "opening the new section does not select its evidence");
+  assert.equal(p.currentCandidates, payload.candidates);
+  assert.equal(p.currentResearchId, "archive-token");
+  assert.equal(p.requests.length, 1);
+  assert.equal(JSON.parse(p.requests[0].options.body).action, "add_manual");
+  assert.match(p.pendingMessage, /not saved yet/);
+});
+
+test("a duplicate archive sale reopens its own section and preserves existing evidence selections", async () => {
+  const candidates = [{id: "old-api", provider: "LiveArt"},
+    {id: "archive-existing", provider: "Auction archive", match_type: "auction_archive", entry_method: "manual_web"}];
+  const payload = {candidates, selected_ids: ["old-api", "archive-existing"],
+    research_id: "duplicate-token", added_id: "archive-existing", duplicate: true};
+  const p = integration({response: payload});
+  p.currentCandidates = candidates;
+  p.selectedIds = new Set(payload.selected_ids);
+  const result = await p.entryOptions.onAdd({...sample, source_kind: "auction_archive"});
+  assert.equal(result.duplicate, true);
+  assert.equal(p.archiveGroup.open, true);
+  assert.equal(p.webGroup.open, false);
+  assert.equal(p.currentCandidates, candidates);
+  assert.deepEqual([...p.selectedIds], ["old-api", "archive-existing"]);
+  assert.deepEqual(JSON.parse(p.requests[0].options.body).selected_ids, ["old-api", "archive-existing"]);
+  assert.equal(p.requests.length, 1, "revealing the existing sale does not issue a second request");
 });
 
 test("failed manual request preserves prior evidence and token, and always re-enables controls", async () => {
@@ -360,4 +457,93 @@ test("a pending removal is protected from a second click", async () => {
   assert.equal(p.busy, false);
   assert.equal(p.currentCandidates.length, 0);
   assert.match(p.pendingMessage, /not saved yet/);
+});
+
+const formValues = p => Object.fromEntries(Object.entries(p.fields).map(([key, field]) => [key, field.value]));
+const fxFields = ["fx_rate", "fx_direction", "fx_date", "fx_source_url"];
+
+test("failed archive-FX add restores mode-disabled controls without changing the form or draft", async () => {
+  let rejectRequest;
+  const response = new Promise((_resolve, reject) => { rejectRequest = reject; });
+  const p = integration({withForm: true, response});
+  p.fields.source_kind.value = "auction_archive";
+  await p.fields.source_kind.dispatch("change");
+  p.fields.price_mode.value = "historical_fx";
+  await p.fields.price_mode.dispatch("change");
+  const values = {...sample, hammer_usd: "", provider_url: "https://auction.example/lot/42",
+    original_hammer: "3000", original_currency: "CHF", fx_rate: "0.9024",
+    fx_direction: "original_per_usd", fx_date: "2024-05-22", fx_source_url: "https://bank.example/rate"};
+  for (const [key, value] of Object.entries(values)) p.fields[key].value = value;
+  await p.formBody.dispatch("input", {target: p.fields.fx_rate});
+  p.formExtra.open = false;
+  p.formConfirmed.checked = true;
+  const beforeValues = formValues(p), beforeDraft = p.storage.get("3588:manual-sale");
+  const pending = p.formAdd.dispatch("click");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(p.requests.length, 1);
+  assert(p.section.querySelectorAll("button, input, textarea, select").every(control => control.disabled));
+  rejectRequest(new Error("Archive entry could not be saved."));
+  await pending;
+  assert.equal(p.fields.hammer_usd.disabled, true);
+  assert.equal(p.fields.price_mode.disabled, false);
+  for (const key of fxFields) assert.equal(p.fields[key].disabled, false, key);
+  assert.equal(p.fields.title.disabled, false);
+  assert.deepEqual(formValues(p), beforeValues);
+  assert.equal(p.storage.get("3588:manual-sale"), beforeDraft);
+  assert.equal(p.formConfirmed.checked, true, "restoring disabled states must not revoke a checked confirmation");
+  assert.equal(p.formExtra.open, false, "restoring disabled states must not reopen collapsed details");
+  assert.equal(p.formStatus.textContent, "Archive entry could not be saved.");
+});
+
+test("failed LiveArt add keeps price mode and hidden FX inputs disabled", async () => {
+  const p = integration({withForm: true, failure: new Error("LiveArt entry could not be saved.")});
+  for (const [key, value] of Object.entries(sample)) p.fields[key].value = value;
+  await p.formBody.dispatch("input", {target: p.fields.title});
+  p.formExtra.open = false;
+  p.formConfirmed.checked = true;
+  const beforeValues = formValues(p), beforeDraft = p.storage.get("3588:manual-sale");
+  await p.formAdd.dispatch("click");
+  assert.equal(p.requests.length, 1);
+  assert.equal(p.fields.price_mode.disabled, true);
+  assert.equal(p.fields.hammer_usd.disabled, false);
+  for (const key of fxFields) assert.equal(p.fields[key].disabled, true, key);
+  assert.equal(p.fields.title.disabled, false);
+  assert.deepEqual(formValues(p), beforeValues);
+  assert.equal(p.storage.get("3588:manual-sale"), beforeDraft);
+  assert.equal(p.formConfirmed.checked, true);
+  assert.equal(p.formExtra.open, false);
+  assert.equal(p.formStatus.textContent, "LiveArt entry could not be saved.");
+});
+
+test("parent or child busy state overrides mode controls until both become idle", async () => {
+  const p = integration({withForm: true});
+  p.fields.source_kind.value = "auction_archive";
+  await p.fields.source_kind.dispatch("change");
+  p.fields.price_mode.value = "historical_fx";
+  await p.fields.price_mode.dispatch("change");
+  p.formExtra.open = false;
+  p.formConfirmed.checked = true;
+  const beforeValues = formValues(p), beforeDraft = p.storage.get("3588:manual-sale");
+  let parentBusy = true;
+  p.options.isParentBusy = () => parentBusy;
+  for (const childBusy of [true, false]) {
+    p.busy = childBusy;
+    p.run("syncBusyControls()");
+    assert(p.section.querySelectorAll("button, input, textarea, select").every(control => control.disabled));
+  }
+  parentBusy = false;
+  p.busy = true;
+  p.run("syncBusyControls()");
+  assert(p.section.querySelectorAll("button, input, textarea, select").every(control => control.disabled));
+  p.busy = false;
+  p.run("syncBusyControls()");
+  assert.equal(p.fields.hammer_usd.disabled, true);
+  assert.equal(p.fields.price_mode.disabled, false);
+  for (const key of fxFields) assert.equal(p.fields[key].disabled, false, key);
+  assert.equal(p.formAdd.disabled, false);
+  assert.deepEqual(formValues(p), beforeValues);
+  assert.equal(p.storage.get("3588:manual-sale"), beforeDraft);
+  assert.equal(p.formConfirmed.checked, true);
+  assert.equal(p.formExtra.open, false);
+  assert.equal(p.requests.length, 0);
 });

@@ -1,0 +1,141 @@
+
+<style>
+	.link_a {
+		position:relative;left:25px;
+		text-decoration: none!important;
+	}
+	.link_img { 
+		width:15px;
+		height:15px;
+	}
+</style>
+
+<div class="kolom44auto">
+	<div class="listingbalk" style="padding:5px 10px;">
+		<div class="content">
+			<form name="details" method="get">
+				
+				<input type="hidden" name="veil" value="">
+				<input type="hidden" name="lijst" value="">
+				<input type="hidden" name="zitting" value="">
+				
+				<!--------AANTAL LOTEN------------>
+				<div class="kolom14first">
+					<div class="labeldropdown hidemobile" style="margin: 10px 10px 10px 0 !important;">Aantal loten: 3</div>
+				</div>
+				
+				<!--------LOTEN RANGE------------>
+				<div class="kolom14">
+					
+					<div class="labeldropdown" style="margin: 10px 10px 10px 0 !important;">Pagina:</div><div class="dropdown" style="margin: 2px 0 2px !important;"><select name="paginatonen" onchange="do_pagina()"><option value="0" selected >1</option></select><div class="select_arrow"></div></div>					
+				</div>
+				
+				<!--------SORTERING------------>
+				<div class="kolom14sortering">
+					<div class="labeldropdown" style="margin: 10px 10px 10px 0 !important;">Sortering:</div> 
+					<div class="dropdown" style="margin: 2px 0 2px !important;">
+						<select name="sort_method" onchange="do_sort()">
+							<option value="0"  selected >Op lotnummer</option>
+							<option value="1" >Auteur A-Z</option>
+							<option value="2" >Auteur Z-A</option>
+							<option value="3" >Prijs stijgend</option>
+							<option value="4" >Prijs dalend</option>
+						</select>
+						<div class="select_arrow"></div>
+					</div>
+				</div>
+				
+				<!--------GALLERIJ------------>
+				<div class="kolom14 lastchild">
+					<div class="labeldropdown hidemobile" style="margin: 10px 10px 10px 0 !important; display:flex; gap:0.5rem;">
+						Galerij:<a href="javascript:lijst=0;update_ajax()"><i class="fa fa-th fa-1x" aria-hidden="true" style="color:red"></i></a><span> | </span>Lijst:<a href="javascript:lijst=1;update_ajax()"><i class="fa fa-list fa-1x" aria-hidden="true" style="color:black"></i></a>
+					</div>
+				</div>
+				
+			</form>	
+		</div>
+	</div>
+</div>
+<div class="gridwrapper" id="lot-grid">
+			
+					<div class="gridblokdetail">
+				<div class="gridbeeld">
+					<a href="/veilingen/veilingen-detail?verkocht=0&veil=
+					c1114&item=743&zitting=5"><span class="rollover"></span>
+						<img src="/catalog/image_out/c1114/Thumb/1500.jpg">
+					</a>
+				</div>
+				
+				<a href="/veilingen/veilingen-detail?verkocht=0&veil=
+				c1114&item=743" style="color:black">
+					
+					<div class="gridcontent">
+						<div class="content">
+							<h3>
+								Lot 1500															</h3>
+							
+							<p><span class="bold">
+								PAUL DELVAUX (1894-1994)							</span></p>
+							<p>
+								Zonder titel. Potlood.							</p>
+							<p>Schatting: &euro; 800 - 1200</p><p class="red">Hamerprijs: &euro; 400</p>						</div>
+					</div>
+				</a>
+			</div>
+						
+				
+					<div class="gridblokdetail">
+				<div class="gridbeeld">
+					<a href="/veilingen/veilingen-detail?verkocht=0&veil=
+					c1114&item=806&zitting=5"><span class="rollover"></span>
+						<img src="/catalog/image_out/c1114/Thumb/1561.jpg">
+					</a>
+				</div>
+				
+				<a href="/veilingen/veilingen-detail?verkocht=0&veil=
+				c1114&item=806" style="color:black">
+					
+					<div class="gridcontent">
+						<div class="content">
+							<h3>
+								Lot 1561															</h3>
+							
+							<p><span class="bold">
+								PAUL DELVAUX (1894-1994)							</span></p>
+							<p>
+								'Les derniers beaux jours', 1978.. Ets gehoogd met aquarel.							</p>
+							<p>Schatting: &euro; 800 - 1200</p><p class="red">Hamerprijs: &euro; 950</p>						</div>
+					</div>
+				</a>
+			</div>
+						
+				
+					<div class="gridblokdetail">
+				<div class="gridbeeld">
+					<a href="/veilingen/veilingen-detail?verkocht=0&veil=
+					c1114&item=788&zitting=5"><span class="rollover"></span>
+						<img src="/catalog/image_out/c1114/Thumb/1562.jpg">
+					</a>
+				</div>
+				
+				<a href="/veilingen/veilingen-detail?verkocht=0&veil=
+				c1114&item=788" style="color:black">
+					
+					<div class="gridcontent">
+						<div class="content">
+							<h3>
+								Lot 1562															</h3>
+							
+							<p><span class="bold">
+								PAUL DELVAUX (1894-1994)							</span></p>
+							<p>
+								'Le Laid', 1978.. Reeks van vier etsen op keizerlijk Japans, gehoogd imet aquarel.							</p>
+							<p>Schatting: &euro; 4000 - 6000</p><p class="red">Hamerprijs: &euro; 2400</p>						</div>
+					</div>
+				</a>
+			</div>
+						
+		</div>
+
+<div class="bottom-nav" style="clear:both"></div>
+

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from html.parser import HTMLParser
 from pathlib import Path
 import re
@@ -264,6 +264,90 @@ def _folder_selected(path: tuple[str, ...], selected_folders: set[str] | None) -
     return full_path in folded or any(part.casefold() in folded for part in path)
 
 
+def invaluable_search_artists(url: str) -> tuple[str, ...]:
+    """Return every explicit artist facet, never a bulk search's first artist."""
+    try:
+        canonical = canonicalize_bookmark_url(url)
+        parts = urlsplit(canonical)
+    except ValueError:
+        return ()
+    if source_for_url(canonical) != "Invaluable" or parts.path.casefold() != "/search":
+        return ()
+    return tuple(sorted({value.strip() for key, value in parse_qsl(parts.query)
+                         if key.casefold() in {"artist", "artistname"} and value.strip()}, key=str.casefold))
+
+
+INVALUABLE_INTAKE_BULK_TITLES = ("BULK-1A", "BULK-1B", "BULK-2A", "BULK-2B")
+
+
+def select_invaluable_intake_entries(entries: Iterable[BookmarkEntry]) -> list[BookmarkEntry]:
+    """Prefer the complete named split while retaining singles and other sources.
+
+    Old exports keep their original behavior. A partial or conflicting named
+    split must be repaired instead of silently falling back to older searches.
+    Select before applying folder filters so a folder picker can intentionally
+    choose just one part of a complete export.
+    """
+    entries = list(entries)
+    named: dict[str, set[str]] = {}
+    for entry in entries:
+        title = entry.title.strip().upper()
+        if title not in INVALUABLE_INTAKE_BULK_TITLES:
+            continue
+        try:
+            parts = urlsplit(entry.url)
+            public_search = (len(entry.url) <= 8192 and parts.scheme == "https"
+                             and parts.hostname in {"invaluable.com", "www.invaluable.com"}
+                             and parts.username is None and parts.password is None
+                             and parts.port in {None, 443})
+        except ValueError:
+            public_search = False
+        if not public_search or len(invaluable_search_artists(entry.url)) < 2:
+            raise ValueError(f"{title} must contain a valid multi-artist Invaluable search.")
+        named.setdefault(title, set()).add(canonicalize_bookmark_url(entry.url))
+    if not named:
+        return entries
+    missing = [title for title in INVALUABLE_INTAKE_BULK_TITLES if title not in named]
+    if missing:
+        raise ValueError("The split Invaluable intake is incomplete; missing " + ", ".join(missing) + ".")
+    conflicting = [title for title, urls in named.items() if len(urls) != 1]
+    if conflicting:
+        raise ValueError("The split Invaluable intake has conflicting searches named " + ", ".join(conflicting) + ".")
+    return [entry for entry in entries
+            if len(invaluable_search_artists(entry.url)) < 2
+            or entry.title.strip().upper() in INVALUABLE_INTAKE_BULK_TITLES]
+
+
+def expand_invaluable_bulk_entries(entries: Iterable[BookmarkEntry]) -> list[BookmarkEntry]:
+    """Register each bulk facet as its own watch, preserving all other filters.
+
+    The capture keeps its original bulk source URL as evidence. Desktop watches
+    use individual URLs so cached membership and refreshes cannot attribute an
+    entire bulk search to one artist. Distinct scopes (for example all categories
+    versus Prints) remain separate watches, even for the same artist.
+    """
+    expanded: list[BookmarkEntry] = []
+    seen: set[str] = set()
+    for entry in entries:
+        artists = invaluable_search_artists(entry.url)
+        candidates = [entry]
+        if len(artists) > 1:
+            parts = urlsplit(canonicalize_bookmark_url(entry.url))
+            filters = [(key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True)
+                       if key.casefold() not in {"artist", "artistname"}]
+            candidates = [replace(
+                entry, artist=normalize_artist_label(artist), title=f"{artist}: Invaluable",
+                source="Invaluable", url=canonicalize_bookmark_url(urlunsplit((
+                    parts.scheme, parts.netloc, parts.path, urlencode([*filters, ("artistName", artist)]), "",
+                ))),
+            ) for artist in artists]
+        for candidate in candidates:
+            if candidate.url not in seen:
+                seen.add(candidate.url)
+                expanded.append(candidate)
+    return expanded
+
+
 def parse_bookmarks_html(
     html: str,
     *,
@@ -273,7 +357,7 @@ def parse_bookmarks_html(
     selected = set(selected_folders) if selected_folders is not None else None
     entries: list[BookmarkEntry] = []
     seen: set[str] = set()
-    for raw in parse_netscape_bookmarks(html):
+    for raw in select_invaluable_intake_entries(parse_netscape_bookmarks(html)):
         if not _folder_selected(raw.folder_path, selected):
             continue
         canonical = canonicalize_watch_url(raw.url)
@@ -293,7 +377,7 @@ def parse_bookmarks_html(
                 source=source_for_url(canonical),
             )
         )
-    return entries
+    return expand_invaluable_bulk_entries(entries)
 
 
 def load_bookmarks_file(

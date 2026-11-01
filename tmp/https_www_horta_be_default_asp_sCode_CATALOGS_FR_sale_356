@@ -1,0 +1,1311 @@
+<!DOCTYPE html> <html lang="fr"> <head> <meta charset="utf-8"> <title>Catalogues de Ventes</title> <!-- Google tag (gtag.js) -->
+<!-- No consent, no connection -->
+ <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-BZW2B3ZX2V'); </script> <!-- End Google --> <!-- SEO Meta Tags--> <meta content="salle de vente,auction,auctioneer,veilingzaal,Bruxelles,Brussels,Art,Autiquités" name="keywords" /> <meta content="Ventes aux enchères d'Art et Antiquités à Bruxelles" name="description" /> <meta name="author" content="Juan Regout"> <!-- Viewport--> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"> <!-- Favicon and Touch Icons--> <link rel="stylesheet" href="fonts/font-awesome/css/font-awesome.css"/> <link rel="icon" type="image/png" sizes="32x32" href="UserFiles/Images/logo_32px.png"> <link rel="icon" type="image/x-icon" sizes="16x16" href="favicon.ico"> <meta name="msapplication-TileColor" content="#ffffff"> <meta name="theme-color" content="#ffffff"> <!-- Vendor Styles including: Font Icons, Plugins, etc.--> <link rel="stylesheet" media="screen" href="UserFiles/templates/Cartzilla/dist/css/vendor.css"> <!-- Main Theme Styles + Bootstrap--> <link rel="stylesheet" media="screen" id="main-styles" href="UserFiles/templates/Cartzilla/dist/css/theme.css"> <link rel="stylesheet" href="UserFiles/site.css"> <!-- JavaScript libraries, plugins and custom scripts--> <script src="UserFiles/templates/Cartzilla/dist/js/vendor.min.js"></script> 
+<meta name="robots" content="noindex, nofollow"> <script src="js/site.js"></script> </head> <!-- Body--> <body> <header class="bg-light box-shadow-sm"> <div class="topbar topbar-dark bg-dark"> <div class="container"> <!-- Topbar content --> <span id="topbar-login"><i class="fa fa-sign-in fa-fw"></i> <a href="default.asp?sCode=LOGIN-fr" id="a-topbar-login" class="passive"> Mon Catalogue  <span>Se connecter</span></a></span> <span id="countdown-basic"> </span> <span id="LangSwitcher"> <a href="#" id="hrefFR" class="passive">Français</a><span class="passive"> | </span> <a href="#" id="hrefNL" class="passive">Nederlands</a><span class="passive"> | </span> <a href="#" id="hrefEN" class="passive">English</a> </span> </div> </div> <!-- Navbar 1 Level (Light)--> <div class="navbar-sticky bg-light"> <div class="navbar navbar-expand-lg navbar-light"> <div class="container"><a class="navbar-brand d-none d-sm-block mr-4 order-lg-1" href="default.asp?sCode=HOME-fr" style="min-width: 7rem;"><img src="UserFiles/Images/Logo-Horta.svg" alt="Horta" width="200" height="50" class="logo-large"/></a> <a class="navbar-brand d-sm-none mr-2 order-lg-1" href="default.asp?sCode=HOME-fr" style="min-width: 4.625rem;"><img src="UserFiles/Images/Logo-Horta.svg" alt="Horta" width="100" height="50"/></a> <div class="navbar-toolbar d-flex align-items-center order-lg-3"> <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse"><img class="navbar-toggler-icon" src="UserFiles/Images/hamburger.svg"></button> </div> <div class="collapse navbar-collapse mr-auto order-lg-2" id="navbarCollapse"> <!--Primary menu--> <!--menu-->
+<ul class="nav navbar-nav">
+  <li class="nav-item topfirst level1 li-item2947 HOME-FR"><a href="/bienvenue" class="nav-link image-menu level1 a-item2947 HOME-FR"><i class="fa fa-home fa-lg"></i>Bienvenue <span class="caret"></span> <span class="caret"></span></a></li>
+  <li class="nav-item level1 li-item2936 CALENDAR-FR"><a href="/Calendrier" class="nav-link image-menu level1 a-item2936 CALENDAR-FR"><i class="fa fa-calendar fa-lg"></i>Calendrier <span class="caret"></span> <span class="caret"></span></a></li>
+  <li class="nav-item level1 active li-item2934 CATALOGS-FR"><a href="#" class="nav-link image-menu level1 active a-item2934 CATALOGS-FR"><i class="fa fa-book fa-lg"></i>Catalogues <span class="caret"></span> <span class="caret"></span></a></li>
+  <li class="nav-item level1 li-item3177 dropdown BUYSELL-FR"><a href="#" class="nav-link image-menu level1 a-item3177 dropdown-toggle"  data-rel="submenu1" data-toggle="dropdown" BUYSELL-FR"><i class="fa fa-gavel fa-lg"></i>Acheter &amp; Vendre <span class="caret"></span> <span class="caret"></span></a>
+    <ul class="dropdown-menu column1" id="submenu1">
+      <li class="level2 nav-item li-item2957 THESALE-FR"><a href="/Comment-Acheter" class="level2 a-item2957 THESALE-FR dropdown-item " >Comment acheter <span class="caret"></span> <span class="caret"></span></a></li>
+      <li class="level2 nav-item li-item2960 ESTIMATION-FR"><a href="/Comment-Vendre" class="level2 a-item2960 ESTIMATION-FR dropdown-item " >Comment vendre <span class="caret"></span></a></li>
+    </ul>
+  </li>
+  <li class="nav-item level1 li-item2949 dropdown SUB-MENU-INFO-FR"><a href="#" class="nav-link image-menu level1 a-item2949 dropdown-toggle"  data-rel="submenu2" data-toggle="dropdown" SUB-MENU-INFO-FR"><i class="fa fa-info-circle fa-lg"></i>Informations <span class="caret"></span></a>
+    <ul class="dropdown-menu column2" id="submenu2">
+      <li class="level2 nav-item li-item2951 CONDITIONS-BUY-FR"><a href="/Conditions-Generales" class="level2 a-item2951 CONDITIONS-BUY-FR dropdown-item " >Conditions Générales <span class="caret"></span></a></li>
+      <li class="level2 nav-item li-item2952 SUBSCRIPTION-FR"><a href="/Les-catalogues-et-abonnements" class="level2 a-item2952 SUBSCRIPTION-FR dropdown-item " >Les catalogues et abonnements</a></li>
+      <li class="level2 nav-item li-item3111 DOWNLOAD-FR"><a href="/Telecharger" class="level2 a-item3111 DOWNLOAD-FR dropdown-item " >À télécharger</a></li>
+      <li class="level2 nav-item li-item2993 VIDEO-FR"><a href="/Reportages-Video" class="level2 a-item2993 VIDEO-FR dropdown-item " >Reportages vidéo</a></li>
+      <li class="level2 nav-item li-item3120 PRIVACY-POLICY-FR"><a href="/donnees-personnelles" class="level2 a-item3120 PRIVACY-POLICY-FR dropdown-item " >Politique de confidentialité</a></li>
+      <li class="level2 nav-item li-item3159 COOKIEPOLICY-FR"><a href="default.asp?iId=GIDJHM" class="level2 a-item3159 COOKIEPOLICY-FR dropdown-item " >Gestion des cookies</a></li>
+    </ul>
+  </li>
+  <li class="nav-item level1 li-item2995 MY-CATALOG-FR"><a href="/mon-catalogue" class="nav-link image-menu level1 a-item2995 MY-CATALOG-FR"><i class="fa fa-sign-in fa-lg"></i>Mon Catalogue</a></li>
+  <li class="nav-item level1 li-item2994 toplast CONTACT-FR"><a href="/Contactez-nous" class="nav-link image-menu level1 a-item2994 CONTACT-FR"><i class="fa fa-comment"></i>Contact</a></li>
+</ul>
+
+<input type=hidden id="sCode" value="CATALOGS"/>
+<input type=hidden id="sLang" value="FR"/>
+          <!--menu/-->
+ <!--Primary menu end--> </div> </div> </div> </div> </header>  <!-- Page Title--> <section class="container-fluid page-title-overlap bg-accent pt-2" id="page-title-2934"> <div class="bg-secondary py-4"> <div class="container d-lg-flex justify-content-between py-2 py-lg-3"> <div class="pr-lg-4 text-center text-lg-left" id="page-title"> <h1 class="h3 mb-1" id="page-title-h1">Catalogues de Ventes</h1> </div> </div> </div> </section> <!-- Page Content--> 
+
+<section class="container section-catalogues page-content">
+  <div class="bg-light box-shadow-lg rounded-lg pl-4 pr-4 pt-4 pb-4 pl-lg-4 p-md-4">
+    <div class="row">
+    <div class="col-md-5 gauche pl-2 pr-0 pr-sm-2">
+    <form action="default.asp?sCode=CATALOGUES-FR" id="form_search" name="form_search" rel="nofollow">
+      <div class="form-row">
+        <div class="form-group col-md-11 pr-2">
+          <label>
+          Ventes
+          </label>
+          
+            <select name="sale" id="IDAuction" class="form-control" size="6">
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=359" class="search_option_sales_in_progress"> Novembre 2026 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=360"> Octobre 2026 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=361"> Septembre 2026 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=362"> Juin 2026 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=364"> Mai 2026 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=365"> Avril 2026 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=366"> Mars 2026 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=367"> Février 2026 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=368"> Janvier 2026 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=356" selected> Décembre 2025 : d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=354"> Novembre 2025 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=353"> Octobre 2025 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=352"> Septembre 2025 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=351"> Juin 2025 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=350"> Mai 2025 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=349"> Mai 2025 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=348"> Avril 2025 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=347"> Mars 2025 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=346"> Février 2025 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=345"> Janvier 2025 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=342"> Décembre 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=344"> Novembre 2024 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=341"> Novembre 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=340"> Octobre 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=339"> Septembre 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=338"> Juin 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=343"> Mai 2024 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=337"> Mai 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=336"> Avril 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=335"> Mars 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=334"> Février 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=333"> Janvier 2024 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=330"> Décembre 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=332"> Novembre 2023 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=329"> Novembre 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=328"> Octobre 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=327"> Septembre 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=326"> Juin 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=325"> Mai 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=331"> Mai 2023 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=324"> Avril 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=323"> Mars 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=322"> Février 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=321"> Janvier 2023 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=318"> Décembre 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=320"> Novembre 2022 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=316"> Novembre 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=315"> Octobre 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=314"> Septembre 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=313"> Juin 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=319"> Mai 2022 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=311"> Mai 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=310"> Avril 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=309"> Mars 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=308"> Février 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=307"> Janvier 2022 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=304"> Décembre 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=306"> Novembre 2021 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=303"> Novembre 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=302"> Octobre 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=301"> Septembre 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=300"> Juin 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=305"> Mai 2021 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=299"> Mai 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=298"> Avril 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=297"> Mars 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=296"> Février 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=295"> Janvier 2021 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=291"> Decembre 2020 : Vente d´Art et Antiquités (catalogue de novembre) </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=294"> Novembre 2020 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=290"> Octobre 2020 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=289"> Septembre 2020 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=288"> Juin 2020 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=285"> Mai 2020 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=293"> Mai 2020 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=284"> Février 2020 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=283"> Janvier 2020 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=270"> Décembre 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=272"> Novembre 2019 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=268"> Novembre 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=267"> Octobre 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=265"> Septembre 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=264"> Juin 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=271"> Mai 2019 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=262"> Mai 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=261"> Avril 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=260"> Mars 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=259"> Février 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=258"> Janvier 2019 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=254"> Décembre 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=256"> Novembre 2018 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=253"> Novembre 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=252"> Octobre 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=257"> Octobre 2018 : Vente aux enchères de prestige, Dispersion de la collection de Mey - Lippens </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=251"> Septembre 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=250"> Juin 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=255"> Mai 2018 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=249"> Mai 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=248"> Avril 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=247"> Mars 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=246"> Février 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=245"> Janvier 2018 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=242"> Décembre 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=241"> Novembre 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=244"> Novembre 2017 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=240"> Octobre 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=239"> Septembre 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=238"> Juin 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=237"> Mai 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=243"> Mai 2017 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=236"> Avril 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=235"> Mars 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=234"> Février 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=233"> Janvier 2017 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=229"> Décembre 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=227"> Novembre 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=232"> Novembre 2016 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=226"> Octobre 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=225"> Septembre 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=224"> Juin 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=230"> Mai 2016 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=223"> Mai 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=221"> Avril 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=220"> Mars 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=219"> Février 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=218"> Janvier 2016 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=204"> Décembre 2015 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=203"> Novembre 2015 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=202"> Novembre 2015 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=201"> Octobre 2015 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=200"> Septembre 2015 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=199"> Juin 2015 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=197"> Mai 2015 le 13 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=198"> Mai 2015, les 11 et 12 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=196"> Avril 2015, les 20 et 21 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=195"> Mars 2015, les 16 et 17 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=194"> Février 2015, les 9 et 10 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=193"> Janvier 2015, les 12 et 13 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=189"> Décembre 2014, les 8 et 9 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=188"> Novembre 2014, les 17 et 18 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=192"> Novembre 2014 le 19: Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=187"> Octobre 2014, les 13 et 14 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=186"> Septembre 2014, les 8 et 9 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=185"> Juin 2014, les 16 et 17 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=183"> Mai 2014, les 19 et 20 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=191"> Mai 2014 le 21: Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=182"> Avril 2014, les 28 et 29 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=181"> Mars 2014, les 17 et 18 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=180"> Février 2014, les 17 et 18 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=179"> Janvier 2014, les 20 et 21 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=176"> Décembre 2013, les 16 et 17 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=175"> Novembre 2013, les 18 et 19 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=190"> Novembre 2013 le 20: Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=174"> Octobre 2013, 12 les 7 et 8 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=173"> Septembre 2013, les 9 et 10: Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=172"> Juin 2013, les 17 et 18 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=178"> Mai 2013 le 29 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=171"> Mai 2013, les 27 et 28 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=169"> Avril 2013, les 22 et 23 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=168"> Mars 2013, les 18 et 19 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=167"> Février 2013, les 25 et 26 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=166"> Janvier 2013, les 21 et 22 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=164"> Décembre 2012, les 10 et 11 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=177"> Novembre 2012 le 21: Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=162"> Novembre 2012, les 19 et 20 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=161"> Octobre 2012, 12 les 15 et 16 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=160"> Septembre 2012, les 10 et 11: Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=158"> Juin 2012, les 18 et 19 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=157"> Mai 2012, les 14 et 15 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=165"> Mai 2012 le 15: Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=156"> Avril 2012, les 23 et 24 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=155"> Mars 2012, les 19 et 20 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=154"> Février 2012, les 13 et 14 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=153"> Janvier 2012, les 16 et 17 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=150"> Décembre 2011, les 5 et 6 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=152"> Novembre 2011 le 16: Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=148"> Novembre 2011, les 14 et 15 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=147"> Octobre 2011, 12 les 10 et 11 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=146"> Septembre 2011, les 12 et 13 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=151"> Juin 2011 le 15 : Vente de Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=145"> Juin 2011, les 13 et 14 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=144"> Mai 2011, les 16 et 17 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=142"> Avril 2011, les 4 et 5 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=141"> Mars 2011, les 14 et 15 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=140"> Février 2011, les 21 et 22 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=136"> Décembre 2010, les 6 et 7 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=138"> Novembre 2010 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=135"> Novembre 2010, les 8 et 9 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=134"> Octobre 2010, 12 les 11 et 12 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=133"> Septembre 2010, les 13 et 14 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=132"> Juin 2010, les 14 et 15 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=131"> Mai 2010, les 17 et 18 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=137"> Mai 2010 : Vente de Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=130"> Avril 2010, les 19 et 20 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=129"> Mars 2010, les 8 et 9 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=128"> Février 2010, les 8 et 9 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=120"> Novembre 2009, les 9 et 10 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=125"> Novembre 2009, le 11 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=119"> Octobre 2009 12 et 13 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=118"> Septembre 2009 14 et15 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=117"> Juin 2009 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=116"> Mai 2009 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=115"> Avril 2009 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=114"> Mars 2009 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=124"> Février 2009 : Vente de Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=113"> Février 2009 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=112"> Janvier 2009: Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=108"> Décembre 2008 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=111"> Novembre 2008 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=107"> Novembre 2008 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=106"> Les 6 et 7 octobre 2008 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=105"> Septembre 2008 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=104"> Juin 2008 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=103"> Mai 2008 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=102"> Avril 2008 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=110"> Mars 2008 : Vente de Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=101"> Mars 2008 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=100"> Février 2008 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=99"> Janvier 2008: Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=96"> Décembre 2007 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=98"> Novembre 2007 : Vente de Vins Fins </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=95"> Novembre 2007 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=94"> Octobre 2007 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=93"> Septembre 2007 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=92"> Juin 2007 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=97"> Mai 2007 : Vente de Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=91"> Mai 2007 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=90"> Avril 2007 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=89"> Mars 2007 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=88"> Février 2007 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=87"> Janvier 2007: Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=85"> Décembre 2006 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=84"> Novembre 2006 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=83"> Octobre 2006 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=86"> Septembre 2006 : Vente de Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=82"> Septembre 2006 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=81"> Juin 2006 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=80"> Mai 2006 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=79"> Avril 2006 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=78"> Mars 2006 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=77"> Février 2006 : Vente d´Art et Antiquités et de Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=76"> Janvier 2006: Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=73"> Décembre 2005 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=72"> Novembre 2005 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=71"> Octobre 2005 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=70"> Septembre 2005 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=69"> Juin 2005 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=75"> Mai 2005: Vente de Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=68"> Mai 2005 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=67"> Avril 2005 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=66"> Mars 2005 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=65"> Février 2005 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=74"> Janvier 2005: Vente de Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=63"> Janvier 2005: Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=62"> Décembre 2004 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=61"> Ventes de Novembre 2004  </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=60"> Octobre 2004 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=59"> Septembre 2004 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=58"> Juin 2004 : Vente d´Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=57"> Mai 2004 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=56"> Avril 2004 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=55"> Mars 2004 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=54"> Février 2004 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=53"> Janvier 2004 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=52"> Décembre 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=51"> Novembre 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=50"> Octobre 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=49"> Septembre 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=48"> Juin 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=47"> Mai 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=46"> Avril 2003 - Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=45"> Avril 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=44"> Mars 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=43"> Février 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=42"> Janvier 2003 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=39"> Décembre 2002 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=38"> Novembre 2002 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=37"> Octobre 2002 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=36"> Septembre 2002 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=35"> Juin 2002 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=34"> Mai 2002 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=33"> Avril 2002 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=32"> Mars 2002 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=31"> Février 2002 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=40"> Janvier 2002 - Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=30"> Janvier 2002 Art et Antiquités </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=29"> Décembre 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=28"> Novembre 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=27"> Octobre 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=26"> Septembre 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=25"> Juin 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=24"> Mai 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=23"> Avril 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=22"> Mars 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=21"> Février 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=20"> Janvier 2001 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=19"> Décembre 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=18"> Novembre 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=41"> Octobre 2002 - Bandes Dessinées </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=17"> Octobre 2000 BD </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=16"> Octobre 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=15"> Septembre 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=14"> Juin 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=13"> Mai 2000 BD </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=11"> Mai 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=10"> Avril 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=9"> Mars 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=8"> Février 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=7"> Janvier 2000 BD </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=6"> Janvier 2000 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=5"> Décembre 1999 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=4"> Novembre 1999 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=3"> Octobre 1999 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=2"> Septembre 1999 </option>
+            
+            <option value="default.asp?sCode=CATALOGS-FR&sale=1"> Juin 1999 </option>
+            
+          </select>
+          <input type="hidden" name="sCode" value="CATALOGUES1" />
+        </div>
+      </div>
+    </form>
+    <form action="default.asp" id="form" method="get">
+      <div class="form-row">
+        <div class="form-group col-md-11 pr-2 input-field">
+          <label>
+          Lots  (ex. : 1-8-15-25)
+          </label>
+          <input type="hidden" name="sCode" value="CATALOG-FR" />
+          <input id="input_lot" name="lot" type="text" size="20" class="form-control input-md px-2" onkeyup="this.value=this.value.replace(/[a-zA-Z]/,'')" value=""/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-md-5 pl-1 pr-2 input-field">
+          <label>
+          Estimation basse
+          </label>
+          <input name="estmin" type="text" size="20" class="form-control input-md px-2" onkeyup="this.value=this.value.replace(/[^\d]/,'')" value="" id="input_estmin">
+        </div>
+        <div class="col-md-1"> </div>
+        <div class="form-group col-md-5  pr-2 input-field">
+          <label>
+          Estimation haute
+          </label>
+          <input name="estmax" type="text" size="20" class="form-control input-md px-2" onkeyup="this.value=this.value.replace(/[^\d]/,'')" value="" id="input_estmax"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-md-11 pr-2 input-field">
+          <label>
+          Mot-clef
+          </label>
+          <input name="key" type="text" size="20" class="form-control input-md px-2" value="" id="input_key" placeholder="Keywords"/>
+        </div>
+      </div>
+      </div>
+      
+<div id='data_ajax' class="centre col-md-3 pl-1 px-0 pr-sm-2">
+  
+<div class="form-row pl-2 pr-1">
+  <div class="form-group col-md-12 px-1 pr-lg-4 pr-md-4">
+  <label>
+  Cat&eacute;gories
+  </label>
+  <br>
+  <input type="hidden" name="sale" value="356">
+  <select name="categorie" id="indexPrincipal"  size="21" class="form-control px-2">
+    <option value="" selected="selected">
+    Toutes les cat&eacute;gories
+    </option>
+    
+    <option value="4">Argenterie &nbsp;&nbsp;(27)</option>
+    
+    <option value="8">C&#233;ramiques &nbsp;&nbsp;(16)</option>
+    
+    <option value="9">Dessins &nbsp;&nbsp;(33)</option>
+    
+    <option value="10">Eau-forte &nbsp;&nbsp;(1)</option>
+    
+    <option value="35">Estampe &nbsp;&nbsp;(16)</option>
+    
+    <option value="14">Horlogerie &nbsp;&nbsp;(14)</option>
+    
+    <option value="1174">Huile sur toile &nbsp;&nbsp;(1)</option>
+    
+    <option value="16">Instruments de musique &nbsp;&nbsp;(3)</option>
+    
+    <option value="110">Joaillerie &nbsp;&nbsp;(73)</option>
+    
+    <option value="19">Luminaire &nbsp;&nbsp;(20)</option>
+    
+    <option value="20">Meubles &nbsp;&nbsp;(20)</option>
+    
+    <option value="143">Objets d'Art &nbsp;&nbsp;(8)</option>
+    
+    <option value="133">Photographies &nbsp;&nbsp;(1)</option>
+    
+    <option value="533">Sculpture &nbsp;&nbsp;(67)</option>
+    
+    <option value="37">Tableaux &nbsp;&nbsp;(160)</option>
+    
+    <option value="25">Tapis &nbsp;&nbsp;(5)</option>
+    
+    <option value="27">Verrerie &nbsp;&nbsp;(25)</option>
+    
+    <option value="28">Vins Fins &nbsp;&nbsp;(9)</option>
+    
+  </select>
+  </div>
+</div>
+</div>
+<div class="droite col-md-4 pl-1 px-0 pr-sm-2">
+<div class="form-row pl-2 pl-1">
+  <div class="form-group col-md-12 px-1 pr-lg-4 pr-md-4">
+  
+  <label>
+  Artistes
+  </label>
+  <br>
+  <select name="artist" id="artist"  size="21" class="form-control px-2 ">
+    <option value="" selected="selected">
+    Tous les artistes
+    </option>
+    
+    <option value="5">ALECHINSKY&nbsp;Pierre&nbsp;&nbsp;(1927-)</option>
+    
+    <option value="796">ALLARD L'OLIVIER&nbsp;Fernand&nbsp;&nbsp;(1883-1933)</option>
+    
+    <option value="44780">ANGELUS&nbsp;</option>
+    
+    <option value="8">ARTAN DE SAINT MARTIN&nbsp;Louis&nbsp;&nbsp;(1837-1890)</option>
+    
+    <option value="3708">ARTZ&nbsp;Constant&nbsp;&nbsp;(1870-1951)</option>
+    
+    <option value="44745">ASTIEN&nbsp;Alfred Theodore Joseph&nbsp;&nbsp;(1873-1955)</option>
+    
+    <option value="215">BAES&nbsp;Firmin&nbsp;&nbsp;(1874-1943)</option>
+    
+    <option value="439">BARON&nbsp;Théodore&nbsp;&nbsp;(1840-1899)</option>
+    
+    <option value="42779">BARRIAS&nbsp;Louis Ernest&nbsp;&nbsp;(1841-1905)</option>
+    
+    <option value="44480">BARYE&nbsp;Antoine-Louis</option>
+    
+    <option value="44746">BEAVIS&nbsp;Richard&nbsp;&nbsp;(1824-1896)</option>
+    
+    <option value="44747">BÉCAT&nbsp;Paul-Émile&nbsp;&nbsp;(1885-1960)</option>
+    
+    <option value="9139">BEERNAERT&nbsp;Euphrosine&nbsp;&nbsp;(1831-1901)</option>
+    
+    <option value="44748">BEERSTRAATEN&nbsp;Abraham&nbsp;&nbsp;(1635-1665)</option>
+    
+    <option value="2543">BELLIS&nbsp;Hubert&nbsp;&nbsp;(1831-1902)</option>
+    
+    <option value="40109">BERROCAL&nbsp;Miguel Ortiz&nbsp;&nbsp;(1933-2006)</option>
+    
+    <option value="18">BLIECK&nbsp;Maurice&nbsp;&nbsp;(1876-1922)</option>
+    
+    <option value="442">BOLLÉ&nbsp;Martin&nbsp;&nbsp;(1912-1968)</option>
+    
+    <option value="41139">BOOMPUTTE&nbsp;Jean Marie&nbsp;&nbsp;(1947-)</option>
+    
+    <option value="2418">BOULENGER&nbsp;Hippolyte&nbsp;&nbsp;(1837-1874)</option>
+    
+    <option value="38500">BRANDANI&nbsp;Enrico&nbsp;&nbsp;(1914-1979)</option>
+    
+    <option value="444">BRUNIN&nbsp;Léon&nbsp;&nbsp;(1861-1949)</option>
+    
+    <option value="44501">CALEMBERT&nbsp;Joëlle&nbsp;&nbsp;(1947-)</option>
+    
+    <option value="38995">CAMPOTOSTO&nbsp;Henri Joseph&nbsp;&nbsp;(1833-1910)</option>
+    
+    <option value="26">CAMUS&nbsp;Gustave&nbsp;&nbsp;(1914-1984)</option>
+    
+    <option value="27074">CARLIER&nbsp;Max Albert &nbsp;&nbsp;(1872-1938)</option>
+    
+    <option value="43199">CHARLES SCHNEIDER&nbsp;</option>
+    
+    <option value="42848">CHAURAY&nbsp;Jean-Claude&nbsp;&nbsp;(1934-1996)</option>
+    
+    <option value="29525">CHECA GALINDO&nbsp;José Luis&nbsp;&nbsp;(1950-)</option>
+    
+    <option value="36745">CHENET&nbsp;Pierre</option>
+    
+    <option value="44749">CLARA AYATS&nbsp;José&nbsp;&nbsp;(1878-1958)</option>
+    
+    <option value="35">CLESSE&nbsp;Louis&nbsp;&nbsp;(1889-1961)</option>
+    
+    <option value="44785">CLESSE-PIRON&nbsp;Théo&nbsp;&nbsp;(1879-1943)</option>
+    
+    <option value="9083">COLLIN&nbsp;Albéric&nbsp;&nbsp;(1886-1962)</option>
+    
+    <option value="44786">CORDIER&nbsp;Pierre&nbsp;&nbsp;(1933-2024)</option>
+    
+    <option value="41381">CUYPERS &nbsp;Marc&nbsp;&nbsp;(1970-)</option>
+    
+    <option value="551">DALI&nbsp;Salvador&nbsp;&nbsp;(1904-1989)</option>
+    
+    <option value="24327">DARDENNE&nbsp;Milo&nbsp;&nbsp;(1938-)</option>
+    
+    <option value="44035">DAUM NANCY&nbsp;Daum Nancy</option>
+    
+    <option value="44875">DE BORCHGRAVE D’ALTENA&nbsp;Isabelle&nbsp;&nbsp;(1946-2024)</option>
+    
+    <option value="41716">DE CARRIER-BELLEUSE &nbsp;Albert-Ernest&nbsp;&nbsp;(1824-1887)</option>
+    
+    <option value="44751">DE FAUVEAU&nbsp;Félicie & Hippolyte</option>
+    
+    <option value="43899">DE LOOF&nbsp;Aurel&nbsp;&nbsp;(1901-1982)</option>
+    
+    <option value="9687">DE MAEGT&nbsp;JOHAN&nbsp;&nbsp;(1906-1987)</option>
+    
+    <option value="38504">DE MEESTER DE BETZENBROECK&nbsp;Baron Raymond&nbsp;&nbsp;(1904-1995)</option>
+    
+    <option value="39184">DE MEYER&nbsp;Maurice&nbsp;&nbsp;(1911-1999)</option>
+    
+    <option value="44752">DE SALABERRY&nbsp;Antoine&nbsp;&nbsp;(1880-1915)</option>
+    
+    <option value="38567">DE SCHRIJVER&nbsp;Olivier&nbsp;&nbsp;(1958-)</option>
+    
+    <option value="9164">DE SLOOVERE&nbsp;Georges&nbsp;&nbsp;(1873-1970)</option>
+    
+    <option value="5144">DE VOS&nbsp;Vincent&nbsp;&nbsp;(1829-1875)</option>
+    
+    <option value="38310">DE WEVER&nbsp;Auguste&nbsp;&nbsp;(1836-1910)</option>
+    
+    <option value="20150">DE WITTE&nbsp;Marthe&nbsp;&nbsp;(1893-1976)</option>
+    
+    <option value="27267">DECKERS&nbsp;Émile&nbsp;&nbsp;(1885-1968)</option>
+    
+    <option value="21184">DECOENE&nbsp;Henri &nbsp;&nbsp;(1798-1866)</option>
+    
+    <option value="44753">DEGLE&nbsp;Franz Joseph&nbsp;&nbsp;(1724-1812)</option>
+    
+    <option value="38199">DEGREEF&nbsp;Amédée&nbsp;&nbsp;(1878-1969)</option>
+    
+    <option value="38507">DEGREEF&nbsp;Jean Baptiste&nbsp;&nbsp;(1852-1894)</option>
+    
+    <option value="40144">DEGUÉ&nbsp;</option>
+    
+    <option value="44754">DEL COLOMBO&nbsp;M.</option>
+    
+    <option value="13528">DELMOTTE&nbsp;Marcel&nbsp;&nbsp;(1901-1984)</option>
+    
+    <option value="9263">DELVAUX&nbsp;Paul&nbsp;&nbsp;(1897-1994)</option>
+    
+    <option value="31002">D'HAENENS&nbsp;Marc </option>
+    
+    <option value="44755">D'HUART&nbsp;Adrienne Baudouin&nbsp;&nbsp;(1892-1992)</option>
+    
+    <option value="25525">DINGELSTADT&nbsp;Jean-Claude &nbsp;&nbsp;(1947-)</option>
+    
+    <option value="44793">DINGEMANS&nbsp;Waalko Jans I&nbsp;&nbsp;(1912-1991)</option>
+    
+    <option value="44502">DU MONCEAU DE BERGENDAEL&nbsp;Mathilde&nbsp;&nbsp;(1875-1952)</option>
+    
+    <option value="71">DUBOIS&nbsp;Louis&nbsp;&nbsp;(1830-1880)</option>
+    
+    <option value="44757">DUFRANE&nbsp;Jacques Marcel&nbsp;&nbsp;(1947-)</option>
+    
+    <option value="9099">DUPAGNE&nbsp;Arthur&nbsp;&nbsp;(1895-1961)</option>
+    
+    <option value="44789">EECKHOUT&nbsp;Victor&nbsp;&nbsp;(1821-1879)</option>
+    
+    <option value="13526">ENSOR&nbsp;James&nbsp;&nbsp;(1860-1949)</option>
+    
+    <option value="44781">ERMES ZAVETTO&nbsp;</option>
+    
+    <option value="21231">FAURE&nbsp;Elisabeth&nbsp;&nbsp;(1906-1964)</option>
+    
+    <option value="9235">FRANK&nbsp;Lucien&nbsp;&nbsp;(1857-1920)</option>
+    
+    <option value="42145">FREDERIC &nbsp;Baron Georges&nbsp;&nbsp;(1900-1981)</option>
+    
+    <option value="39747">FRÉMIET &nbsp;Emmanuel&nbsp;&nbsp;(1824-1910)</option>
+    
+    <option value="21188">FRIED&nbsp;Pal &nbsp;&nbsp;(1893-1976)</option>
+    
+    <option value="9209">FRISON&nbsp;Jehan&nbsp;&nbsp;(1882-1961)</option>
+    
+    <option value="4380">GAUDEZ&nbsp;Adrien Etienne&nbsp;&nbsp;(1845-1902)</option>
+    
+    <option value="43806">GENOT&nbsp;Luc&nbsp;&nbsp;(1943-1995)</option>
+    
+    <option value="4042">GHOBERT&nbsp;Bernard&nbsp;&nbsp;(1914-1975)</option>
+    
+    <option value="27011">GIALLINA&nbsp;Angelos&nbsp;&nbsp;(1857-1939)</option>
+    
+    <option value="26636">GILBERT &nbsp;ALFRED&nbsp;&nbsp;(1854-1934)</option>
+    
+    <option value="44782">GILBERT ALBERT&nbsp;</option>
+    
+    <option value="42691">GLANSDORFF&nbsp;Hubert&nbsp;&nbsp;(1877-1963)</option>
+    
+    <option value="13522">HALLET&nbsp;André&nbsp;&nbsp;(1890-1959)</option>
+    
+    <option value="44758">HAMAR&nbsp;J.J. Fernand&nbsp;&nbsp;(1869-1943)</option>
+    
+    <option value="44759">HÉBERT&nbsp;Émile Pierre Eugène&nbsp;&nbsp;(1828-1893)</option>
+    
+    <option value="5196">HEYMANS&nbsp;Adrien-Joseph&nbsp;&nbsp;(1839-1921)</option>
+    
+    <option value="44790">HOCQ&nbsp;Marcel&nbsp;&nbsp;(1933-2021)</option>
+    
+    <option value="38966">HOUDON&nbsp;Jean Antoine&nbsp;&nbsp;(1741-1828)</option>
+    
+    <option value="33528">HUNDERTWASSER&nbsp;Friedensreich&nbsp;&nbsp;(1928-2000)</option>
+    
+    <option value="290">ICART&nbsp;Louis&nbsp;&nbsp;(1888-1950)</option>
+    
+    <option value="2997">INGELS&nbsp;Domien&nbsp;&nbsp;(1881-1946)</option>
+    
+    <option value="44760">INVREA&nbsp;Irene&nbsp;&nbsp;(1919-2003)</option>
+    
+    <option value="44761">JANS&nbsp;Jan&nbsp;&nbsp;(1893-1963)</option>
+    
+    <option value="9240">JEFFERYS&nbsp;Marcel&nbsp;&nbsp;(1872-1924)</option>
+    
+    <option value="14474">JUSTE&nbsp;Estelle &nbsp;&nbsp;(1894-1962)</option>
+    
+    <option value="838">KAISIN&nbsp;Luc&nbsp;&nbsp;(1901-1963)</option>
+    
+    <option value="31748">KAPOOR&nbsp;ANISH&nbsp;&nbsp;(1954-)</option>
+    
+    <option value="9081">KELLER&nbsp;Adolphe&nbsp;&nbsp;(1880-1968)</option>
+    
+    <option value="22021">KEN&nbsp;Don&nbsp;&nbsp;(1956-)</option>
+    
+    <option value="9145">KHNOPFF&nbsp;Fernand&nbsp;&nbsp;(1858-1921)</option>
+    
+    <option value="2961">KOEKKOEK&nbsp;Marinus Adrianus I&nbsp;&nbsp;(1807-1868)</option>
+    
+    <option value="44762">KOVACS&nbsp;Margit&nbsp;&nbsp;(1902-1977)</option>
+    
+    <option value="37581">LALIQUE&nbsp;René&nbsp;&nbsp;(1860-1945)</option>
+    
+    <option value="9207">LAMBEAUX&nbsp;Jef&nbsp;&nbsp;(1852-1908)</option>
+    
+    <option value="44122">LANDUYT&nbsp;Octave&nbsp;&nbsp;(1922-2024)</option>
+    
+    <option value="44763">LAUREL&nbsp;Pierre LAUREL&nbsp;&nbsp;(1892-1962)</option>
+    
+    <option value="44764">LE BEUZE&nbsp;Gaston</option>
+    
+    <option value="44765">LE FAGUAYS&nbsp;Pierre "FAYRAL"&nbsp;&nbsp;(1892-1962)</option>
+    
+    <option value="39897">LE MOULT&nbsp;Christian&nbsp;&nbsp;(1941-)</option>
+    
+    <option value="29608">LEFEBVRE&nbsp;Madeleine &nbsp;&nbsp;(1900-1976)</option>
+    
+    <option value="43813">LICHTFUS&nbsp;Yvette&nbsp;&nbsp;(1925-2014)</option>
+    
+    <option value="39474">LIU &nbsp;Yujun&nbsp;&nbsp;(1963-)</option>
+    
+    <option value="16673">MAK&nbsp;Paul&nbsp;&nbsp;(1891-1967)</option>
+    
+    <option value="36249">MARQUES&nbsp;Guilherme&nbsp;&nbsp;(1887-1960)</option>
+    
+    <option value="7716">MENE&nbsp;Pierre-Jules&nbsp;&nbsp;(1810-1879)</option>
+    
+    <option value="9217">MERCKAERT&nbsp;Jules&nbsp;&nbsp;(1872-1924)</option>
+    
+    <option value="17577">MEULLEMANS&nbsp;J.</option>
+    
+    <option value="13501">MOREAU&nbsp;Max</option>
+    
+    <option value="42038">MULDERS&nbsp;Jean&nbsp;&nbsp;(1913-)</option>
+    
+    <option value="44495">MULLER FRÈRES LUNÉVILLE&nbsp;</option>
+    
+    <option value="44766">NEWMARCH&nbsp;Stafford&nbsp;&nbsp;(1861-1895)</option>
+    
+    <option value="36636">PARISON&nbsp;Gaston&nbsp;&nbsp;(1889-1959)</option>
+    
+    <option value="33937">PASMORE&nbsp;Victor&nbsp;&nbsp;(1908-1998)</option>
+    
+    <option value="470">PAUWELS&nbsp;Henri Joseph&nbsp;&nbsp;(1903-1983)</option>
+    
+    <option value="39060">PEDERSEN&nbsp;Finn&nbsp;&nbsp;(1944-2014)</option>
+    
+    <option value="27637">PELUSO&nbsp;FRANCESCO&nbsp;&nbsp;(1836-1916)</option>
+    
+    <option value="9117">PERMEKE&nbsp;Constant&nbsp;&nbsp;(1886-1952)</option>
+    
+    <option value="3637">PEVERNAGIE&nbsp;Erik&nbsp;&nbsp;(1939-)</option>
+    
+    <option value="38034">PHILIPPART&nbsp;Georges</option>
+    
+    <option value="42678">PHILIPS &nbsp;Walter&nbsp;&nbsp;(1939-)</option>
+    
+    <option value="2479">PICAULT&nbsp;Emile Louis&nbsp;&nbsp;(1833-1915)</option>
+    
+    <option value="22735">PIGALLE&nbsp;JEAN-BAPTISTE&nbsp;&nbsp;(1714-1785)</option>
+    
+    <option value="36376">POOT&nbsp;Rik&nbsp;&nbsp;(1924-2007)</option>
+    
+    <option value="9261">POREAU&nbsp;Oswald&nbsp;&nbsp;(1877-1955)</option>
+    
+    <option value="44767">POUCHAIN&nbsp;Jacques&nbsp;&nbsp;(1925-2015)</option>
+    
+    <option value="40524">PREISS&nbsp;Johann Philipp Ferdinand&nbsp;&nbsp;(1882-1943)</option>
+    
+    <option value="2384">PROOST&nbsp;Alfons&nbsp;&nbsp;(1880-1957)</option>
+    
+    <option value="44768">QUINQUAUD&nbsp;Anna&nbsp;&nbsp;(1890-1984)</option>
+    
+    <option value="44783">RAPHAEL-SCHWARTZ&nbsp;&nbsp;&nbsp;(1884-1942)</option>
+    
+    <option value="36262">RASSENFOSSE&nbsp;Armand&nbsp;&nbsp;(1862-1934)</option>
+    
+    <option value="44769">REEVES&nbsp;Philip</option>
+    
+    <option value="37930">RIGAUX&nbsp;Albert&nbsp;&nbsp;(1954-)</option>
+    
+    <option value="4286">ROBIE&nbsp;Jean&nbsp;&nbsp;(1821-1910)</option>
+    
+    <option value="2482">ROFFIAEN&nbsp;Jean François Xavier&nbsp;&nbsp;(1820-1898)</option>
+    
+    <option value="44770">ROUGET&nbsp;Eliane</option>
+    
+    <option value="43212">SANDOZ&nbsp;Édouard Marcel&nbsp;&nbsp;(1881-1971)</option>
+    
+    <option value="463">SAUER&nbsp;Walter&nbsp;&nbsp;(1889-1927)</option>
+    
+    <option value="44787">SCHOUTEN&nbsp;Henry&nbsp;&nbsp;(1847-1927)</option>
+    
+    <option value="40772">SCHWABE&nbsp; Heinrich &nbsp;&nbsp;(1847-1924)</option>
+    
+    <option value="41993">SEEVAGEN&nbsp;Lucien&nbsp;&nbsp;(1887-1959)</option>
+    
+    <option value="39061">SERSTÉ&nbsp;Paul&nbsp;&nbsp;(1910-2000)</option>
+    
+    <option value="44771">SIMONIS&nbsp;Kazys&nbsp;&nbsp;(1887-1978)</option>
+    
+    <option value="44791">SMEETS&nbsp;Yves&nbsp;&nbsp;(1961-2006)</option>
+    
+    <option value="37443">SOMVILLE&nbsp;Roger&nbsp;&nbsp;(1923-2014)</option>
+    
+    <option value="44772">SPARK&nbsp;Benjamin&nbsp;&nbsp;(1969-)</option>
+    
+    <option value="7432">STEVENS&nbsp;A.</option>
+    
+    <option value="3206">STREBELLE&nbsp;Jean-Marie&nbsp;&nbsp;(1916-1989)</option>
+    
+    <option value="14235">TAYMANS &nbsp;Louis Joseph&nbsp;&nbsp;(1826-1877)</option>
+    
+    <option value="34203">TCHOLARIA&nbsp;Igor&nbsp;&nbsp;(1959-)</option>
+    
+    <option value="24620">TELLIER &nbsp;RAYMOND&nbsp;&nbsp;(1897-1985)</option>
+    
+    <option value="44773">THÉOBALD&nbsp;Renée&nbsp;&nbsp;(1926-2014)</option>
+    
+    <option value="6525">THIRIAR&nbsp;James&nbsp;&nbsp;(1889-1965)</option>
+    
+    <option value="37611">THOMAS&nbsp;Henri Joseph&nbsp;&nbsp;(1878-1972)</option>
+    
+    <option value="484">TOUSSAINT&nbsp;Fernand&nbsp;&nbsp;(1873-1956)</option>
+    
+    <option value="5353">TREMERIES&nbsp;Carolus&nbsp;&nbsp;(1858-1945)</option>
+    
+    <option value="41984">VAJDA&nbsp;Livia&nbsp;&nbsp;(1929-2011)</option>
+    
+    <option value="775">VALTON&nbsp;Charles&nbsp;&nbsp;(1851-1918)</option>
+    
+    <option value="42069">VAN BREE &nbsp;Philippe-Jacques&nbsp;&nbsp;(1786-1871)</option>
+    
+    <option value="38002">VAN DAMME&nbsp;Frans&nbsp;&nbsp;(1858-1925)</option>
+    
+    <option value="631">VAN DAMME&nbsp;Suzanne&nbsp;&nbsp;(1901-1986)</option>
+    
+    <option value="44774">VAN DE PUTTE&nbsp;Adrien&nbsp;&nbsp;(1911-1994)</option>
+    
+    <option value="2395">VAN DEN EYCKEN&nbsp;Charles&nbsp;&nbsp;(1859-1923)</option>
+    
+    <option value="44775">VAN DEN HOVE&nbsp;Martinus&nbsp;&nbsp;(1605-1639)</option>
+    
+    <option value="44776">VAN DER LINDEN&nbsp;Baron Max&nbsp;&nbsp;(1922-1999)</option>
+    
+    <option value="777">VAN DER OUDERAA&nbsp;Piet&nbsp;&nbsp;(1841-1915)</option>
+    
+    <option value="15896">VAN DER STRAETEN&nbsp;Georges&nbsp;&nbsp;(1856-1928)</option>
+    
+    <option value="44777">VAN HEERDEN&nbsp;Louis&nbsp;&nbsp;(1941-)</option>
+    
+    <option value="632">VAN MENS&nbsp;Isidore&nbsp;&nbsp;(1890-1985)</option>
+    
+    <option value="37476">VAN NOORT&nbsp;Alexander&nbsp;&nbsp;(1953-)</option>
+    
+    <option value="44778">VAN ROYEN&nbsp;Willem&nbsp;&nbsp;(1687-1742)</option>
+    
+    <option value="37836">VAN RYSWYCK&nbsp;Thierry&nbsp;&nbsp;(1911-1958)</option>
+    
+    <option value="37837">VAN VAERENBERGH&nbsp;Gustave&nbsp;&nbsp;(1873-1927)</option>
+    
+    <option value="2084">VANAISE&nbsp;Gustave&nbsp;&nbsp;(1854-1902)</option>
+    
+    <option value="36751">VASARELY&nbsp;Victor&nbsp;&nbsp;(1906-1997)</option>
+    
+    <option value="194">VERBURGH&nbsp;Médard&nbsp;&nbsp;(1886-1957)</option>
+    
+    <option value="3178">VERDOODT&nbsp;Jan&nbsp;&nbsp;(1908-1980)</option>
+    
+    <option value="195">VERDYEN&nbsp;Eugène&nbsp;&nbsp;(1836-1903)</option>
+    
+    <option value="29197">VERHAERT&nbsp;Pieter &nbsp;&nbsp;(1852-1908)</option>
+    
+    <option value="37435">VERHEYDEN&nbsp;Isidore&nbsp;&nbsp;(1846-1905)</option>
+    
+    <option value="44784">VERTONGHE&nbsp;</option>
+    
+    <option value="42467">VERWEE&nbsp;Louis Charles&nbsp;&nbsp;(1832-1882)</option>
+    
+    <option value="39844">VEUVENOT LEROUX &nbsp;Gaston&nbsp;&nbsp;(1854-1942)</option>
+    
+    <option value="42573">VICCHI &nbsp;Ferdinando&nbsp;&nbsp;(1875-1945)</option>
+    
+    <option value="639">VIERIN&nbsp;Emmanuel&nbsp;&nbsp;(1869-1954)</option>
+    
+    <option value="36218">WABBES&nbsp;Jules&nbsp;&nbsp;(1919-1974)</option>
+    
+    <option value="44779">WAGNER&nbsp;Paul Hermann&nbsp;&nbsp;(1852-1937)</option>
+    
+    <option value="42591">WELLENS&nbsp;Charles&nbsp;&nbsp;(1889-1959)</option>
+    
+    <option value="44470">WOLMANS&nbsp;Jacques&nbsp;&nbsp;(1919-)</option>
+    
+    <option value="38455">WUNDERLICH&nbsp;Paul&nbsp;&nbsp;(1927-2010)</option>
+    
+    <option value="44788">ZORITCHAK&nbsp;Yan&nbsp;&nbsp;(1944-)</option>
+    
+  </select>
+  
+</div>
+</div>
+</div>
+
+      </div>
+      <div class="row">
+      <div class="col-md-5 gauche pl-1 pr-2 pr-sm-2">
+      <div class="form-row">
+        <div class="form-group col-md-11 col-md-5 pl-1 px-0 ">
+          <input name="submit" type="submit" id="submit" value="Recherche" class="form-control btn btn-primary btn-lg btn-block px-2"/>
+        </div>
+      </div>
+    </form>
+  </div>
+  
+  <div class="col-md-7 pr-2 pl-1" style="height:36px; text-align:right;">
+    
+    <a href="default.asp?sCode=ARTISTS-FR&sale=356" class="listedesartistes-btn btn btn-primary btn-lg" role="button">
+    Liste des artistes
+    &nbsp; <i class="fa fa-hand-o-right fa-lg"></i> </a>
+    
+  </div>
+  </div>
+</section>
+
+ <!-- Footer--> <footer class="bg-dark pt-5">
+<div class="container">
+	<div class="row pb-2">
+		<div class="col-md-4 col-sm-6">
+			<div class="widget widget-links widget-light pb-2 mb-4 widget-footer">
+				<h3 class="widget-title text-light">Contactez-nous</h3>
+
+				<ul class="ulAddress list list-icons widget-list font-size-md text-light opacity-90">
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-map-marker fa-fw"></i>&nbsp;Avenue de Roodebeek 70-74<br />
+						<span style=" padding-left:24px;">B - 1030 Bruxelles, Belgique</span>
+					</li>
+					<li class="widget-list-item">
+						<span style=" padding-left:24px;">Direction: Dominique de Villegas</span>
+					</li>
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-phone-square fa-fw"></i>&nbsp;+32 2 741 60 60
+					</li>
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-envelope-o fa-fw"></i>&nbsp;<a href="#" class="cryptedmail" data-name="info" data-domain="horta" data-tld="be"></a>
+
+
+					</li>
+					<li class="widget-list-item">
+						<i class="fa fa-bar-chart fa-fw"></i>&nbsp;TVA: BE 0471.388.227
+					</li>
+					<li class="widget-list-item">
+						<i class="fa fa-university fa-fw"></i>&nbsp;IBAN BE95 7340 1117 9358
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="col-md-3 col-sm-6">
+			<div class="widget widget-links widget-light pb-2 mb-4 widget-footer">
+				<h3 class="widget-title text-light">Suivez-nous</h3>
+
+				<ul class="ulAddress list list-icons widget-list font-size-md text-light opacity-90">
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-instagram fa-fw"></i><a class="widget-list-link" href="https://www.instagram.com/hotel_de_ventes_horta/" style="display:inline;" target="_blank">Suivez Horta sur Instagram</a>
+					</li>
+					<li class="widget-list-item">
+						<i aria-hidden="true" class="fa fa-street-view fa-fw"></i><a class="widget-list-link" href="default.asp?sCode=GMVT-FR" style="display:inline;">Horta sur Google Street Virtual Tour</a>
+					</li>
+					<li class="widget-list-item">
+						<i class="fa fa-facebook-official fa-fw"></i><a class="widget-list-link" href="https://www.facebook.com/hoteldeventeshorta?fref=ts" style="display:inline;" target="_blank">Suivez Horta sur Facebook</a>
+					</li>
+					<li class="widget-list-item">
+						<img height="16" src="/UserFiles/Images/icon-drouot.png" width="16" /><a class="widget-list-link" href="https://drouot.com/fr/auctioneer/922/hotel-de-ventes-horta" style="display:inline;" target="_blank">Drouot Digital</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		<div class="col-md-5 col-sm-6">
+			<div class="widget widget-links widget-light pb-2 mb-4 widget-footer">
+				<p class="d-none d-sm-none d-md-block" style="text-align: center; max-width:400px; margin-left:auto; margin-right:auto;">
+					<iframe class="mj-w-res-iframe" frameborder="0" height="310" marginheight="0" marginwidth="0" scrolling="no" src="https://xylg.mj.am/wgt/xylg/p3k/form?c=9db23641 " width="450px !important"></iframe><script type="text/javascript" src=https://app.mailjet.com/pas-nc-embedded-v1.js></script>
+				</p>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="pt-5 bg-darker">
+	<div class="container">
+		<table border="0" cellspacing="5" class="foot-tabel">
+			<tbody>
+				<tr>
+					<td valign="top">
+					<p>
+						<a href="http://www.auctions-in-belgium.be/default.asp?sCode=CALBYSDV-FR&amp;MemberID=19" target="_blank"><img alt="Lot 1" class="rounded-circle" src="/UserFiles/Images/logo_veilingzalen_200.jpg" style="width: 120px; height: 120px; float: left; margin-right: 10px;" /></a>
+					</p>
+					</td>
+					<td valign="top">
+					<p>
+						&nbsp;
+					</p>
+
+					<p>
+						Membre de la Chambre Royale Belgo-Luxembourgeoise des Salles de Ventes
+					</p>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<div class="pb-4 font-size-xs text-light opacity-50 text-center text-md-right">
+			Hôtel de Ventes Horta © 2026
+		</div>
+	</div>
+</div>
+</footer>
+
+ <!-- Toolbar for handheld devices--> <div class="cz-handheld-toolbar"> <div class="d-table table-fixed w-100"> <a class="d-table-cell cz-handheld-toolbar-item" href="#navbarCollapse" data-toggle="collapse" onClick="window.scrollTo(0, 0)"> <span class="cz-handheld-toolbar-icon"><i class="czi-menu"></i></span> <span class="cz-handheld-toolbar-label">Menu</span></a> </div> </div> <!-- Back To Top Button--> <a class="btn-scroll-top" href="#top" data-scroll><span class="btn-scroll-top-tooltip text-muted font-size-sm mr-2">Top</span><i class="btn-scroll-top-icon czi-arrow-up"> </i></a>  <!-- JavaScript libraries, plugins and custom scripts--> <script src="js/currencyFormatter/currencyFormatter.js" ></script> <script src="UserFiles/templates/Cartzilla/dist/js/theme.min.js"></script> <script src="UserFiles/templates/Cartzilla/dist/js/prism.min.js"></script> <script type="text/javascript" id="cookieinfo" src="js/cookieinfo.min.js" data-bg="#1c2535" data-fg="#FFFFFF" data-link="#F1D600" data-cookie="CookiesPreferences" data-expires=";max-age=7890000" //90 days data-text-align="left" data-message="<p class='cookiesfr'>Ce site utilise des Cookies pour améliorer votre expérience. </p> <p class='cookiesnl'>Deze site gebruikt cookies om uw surfervaring gemakkelijker en aangenamer te maken. Door « Ik begrijp het » te klikken, geeft u aan dat u akkoord gaat met ons </p> <p class='cookiesen'>This website uses cookies to improve your experience. By clicking « Got it », you indicate that you agree with our </p>" data-linkmsg="<p class='cookiesfr'><a href='default.asp?sCode=COOKIEPOLICY-FR#tab2'>Vous pouvez consulter notre politique de Cookies et en modifier les paramètres</a></p> <p class='cookiesnl'><a href='default.asp?sCode=COOKIEPOLICY-FR#tab2'>persoonlijke gegevens en cookiebeheerbeleid</a></p> <p class='cookiesen'><a href='default.asp?sCode=COOKIEPOLICY-FR#tab2'>privacy and cookies policy</a></p>" data-moreinfo="" data-scriptmsg="" data-close-text="<p class='cookiesfr'>Autoriser tous les Cookies</p><p class='cookiesnl'>Ik begrijp het!</p><p class='cookiesen'>Got it!</p>" > </script>   </body> </html> 

@@ -12,7 +12,7 @@ Posted Invaluable sale results sync as separate `sold_price` and `sold_currency`
 
 Doyle and Phillips whole-sale imports include artists without individual watchlist bookmarks. Phillips lots retain their published session dates; date-only Doyle catalog snapshots stay all-day entries and use `Lot N` when artwork titles are absent. Saved catalog images use the same validated image-upload path as Heritage. Re-imports retain source identities, snapshot observation times, saved research, and Email Tray state.
 
-The Calendar reads artist research links from `docs/artist-links.html` and the generated `docs/artprice-artist-links.json` registry, including for whole-sale artists without an individual watchlist record. Existing database artist links take precedence. Artist names link to Artprice, and saved Invaluable artist searches appear in the Gallery Catalog and research controls. No external lookup runs while rendering the Calendar HTML; USD price conversions load afterward for the selected day.
+The single maintained bookmarks file is `docs/artist-links.html`, shared by the collection workers, LiveArt research, and Artprice bookmarking. The Calendar reads its artist research links from that file and the generated `docs/artprice-artist-links.json` registry, including for whole-sale artists without an individual watchlist record. Existing database artist links take precedence. Artist names link to Artprice, and saved Invaluable artist searches appear in the Gallery Catalog and research controls. No external lookup runs while rendering the Calendar HTML; USD price conversions load afterward for the selected day.
 
 Calendar presentation uses `secondstateapp/lot_presentation.py` to display known artists as **Last Name, First Name** and supply a separate surname sort key. Curated aliases handle compound surnames, surname-first Chinese names, and mononyms; uncertain names retain their supplied order. **Artist surname A–Z** sorts the Gallery Catalog with accent-insensitive comparison and stable ties. Research search accepts both the original name and the displayed name.
 
@@ -101,6 +101,8 @@ The source ledger displays normalized artwork, artist, USD hammer, medium, dimen
 `GET/POST /calendar/lots/<id>/bid-board/` provides staff-only previews and saves with CSRF protection. It makes no paid research calls. For a positive non-USD source hammer, it retrieves a daily exchange rate from the public [Frankfurter API](https://frankfurter.dev/) and caches successful rates for six hours (failed lookups for five minutes). The server obtains candidate prices from saved normalized records or the opaque LiveArt research ID in the current server session, never from browser-supplied prices. Saves persist `AuctionBidBoardAnalysis` and synchronize selected evidence with `LiveArtResaleAnalysis`.
 
 The three evidence-derived gross resale cases reuse the combined, deduplicated Artprice + LiveArt analysis: a configurable factor of the lowest selected hammer, the median selected hammer, and a configurable factor of the highest selected hammer. They expose their basis and source counts. Fewer than three unique sales receives a limited-evidence notice; no evidence produces unavailable cases unless a manual override is supplied. Overrides are labeled manual and can be cleared to resume evidence-derived values.
+
+The Bid Board also shows **Upside ⅓** and **Upside ⅔**, evenly spaced between the effective working and optimistic resale values. These interpolated assumptions update with the evidence or either endpoint's manual override, and are unavailable if an endpoint is missing. Each is rounded independently to cents and supports the same bid selection, qualifying ceiling, profit targets, saving and email snapshot as the original cases. Only the original three cases have manual overrides. Previously saved three-case snapshots retain their saved values and columns until explicitly resaved.
 
 All calculations use server-side `Decimal` values. Buyer premium, purchase tax and selling commission round individually to cents, half up. Purchase tax can apply to hammer only, hammer plus premium, or hammer plus premium plus other acquisition costs. Other acquisition and selling costs are explicit. Return on cost is net profit divided by all-in acquisition; profit divided by gross resale is a separate metric. Neither is a probability.
 
@@ -299,3 +301,14 @@ node --test secondstateapp/tests_calendar_currency_frontend.js secondstateapp/te
 ```
 
 Tests mock Gmail delivery and make no external Gmail, Twilio, Artprice, Invaluable, or production website calls.
+
+
+## LiveArt Research Queue
+
+**Add to research** on a Calendar lot saves a staff-shared selection independently of the Email Tray star. No existing Artprice/LiveArt link or saved analysis is needed. **LiveArt Queue · N** opens selections across all auction dates, with order controls, optional instructions and progress/results. Selections survive date changes, filters, pagination, reloads and auction synchronization because they reference the existing lot ID.
+
+To start, tell LiveArt Worker **“Process my LiveArt queue.”** The automation stays paused. This request captures an immutable ordered snapshot; later additions and note/order edits wait for the next request. Empty queues do no research. There is no website launch button, polling, catalog fallback or fixed lot quota.
+
+**Queued**, **Researching**, **Done** and **Needs attention** report saved progress. Terminal research, unavailable valuation, skips and triage retain distinct dispositions; saved research/Board links appear only when those artifacts exist. A blocked lot retains its reason. **Research again → Queue again** requires an explicit reason and never starts research by itself. Removing unclaimed work cancels it safely; removing a researching selection preserves its in-flight result and receipts.
+
+See [LiveArt Research Queue implementation](liveart-research-queue.md) for coordination, proof validation, recovery and tests. New migrations create an empty queue; old catalog priorities are never imported.

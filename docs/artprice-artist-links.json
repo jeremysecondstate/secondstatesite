@@ -24,6 +24,13 @@
       ]
     },
     {
+      "name": "Albrecht Dürer",
+      "url": "https://www.artprice.com/artist/33949/albrecht-durer/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/33949/albrecht-durer",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-23T07:29:32+00:00"
+    },
+    {
       "name": "Amy Sillman",
       "url": "https://www.artprice.com/artist/188391/amy-sillman/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/188391/amy-sillman",
@@ -177,6 +184,13 @@
       ]
     },
     {
+      "name": "George Wesley Bellows",
+      "url": "https://www.artprice.com/artist/2018/george-wesley-bellows/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/2018/george-wesley-bellows",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-23T07:00:12+00:00"
+    },
+    {
       "name": "Gerhard Richter",
       "url": "https://www.artprice.com/artist/24376/gerhard-richter/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/24376/gerhard-richter",
@@ -186,6 +200,17 @@
         "https://www.artprice.com/artprice-news/1832/richter-atteindra-t-il-les-50-millions-en-mars-",
         "https://www.artprice.com/artprice-news/9215/top-10-german-artists"
       ]
+    },
+    {
+      "name": "Gustave Baumann",
+      "url": "https://www.artprice.com/artist/32716/gustave-baumann/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/32716/gustave-baumann",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-30T20:36:42+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/32716/gustave-baumann/lots/pasts?idcategory=2&p=1&sort=datesale_desc"
+      ],
+      "source_file": "docs/artist-links-bulks.html"
     },
     {
       "name": "HARING, KEITH",
@@ -213,6 +238,13 @@
         "https://www.artprice.com/artprice-news/13313/exhibition-from-monet-to-warhol-in-athens-83-masterpieces-from-impressionism-to-pop-art",
         "https://www.artprice.com/artprice-news/15560/lacma-village-square-brings-together-van-gogh-manet-and-modern-masters-until-july-19-2026"
       ]
+    },
+    {
+      "name": "Jacob Lawrence",
+      "url": "https://www.artprice.com/artist/16734/jacob-lawrence/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/16734/jacob-lawrence",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-22T14:01:54+00:00"
     },
     {
       "name": "Jasper Johns",
@@ -407,6 +439,17 @@
       ]
     },
     {
+      "name": "Mel Ramos",
+      "url": "https://www.artprice.com/artist/23816/mel-ramos/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/23816/mel-ramos",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-30T22:22:04+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/23816/mel-ramos/lots/pasts?idcategory=2&p=1&sort=datesale_desc"
+      ],
+      "source_file": "docs/artist-links-bulks.html"
+    },
+    {
       "name": "Michelangelo Pistoletto",
       "url": "https://www.artprice.com/artist/23018/michelangelo-pistoletto/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/23018/michelangelo-pistoletto",
@@ -450,6 +493,13 @@
       ]
     },
     {
+      "name": "Peter Max",
+      "url": "https://www.artprice.com/artist/69415/peter-max/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/69415/peter-max",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-22T08:53:16+00:00"
+    },
+    {
       "name": "Philip Guston",
       "url": "https://www.artprice.com/artist/12389/philip-guston/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/12389/philip-guston",
@@ -468,6 +518,20 @@
       "evidence_urls": [
         "https://de.artprice.com/check_browser?from=%252Fartist%252F27103%252Fpierre-soulages"
       ]
+    },
+    {
+      "name": "Rembrandt van Rijn",
+      "url": "https://www.artprice.com/artist/24103/rembrandt-van-rijn/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/24103/rembrandt-van-rijn",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-23T07:35:04+00:00"
+    },
+    {
+      "name": "Richard Diebenkorn",
+      "url": "https://www.artprice.com/artist/7696/richard-diebenkorn/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/7696/richard-diebenkorn",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-23T07:00:12+00:00"
     },
     {
       "name": "Richard Prince",
@@ -555,6 +619,13 @@
       ]
     },
     {
+      "name": "Wassily Kandinsky",
+      "url": "https://www.artprice.com/artist/15079/wassily-kandinsky/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/15079/wassily-kandinsky",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-23T07:00:12+00:00"
+    },
+    {
       "name": "William Blake",
       "url": "https://www.artprice.com/artist/2771/william-blake/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/2771/william-blake",
@@ -563,6 +634,17 @@
       "evidence_urls": [
         "https://www.artprice.com/artprice-news/artist/18384/398/ghosts-at-the-kunstmuseum-basel-exploring-the-supernatural-in-art-from-william-blake-to-today"
       ]
+    },
+    {
+      "name": "Wolf Kahn",
+      "url": "https://www.artprice.com/artist/15037/wolf-kahn/lots/pasts?idcategory[]=2",
+      "source_url": "https://www.artprice.com/artist/15037/wolf-kahn",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-10-30T21:42:58+00:00",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/15037/wolf-kahn/lots/pasts?idcategory[]=2"
+      ],
+      "source_file": "docs/artist-links-bulks.html"
     },
     {
       "name": "Yoshitomo Nara",

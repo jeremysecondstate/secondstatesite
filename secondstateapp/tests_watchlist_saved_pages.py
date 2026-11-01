@@ -107,6 +107,35 @@ class SavedHeritagePagesTests(TestCase):
         self.assertEqual(updated.metrics.changed_lots, 1)
         self.assertEqual(updated.lots[0].current_bid, 3000)
 
+    def test_description_source_wrapping_preserves_title_and_medium(self):
+        cases = (
+            (
+                "<i>Untitled (2 works)</i>,\n1992",
+                "Etchings in colors on\nBFK Rives paper",
+                "Untitled (2 works), 1992",
+                "Etchings in colors on BFK Rives paper",
+            ),
+            (
+                "<i>Helicopters, Mountains, People, from The Valley\nSeries</i>, 1989",
+                "Etching on Twinrocker handmade cotton paper",
+                "Helicopters, Mountains, People, from The Valley Series, 1989",
+                "Etching on Twinrocker handmade cotton paper",
+            ),
+        )
+        for title, medium, expected_title, expected_medium in cases:
+            with self.subTest(title=expected_title):
+                content = card("65001").replace(
+                    "<i>Portrait 65001</i>, 1957", title
+                ).replace("Lithograph in colors", medium)
+                result = self.run_import([self.page("wrapped.html", content)])
+                self.assertEqual(len(result.lots), 1)
+                lot = result.lots[0]
+                self.assertEqual(lot.artist, "Pablo Picasso")
+                self.assertEqual(lot.title, expected_title)
+                self.assertEqual(lot.medium, expected_medium)
+                self.assertEqual(lot.source_lot_id, "8280-65001")
+                self.assertEqual(lot.start_at, "2026-10-22")
+
     def test_partial_gallery_snapshot_reports_coverage_and_repairs_cached_missing_dates(self):
         old_card = card("65001").replace('<span class="live-auction-date">Live Auction: Oct 22, 2026</span>', "")
         old = HeritageAdapter().parse_search_page(old_card, ENTRY.url, "")[0]

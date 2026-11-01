@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SECONDSTATE Invaluable Collector",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "description": "Collect public lots from Invaluable searches loaded in your browser, then import one bundle in SECONDSTATE Studio.",
   "minimum_chrome_version": "111",
   "permissions": ["storage", "alarms"],

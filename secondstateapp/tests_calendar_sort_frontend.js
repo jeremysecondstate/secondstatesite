@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const {test} = require("node:test");
 const CalendarCurrency = require("./static/secondstateapp/calendar_currency.js");
+const CalendarArtists = require("./static/secondstateapp/calendar_artists.js");
 
 const template = fs.readFileSync(path.join(__dirname, "../templates/calendar/calendar.html"), "utf8");
 const sortFunctions = template.slice(template.indexOf("  const galleryPrice ="),
@@ -16,12 +17,14 @@ const sortListener = template.slice(template.indexOf('  gallerySort.addEventList
 
 function catalog(lots, sort = "price_asc", filter = "all") {
   const context = vm.createContext({
-    window: {CalendarCurrency},
+    window: {CalendarCurrency, CalendarArtists},
     data: {"2026-10-22": lots.map(lot => ({currency: "USD", ...lot}))}, selectedDay: "2026-10-22", galleryFilter: filter,
     galleryVisibleCount: 24,
     activeView: "catalog",
+    galleryHideAttributed: false,
     gallerySort: {value: sort, addEventListener(type, callback) { this[type] = callback; }},
     gallerySortNote: {}, galleryDescription: {}, galleryResults: {}, galleryMore: {},
+    galleryArtistClear: {},
     galleryGrid: {cards: [], replaceChildren() { this.cards = []; }, appendChild(card) { this.cards.push(card); }},
     galleryCard: (lot, index) => ({id: lot.id, index}), appendText() {},
     loadCurrencyPrices() {},
@@ -101,6 +104,59 @@ test("filters and Show more keep price order across the full day and retain rese
   page.render();
   assert.equal(page.galleryGrid.cards.length, 0);
   assert.equal(page.galleryResults.textContent, "0 watched lots");
+});
+
+test("Bid Boards retains every saved outcome through all catalog sorts and preserves research indices", () => {
+  const lots = [
+    {id: "unsaved", artist: "A", auction_house: "A", lot_number: "1", estimate_low: "1", event_at: "2026-10-22T00:00:00Z", saved_bid_board: null},
+    {id: "qualifying", artist: "Z", auction_house: "C", lot_number: "100", estimate_low: "900", event_at: "2026-10-22T18:00:00Z", saved_bid_board: {qualifies: true, qualifying_bid: "300"}},
+    {id: "no-bid", artist: "A", auction_house: "A", lot_number: "2", estimate_low: "90", event_at: "2026-10-22T15:00:00Z", saved_bid_board: {qualifies: false, qualifying_bid: null}},
+    {id: "unavailable", artist: "M", auction_house: "B", lot_number: "10A", estimate_low: null, event_at: null, saved_bid_board: {qualifies: null, qualifying_bid: null}},
+    {id: "research-only", artist: "A", auction_house: "A", saved_bid_board_url: "/saved/5/", liveart_research: {selected_ids: ["example"]}},
+  ];
+  const page = catalog(lots, "catalog", "bidboards");
+  const before = JSON.stringify(page.data);
+  const expected = {
+    catalog: ["qualifying", "no-bid", "unavailable"],
+    artist: ["no-bid", "unavailable", "qualifying"],
+    house: ["no-bid", "unavailable", "qualifying"],
+    lot_asc: ["no-bid", "unavailable", "qualifying"],
+    lot_desc: ["qualifying", "unavailable", "no-bid"],
+    price_asc: ["no-bid", "qualifying", "unavailable"],
+    price_desc: ["qualifying", "no-bid", "unavailable"],
+    time_asc: ["no-bid", "qualifying", "unavailable"],
+    time_desc: ["qualifying", "no-bid", "unavailable"],
+  };
+  for (const [sort, ids] of Object.entries(expected)) {
+    page.gallerySort.value = sort;
+    page.render();
+    assert.deepEqual(page.galleryGrid.cards.map(card => card.id), ids, sort);
+    for (const card of page.galleryGrid.cards) assert.equal(lots[card.index].id, card.id);
+  }
+  assert.equal(JSON.stringify(page.data), before, "filtering cannot modify saved outcomes or source order");
+});
+
+test("Bid Boards sorts the complete saved set before pagination and resets Show more on sort changes", () => {
+  const lots = Array.from({length: 60}, (_, index) => ({
+    id: index, estimate_low: String(60 - index),
+    saved_bid_board: index % 3 === 0 ? null : {qualifies: index % 2 === 0, qualifying_bid: null},
+  }));
+  const page = catalog(lots, "price_asc", "bidboards");
+  const saved = lots.filter(lot => lot.saved_bid_board).map(lot => lot.id);
+  page.render();
+  assert.deepEqual(page.galleryGrid.cards.map(card => card.id), [...saved].reverse().slice(0, 24));
+  assert.equal(page.galleryResults.textContent, "Showing 24 of 40 watched lots");
+  assert.equal(page.galleryMore.hidden, false);
+  page.galleryVisibleCount += 24;
+  page.render();
+  assert.deepEqual(page.galleryGrid.cards.map(card => card.id), [...saved].reverse());
+  assert.equal(page.galleryMore.hidden, true);
+  page.gallerySort.value = "price_desc";
+  page.gallerySort.change();
+  assert.equal(page.galleryFilter, "bidboards");
+  assert.equal(page.galleryVisibleCount, 24);
+  assert.deepEqual(page.galleryGrid.cards.map(card => card.id), saved.slice(0, 24));
+  for (const card of page.galleryGrid.cards) assert.equal(lots[card.index].id, card.id);
 });
 
 test("existing catalog, artist and auction-house orders are unchanged", () => {

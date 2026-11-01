@@ -4,6 +4,7 @@
   const MAX_BYTES = 7 * 1024 * 1024;
   const MAX_WATCHES = 250;
   const MAX_PAGES = 25;
+  const MAX_BULK_PAGES = 100;
   const MAX_SNAPSHOTS = 500;
   const MAX_MESSAGE_BYTES = 2 * 1024 * 1024;
   const FILTERS = "banned:false AND channelIDs:1 AND unlotted:false AND onlineOnly:false "
@@ -36,31 +37,63 @@
       if (["datetimeutcunix[min]", "datetimeutcunix[max]", "datetype"].includes(key.toLowerCase())) original.searchParams.delete(key);
     }
     // Validate the supplied scope before normalizing the sort and first page.
-    const spec = core().searchSpec(original.href);
-    const normalized = new URL(spec.sourceURL);
-    normalized.searchParams.set("sort", "endDateAsc");
-    normalized.searchParams.delete("page");
-    const checked = core().searchSpec(normalized.href);
-    const navigation = new URL(checked.sourceURL);
-    // The shared evidence key lowercases sort names. Preserve the site's
-    // public spelling for actual top-level navigation.
+    core().searchSpec(original.href);
+    const navigation = new URL(original.href);
+    // Keep the working bookmark's artist order and repeated URL encoding.
+    // Canonical evidence keys are separate from actual browser navigation.
+    for (const key of [...navigation.searchParams.keys()]) {
+      if (["sort", "page"].includes(key.toLowerCase())) navigation.searchParams.delete(key);
+    }
     navigation.searchParams.set("sort", "endDateAsc");
     navigation.hostname = "www.invaluable.com";
-    return { artist: checked.artist, url: navigation.href };
+    navigation.hash = "";
+    const checked = core().searchSpec(navigation.href);
+    return { artist: checked.artist, artists: checked.artists, url: navigation.href };
   }
   function normalizeWatches(values) {
     if (!Array.isArray(values) || values.length > 10000) throw new Error("Too many bookmark entries.");
     const watches = new Map();
     for (const value of values) {
-      try { const watch = normalizeSearch(value); watches.set(watch.url, watch); }
+      try { const watch = normalizeSearch(value); const key = core().searchSpec(watch.url).sourceURL;
+        if (!watches.has(key)) watches.set(key, watch); }
       catch { /* Unrelated and unsupported bookmarks are not imported. */ }
     }
     if (!watches.size) throw new Error("No supported Invaluable artist-search bookmarks were found.");
-    if (watches.size > MAX_WATCHES) throw new Error(`Choose at most ${MAX_WATCHES} artist searches.`);
-    return [...watches.values()].sort((a, b) => a.artist.localeCompare(b.artist) || a.url.localeCompare(b.url));
+    const bulk = [...watches.values()].filter((watch) => watch.artists.length > 1);
+    const selected = bulk.length ? bulk : [...watches.values()];
+    if (selected.length > MAX_WATCHES) throw new Error(`Choose at most ${MAX_WATCHES} searches.`);
+    if (bulk.length) return selected.map((watch, index) => ({ ...watch, artist: `Bulk ${index + 1} · ${watch.artists.length} artists` }));
+    return selected.sort((a, b) => a.artist.localeCompare(b.artist) || a.url.localeCompare(b.url));
+  }
+  function selectIntakeBookmarks(entries) {
+    if (!Array.isArray(entries) || entries.length > 10000) throw new Error("Too many bookmark entries.");
+    const names = ["BULK-1A", "BULK-1B", "BULK-2A", "BULK-2B"];
+    const selected = new Map();
+    for (const entry of entries) {
+      const title = String(entry.title || "").trim().toUpperCase();
+      if (!names.includes(title)) continue;
+      let url;
+      try { url = new URL(entry.url); } catch { throw new Error(`${title} has an invalid search URL.`); }
+      if (!["invaluable.com", "www.invaluable.com"].includes(url.hostname)) throw new Error(`${title} must use an Invaluable search URL.`);
+      const watch = normalizeSearch(entry.url);
+      if (watch.artists.length < 2) throw new Error(`${title} must contain a bulk artist search.`);
+      const key = core().searchSpec(watch.url).sourceURL;
+      if (selected.has(title) && selected.get(title).key !== key) throw new Error(`Conflicting ${title} bookmarks.`);
+      selected.set(title, { url: entry.url, key });
+    }
+    if (!selected.size) return entries.map((entry) => entry.url);
+    const missing = names.filter((name) => !selected.has(name));
+    if (missing.length) throw new Error(`The four-list export is incomplete. Missing ${missing.join(", ")}.`);
+    if (new Set([...selected.values()].map((entry) => entry.key)).size !== names.length) {
+      throw new Error("The four bulk bookmarks must contain distinct searches.");
+    }
+    return names.map((name) => selected.get(name).url);
+  }
+  function pageLimit(watch) {
+    return (watch.artists || core().searchSpec(watch.url).artists).length > 1 ? MAX_BULK_PAGES : MAX_PAGES;
   }
   function pageURL(watch, page) {
-    if (!Number.isSafeInteger(page) || page < 0 || page >= MAX_PAGES) throw new Error("The page limit was reached.");
+    if (!Number.isSafeInteger(page) || page < 0 || page >= pageLimit(watch)) throw new Error("The page limit was reached.");
     const url = new URL(watch.url);
     if (page) url.searchParams.set("page", String(page + 1));
     core().searchSpec(url.href);
@@ -80,9 +113,10 @@
       next.status = "complete"; next.target = null; next.note = "Queue finished. Export the captured results."; return next;
     }
     const row = next.progress[next.current_index];
-    if (row.next_page >= MAX_PAGES) throw new Error("The per-artist page limit was reached. Skip this artist or export partial results.");
+    if (row.next_page >= pageLimit(next.watches[next.current_index])) throw new Error("The search page limit was reached. Skip this search or export partial results.");
     next.status = "running"; row.status = "loading"; row.note = "Waiting for the page's own catalog response.";
-    next.target = { url: pageURL(next.watches[next.current_index], row.next_page), nonce,
+    next.target = { url: next.watches[next.current_index].url,
+      source_url: pageURL(next.watches[next.current_index], row.next_page), nonce,
       started_at: now, index: next.current_index, page: row.next_page };
     next.note = `Loading ${row.artist}, page ${row.next_page + 1}.`;
     return next;
@@ -97,6 +131,16 @@
   function sameSearch(left, right) {
     try { return core().searchSpec(left).sourceURL === core().searchSpec(right).sourceURL; }
     catch { return false; }
+  }
+  function sameScope(left, right) {
+    try {
+      const base = (value) => {
+        const url = new URL(value);
+        for (const key of [...url.searchParams.keys()]) if (key.toLowerCase() === "page") url.searchParams.delete(key);
+        return core().searchSpec(url.href).sourceURL;
+      };
+      return base(left) === base(right);
+    } catch { return false; }
   }
   function validatedSnapshot(snapshot, targetURL, now) {
     if (!snapshot || typeof snapshot !== "object" || byteSize(snapshot) > MAX_MESSAGE_BYTES) throw new Error("Snapshot is missing or exceeds the size limit.");
@@ -119,8 +163,8 @@
   function acceptCapture(state, message, senderTabId, now) {
     const target = state.target;
     if (state.status !== "running" || !target || senderTabId !== state.tab_id
-        || message.nonce !== target.nonce || !sameSearch(message.page_url, target.url)) throw new Error("Stale or unrelated capture ignored.");
-    const snapshot = validatedSnapshot(message.snapshot, target.url, now);
+        || message.nonce !== target.nonce || !sameScope(message.page_url, target.url)) throw new Error("Stale or unrelated capture ignored.");
+    const snapshot = validatedSnapshot(message.snapshot, target.source_url || target.url, now);
     if (Date.parse(snapshot.captured_at) < Date.parse(target.started_at) - 1000) throw new Error("Capture predates this navigation.");
     const next = clone(state);
     const result = snapshot.results[0];
@@ -157,18 +201,18 @@
     if (!result.nbPages || row.next_page >= result.nbPages) {
       row.status = "captured"; row.note = "All reported pages captured; import retains unobserved cached lots.";
       next.current_index += 1;
-    } else if (row.next_page >= MAX_PAGES) {
-      next.status = "paused"; row.status = "partial"; row.note = `Stopped at the ${MAX_PAGES}-page limit. Export or skip this artist.`;
+    } else if (row.next_page >= pageLimit(next.watches[target.index])) {
+      next.status = "paused"; row.status = "partial"; row.note = `Stopped at the ${pageLimit(next.watches[target.index])}-page limit. Export or skip this search.`;
       next.note = row.note;
     } else { row.status = "queued"; row.note = "Page saved. Continuing to the next page."; }
     if (byteSize(next) > MAX_BYTES) throw new Error("Local capture storage limit reached. Export this run before starting another.");
     return next;
   }
   function skip(state) {
-    if (!state || state.current_index >= state.watches.length) throw new Error("There is no current artist to skip.");
+    if (!state || state.current_index >= state.watches.length) throw new Error("There is no current search to skip.");
     const next = clone(state); const row = next.progress[next.current_index];
     row.status = "skipped"; row.note = "Skipped by user; captured pages are retained.";
-    next.current_index += 1; next.target = null; next.status = "paused"; next.note = "Artist skipped. Resume when ready.";
+    next.current_index += 1; next.target = null; next.status = "paused"; next.note = "Search skipped. Resume when ready.";
     return next;
   }
   function exportBundle(state, now) {
@@ -179,8 +223,8 @@
         captured_pages: row.captured_pages.map((page) => page + 1), reported_pages: row.reported_pages,
         reported_lots: row.reported_lots, captured_lots: row.captured_lots, last_captured_at: row.last_captured_at, note: row.note })) };
   }
-  const api = { MAX_BYTES, MAX_WATCHES, MAX_PAGES, MAX_SNAPSHOTS, MAX_MESSAGE_BYTES, byteSize, normalizeSearch, normalizeWatches,
-    validateWindow, pageURL, makeRun, prepareTarget, pause, sameSearch, validatedSnapshot, acceptCapture, skip, exportBundle };
+  const api = { MAX_BYTES, MAX_WATCHES, MAX_PAGES, MAX_BULK_PAGES, MAX_SNAPSHOTS, MAX_MESSAGE_BYTES, byteSize, normalizeSearch, normalizeWatches, selectIntakeBookmarks,
+    validateWindow, pageLimit, pageURL, makeRun, prepareTarget, pause, sameSearch, sameScope, validatedSnapshot, acceptCapture, skip, exportBundle };
   root.SecondStateCollector = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);
