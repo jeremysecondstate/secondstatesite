@@ -1048,6 +1048,22 @@ body:has(.lot-browser[open]) {
   text-decoration-color: currentColor;
 }
 
+.lot-attribution-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin: 2px 0 9px;
+  padding: 4px 8px;
+  border: 1px solid #b8794f;
+  border-radius: 4px;
+  background: #42291e;
+  color: #ffe0bf;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+  letter-spacing: .025em;
+}
+
 .lot-title {
   margin: 0;
   font-family: "Playfair Display", serif;
@@ -3105,6 +3121,16 @@ body:has(.lot-browser[open]) {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.day-gallery-work.has-attribution:not(.is-won) .day-gallery-visual {
+  border-color: #b8794f;
+}
+
+.day-gallery-work.has-attribution:not(.is-won) .day-gallery-caption {
+  padding-left: 12px;
+  border-left: 3px solid #b8794f;
+  background: linear-gradient(90deg, rgba(184, 121, 79, .12), transparent);
 }
 
 /* Confirmed purchases retain their emphasis after the auction has ended. */

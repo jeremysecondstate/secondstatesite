@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=artist-jump-20261027">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=attribution-flags-20261101">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=finite-tier-notes-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
@@ -740,6 +740,13 @@
       label.textContent = lot.artist;
     }
     item.appendChild(label);
+    if (lot.attribution_label) {
+      const attribution = document.createElement("span");
+      attribution.className = "lot-attribution-badge";
+      attribution.textContent = lot.attribution_label;
+      attribution.title = "Auction catalog credit";
+      item.appendChild(attribution);
+    }
   };
 
   const formatAnalysisMoney = (value, currency = "USD") => {
@@ -3406,7 +3413,7 @@
   const galleryCard = (lot, index) => {
     const card = document.createElement("article");
     card.dataset.galleryLotId = String(lot.id);
-    card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}`;
+    card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}${lot.attribution_label ? " has-attribution" : ""}`;
     const visual = document.createElement("div");
     visual.className = "day-gallery-visual";
     const researchUrl = galleryResearchUrl(lot);

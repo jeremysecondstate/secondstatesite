@@ -57,7 +57,7 @@ from .liveart_client import LiveArtAPIError, LiveArtClient, LiveArtConfiguration
 from .liveart_manual import MAX_MANUAL_SALES, find_existing_sale, is_manual_web, normalize_manual_entry, retained_manual_candidates
 from .liveart_resale import artwork_matches, artwork_search_title, build_scenarios_with_sources, is_prints_and_multiples, manual_review_eligible, normalize_candidate, resale_candidate_selectable, safe_artwork_reference
 from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPLES_LABEL, merge_search_lots, parse_search_terms, search_query_limits
-from .lot_presentation import artist_display_name, artist_sort_key, clean_display_text
+from .lot_presentation import artist_attribution_label, artist_display_name, artist_sort_key, clean_display_text
 from .oliver_houses import is_oliver_house, oliver_house_name, oliver_house_names
 from .research_queue import selected_queue_state
 from .models import (
@@ -246,6 +246,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "id": lot.pk,
         "artist": artist_display_name(source_artist),
         "artist_source": source_artist,
+        "attribution_label": artist_attribution_label(lot.artist, source_artist, title=lot.title),
         "artist_sort_key": artist_sort_key(source_artist),
         "title": clean_display_text(lot.title, strip_lot_markers=True) or "Untitled lot",
         "auction_house": clean_display_text(lot.auction_house or lot.source or "Auction"),
