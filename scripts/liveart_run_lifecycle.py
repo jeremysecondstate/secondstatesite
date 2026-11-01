@@ -552,6 +552,33 @@ def queue_completion_audit(config, ident, pointer, audit_path=None):
         operations = item.get("operations", [])
         if any(operation.get("status") != "settled" for operation in operations):
             issues.append(f"Lot {lot_id} has an unsettled queue operation; its protection must remain.")
+        amendments = [entry for entry in run.get("recovery_log", [])
+                      if entry.get("event") == "amendment" and entry.get("item_id") == item["id"]]
+        recorded_amendments = {entry.get("amendment_id") for entry in amendments}
+        for operation in operations:
+            correction = operation.get("details", {}).get("correction")
+            if isinstance(correction, dict) and correction.get("amendment_id") not in recorded_amendments:
+                issues.append(f"Lot {lot_id} has a correction save without a verified amendment.")
+        if amendments:
+            latest = amendments[-1]
+            effective = latest.get("outcome", {})
+            proof = effective.get("proof", {})
+            current = item.get("current_saved_proof", {})
+            if any(proof.get(key) != current.get(key) or current.get(key) is None
+                   for key in ("liveart_analysis_id", "liveart_updated_at", "bid_board_analysis_id", "bid_board_updated_at")):
+                issues.append(f"Lot {lot_id} current saved proof differs from its latest amendment.")
+            if (item.get("effective_outcome") != effective
+                    or item.get("effective_saved_revisions") != latest.get("saved_revisions")):
+                issues.append(f"Lot {lot_id} effective result does not match its latest amendment.")
+            correction_ids = latest.get("correction_operation_ids", [])
+            corrected = [operation for operation in operations if operation.get("operation_id") in correction_ids]
+            if (not correction_ids or len(corrected) != len(correction_ids)
+                    or not any(operation.get("kind") == "save_board" for operation in corrected)
+                    or any(operation.get("status") != "settled" or operation.get("kind") not in {"save_evidence", "save_board"}
+                           or operation.get("details", {}).get("correction") != {
+                               key: latest.get(key) for key in ("amendment_id", "reason", "authorization")}
+                           for operation in corrected)):
+                issues.append(f"Lot {lot_id} amendment requires its settled save-only correction receipts.")
         outcome = item.get("outcome", {})
         outcome = outcome if isinstance(outcome, dict) else {}
         source = outcome.get("source_proof", {})

@@ -174,6 +174,11 @@ def operation_json(operation):
             "units_spent": str(operation.units_spent) if operation.units_spent is not None else None}
 
 
+def _latest_amendment(run, item_id):
+    return next((entry for entry in reversed(run.recovery_log)
+                 if entry.get("event") == "amendment" and entry.get("item_id") == item_id), None)
+
+
 def run_json(run):
     items = []
     for item in run.items.select_related("lot__liveart_resale_analysis", "lot__bid_board_analysis").prefetch_related("operations"):
@@ -182,12 +187,16 @@ def run_json(run):
             record = getattr(item.lot, relation, None)
             if record is not None:
                 current_proof.update({f"{prefix}_analysis_id": record.pk, f"{prefix}_updated_at": record.updated_at.isoformat()})
+        amendment = _latest_amendment(run, item.pk)
         items.append({"id": item.pk, "lot_id": item.lot_id, "position": item.position,
                       "lot_snapshot": item.lot_snapshot, "note_snapshot": item.note_snapshot,
                       "status": item.status, "disposition": item.disposition, "reason": item.reason,
                       "claimed_at": item.claimed_at.isoformat() if item.claimed_at else None,
                       "completed_at": item.completed_at.isoformat() if item.completed_at else None,
                       "outcome": item.outcome, "saved_revisions": item.saved_revisions,
+                      "effective_outcome": amendment["outcome"] if amendment else item.outcome,
+                      "effective_saved_revisions": amendment["saved_revisions"] if amendment else item.saved_revisions,
+                      "latest_amendment_id": amendment["amendment_id"] if amendment else None,
                       "current_saved_proof": current_proof,
                       "operations": [operation_json(op) for op in item.operations.all()]})
     return {"id": str(run.pk), "request_id": str(run.request_id), "owner_token": str(run.owner_token),
@@ -205,6 +214,75 @@ def get_run(run_id):
 
 
 RESEARCH_CHECKS = ("google_original_researched", "liveart_browser_researched", "evidence_saved_reloaded", "board_saved_reloaded", "costs_verified", "selection_verified", "email_flags_verified")
+CORRECTION_KINDS = {"save_evidence", "save_board"}
+
+
+def _correction_context(run, value):
+    if not isinstance(value, dict) or set(value) != {"amendment_id", "reason", "authorization"}:
+        raise QueueError("Correction requires an amendment_id, reason and human authorization descriptor.", 400)
+    _uuid(value["amendment_id"], "amendment_id")
+    if not isinstance(value["reason"], str) or not value["reason"].strip() or len(value["reason"]) > 10000:
+        raise QueueError("A nonempty correction reason of at most 10,000 characters is required.", 400)
+    authorization = value["authorization"]
+    if (not isinstance(authorization, dict) or set(authorization) != {"thread_id", "turn_id", "item_id", "instruction"}
+            or authorization["thread_id"] != run.thread_id
+            or not isinstance(authorization["instruction"], str) or not authorization["instruction"].strip()
+            or len(authorization["instruction"]) > 10000):
+        raise QueueError("Correction authorization must identify the owner's human instruction.", 400)
+    for key in ("thread_id", "turn_id", "item_id"):
+        _uuid(authorization[key], f"authorization.{key}")
+    return value
+
+
+def _amendment_request(payload):
+    return {key: payload[key] for key in ("amendment_id", "reason", "authorization", "correction_operation_ids",
+            "disposition", "checks", "proof", "source_proof") if key in payload}
+
+
+def _validate_amendment_operations(run, item, request):
+    if ResearchQueueOperation.objects.filter(item__run=run, settled_at__isnull=True).exists():
+        raise QueueError("Reconcile every run operation before amending a result.")
+    ids = request.get("correction_operation_ids")
+    if not isinstance(ids, list) or not ids or len(ids) != len(set(map(str, ids))):
+        raise QueueError("Distinct settled correction_operation_ids are required.", 400)
+    for operation_id in ids:
+        _uuid(operation_id, "correction_operation_id")
+    context = {key: request.get(key) for key in ("amendment_id", "reason", "authorization")}
+    operations = list(item.operations.filter(details__correction__amendment_id=request["amendment_id"]))
+    if ({str(operation.pk) for operation in operations} != set(ids)
+            or not any(operation.kind == "save_board" for operation in operations)
+            or any(operation.kind not in CORRECTION_KINDS or operation.details.get("correction") != context
+                   or not operation.settled_at for operation in operations)):
+        raise QueueError("The amendment must account for its exact settled save-only correction operations, including a Board save.")
+
+
+def _amend_result(run, item, payload):
+    request = _amendment_request(payload)
+    _uuid(request.get("amendment_id"), "amendment_id")
+    previous = next((entry for entry in run.recovery_log if entry.get("event") == "amendment"
+                     and entry.get("amendment_id") == request["amendment_id"]), None)
+    if previous:
+        if previous["item_id"] != item.pk or previous["request"] != request:
+            raise QueueError("A recorded amendment cannot be rewritten.")
+        return {"run": run_json(run), "amendment": previous}
+    context = _correction_context(run, {key: request.get(key) for key in ("amendment_id", "reason", "authorization")})
+    if (run.status != "running" or item.status != "done"
+            or item.disposition not in {"researched", "valuation_unavailable"}
+            or request.get("disposition") not in {"researched", "valuation_unavailable"}):
+        raise QueueError("Only a completed research result in the owner's running pass can be amended.")
+    _validate_amendment_operations(run, item, request)
+    revisions = _validate_outcome(item, request)
+    latest = _latest_amendment(run, item.pk)
+    outcome = {key: request[key] for key in ("disposition", "reason", "checks", "proof", "source_proof") if key in request}
+    amendment = {"event": "amendment", "item_id": item.pk, "lot_id": item.lot_id, **context,
+                 "request": request, "correction_operation_ids": request["correction_operation_ids"],
+                 "previous": {"outcome": latest["outcome"] if latest else item.outcome,
+                              "saved_revisions": latest["saved_revisions"] if latest else item.saved_revisions},
+                 "outcome": outcome, "saved_revisions": revisions, "at": timezone.now().isoformat()}
+    run.recovery_log = [*run.recovery_log, amendment]
+    run.save(update_fields=["recovery_log"])
+    _update_current(item, latest_result={**outcome, "amendment_id": context["amendment_id"]})
+    return {"run": run_json(run), "amendment": amendment}
 
 
 def _revision(model):
@@ -280,7 +358,17 @@ def _validate_completion_audit(run, audit):
     receipts, server_receipts = audit.get("lot_receipts", {}), audit.get("server_receipts", {})
     if not isinstance(receipts, dict) or not isinstance(server_receipts, dict):
         raise QueueError("Completion receipt maps must be objects.", 400)
+    amended_ids = {entry.get("amendment_id") for entry in run.recovery_log if entry.get("event") == "amendment"}
+    if any(operation.details.get("correction", {}).get("amendment_id") not in amended_ids
+           for operation in ResearchQueueOperation.objects.filter(item__run=run)
+           if "correction" in operation.details and isinstance(operation.details.get("correction"), dict)):
+        raise QueueError("Every correction save must have its verified amendment before finish.")
     for item in items:
+        amendment = _latest_amendment(run, item.pk)
+        if amendment:
+            _validate_amendment_operations(run, item, amendment["request"])
+            if _validate_outcome(item, amendment["outcome"]) != amendment["saved_revisions"]:
+                raise QueueError("Current saved revisions do not match the latest amendment.")
         lot_id = str(item.lot_id)
         if isinstance(receipts.get(lot_id), str) and receipts[lot_id].strip():
             continue
@@ -413,6 +501,8 @@ def worker_action(payload):
             if replay != item.outcome:
                 raise QueueError("A settled outcome cannot be rewritten.")
             return {"run": run_json(run)}
+        if action == "amend":
+            return _amend_result(run, item, payload)
         if action == "block" and item.status == "needs_attention":
             replay = {"reason": str(payload.get("reason", "")), "reopening_condition": str(payload.get("reopening_condition", "")), "source_proof": payload.get("source_proof", {})}
             if payload.get("shared_block") is True:
@@ -420,13 +510,29 @@ def worker_action(payload):
             if replay != item.outcome:
                 raise QueueError("A blocked result cannot be rewritten.")
             return {"run": run_json(run)}
-        if item.status != "researching" or run.status != "running":
+        correcting = action == "intent" and item.status == "done"
+        if (item.status != "researching" and not correcting) or run.status != "running":
             raise QueueError("This item is not currently claimed in a running pass.")
         if action == "intent":
             operation_id = _uuid(payload.get("operation_id"), "operation_id")
             kind, details = payload.get("kind"), payload.get("details", {})
             if not isinstance(kind, str) or kind not in {"search", "save_evidence", "save_board", "other"} or not isinstance(details, dict):
                 raise QueueError("Supported operation kind and details object are required.", 400)
+            if correcting:
+                if kind not in CORRECTION_KINDS or item.disposition not in {"researched", "valuation_unavailable"}:
+                    raise QueueError("Completed items allow only evidence or Board correction saves; research cannot repeat.")
+                correction = _correction_context(run, details.get("correction"))
+                recorded = {entry.get("amendment_id") for entry in run.recovery_log if entry.get("event") == "amendment"}
+                if correction["amendment_id"] in recorded:
+                    # Existing operation replays remain safe; no new save may join a finished amendment.
+                    if not ResearchQueueOperation.objects.filter(pk=operation_id, item=item).exists():
+                        raise QueueError("A completed amendment cannot acquire another operation.")
+                if any(isinstance(op.details.get("correction"), dict)
+                       and op.details["correction"].get("amendment_id") not in recorded | {correction["amendment_id"]}
+                       for op in item.operations.all()):
+                    raise QueueError("Finish the previous correction amendment before beginning another.")
+            elif "correction" in details:
+                raise QueueError("Correction saves apply only to an already completed research result.")
             operation = ResearchQueueOperation.objects.filter(pk=operation_id).first()
             if operation:
                 if operation.item_id != item.pk or operation.kind != kind or operation.details != details:

@@ -390,6 +390,96 @@ class ResearchQueueTests(TestCase):
         self.assertEqual(refreshed["saved_revisions"], {})
 
 
+    def _completed_research_for_amendment(self):
+        select_lot(self.lots[0].pk, True)
+        run = self.start()
+        item = self.claim(run)
+        operation_id = str(uuid.uuid4())
+        self.call(run, "intent", item_id=item["id"], operation_id=operation_id, kind="search", details={"query": "Original query"})
+        self.call(run, "settle", item_id=item["id"], operation_id=operation_id, result={"returned": 1}, units_spent="7")
+        analysis = LiveArtResaleAnalysis.objects.create(lot=self.lots[0], retrieved_at=timezone.now(), candidates=[{"id": "comp-1"}], selected_ids=["comp-1"])
+        board = AuctionBidBoardAnalysis.objects.create(lot=self.lots[0], selected_ids=["comp-1"], evidence_snapshot={"selected_records": analysis.candidates, "source_summary": {}}, analysis={"tax": "8.88"})
+        checks = {key: True for key in ("google_original_researched", "liveart_browser_researched", "evidence_saved_reloaded", "board_saved_reloaded", "costs_verified", "selection_verified", "email_flags_verified")}
+        proof = {"liveart_analysis_id": analysis.pk, "liveart_updated_at": analysis.updated_at.isoformat(), "bid_board_analysis_id": board.pk, "bid_board_updated_at": board.updated_at.isoformat()}
+        original = self.finish_item(run, item, disposition="researched", checks=checks, proof=proof)["run"]["items"][0]
+        context = {"amendment_id": str(uuid.uuid4()), "reason": "Apply the user's confirmed zero purchase tax.",
+                   "authorization": {"thread_id": self.thread, "turn_id": str(uuid.uuid4()), "item_id": str(uuid.uuid4()), "instruction": "Use my resale exemption, 0% tax."}}
+        return run, item, analysis, board, checks, proof, original, context
+
+    def _correction_save(self, run, item, context, *, settle=True):
+        operation_id = str(uuid.uuid4())
+        self.call(run, "intent", item_id=item["id"], operation_id=operation_id, kind="save_board", details={"correction": context})
+        if settle:
+            self.call(run, "settle", item_id=item["id"], operation_id=operation_id, result={"saved_reloaded": True}, units_spent="0")
+        return operation_id
+
+    def test_amendment_retains_original_result_and_receipts_and_replays_without_rewriting(self):
+        run, item, analysis, board, checks, proof, original, context = self._completed_research_for_amendment()
+        operation_id = self._correction_save(run, item, context)
+        board.analysis = {"tax": "0"}
+        board.save()
+        proof = {**proof, "bid_board_updated_at": board.updated_at.isoformat()}
+        payload = {**context, "item_id": item["id"], "correction_operation_ids": [operation_id], "disposition": "researched", "checks": checks, "proof": proof}
+        result = self.call(run, "amend", **payload)
+        latest = result["run"]["items"][0]
+        for field in ("outcome", "saved_revisions", "status", "reason", "disposition", "completed_at"):
+            self.assertEqual(latest[field], original[field], field)
+        self.assertEqual(latest["operations"][0], original["operations"][0])
+        self.assertEqual(latest["effective_outcome"]["reason"], context["reason"])
+        self.assertEqual(latest["effective_saved_revisions"]["bid_board"]["analysis"], {"tax": "0"})
+        self.assertEqual(result["amendment"]["previous"]["outcome"], original["outcome"])
+        self.assertEqual(ResearchQueueItem.objects.get(lot=self.lots[0]).outcome_summary, context["reason"])
+        replay = self.call(run, "amend", **payload)
+        self.assertEqual(replay["amendment"], result["amendment"])
+        self.assertEqual(len(replay["run"]["recovery_log"]), 1)
+        with self.assertRaises(QueueError):
+            self.call(run, "amend", **{**payload, "reason": "Rewritten reason"})
+        with self.assertRaises(QueueError):
+            self.call(run, "intent", item_id=item["id"], operation_id=str(uuid.uuid4()), kind="save_board", details={"correction": context})
+        self.assertEqual(self.call(run, "finish")["run"]["status"], "completed")
+
+    def test_completed_item_correction_rejects_search_missing_authority_and_unknown_operation(self):
+        run, item, analysis, board, checks, proof, original, context = self._completed_research_for_amendment()
+        for kind in ("search", "other"):
+            with self.subTest(kind=kind), self.assertRaises(QueueError):
+                self.call(run, "intent", item_id=item["id"], operation_id=str(uuid.uuid4()), kind=kind, details={"correction": context})
+        for bad in ({}, {**context, "reason": ""}, {**context, "authorization": {}},
+                    {**context, "authorization": {**context["authorization"], "thread_id": str(uuid.uuid4())}}):
+            with self.subTest(context=bad), self.assertRaises(QueueError):
+                self.call(run, "intent", item_id=item["id"], operation_id=str(uuid.uuid4()), kind="save_board", details={"correction": bad})
+        operation_id = self._correction_save(run, item, context, settle=False)
+        payload = {**context, "item_id": item["id"], "correction_operation_ids": [operation_id], "disposition": "researched", "checks": checks, "proof": proof}
+        with self.assertRaisesRegex(QueueError, "Reconcile"):
+            self.call(run, "amend", **payload)
+        with self.assertRaises(QueueError):
+            self.call(run, "intent", item_id=item["id"], operation_id=str(uuid.uuid4()), kind="save_evidence", details={"correction": context})
+        self.call(run, "settle", item_id=item["id"], operation_id=operation_id, result={"saved_reloaded": True}, units_spent="0")
+        with self.assertRaises(QueueError):
+            self.call(run, "amend", **{**payload, "correction_operation_ids": [str(uuid.uuid4())]})
+        with self.assertRaisesRegex(QueueError, "verified amendment"):
+            self.call(run, "finish")
+
+    def test_amendment_rejects_stale_save_proof_and_finish_rechecks_latest_revision(self):
+        run, item, analysis, board, checks, proof, original, context = self._completed_research_for_amendment()
+        operation_id = self._correction_save(run, item, context)
+        board.analysis = {"tax": "0"}
+        board.save()
+        payload = {**context, "item_id": item["id"], "correction_operation_ids": [operation_id], "disposition": "researched", "checks": checks, "proof": proof}
+        with self.assertRaisesRegex(QueueError, "revision"):
+            self.call(run, "amend", **payload)
+        self.assertEqual(get_run(run["id"]).recovery_log, [])
+        payload["proof"] = {**proof, "bid_board_updated_at": board.updated_at.isoformat()}
+        self.call(run, "amend", **payload)
+        board.analysis = {"tax": "5"}
+        board.save()
+        with self.assertRaisesRegex(QueueError, "revision"):
+            self.call(run, "finish")
+        new_context = {**context, "amendment_id": str(uuid.uuid4()), "reason": "Apply the updated user instruction."}
+        new_operation = self._correction_save(run, item, new_context)
+        self.call(run, "amend", **{**payload, **new_context, "correction_operation_ids": [new_operation], "proof": {**proof, "bid_board_updated_at": board.updated_at.isoformat()}})
+        self.assertEqual(self.call(run, "finish")["run"]["status"], "completed")
+
+
 class ResearchQueueBoundaryTests(TestCase):
     def setUp(self):
         self.lot = AuctionWatchLot.objects.create(source="test", source_lot_id="auth")

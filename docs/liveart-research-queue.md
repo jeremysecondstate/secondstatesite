@@ -28,13 +28,14 @@ Run from `C:/dev/secondstatesite`. The client reads the existing `CATALOG_API_KE
 
 During an ongoing snapshot the original verified authorization remains valid through harmless status questions or other steering. Such messages do not create another snapshot. Join supporting descendants before a mutating helper command: these commands require an active coordinator root and terminal descendants. New `claim` and genuinely new `intent` commands also require the historical business guards to be clear. Do not create a legacy `active_batch` or lot claim for this pass; queue claims and intents provide its operation ownership. Preserve historical locks and reconcile their actual outcomes when required.
 
-For `intent`, `settle`, `outcome` and `block`, pass `--payload PATH` pointing to a private JSON file. `item_id` is the frozen run-item ID, not the Calendar lot ID.
+For `intent`, `settle`, `outcome`, `amend` and `block`, pass `--payload PATH` pointing to a private JSON file. `item_id` is the frozen run-item ID, not the Calendar lot ID.
 
 | Command | Required payload / behavior |
 | --- | --- |
 | `intent` | `item_id`, `kind` (`search`, `save_evidence`, `save_board`, `other`), `details` object; optional stable `operation_id`. The client journals an ID before the request. Execute the actual operation only if the first confirmed response says `operation_execution_allowed: true`. A replay says false even if the original response was lost; reconcile rather than repeat. |
 | `settle` | `item_id`, `operation_id`, nonempty `result` containing the actual observed receipt, and `units_spent` as a known nonnegative decimal. For unknown usage use null plus `result.usage_unknown: true`; never invent zero. Retrying the exact receipt is safe; rewriting it is rejected. |
 | `outcome` | `item_id`, `disposition`, `reason`, and applicable `checks`/`proof` or `source_proof` described below. All operations must be settled. |
+| `amend` | For an already Done research result in the owner's running pass: `item_id`, stable `amendment_id`, `reason`, `authorization`, `correction_operation_ids`, and the complete updated research `disposition`, `checks`, `proof` (plus applicable `source_proof`). Appends a separate, immutable correction receipt; original outcome, saved revisions, status and settled operations remain unchanged. |
 | `block` | `item_id`, `reason`, `reopening_condition`, `source_proof`. Other actionable items continue. Only a demonstrated common obstruction justifies `shared_block: true`; this requires source proof and marks remaining work Needs attention. |
 
 For `researched` and `valuation_unavailable`, truthful checks are required: `google_original_researched`, `liveart_browser_researched`, `evidence_saved_reloaded`, `board_saved_reloaded`, `costs_verified`, `selection_verified`, `email_flags_verified`. An unobservable email flag must instead have an explicit `proof.verification_gaps.email_flags` explanation. Preserve the established zero-evidence unavailable workflow.
@@ -42,6 +43,16 @@ For `researched` and `valuation_unavailable`, truthful checks are required: `goo
 After the existing visible save/reload workflow, `status` and `claim` expose `run.items[*].current_saved_proof`: actual `liveart_analysis_id`, `liveart_updated_at`, `bid_board_analysis_id`, `bid_board_updated_at`. Use these values in `proof`; never infer analysis IDs from a lot ID. The server verifies current revisions and that the Board matches saved selected evidence, candidate records and source summary. A stale Board must be reconciled/resaved before completion. These metadata supplement the required rendered save/reload proof; they do not replace research checks.
 
 For `triaged` or `skipped`, preserve the actual gate, reason and source proof. Do not manufacture a Board or report completed valuation research. Full research standards and financial rules remain in the [canonical worker instructions](sched-tasks-codex/liveart-sched-tasks/liveart-sched-task-description.md).
+
+### Correct a saved result during the same run
+
+A later explicit human instruction may require correcting costs or appending verified evidence to a Done research result. Use a new UUID `amendment_id` and an `authorization` object containing the actual human message's `thread_id`, `turn_id`, `item_id` and exact `instruction` text. The local client verifies that message belongs to the current owner and was sent after this snapshot started. An agent note, the original queue request or an invented authorization does not qualify. A later message in the same active turn is supported.
+
+Before each correction save, call `intent` with only `save_evidence` or `save_board`, and `details.correction` equal to `{amendment_id, reason, authorization}`. Preserve that context across all operations for this correction. Execute only the first confirmed allowed intent and settle its actual receipt normally. This path never permits another search, reopens the item or changes the original operation receipts.
+
+After the visible saves and reload checks, call `amend` with that same context, every correction operation ID, and current outcome proof. A Board save is required; all run operations must be settled. The server verifies current evidence/Board revisions and appends the amendment to `run.recovery_log`. Identical retries are idempotent; a changed request under the same ID is rejected. Complete an amendment before starting a different correction for that item.
+
+`run.items[*].outcome` and `saved_revisions` remain the original result. `effective_outcome`, `effective_saved_revisions` and `latest_amendment_id` identify the latest correction; the queue displays its summary. Finishing the run requires every correction save to be accounted for and the latest amended proof to match the current saved state. Keep the amended lot receipt in the final audit's `lot_receipts` map.
 
 ## Finish, interruptions and unknown outcomes
 

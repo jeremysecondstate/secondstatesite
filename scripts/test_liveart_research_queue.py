@@ -30,7 +30,7 @@ class FakeAPI:
         if action == "start":
             if self.run is None:
                 self.run = {"id": str(uuid4()), "request_id": payload["request_id"],
-                            "owner_token": payload["owner_token"], "thread_id": payload["thread_id"], "status": "running",
+                            "owner_token": payload["owner_token"], "thread_id": payload["thread_id"], "status": "running", "recovery_log": [],
                             "items": [{"id": index, "lot_id": lot, "position": index,
                                        "lot_snapshot": {"title": str(lot)}, "note_snapshot": "Only this selected work",
                                        "status": "queued", "claimed_at": None, "outcome": {}, "operations": []} for index, lot in enumerate(self.lots, 1)]}
@@ -61,6 +61,17 @@ class FakeAPI:
                 extra["operation"] = operation
             else:
                 item["status"] = "done" if action == "outcome" else "needs_attention"
+        elif action == "amend":
+            item = next(item for item in self.run["items"] if item["id"] == payload["item_id"])
+            entry = next((entry for entry in self.run["recovery_log"] if entry.get("amendment_id") == payload["amendment_id"]), None)
+            if entry is None:
+                outcome = {key: payload[key] for key in ("disposition", "reason", "checks", "proof")}
+                entry = {"event": "amendment", "item_id": item["id"], "outcome": outcome,
+                         **{key: payload[key] for key in ("amendment_id", "reason", "authorization", "correction_operation_ids")},
+                         "saved_revisions": {"test": "corrected"}}
+                self.run["recovery_log"].append(entry)
+                item.update(effective_outcome=outcome, effective_saved_revisions=entry["saved_revisions"])
+            extra["amendment"] = entry
         elif action == "stop":
             self.run["status"] = "blocked"
             for item in self.run["items"]:
@@ -405,6 +416,62 @@ class ManualQueueTests(unittest.TestCase):
         with self.assertRaisesRegex(lifecycle.LifecycleError, "cannot be verified"):
             queue.stop(self.config, self.api, ident)
         self.assertEqual(len(self.api.calls), before)
+
+
+    def test_correction_is_journaled_bound_to_real_later_human_and_replayed_after_lost_response(self):
+        self.api = FakeAPI([101])
+        ident, _ = self.human()
+        queue.start(self.config, self.api, ident)
+        item = self.api.run["items"][0]
+        item.update(status="done", outcome={"disposition": "researched", "reason": "Original"}, saved_revisions={"test": "original"})
+        queue.coordinate(self.config, self.api, ident, "status")
+        self.f.set_turn(ident, "completed")
+        instruction = "Use my resale exemption, 0% tax."
+        _, human_id = self.human(ident, instruction)
+        with closing(sqlite3.connect(self.f.history)) as db:
+            turn_id = db.execute("SELECT turn_id FROM thread_items WHERE item_id=?", (human_id,)).fetchone()[0]
+        authorization = {"thread_id": ident, "turn_id": turn_id, "item_id": human_id, "instruction": instruction}
+        context = {"amendment_id": str(uuid4()), "reason": "Apply the user-confirmed exemption.", "authorization": authorization}
+        intent = {"item_id": 1, "kind": "save_board", "details": {"correction": context}}
+        def journal_precedes_network(action, payload):
+            if action in {"intent", "amend"}:
+                journal = queue.pointer(self.config)["current"]["journal"]
+                self.assertTrue(any(entry["action"] == action and entry["payload"].get("item_id") == 1 for entry in journal))
+        self.api.before = journal_precedes_network
+        response = queue.coordinate(self.config, self.api, ident, "intent", intent)
+        self.assertTrue(response["operation_execution_allowed"])
+        operation_id = response["operation"]["operation_id"]
+        queue.coordinate(self.config, self.api, ident, "settle", {"item_id": 1, "operation_id": operation_id, "result": {"saved": True}, "units_spent": "0"})
+        proof = {"liveart_analysis_id": 11, "liveart_updated_at": "current-a", "bid_board_analysis_id": 22, "bid_board_updated_at": "current-b"}
+        item["current_saved_proof"] = proof
+        amendment = {**context, "item_id": 1, "correction_operation_ids": [operation_id], "disposition": "researched", "checks": {}, "proof": proof}
+        self.api.fail_after = "amend"
+        with self.assertRaises(queue.QueueError):
+            queue.coordinate(self.config, self.api, ident, "amend", amendment)
+        result = queue.coordinate(self.config, self.api, ident, "amend", amendment)
+        self.assertEqual(len(result["run"]["recovery_log"]), 1)
+        self.assertEqual(item["outcome"]["reason"], "Original")
+        before = len(self.api.calls)
+        with self.assertRaisesRegex(queue.QueueError, "actual later human"):
+            queue.coordinate(self.config, self.api, ident, "amend", {**amendment, "authorization": {**authorization, "instruction": "Invented instruction"}})
+        self.assertEqual(len(self.api.calls), before)
+        audit = self.audit(ident)
+        current = queue.pointer(self.config)["current"]
+        self.assertTrue(lifecycle.queue_completion_audit(self.config, ident, current, audit)["passed"])
+        changed = copy.deepcopy(current)
+        changed["run"]["items"][0]["current_saved_proof"]["bid_board_updated_at"] = "changed"
+        self.assertFalse(lifecycle.queue_completion_audit(self.config, ident, changed, audit)["passed"])
+        changed = copy.deepcopy(current)
+        changed["run"]["items"][0]["operations"][0]["kind"] = "search"
+        self.assertFalse(lifecycle.queue_completion_audit(self.config, ident, changed, audit)["passed"])
+        for mutation in ("outcome", "saved_revisions", "recovery_log"):
+            response = {"run": copy.deepcopy(current["run"])}
+            if mutation == "recovery_log":
+                response["run"]["recovery_log"] = []
+            else:
+                response["run"]["items"][0][mutation] = {"changed": True}
+            with self.subTest(mutation=mutation), self.assertRaises(queue.QueueError):
+                queue.record_response(self.config, {"current": copy.deepcopy(current)}, response)
 
 
 if __name__ == "__main__":

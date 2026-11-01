@@ -147,9 +147,15 @@ def record_response(config, data, response):
         raise QueueError("Server snapshot scope changed; no further work is allowed.")
     prior = current.get("run")
     if isinstance(prior, dict):
+        previous_log = prior.get("recovery_log", [])
+        if not isinstance(run.get("recovery_log", []), list) or run.get("recovery_log", [])[:len(previous_log)] != previous_log:
+            raise QueueError("Recorded recovery history changed; retain the original receipts.")
         for old, new in zip(prior["items"], run["items"]):
             if old.get("status") in {"done", "needs_attention"} and new.get("status") != old["status"]:
                 raise QueueError("A terminal snapshot item was reopened; no repeated research is allowed.")
+            if old.get("status") in {"done", "needs_attention"} and any(
+                    old.get(key) != new.get(key) for key in ("outcome", "saved_revisions", "reason", "disposition", "completed_at")):
+                raise QueueError("An original terminal outcome changed; corrections must append a separate amendment.")
             new_operations = {operation.get("operation_id"): operation for operation in new["operations"]}
             for operation in old["operations"]:
                 updated = new_operations.get(operation.get("operation_id"))
@@ -377,6 +383,28 @@ def stop(config, api, ident, audit_path=None):
         return {"status": "stopped", "work_allowed": False, **public(response), "lifecycle": result}
 
 
+def verify_correction_authorization(config, ident, current, authorization):
+    """Bind a correction to an actual later human instruction, never an agent note."""
+    if not isinstance(authorization, dict) or set(authorization) != {"thread_id", "turn_id", "item_id", "instruction"}:
+        raise QueueError("Correction requires its human authorization descriptor.")
+    for key in ("thread_id", "turn_id", "item_id"):
+        lifecycle.thread_uuid(authorization[key])
+    instruction = authorization["instruction"]
+    if authorization["thread_id"] != ident or not isinstance(instruction, str) or not instruction.strip():
+        raise QueueError("Correction authorization must identify this owner's human instruction.")
+    expected = " ".join(instruction.split()).casefold().rstrip(".! ")
+    with lifecycle.database(config.history_db) as history:
+        item = history.execute("SELECT item_type,created_at_ms,item_json FROM thread_items "
+                               "WHERE thread_id=? AND turn_id=? AND item_id=?",
+                               (ident, authorization["turn_id"], authorization["item_id"])).fetchone()
+    if (item is None or item["item_type"] != "userMessage" or type(item["created_at_ms"]) is not int
+            or item["created_at_ms"] < current["created_at_ms"]
+            or lifecycle.manual_message_text(item["item_json"]) != expected
+            or lifecycle.is_stop_message(expected)
+            or expected in {"process my liveart queue", "please process my liveart queue"}):
+        raise QueueError("The correction must cite the actual later human instruction in this chat.")
+
+
 def coordinate(config, api, ident, action, payload=None, audit_path=None):
     with lifecycle.file_lock(config.path.parent / "manual-queue.lock"):
         data = pointer(config)
@@ -393,9 +421,14 @@ def coordinate(config, api, ident, action, payload=None, audit_path=None):
         payload = copy.deepcopy(payload or {})
         if any(key in payload for key in ("action", "run_id", "owner_token", "expected_owner_token", "new_owner_token")):
             raise QueueError("Payload may not override queue identity or ownership.")
-        if action in {"intent", "settle", "outcome", "block"}:
+        if action in {"intent", "settle", "outcome", "block", "amend"}:
             if payload.get("item_id") not in {item["id"] for item in current["scope"]}:
                 raise QueueError("The item is outside the frozen selected snapshot.")
+        if action == "amend":
+            verify_correction_authorization(config, ident, current, payload.get("authorization"))
+        elif action == "intent" and isinstance(payload.get("details"), dict) and "correction" in payload["details"]:
+            correction = payload["details"]["correction"]
+            verify_correction_authorization(config, ident, current, correction.get("authorization") if isinstance(correction, dict) else None)
         if action == "claim" and not lifecycle.business_clear(config):
             raise QueueError("Business operation guards are not clear; no next item may be claimed.")
         if action == "intent":
@@ -444,12 +477,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", type=Path, default=lifecycle.DEFAULT_CONFIG)
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("start", "resume", "reconcile", "stop", "status", "claim", "intent", "settle", "outcome", "block", "finish"):
+    for action in ("start", "resume", "reconcile", "stop", "status", "claim", "intent", "settle", "outcome", "block", "amend", "finish"):
         command = sub.add_parser(action)
         command.add_argument("--thread-id", required=True)
         if action in {"start", "resume"}:
             command.add_argument("--authorization-item-id")
-        if action in {"intent", "settle", "outcome", "block", "reconcile"}:
+        if action in {"intent", "settle", "outcome", "block", "amend", "reconcile"}:
             command.add_argument("--payload", required=True, type=Path)
         if action == "reconcile":
             command.add_argument("--receipt", required=True, type=Path)
