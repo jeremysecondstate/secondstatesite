@@ -42,11 +42,12 @@ _PRINT_MEDIUM = re.compile(
     r"screen\s?print(?:ed|s)?|silk\s?screen[s]?|serigraph(?:ie|y|s|ies)?|s[eé]rigraphie[s]?|"
     r"gravure[s]?|estampe[s]?|eau[x]?[ -]forte[s]?|aquatin[dt](?:e|s)?|drypoint|"
     r"pointe[ -]s[eè]che|woodcut[s]?|woodblock|stencil\s+print[s]?|linocut[s]?|linogravure[s]?|"
-    r"monotype[s]?|monoprint[s]?|gicl[eé]e[s]?|phototype[s]?|(?:photo|foto)print[s]?|collotype[s]?|pochoir|h[eé]liogravure[s]?|letterpress|offset|print[s]?)\b",
+    r"monotype[s]?|monoprint[s]?|gicl[eé]e[s]?|phototype[s]?|photogravure[s]?|zincograph(?:y|s)?|burin|(?:photo|foto)print[s]?|collotype[s]?|pochoir|h[eé]liogravure[s]?|letterpress|offset|printed(?=\s+poster\b)|print[s]?)\b",
     re.IGNORECASE,
 )
 _QUALIFIED_CREDIT = re.compile(
     r"^\(?(?:after\b|according\s+to\b|attributed(?:\s+to)?\b|attribu[eé](?:e)?(?:\s+[aà])?\b|d[\u2019']?apr[eè]s\b|"
+    r"based\s+on(?:\s+(?:a\s+work|works)\s+by)?\b|"
     r"in\s+(?:the\s+)?(?:style|manner|taste)(?:\s+of)?\b|school\s+of\b|entourage(?:\s+de)?\b|"
     r"[eé]cole(?:\s+de)?\b|atelier(?:\s+de)?\b|follower(?:\s+of)?\b|circle\s+of\b|"
     r"homage\s+to\b|hommage\s+[aà]\b)\)?\s*", re.IGNORECASE,
@@ -55,7 +56,7 @@ _FOLLOWING_QUALIFIER = re.compile(
     r"^[\s,;:.\u2013\u2014-]*(?P<qualifier>\(?(?:after|according\s+to|attributed(?:\s+to)?|"
     r"d[\u2019']?apr[eè]s|attribu[eé](?:e)?(?:\s+[aà])?|circle\s+of|school\s+of|"
     r"in\s+(?:the\s+)?(?:style|manner|taste)(?:\s+of)?|despu[eé]s(?:\s+de)?|naar|"
-    r"homage\s+to|hommage\s+[aà])\)?)(?=\s|[.,;:]|$)", re.IGNORECASE,
+    r"homage\s+to|hommage\s+[aà]|based\s+on|copy\s+after)\)?)(?=\s|[.,;:\u2013\u2014-]|$)", re.IGNORECASE,
 )
 _REFERENCE_SECTION = re.compile(
     r"\b(?:provenance|bibliograph(?:y|ie)|literature|exhibition(?:\s+history)?|expositions?|"
@@ -64,13 +65,20 @@ _REFERENCE_SECTION = re.compile(
 _NONPRINT_MEDIUM = re.compile(
     r"\b(?:oil\s+on|huile\s+sur|acrylic\s+on|acrylique\s+sur|gouache|watercolou?r|"
     r"aquarelle|charcoal|fusain|pencil\s+(?:on|drawing)|crayon\s+sur|pastel|tempera|"
-    r"india\s+ink|encre\s+de\s+chine)\b", re.IGNORECASE,
+    r"india\s+ink|encre\s+de\s+chine|lithographic\s+(?:pencil|crayon|chalk))\b", re.IGNORECASE,
 )
 # Verified expanded source credits for maintained artist bookmarks. Prefer the
 # full name when locating the end of a credit, before the actual work title.
 _SOURCE_CREDIT_ALIASES = {
-    "rembrandt": ("Rembrandt van Rijn Harmensz",),
+    "rembrandt": ("Rembrandt Harmenszoon van Rijn", "Rembrandt van Rijn Harmensz", "H van Rijn Rembrandt", "Rembrandt van Rijn"),
     "dali salvador": ("Salvador Dali Y Domenech",),
+    "alphonse mucha": ("Alphonse Marie Mucha",),
+    "pablo picasso": ("Pablo Ruiz Picasso",),
+    "jean pierre vasarely yvaral": ("Jean-Pierre Vasarely",),
+    "manolo valdes": ("Manolo Valdes Blasco",),
+    "arman": ("Armand Pierre Fernandez known as Arman",),
+    "de francisco goya": ("Francisco de Goya y Lucientes",),
+    "jacques villon": ("Jacques Villon Gaston Duchamp dit",),
 }
 
 
@@ -201,7 +209,8 @@ def _leading_credit_matches(value: str, aliases: Iterable[str]) -> bool:
     credit = re.sub(r"\([^)]*\d{4}[^)]*\)", " ", credit)
     words = normalize_artist_name(credit).split()
     for alias in aliases:
-        wanted = normalize_artist_name(re.sub(r"\([^)]*\)", " ", alias)).split()
+        alias_credit = _QUALIFIED_CREDIT.sub("", alias.lstrip(" *#_\t\r\n"))
+        wanted = normalize_artist_name(re.sub(r"\([^)]*\)", " ", alias_credit)).split()
         if wanted and len(words) >= len(wanted) and sorted(words[:len(wanted)]) == sorted(wanted):
             # A conjunction immediately after the credited name introduces
             # another creator. Later conjunctions may simply be a work title.
@@ -224,7 +233,10 @@ def _credit_prefix_end(value: str, aliases: Iterable[str]) -> int | None:
             continue
         actual = [normalize_artist_name(span.group()) for span in spans[:len(wanted)]]
         if sorted(actual) == sorted(wanted):
-            return leading + spans[len(wanted) - 1].end()
+            end = leading + spans[len(wanted) - 1].end()
+            if value[end:end + 1] == ")" and value[:end].count("(") > value[:end].count(")"):
+                end += 1
+            return end
     return None
 
 
@@ -414,6 +426,12 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
     # Keep positions stable so returned source spans remain easy to audit.
     work = re.sub(r'"[^"\n]*"|\u201c[^\u201d\n]*\u201d|\u00ab[^\u00bb\n]*\u00bb|\u2018[^\u2019\n]*\u2019|(?<!\w)\'[^\'\n]*\'(?!\w)',
                   lambda match: " " * len(match.group()), work)
+    # A series name or the technique of an original being reproduced is not
+    # the technique of this offered impression.
+    work = re.sub(r"\((?:From\s+the\s+(?:set|series)\b)[^()\n]*\)",
+                  lambda match: " " * len(match.group()), work, flags=re.IGNORECASE)
+    work = re.sub(r"\b(?:reprints?|reproductions?)\s+(?:based\s+on|after)\s+(?:the\s+)?" + _PRINT_MEDIUM.pattern,
+                  lambda match: " " * len(match.group()), work, flags=re.IGNORECASE)
     # A catalogue work called "Lithograph No. 22" may be reproduced as a
     # poster. Its title identifies the original work, not the offered medium.
     # Mask bare numbered titles and explicit references to them, preserving
@@ -433,13 +451,26 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
             re.fullmatch(_NONPRINT_MEDIUM.pattern + r"\s+on\s+paper\s*,\s*[0-9]{4}", candidate, re.IGNORECASE)
             and re.match(r"\s*(?:original\s+)?poster\b", "".join(lines[index + 1:]), re.IGNORECASE)
         )
-        if re.fullmatch(numbered_title, candidate, re.IGNORECASE) or dated_nonprint_poster_title:
+        exhibition_medium_title = (
+            re.fullmatch(r"[^.\n]{1,60}\.\s*(?:paintings?|drawings?|lithographs?|etchings?|prints?|sculptures?|ceramics)"
+                         r"(?:\s*[,\u2013\u2014-]\s*(?:paintings?|drawings?|lithographs?|etchings?|prints?|sculptures?|ceramics))*"
+                         r"\s*,\s*[0-9]{4}", candidate, re.IGNORECASE)
+            and re.match(r"\s*(?:(?:original|color|black|white|three-color)\s+)*lithographic\s+poster\b",
+                         "".join(lines[index + 1:]), re.IGNORECASE)
+        )
+        if re.fullmatch(numbered_title, candidate, re.IGNORECASE) or dated_nonprint_poster_title or exhibition_medium_title:
             lines[index] = re.sub(r"[^\r\n]", " ", line)
     work = "".join(lines)
     work = re.sub(r"\b(?:after|based\s+on)\s+(?:the\s+)?" + numbered_title,
                   lambda match: " " * len(match.group()), work, flags=re.IGNORECASE)
     nonprint = _NONPRINT_MEDIUM.search(work)
     for positive in _PRINT_MEDIUM.finditer(work):
+        # A lithographic pencil/crayon is a drawing implement; its name does
+        # not establish that the offered sheet is a printed impression.
+        if positive.group().casefold() == "lithographic" and re.match(
+            r"\s+(?:pencil|crayon|chalk)\b", work[positive.end():], re.IGNORECASE,
+        ):
+            continue
         if positive.group().casefold() == "lithographic":
             # A later explicit process in the same offered-object line can
             # refine the earlier adjective, e.g. "lithographic poster ...;
@@ -451,8 +482,11 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
                 positive = _PRINT_MEDIUM.match(work, start)
         if positive.group().casefold() in {"print", "prints"}:
             before, after = work[:positive.start()], work[positive.end():]
+            if re.search(r"\b(?:signed|dated|monogrammed|numbered)(?:\s+and\s+(?:signed|dated|monogrammed|numbered))?\s+in\s+$",
+                         before, re.IGNORECASE):
+                continue
             modifier = re.search(r"\b(?:art|original|color|colour|vintage|fine\s+art|digital|pigment|signed|numbered|"
-                                 r"reproduction|offset|gicl[eé]e|edition|\d+)\s+$", before, re.IGNORECASE)
+                                 r"reproduction|offset|gicl[eé]e|edition|relief|sepia[ -]toned|\d+)\s+$", before, re.IGNORECASE)
             context = re.match(
                 r"\s*(?:on\b|in\b|with\b|signed\b|numbered\b|edition\b|n[\u00b0o.]\s*\d|"
                 r"\((?:(?:minor|slight|some)\s+)?(?:wear|damage|foxing|staining|creases?)\b|"
@@ -478,7 +512,17 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
                 and not re.search(r"\b(?:after|based\s+on|titled|called|exhibition|retrospective)\b",
                                   line_prefix, re.IGNORECASE)
             )
-            if not (modifier or context or counted_prints):
+            dash_medium = re.match(
+                r"\s*[\u2013\u2014-]\s*(?:signed\b|numbered\b|on\s+(?:paper|board|card)\b)",
+                after, re.IGNORECASE,
+            )
+            written_count = (
+                positive.group().casefold() == "prints"
+                and re.search(r"\b(?:two|three|four|five|six|seven|eight|nine|ten)\s+$", before, re.IGNORECASE)
+                and re.match(r"\s+from\b", after, re.IGNORECASE)
+                and re.search(r"\b[0-9]+(?:[.,][0-9]+)?\s*[x\u00d7]\s*[0-9]+(?:[.,][0-9]+)?\s*(?:cm|mm|in(?:ches)?)\b", work, re.IGNORECASE)
+            )
+            if not (modifier or context or counted_prints or dash_medium or written_count):
                 continue
         if nonprint and nonprint.start() < positive.start() and not re.search(r"\bmixed[ -]media\b|\btechnique\s+mixte\b", work, re.IGNORECASE):
             continue
@@ -499,7 +543,59 @@ def _resolved_collaboration(description: str, aliases: Iterable[str]) -> tuple[s
         end = _credit_prefix_end(line, aliases)
         if end is None:
             continue
-        tail = _strip_leading_biography(line[end:]).strip(" ,;:")
+        # Explicit comma-separated creator lists are collective lots, not a
+        # single resolved collaboration or a work by only the first artist.
+        # Requiring multiple list items and "others" avoids treating an
+        # ordinary comma-delimited artwork title as another creator.
+        collective = _strip_leading_biography(line[end:])
+        if not re.match(r"\s*,\s*(?:also\s+)?known\s+as\b", collective, re.IGNORECASE) and (re.match(r"\s*,\s*[^,;\n]+,\s*(?:[^,;\n]+,\s*)?(?:and\s+|et\s+)?(?:others|autres)\b",
+                    collective, re.IGNORECASE) or re.match(
+                        r"\s*,\s*[^,()\n]+\([^)]*\d{4}[^)]*\),?\s*(?:and|et)\s+[^,()\n]+\([^)]*\d{4}[^)]*\)",
+                        collective, re.IGNORECASE)):
+            return "", "", ""
+        tail = _strip_leading_biography(line[end:].lstrip(" *")).strip(" ,;:")
+        # Some source headings place a full second name after the qualifier.
+        # Retain that source relationship and read the next line as the work.
+        named_after = re.fullmatch(r"after\s+([A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ -]+)", tail)
+        if (named_after and len(normalize_artist_name(named_after.group(1)).split()) >= 2
+                and index + 2 < len(lines) and _print_technique(lines[index + 2], aliases) is not None):
+            suffix = " " + named_after.group(1)
+            return line, lines[index + 1].strip(" *_\t"), suffix
+        # A named, quoted work can follow both credits on the same line.
+        # Keep the complete credit instead of promoting the first creator.
+        inline = re.match(
+            r"(?P<separator>and|et|&)\s+(?P<collaborator>[^,;:()\n]+?)"
+            r"(?:\s*\([^)]*\d{4}[^)]*\))?[\s*,;:.\u2013\u2014-]*"
+            r"(?P<context>fragment\s+from\s+the\s+illustrated\s+work\s+)?"
+            r"[\"'\u201c\u2018*](?P<title>[^\"'\u201d\u2019*\n]+)[\"'\u201d\u2019*]",
+            tail, re.IGNORECASE,
+        )
+        if inline:
+            collaborator = inline.group("collaborator").strip(" *.,;:")
+            named = normalize_artist_name(collaborator).split()
+            # Do not absorb a sentence about another work into a name.
+            if (2 <= len(named) <= 5 and not any(c.isdigit() for c in collaborator)
+                    and not re.search(r"\b(?:from|with|including|collection|portfolio|prints|works)\b", collaborator, re.IGNORECASE)
+                    and _print_technique(description, aliases) is not None):
+                suffix = " " + inline.group("separator") + " " + collaborator
+                title = inline.group("title").strip(" ,")
+                if inline.group("context"):
+                    title = "Fragment from " + title
+                return line[:end].strip(" ,;:") + suffix, title, suffix
+            return "", "", ""
+        # Explicit production roles resolve a dash-separated engraver credit.
+        # Require that both source names occur in the role statement; retain
+        # that statement visibly so an engraving after a drawing stays clear.
+        secondary = re.fullmatch(r"[-\u2013\u2014]\s*([^,;:()\n]+)", tail)
+        if secondary and index + 2 < len(lines):
+            collaborator = secondary.group(1).strip()
+            role = re.search(r"\bengraved\s+by\s+([^,.;\n]+?)\s+after\s+a\s+drawing\s+by\s+([^,.;\n]+)",
+                             _offered_work_prefix(description), re.IGNORECASE)
+            if (role and normalize_artist_name(role.group(1)) == normalize_artist_name(collaborator)
+                    and any(set(normalize_artist_name(role.group(2)).split()) <= set(normalize_artist_name(alias).split()) for alias in aliases)
+                    and _print_technique(lines[index + 2], aliases) is not None):
+                suffix = " - " + collaborator + " (" + role.group(0).strip() + ")"
+                return line[:end].strip(" ,;:") + suffix, lines[index + 1].strip(" *_\t"), suffix
         match = re.fullmatch(
             r"(?:also\s+known\s+as\s+[^,]+,\s*)?(?P<separator>x|and|et|&)\s+"
             r"(?P<collaborator>[^,;:()\n]+?)(?:\s*\([^)]*\d{4}[^)]*\))?",
@@ -556,6 +652,24 @@ def _resolved_collaboration(description: str, aliases: Iterable[str]) -> tuple[s
     return None
 
 
+def _contradictory_offered_creator(description: str, aliases: Iterable[str]) -> bool:
+    """A direct offered-technique 'by' credit must not contradict its heading."""
+    work = _offered_work_prefix(description)
+    for match in re.finditer(_PRINT_MEDIUM.pattern + r"\s+by\s+([A-ZÀ-ÖØ-Þ][\w'’.-]+(?:\s+[A-ZÀ-ÖØ-Þ][\w'’.-]+){1,3})", work):
+        named = normalize_artist_name(match.group(1)).split()
+        wanted_names = [normalize_artist_name(alias).split() for alias in aliases]
+        if any(all(part in wanted or len(part) == 1 and any(word.startswith(part) for word in wanted)
+                       for part in named) for wanted in wanted_names):
+            continue
+        # Shared surname but a different full name is an explicit conflict,
+        # e.g. Giovanni Battista / Francesco Piranesi. A printer's separate
+        # production credit or a surname-only reference is not this case.
+        for wanted in wanted_names:
+            if named[-1:] == wanted[-1:] and not set(named) <= set(wanted):
+                return True
+    return False
+
+
 def _normalized_lot(raw: dict, card: dict, entry: BookmarkEntry, captured_at: datetime, auctioneers: dict) -> tuple[NormalizedLot | None, str]:
     identity = _id(raw.get("id"), "lot.id")
     if set(raw) - _LOT_FIELDS or set(card) - _CARD_FIELDS:
@@ -604,6 +718,8 @@ def _normalized_lot(raw: dict, card: dict, entry: BookmarkEntry, captured_at: da
         return None, "No explicit print technique is visible in the captured source description."
     if collaboration == ("", "", ""):
         return None, "The source's multiple-artist credit is unresolved."
+    if not collaboration and _contradictory_offered_creator(description, aliases):
+        return None, "The offered print's named creator contradicts its leading artist credit."
     zone = raw.get("timezone")
     try:
         if not isinstance(zone, str):

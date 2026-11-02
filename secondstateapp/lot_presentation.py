@@ -233,12 +233,16 @@ _ATTRIBUTION_TITLE_MARKER = re.compile(rf"\b(?:after|attributed\s+to|{_FRENCH_AT
 _FRENCH_CREDIT_PREFIX = re.compile(rf"^(?P<lead>\(?\s*)(?P<marker>{_FRENCH_ATTRIBUTION})(?=\s|\)|:|$)", re.IGNORECASE)
 _FRENCH_CREDIT_SUFFIX = re.compile(rf"(?P<lead>\(\s*|,\s*)(?P<marker>{_FRENCH_ATTRIBUTION})(?P<tail>\s*\)?)$", re.IGNORECASE)
 _CREDIT_BIOGRAPHY = re.compile(r"\s*\([^)]*\b\d{4}\b[^)]*\)\s*")
+_BILINGUAL_AFTER = re.compile(r"\bnach\s*[-–—/]\s*after\b", re.IGNORECASE)
+# Explicit auction-credit alias; retain strict full-name matching in titles.
+_CREDIT_NAME_ALIASES = {("harmensz", "rembrandt", "rijn", "van"): ("rembrandt",)}
 
 
 def _attribution_credit(value: object) -> tuple[str, str]:
     """Read explicit credit markers without changing the supplied artist text."""
     text = clean_display_text(value, strip_lot_markers=True)
     text = " ".join(_CREDIT_BIOGRAPHY.sub(" ", text).split())
+    text = _BILINGUAL_AFTER.sub("After", text)
     # Translate only explicit credit-position markers, never the stored source.
     def translate_marker(match):
         label = "After" if match["marker"].casefold().startswith("d") else "Attributed to"
@@ -260,7 +264,8 @@ def _credit_name_key(value: object) -> tuple[str, ...]:
     _, name = _attribution_credit(value)
     # Use only a complete supplied name or its existing curated display alias.
     # Sorted tokens permit explicit surname-first labels, not fuzzy matching.
-    return tuple(sorted(re.findall(r"\w+", _name_key(artist_display_name(name)))))
+    key = tuple(sorted(re.findall(r"\w+", _name_key(artist_display_name(name)))))
+    return _CREDIT_NAME_ALIASES.get(key, key)
 
 
 def artist_attribution_label(*artists: object, title: object = "") -> str:
@@ -274,7 +279,8 @@ def artist_attribution_label(*artists: object, title: object = "") -> str:
         label, _ = _attribution_credit(artist)
         if label:
             return label
-    text = clean_display_text(title, strip_lot_markers=True)
+    # Keep the bilingual marker together before splitting title/credit fields.
+    text = _BILINGUAL_AFTER.sub("After", clean_display_text(title, strip_lot_markers=True))
     if not _ATTRIBUTION_TITLE_MARKER.search(text):
         return ""
     names = {_credit_name_key(artist) for artist in artists if clean_display_text(artist)}

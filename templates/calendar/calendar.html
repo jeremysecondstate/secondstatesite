@@ -3366,7 +3366,7 @@
     });
     galleryHousesSummary.textContent = `${houseCounts.size} house${houseCounts.size === 1 ? "" : "s"}`
       + (activeView === "oliver" ? ` · ${Array.from(houseCounts.values()).filter((count) => count > 0).length} with lots` : "")
-      + (galleryFilter.startsWith("house:") ? ` · Selected: ${galleryFilter.slice(6)}` : galleryFilter === "tray" ? " · Email Tray selected" : " · All houses selected");
+      + (galleryFilter.startsWith("house:") ? ` · Selected: ${galleryFilter.slice(6)}` : galleryFilter === "tray" ? " · Email Tray selected" : galleryFilter === "bidboards" ? " · Bid Boards selected" : " · All houses selected");
     const choices = [
       {key: "all", label: "All houses", count: houseCounts.size},
       {key: "tray", label: "Email Tray", count: lots.filter((lot) => lot.email_tray_selected).length},
@@ -4199,7 +4199,7 @@
     else url.searchParams.delete("view");
     if (selectedDay) url.searchParams.set("day", selectedDay);
     else url.searchParams.delete("day");
-    if (isGalleryView() && ["tray", "bidboards"].includes(galleryFilter)) url.searchParams.set("filter", galleryFilter);
+    if (isGalleryView() && (["tray", "bidboards"].includes(galleryFilter) || galleryFilter.startsWith("house:"))) url.searchParams.set("filter", galleryFilter);
     else url.searchParams.delete("filter");
     if (isGalleryView() && galleryFilter.startsWith("artist:")) url.searchParams.set("artist", galleryFilter.slice(7));
     else url.searchParams.delete("artist");
@@ -4293,7 +4293,7 @@
       const requestedIndex = dayLots().findIndex((lot) => lot.id === requestedLot);
       if (requestedIndex >= 0) researchIndex = requestedIndex;
       const view = params.get("view");
-      galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : ["tray", "bidboards"].includes(params.get("filter")) ? params.get("filter") : "all";
+      galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : (["tray", "bidboards"].includes(params.get("filter")) || params.get("filter")?.startsWith("house:")) ? params.get("filter") : "all";
       setCalendarView(view);
       const focusTarget = view === "research" ? researchTitle
         : isGalleryView() ? document.getElementById("day-gallery-title") : calendarViewToggle;
@@ -4554,7 +4554,7 @@
     if (matchingIndex >= 0) researchIndex = matchingIndex;
   }
   if (validRequestedDay || initialDay) showDay(validRequestedDay ? requestedDay : initialDay);
-  galleryFilter = initialParams.get("artist") ? `artist:${initialParams.get("artist")}` : ["tray", "bidboards"].includes(initialParams.get("filter")) ? initialParams.get("filter") : "all";
+  galleryFilter = initialParams.get("artist") ? `artist:${initialParams.get("artist")}` : (["tray", "bidboards"].includes(initialParams.get("filter")) || initialParams.get("filter")?.startsWith("house:")) ? initialParams.get("filter") : "all";
   setCalendarView(requestedView);
   const requestedSavedBoard = initialParams.get("saved_bid_board");
   if (requestedSavedBoard && window.SavedBidBoard) {

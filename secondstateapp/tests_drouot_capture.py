@@ -127,6 +127,103 @@ class DrouotCaptureTests(TestCase):
         self.assertEqual(report["summary"]["artists"], 1)
         self.assertEqual(len(report["attribution_notes"]), 1)
 
+    def test_offered_print_processes_are_distinct_from_signature_and_original_work_references(self):
+        positive = [
+            ("A large photogravure from a portfolio.", "photogravure"),
+            ("Includes 1 original zincograph and 6 plates based on zincographs.", "zincograph"),
+            ("Burin. Very fine proof on simili-japan.", "Burin"),
+            ("Mixed media with relief print, signed in pencil.", "print"),
+            ("A sepia-toned print depicting a seated figure.", "print"),
+            ("Print — signed on the plate — 38 x 25 cm.", "Print"),
+            ("Four prints from the Garden, 33 x 24 cm each.", "prints"),
+            ("Polychrome printed poster, 42 x 30 cm.", "printed"),
+            ("Lithograph on paper, signed in print.", "Lithograph"),
+            ("Print on paper (From the set of Twelve Original Lithographs).", "Print"),
+        ]
+        negative = [
+            "Scarf, signed in print in the lower right corner.",
+            "Eleven facsimiles on vellum. Each signed in print.",
+            "Three reprints based on engravings from a famous work.",
+            '"Photogravure Exhibition". Poster.',
+            "Four prints from the artist were exhibited in 1980.",
+            "Poster. Bibliography: Original zincograph.",
+        ]
+        for statement, expected in positive + [(value, None) for value in negative]:
+            with self.subTest(statement=statement):
+                raw, card = evidence()
+                raw["description"] = "Joan Miro\nThe Garden\n" + statement
+                result = validate_drouot_capture(bundle((raw, card)), [ENTRY], now=NOW)
+                self.assertEqual(result.lots[0].medium if result.lots else None, expected)
+
+    def test_inline_joint_credits_and_engraver_roles_keep_both_creators(self):
+        cases = [
+            ('Joan Miró* (1893-1983) and Pablo Neruda (1904-1973), \'El Sobreviviente\', 1972\nAquatint etching on paper.', 'Joan Miró and Pablo Neruda', 'El Sobreviviente'),
+            ('After Joan Miro (1893-1983) & Yves KLEIN (1928-1962)\nRoll and Wig\nPolychrome printed poster.', 'After Joan Miro & Yves KLEIN', 'Roll and Wig'),
+            ('Joan Miro and Pablo Neruda. *The Garden*. With eight color lithographs and poems.', 'Joan Miro and Pablo Neruda', 'The Garden'),
+            ('Joan Miro - FIORINI\nSheep\nBlack etching, engraved by Fiorini after a drawing by Miro, signed.', 'Joan Miro - FIORINI (engraved by Fiorini after a drawing by Miro)', 'Sheep'),
+            ('Joan Miro, after HEGER DE LOWENFELD\nCirce\nEmbossed lithograph, signed by Heger de Lowenfeld.', 'Joan Miro, after HEGER DE LOWENFELD', 'Circe'),
+        ]
+        for description, credit, title in cases:
+            with self.subTest(description=description):
+                raw, card = evidence(credit=description.splitlines()[0])
+                raw["description"] = description
+                result = validate_drouot_capture(bundle((raw, card)), [ENTRY], now=NOW)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].artist, credit)
+                self.assertEqual(result.lots[0].title, credit + " — " + title)
+
+    def test_explicit_creator_conflict_does_not_confuse_initials_or_short_query_aliases(self):
+        for creator, accepted in (("J. Miro", True), ("Joan Miro", True), ("Francesco Miro", False)):
+            with self.subTest(creator=creator):
+                raw, card = evidence()
+                raw["description"] = "Joan Miro\nThe Garden\nTwelve lithographs by " + creator + " from the portfolio."
+                result = validate_drouot_capture(bundle((raw, card)), [ENTRY], now=NOW)
+                self.assertEqual(bool(result.lots), accepted)
+        from catalogapp.watchlist_drouot_pages import _contradictory_offered_creator
+        self.assertFalse(_contradictory_offered_creator("Eleven lithographs by Pierre-Auguste Renoir.", ("Pierre-Auguste Renoir", "Auguste Renoir")))
+
+    def test_lithographic_drawing_implements_do_not_establish_print_medium(self):
+        for implement in ("pencil", "crayon", "chalk"):
+            with self.subTest(implement=implement):
+                raw, card = evidence()
+                raw["description"] = f"Joan Miro\nStudio, 1960\nLithographic {implement} on transfer paper, 42 x 32 cm."
+                result = self.run_import(bundle((raw, card)))
+                self.assertFalse(result.errors)
+                self.assertFalse(result.lots)
+                self.assertIn("No explicit print technique", result.rejected_lots[0]["reason"])
+        raw, card = evidence()
+        raw["description"] = "Joan Miro\nStudio\nLithograph on paper, drawn with a lithographic pencil and printed in 50 copies."
+        result = self.run_import(bundle((raw, card)))
+        self.assertFalse(result.errors)
+        self.assertEqual(result.lots[0].medium, "Lithograph")
+
+    def test_explicit_collective_credit_does_not_become_first_artist_authorship(self):
+        raw, card = evidence(credit="Joan Miro, Pablo Picasso, Henri Matisse, and others; a collection of 9 prints")
+        raw["description"] = card["heading"] + ", including an etching after a painting and a lithograph."
+        result = self.run_import(bundle((raw, card)))
+        self.assertFalse(result.errors)
+        self.assertFalse(result.lots)
+        self.assertIn("multiple-artist credit is unresolved", result.rejected_lots[0]["reason"])
+        raw, card = evidence(credit="Joan Miro, Woman, Birds, and Stars")
+        result = self.run_import(bundle((raw, card)))
+        self.assertFalse(result.errors)
+        self.assertEqual(len(result.lots), 1)
+
+    def test_suffix_qualifier_survives_adjacent_dash_and_based_on_label(self):
+        for credit, expected in (
+            ("Joan Miro (1893-1983) (after)\u2014", "Joan Miro (after)"),
+            ("Joan Miro (1893-1983), based on", "Joan Miro, based on"),
+        ):
+            with self.subTest(credit=credit):
+                raw, card = evidence(credit=credit)
+                raw["description"] = credit + "\nThe Garden\nOffset print on paper."
+                result = self.run_import(bundle((raw, card)))
+                self.assertFalse(result.errors)
+                lot = result.lots[0]
+                self.assertEqual(lot.artist, expected)
+                self.assertEqual(lot.title, expected + " \u2014 The Garden")
+                self.assertEqual(result.attribution_notes[0]["source_artist_credit"], expected)
+
     def test_missing_search_or_incomplete_page_leaves_entire_cache_unchanged(self):
         self.run_import(bundle())
         original = list(self.cache.connection.iterdump())
@@ -197,6 +294,85 @@ class DrouotCaptureTests(TestCase):
         entries = select_drouot_entries(html)
         self.assertEqual(entries[0].artist, "Mary Corita Kent")
         self.assertEqual(entries[0].source, "Drouot")
+
+    def test_based_on_primary_credit_is_visible_and_requires_both_source_fields(self):
+        for prefix in ("Based on", "Based on a work by", "Based on works by", "(based on)"):
+            with self.subTest(prefix=prefix):
+                credit = prefix + " Joan Miró (1893-1983)"
+                raw, card = evidence(credit=credit)
+                raw["description"] = credit + "\nThe Garden\nOriginal color lithograph on paper"
+                result = validate_drouot_capture(bundle((raw, card)), [ENTRY], now=NOW)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].artist, prefix + " Joan Miró")
+                self.assertEqual(result.lots[0].title, prefix + " Joan Miró — The Garden")
+                self.assertEqual(result.attribution_notes[0]["source_artist_credit"], prefix + " Joan Miró")
+                for field in ("heading", "description"):
+                    mismatch_raw, mismatch_card = deepcopy(raw), deepcopy(card)
+                    target = mismatch_card if field == "heading" else mismatch_raw
+                    target[field] = target[field].replace("Joan Miró", "Pablo Picasso")
+                    self.assertEqual(validate_drouot_capture(
+                        bundle((mismatch_raw, mismatch_card)), [ENTRY], now=NOW,
+                    ).lots, [])
+
+    def test_based_on_reference_or_nonprint_does_not_supply_primary_authorship_or_medium(self):
+        for credit, description in (
+            ("Exhibition based on Joan Miró", "Exhibition based on Joan Miró\nColor lithograph on paper"),
+            ("Another Artist", "Another Artist\nColor lithograph based on a work by Joan Miró"),
+            ("Based on Joan Miró", "Based on Joan Miró\nDrawing in charcoal on paper"),
+            ("Based on Joan Miró and Pablo Picasso", "Based on Joan Miró and Pablo Picasso\nTwo unrelated lithographs"),
+        ):
+            with self.subTest(credit=credit):
+                raw, card = evidence(credit=credit)
+                raw["description"] = description
+                self.assertEqual(validate_drouot_capture(bundle((raw, card)), [ENTRY], now=NOW).lots, [])
+
+    def test_verified_expanded_primary_names_retain_qualifiers_and_actual_work_titles(self):
+        for artist, query, credit, work, source_artist in (
+            ("Alphonse Mucha", "Alphonse Mucha", "(after) Alphonse Marie MUCHA (1860–1939)",
+             "THE WOMAN AMONG FLOWERS", "(after) Alphonse Marie MUCHA"),
+            ("Pablo Picasso", "Pablo Picasso", "PABLO RUIZ PICASSO (DESPUES)",
+             "Seated Harlequin", "PABLO RUIZ PICASSO (DESPUES)"),
+            ("Rembrandt", "Rembrandt", "H. van Rijn REMBRANDT (1606–1669)",
+             "Joseph Telling His Dreams", "Rembrandt"),
+            ("Yvaral (Jean-Pierre Vasarely)", "Yvaral", "Jean-Pierre VASARELY (1934–2002), known as YVARAL",
+             "Cynetic Composition", "Yvaral (Jean-Pierre Vasarely)"),
+            ("Manolo Valdés", "Manolo Valdes", "MANOLO VALDÉS BLASCO, (Valencia, 1942).",
+             "Player, 1987", "Manolo Valdés"),
+            ("Arman", "Arman", "Armand Pierre Fernandez, known as Arman (1928–2005), after",
+             "Accumulation Renault", "Armand Pierre Fernandez, known as Arman, after"),
+            ("Rembrandt", "Rembrandt", "Rembrandt Harmenszoon van Rijn (1606–1669), after",
+             "The Holy Family", "Rembrandt Harmenszoon van Rijn, after"),
+            ("Francisco de Goya", "Francisco de Goya", "De Goya y Lucientes, Francisco (1746–1828)",
+             "Los Caprichos", "Francisco de Goya"),
+            ("Jacques Villon", "Jacques Villon", "Jacques Villon (Gaston Duchamp, dit) (1875–1963)",
+             "Les Rois mages", "Jacques Villon"),
+        ):
+            with self.subTest(artist=artist):
+                entry = replace(ENTRY, artist=artist, title=artist + ": Drouot — Prints",
+                                url="https://drouot.com/en/c/50/lithographs?" + urlencode({"query": query}))
+                raw, card = evidence(credit=credit)
+                raw["description"] = credit + "\n" + work + "\nLithograph on paper"
+                payload = bundle((raw, card))
+                search = payload["searches"][0]
+                search.update(artist=artist, source_url=entry.url)
+                page = search["pages"][0]
+                page["page_url"] = entry.url
+                page["request_url"] = page["request_url"].replace("Joan+Miro", urlencode({"q": query})[2:])
+                result = validate_drouot_capture(payload, [entry], now=NOW)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].artist, source_artist)
+                expected_title = source_artist + " — " + work if source_artist != artist else work
+                self.assertEqual(result.lots[0].title, expected_title)
+                self.assertEqual(result.lots[0].artist_watchlist_name, artist)
+                if artist == "Jacques Villon":
+                    # Consume the closing parenthesis of an expanded name
+                    # before parsing its adjacent birth/death and work title.
+                    raw["description"] = credit + " " + work + "\nLithograph on paper"
+                    inline_result = validate_drouot_capture(payload, [entry], now=NOW)
+                    self.assertEqual(inline_result.lots[0].title, expected_title)
+                # A verified full name is not an arbitrary substring match.
+                raw["description"] = "Another Artist, after " + raw["description"]
+                self.assertEqual(validate_drouot_capture(payload, [entry], now=NOW).lots, [])
 
     def test_unrelated_and_archived_drouot_folders_do_not_expand_worker_scope(self):
         html = ('<DL><DT><H3>OTHER DROUOT</H3><DL><DT><A HREF="https://drouot.com/en/auctions/future">Other Drouot page</A></DL>'

@@ -812,6 +812,148 @@ for (const view of ["catalog", "oliver"]) {
   });
 }
 
+function houseNavigationPage(lots, view) {
+  const context = page({[dayA]: lots}, view);
+  for (const name of ["calendarLayout", "researchWorkspace", "researchTitle", "auctionCalendar",
+    "calendarPageShell", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle", "researchViewToggle",
+    "galleryDate", "gallerySummary", "galleryPrevious", "galleryNext", "galleryBrowserLaunch"]) context[name] = new Element();
+  context.document.getElementById("day-gallery-title").firstChild = new Element();
+  context.formatCalendarDay = day => day;
+  context.previousGalleryDay = () => undefined;
+  context.nextGalleryDay = () => undefined;
+  context.dayButtons = [];
+  context.researchLookButtons = [];
+  context.renderResearchDays = () => {};
+  context.renderResearchWorkspace = () => {};
+  const monthLinks = [{href: "https://secondstate.art/calendar/?month=2026-11"}];
+  context.document.querySelectorAll = selector => selector === ".month-nav a" ? monthLinks : [];
+  const listeners = new Map();
+  context.window.addEventListener = (name, callback) => listeners.set(name, callback);
+  let pushes = 0;
+  const setLocation = url => {
+    const next = new URL(String(url));
+    context.window.location.href = next.href;
+    context.window.location.search = next.search;
+  };
+  context.window.history.replaceState = function(state, _title, url) {
+    this.state = state;
+    this.url = String(url);
+    setLocation(url);
+  };
+  context.window.history.pushState = function(state, _title, url) {
+    pushes += 1;
+    this.replaceState(state, _title, url);
+  };
+  vm.runInContext(["renderGalleryCatalog", "updateCalendarLocation", "setCalendarView", "openResearchWorkspace"].map(declaration).join("\n"), context);
+  vm.runInContext(between('  window.addEventListener("popstate"', '  researchPrevious.addEventListener("click"'), context);
+  vm.runInContext(between('  galleryAttributionToggle.addEventListener("click"', '  gallerySort.addEventListener("change"'), context);
+  return {
+    context, monthLinks, setLocation, pushes: () => pushes,
+    initialize(filter, extra = {}) {
+      setLocation(`https://secondstate.art/calendar/?${new URLSearchParams({month: "2026-10", day: dayA, view, filter, ...extra})}`);
+      vm.runInContext(between("  const initialParams =", "  const requestedView ="), context);
+      context.requestedView = view;
+      vm.runInContext(between('  galleryFilter = initialParams.get("artist")', '  const requestedSavedBoard ='), context);
+    },
+    restore(url) {
+      setLocation(url);
+      context.window.history.state = {};
+      listeners.get("popstate")();
+    },
+  };
+}
+
+for (const view of ["catalog", "oliver"]) {
+  test(`${view} house URL restores initial and history state with attribution hiding and clears on All houses`, () => {
+    const lots = [
+      lot(1, "Other", false, {email_tray_selected: true}),
+      lot(2, "Phillips", true, {email_tray_selected: true, saved_bid_board: {qualifies: false}}),
+      lot(3, "Phillips", true, {attribution_label: "After", won_by_us: true, email_tray_selected: true}),
+      lot(4, "Bonhams", true),
+    ];
+    const before = JSON.stringify(lots);
+    const navigation = houseNavigationPage(lots, view);
+    const {context} = navigation;
+    navigation.initialize("house:Phillips", {hide_attributed: "1"});
+    assert.equal(context.galleryFilter, "house:Phillips");
+    assert.equal(context.galleryHideAttributed, true);
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), [2]);
+    const galleryUrl = context.window.location.href;
+    assert.equal(new URL(galleryUrl).searchParams.get("filter"), "house:Phillips");
+    assert.equal(new URL(galleryUrl).searchParams.get("hide_attributed"), "1");
+    assert.equal(context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:Phillips").getAttribute("aria-pressed"), "true");
+    context.galleryAttributionToggle.click();
+    assert.equal(context.galleryFilter, "house:Phillips");
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), [2, 3]);
+    context.galleryAttributionToggle.click();
+    context.run("openResearchWorkspace()");
+    const researchUrl = context.window.location.href;
+    assert.equal(new URL(researchUrl).searchParams.has("filter"), false);
+    assert.equal(new URL(researchUrl).searchParams.get("hide_attributed"), "1");
+    for (let repeat = 0; repeat < 2; repeat += 1) {
+      navigation.restore(galleryUrl);
+      assert.equal(context.activeView, view);
+      assert.equal(context.galleryFilter, "house:Phillips");
+      assert.equal(context.galleryHideAttributed, true);
+      assert.deepEqual(context.galleryGrid.children.map(card => card.id), [2]);
+      assert.equal(context.restoringHistory, false);
+      assert.equal(context.document.getElementById("day-gallery-title").focused, true);
+      assert.equal(new URL(context.window.location.href).searchParams.get("filter"), "house:Phillips");
+      if (repeat === 0) navigation.restore(researchUrl);
+    }
+    assert.equal(navigation.pushes(), 1, "Back and Forward must not create history entries");
+    const month = new URL(navigation.monthLinks[0].href);
+    assert.equal(month.searchParams.get("view"), view);
+    assert.equal(month.searchParams.get("hide_attributed"), "1");
+    assert.equal(month.searchParams.has("filter"), false, "month navigation keeps its existing fresh-filter behavior");
+    context.galleryFilters.children.find(button => button.dataset.galleryFilter === "all").click();
+    assert.equal(context.galleryFilter, "all");
+    assert.equal(new URL(context.window.location.href).searchParams.has("filter"), false);
+    assert.equal(new URL(context.window.location.href).searchParams.get("hide_attributed"), "1");
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), view === "oliver" ? [2, 4] : [1, 2, 4]);
+    assert.equal(JSON.stringify(lots), before, "URL and browsing changes must preserve saved lot state");
+  });
+}
+
+for (const [view, house] of [["catalog", "L'Atelier & Co.: Z\u00fcrich"], ["oliver", "Bradford's Auction Galleries"]]) {
+  test(`${view} house URLs round-trip punctuation and encoded characters without rewriting source names`, () => {
+    const lots = [lot(1, house, true), lot(2, "Phillips", true)];
+    const before = JSON.stringify(lots);
+    const navigation = houseNavigationPage(lots, view);
+    navigation.initialize(`house:${house}`);
+    const {context} = navigation;
+    assert.equal(context.galleryFilter, `house:${house}`);
+    assert.equal(new URL(context.window.location.href).searchParams.get("filter"), `house:${house}`);
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
+    const galleryUrl = context.window.location.href;
+    context.run("openResearchWorkspace()");
+    navigation.restore(galleryUrl);
+    assert.equal(context.galleryFilter, `house:${house}`);
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
+    assert.equal(JSON.stringify(lots), before);
+  });
+}
+
+test("Oliver URL validation retains a valid zero-count house but rejects unknown and wrong-scope houses", () => {
+  for (const house of ["Sotheby's", "Unknown house", "Other", ""]) {
+    const navigation = houseNavigationPage([lot(1, "Phillips", true), lot(2, "Other", false)], "oliver");
+    navigation.initialize(`house:${house}`);
+    const {context} = navigation;
+    const expected = house === "Sotheby's" ? `house:${house}` : "all";
+    assert.equal(context.galleryFilter, expected);
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id).filter(id => id !== undefined), expected === "all" ? [1] : []);
+    if (expected !== "all") {
+      const selected = context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === expected);
+      assert.equal(selected.getAttribute("aria-pressed"), "true");
+      assert.equal(selected.children[1].textContent, "0");
+    } else assert.equal(new URL(context.window.location.href).searchParams.has("filter"), false);
+  }
+  const navigation = houseNavigationPage([lot(1, "Phillips", true)], "catalog");
+  navigation.initialize("house:Unknown house");
+  assert.equal(navigation.context.galleryFilter, "all");
+  assert.equal(new URL(navigation.context.window.location.href).searchParams.has("filter"), false);
+});
+
 test("saved-board events tolerate publisher mutations and update membership without rerendering existing-board preferences", () => {
   const context = page({
     [dayA]: [lot(1, "Phillips", true, {saved_bid_board: null}), lot(2, "Phillips", true, {saved_bid_board: null})],

@@ -59,6 +59,23 @@ class ArtistAttributionLabelTests(SimpleTestCase):
             with self.subTest(credit=credit):
                 self.assertEqual(artist_attribution_label(credit), "")
 
+    def test_bilingual_after_credit_stays_bound_to_the_complete_artist(self):
+        for credit in ("Nach - After Pablo Picasso", "Pablo Picasso (Nach / After)",
+                       "Picasso, Pablo, NACH – AFTER"):
+            with self.subTest(credit=credit):
+                self.assertEqual(artist_attribution_label(credit), "After")
+        cases = (
+            ("Rembrandt", 'REMBRANDT VAN RIJN, HARMENSZ, Nach - After: "Die drei Bäume".', "After"),
+            ("Rembrandt", 'REMBRANDT VAN RIJN, HARMENSZ, After — The Three Trees', "After"),
+            ("Pablo Picasso", "Picasso, Pablo, Nach - After: Bouquet", "After"),
+            ("Rembrandt", "REMBRANDT VAN RIJN, HARMENSZ JR., Nach - After: Trees", ""),
+            ("Andy Warhol", "Picasso, Pablo, Nach - After: Bouquet", ""),
+            ("Pablo Picasso", "Nach - After the Party", ""),
+        )
+        for artist, title, expected in cases:
+            with self.subTest(artist=artist, title=title):
+                self.assertEqual(artist_attribution_label(artist, title=title), expected)
+
     def test_title_credit_must_bind_to_the_current_complete_artist_name(self):
         cases = (
             ("Alexander (1898) Calder", "After Alexander Calder (1898–1976)", "After"),
@@ -99,6 +116,7 @@ class CalendarAttributionPayloadTests(SimpleTestCase):
             ("D’après Pablo Picasso", "Pablo Picasso", "Bouquet", "After"),
             ("Pablo Picasso", "Pablo Picasso", "Attribuée à Pablo Picasso — Bouquet", "Attributed to"),
             ("Pablo Picasso", "Pablo Picasso", "After the Party", ""),
+            ("Rembrandt", "Rembrandt", 'REMBRANDT VAN RIJN, HARMENSZ, Nach - After: "Die drei Bäume".', "After"),
         )
         with patch("django.db.backends.utils.CursorWrapper.execute", side_effect=AssertionError("Unexpected database query")), \
                 patch("secondstateapp.calendar_views.artist_research_urls", return_value=(artist_url, "")):

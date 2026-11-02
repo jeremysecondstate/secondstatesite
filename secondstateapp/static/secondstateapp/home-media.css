@@ -48,6 +48,12 @@
 .hero--video .hero-overlay,
 .hero--video .hero-copy { z-index: 4; }
 
+/* Keep wrapped editorial captions readable and aligned with the copy. */
+#etching-detail .kicker {
+  line-height: 1.5;
+  text-align: left;
+}
+
 .hero--video .motion-toggle {
   position: absolute;
   right: 20px;
