@@ -20,6 +20,29 @@ from catalogapp.artprice_link_backfill import _validate_records
 from .liveart_artist import liveart_artist_search_name
 
 
+# Complete source credits audited against Forum's November 4, 2026 catalogue.
+# Keep qualifiers on the lot; only the offline bookmark lookup uses these names.
+# In particular, Jacques Villon is the printmaker in these explicit After credits,
+# and a collaborative credit must not silently resolve to just one contributor.
+_FORUM_CREDIT_ALIASES = {
+    normalize_artist_name(credit): artist
+    for credit, artist in (
+        ("Lucio Fontana after.", "Lucio Fontana"),
+        ("Roy Lichtenstein after.", "Roy Lichtenstein"),
+        ("Marc Chagall after.", "Marc Chagall"),
+        ("Gaston Bernheim de Villers after. Jacques Villon", "Gaston Bernheim de Villers"),
+        ("Marcel Duchamp after. Jacques Villon", "Marcel Duchamp"),
+        ("Marcel Gromaire after. Jacques Villon", "Marcel Gromaire"),
+        ("Marie Laurencin after. Jacques Villon", "Marie Laurencin"),
+        ("Joan Miró after.", "Joan Miró"),
+        ("Pablo Picasso after.", "Pablo Picasso"),
+        ("Pablo Picasso after. Jacques Villon", "Pablo Picasso"),
+        ("Pierre-Auguste Renoir after. Jacques Villon", "Pierre-Auguste Renoir"),
+        ("Rembrandt Harmensz. van Rijn", "Rembrandt van Rijn"),
+    )
+}
+
+
 def _signature(path: Path) -> tuple[str, int, int]:
     try:
         stat = path.stat()
@@ -146,6 +169,7 @@ def _name_matches(name: str, alias: str) -> bool:
 
 @lru_cache(maxsize=4096)
 def _lookup(name, bookmarks_signature, generated_signature):
+    name = _FORUM_CREDIT_ALIASES.get(normalize_artist_name(name), name)
     matches = {"artprice": {}, "invaluable": {}, "generated_artprice": {}}
     for provider, url, aliases in _registry(bookmarks_signature, generated_signature):
         if any(_name_matches(name, alias) for alias in aliases):
