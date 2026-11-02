@@ -64,6 +64,14 @@ The normalizer is `catalogapp/watchlist_drouot_pages.py`; the preview/sync CLI i
 
 Keep Drouot identities distinct from Invaluable identities. Report possible cross-site duplicates for review with auction house, sale, lot number and source URLs; never automatically merge using fuzzy artist/title similarity.
 
+### Auction-house source precedence
+
+The auction house's own verified lot page (for example Forum) takes Calendar display precedence over Drouot or Invaluable copies of the same underlying lot. This preference does not change the Drouot collection scope or its source identities. Keep complete fresh Drouot observations and their provenance even when an explicitly superseded Drouot card is hidden.
+
+Before a new reconciliation, follow the [Calendar duplicate-lot review](C:/dev/secondstatesite/docs/sched-tasks-codex/calendar-sched-task/calendar-worker.md#duplicate-lot-review): establish the same verified house, sale/session, date and lot number using actual source links plus catalogue or image details. Matching artist/title alone cannot establish identity; separate impressions, lots and resales remain separate. Check both records for research, queue/history, Artprice/source links, Email Tray, Bid Boards, purchase and sold state. Use reversible `AuctionWatchLot.superseded_by` only when all saved work remains accessible; retain raw records and provider IDs. Do not move or overwrite saved work to enforce this preference. Checkpoint an incomplete match or split-state conflict with both records available.
+
+An existing verified replacement is authoritative for display. For example, if a Drouot Miró record points to the same Forum auction lot through `superseded_by`, leave the Forum listing visible and the Drouot copy hidden on later collections. Do not clear the relationship, assign a new Drouot source ID or recreate the card. The Calendar sync already preserves `superseded_by` and forces the redundant record inactive while accepting fresh source observations. Verify the retained replacement and hidden original with the supersession readback below; a missing public row is not evidence that the auction ended.
+
 ## Preview and synchronize
 
 A pilot preview can select one or more current artist labels with repeated `--artist` options:

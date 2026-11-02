@@ -277,3 +277,45 @@ test("Back and Forward restore the hide state before rendering without changing 
   }
   assert.equal(JSON.stringify(lots), before);
 });
+
+test("retained saved boards and tray selections keep a single canonical card discoverable in filters", () => {
+  const lots = [lot(1, {retained_saved_work: [
+    {id: 10, saved_bid_board: true, email_tray_selected: true},
+    {id: 11, saved_bid_board: true, email_tray_selected: false},
+  ]}), lot(2)];
+  const before = JSON.stringify(lots);
+  const p = page(lots);
+  p.render();
+  const counts = Object.fromEntries(p.galleryFilters.children.map(button => [button.dataset.galleryFilter, button.children[1].textContent]));
+  assert.equal(counts.bidboards, "1");
+  assert.equal(counts.tray, "1");
+  for (const filter of ["bidboards", "tray"]) {
+    p.galleryFilter = filter;
+    assert.deepEqual(p.visible().map(entry => entry.id), [1]);
+  }
+  assert.equal(JSON.stringify(lots), before);
+});
+
+test("only explicit retained research replaces its canonical slot and preserves original action IDs", () => {
+  const lots = [lot(1), lot(2)];
+  const p = page(lots);
+  const retained = lot(10, {retained_listing: {canonical_id: 1}, artprice_analysis_url: "/calendar/lots/10/artprice-analysis/"});
+  p.retainedResearchLot = retained;
+  p.retainedResearchId = 10;
+  p.activeView = "research";
+  assert.deepEqual(p.ids("dayLots()"), [10, 2]);
+  assert.equal(p.run("dayLots()[0]"), retained);
+  assert.equal(p.run("dayLots()[0].artprice_analysis_url"), "/calendar/lots/10/artprice-analysis/");
+  p.researchIndex = 0;
+  p.run("updateCalendarLocation()");
+  assert.equal(new URL(p.window.history.url).searchParams.get("lot"), "10");
+  p.researchIndex = 1;
+  p.run("updateCalendarLocation()");
+  assert.equal(new URL(p.window.history.url).searchParams.get("lot"), "2");
+  p.activeView = "catalog";
+  assert.deepEqual(p.ids("dayLots()"), [1, 2]);
+  p.activeView = "research";
+  p.retainedResearchId = null;
+  assert.deepEqual(p.ids("dayLots()"), [1, 2]);
+  assert.deepEqual(lots.map(source => source.id), [1, 2]);
+});
