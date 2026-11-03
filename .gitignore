@@ -32,3 +32,6 @@ Thumbs.db
 .idea/
 .vscode/
 stuff.txt
+
+# Keep the oversized source video out of Git.
+/docs/bg-home-vid/bg-vid-workers.mp4
