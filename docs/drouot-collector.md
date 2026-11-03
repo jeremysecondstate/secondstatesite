@@ -64,6 +64,14 @@ The normalizer is `catalogapp/watchlist_drouot_pages.py`; the preview/sync CLI i
 
 Keep Drouot identities distinct from Invaluable identities. Report possible cross-site duplicates for review with auction house, sale, lot number and source URLs; never automatically merge using fuzzy artist/title similarity.
 
+### Auction-house source precedence
+
+The auction house's own verified lot page (for example Forum) takes Calendar display precedence over Drouot or Invaluable copies of the same underlying lot. This preference does not change the Drouot collection scope or its source identities. Keep complete fresh Drouot observations and their provenance even when an explicitly superseded Drouot card is hidden.
+
+Before a new reconciliation, follow the [Calendar duplicate-lot review](C:/dev/secondstatesite/docs/sched-tasks-codex/calendar-sched-task/calendar-worker.md#duplicate-lot-review): establish the same verified house, sale/session, date and lot number using actual source links plus catalogue or image details. Matching artist/title alone cannot establish identity; separate impressions, lots and resales remain separate. Check both records for research, queue/history, Artprice/source links, Email Tray, Bid Boards, purchase and sold state. Use reversible `AuctionWatchLot.superseded_by` only when all saved work remains accessible; retain raw records and provider IDs. Do not move or overwrite saved work to enforce this preference. Checkpoint an incomplete match or split-state conflict with both records available.
+
+An existing verified replacement is authoritative for display. For example, if a Drouot Miró record points to the same Forum auction lot through `superseded_by`, leave the Forum listing visible and the Drouot copy hidden on later collections. Do not clear the relationship, assign a new Drouot source ID or recreate the card. The Calendar sync already preserves `superseded_by` and forces the redundant record inactive while accepting fresh source observations. Verify the retained replacement and hidden original with the supersession readback below; a missing public row is not evidence that the auction ended.
+
 ## Preview and synchronize
 
 A pilot preview can select one or more current artist labels with repeated `--artist` options:
@@ -136,6 +144,8 @@ await fs.writeFile(`${runDir}/calendar-dom-after-november.json`, JSON.stringify(
 ```
 
 Review `calendar-audit.json`: accepted Drouot identities and available fields must agree, new records need verified Calendar IDs, and prior identities/unchanged public records must remain preserved. The auditor reports cross-source listing candidates for review without merging them. Retain `calendar-before.json`, `calendar-after.json`, monthly public DOM arrays and the audit with the capture and receipt.
+
+Global identity keys also include source URL aliases. If Drouot changes a lot's slug, pass this run's before-sync monthly projection with `--before-dom`. The auditor can account for the replaced alias only when the fresh accepted URL, unchanged Drouot source ID, unchanged Calendar database ID, before/after DOM URLs and available API fields agree. Inspect `raw_missing_before_keys` and `resolved_url_alias_changes`; an unproven missing key still fails the audit. Keep older supersession identity evidence under `--prior-dom`, separate from this run's baseline.
 
 Existing staff supersessions are also preserved by synchronization. Superseded rows are omitted from both public API keys and monthly DOM; a receipt can count them as ended even though this worker did not end or merge them. Do not reactivate them or infer an auction result. If an accepted source ID was already absent from the before snapshot, use the connected Render read-only Postgres tool to inspect only its public lot fields, database ID, inactive status and replacement identity. Save the exact query result and observation time as `calendar-superseded-db.json`, and retain the original public-only audit result.
 

@@ -151,6 +151,40 @@ class DrouotCalendarAuditTests(unittest.TestCase):
         _, sync = reports([{**incoming, "current_bid": 900}])
         self.assertFalse(compare_snapshots(snapshot([]), snapshot([incoming]), preview, sync)["passed"])
 
+    def test_observed_source_slug_change_preserves_source_and_calendar_identity(self):
+        previous = lot(lot_url="https://drouot.com/en/l/123-old-slug")
+        incoming = lot(lot_url="https://drouot.com/en/l/123-fresh-slug")
+        old_alias, new_alias = "drouot:" + previous["lot_url"], "drouot:" + incoming["lot_url"]
+        before = snapshot([previous], [key(previous), old_alias])
+        after = snapshot([incoming], [key(incoming), new_alias])
+        prior_dom = {key(previous): {**projected_dom(previous, "America/Los_Angeles"), "calendar_id": 456}}
+        dom = {key(incoming): {**projected_dom(incoming, "America/Los_Angeles"), "calendar_id": 456}}
+        result = compare_snapshots(before, after, *reports([incoming]), dom, baseline_dom=prior_dom)
+        self.assertTrue(result["passed"], result["errors"])
+        self.assertEqual(result["raw_missing_before_keys"], [old_alias])
+        self.assertEqual(result["prior_global_identity_keys_lost"], [])
+        self.assertEqual(result["resolved_url_alias_changes"], [{"key": "drouot:123", "calendar_id": 456,
+                         "old_alias": old_alias, "new_alias": new_alias}])
+        historical_only = compare_snapshots(before, after, *reports([incoming]), dom, historical_dom=prior_dom)
+        self.assertFalse(historical_only["passed"])
+        self.assertEqual(historical_only["prior_global_identity_keys_lost"], [old_alias])
+        for change in ("missing_baseline", "changed_database_id", "missing_source_id", "missing_new_alias",
+                       "unobserved_url", "wrong_source_id", "unaccepted_lot", "wrong_prior_url"):
+            with self.subTest(change=change):
+                b, a, p, d, observed = deepcopy(before), deepcopy(after), deepcopy(prior_dom), deepcopy(dom), deepcopy(incoming)
+                if change == "missing_baseline": p = {}
+                elif change == "changed_database_id": d["drouot:123"]["calendar_id"] = 999
+                elif change == "missing_source_id": a["calendar_lot_keys"].remove("drouot:123")
+                elif change == "missing_new_alias": a["calendar_lot_keys"].remove(new_alias)
+                elif change == "unobserved_url": observed["lot_url"] = previous["lot_url"]
+                elif change == "wrong_source_id": observed["lot_url"] = "https://drouot.com/en/l/999-fresh-slug"
+                elif change == "wrong_prior_url": p["drouot:123"]["lot_url"] = "https://drouot.com/en/l/123-unproven-slug"
+                accepted = [] if change == "unaccepted_lot" else [observed]
+                result = compare_snapshots(b, a, *reports(accepted), d, baseline_dom=p)
+                self.assertFalse(result["passed"])
+                self.assertIn(old_alias, result["prior_global_identity_keys_lost"])
+                self.assertEqual(result["resolved_url_alias_changes"], [])
+
     def test_dom_projection_uses_public_fields_only_and_matches_only_drouot_urls(self):
         incoming = lot()
         row = {**projected_dom(incoming, "America/Los_Angeles"), "id": 456,

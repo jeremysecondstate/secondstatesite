@@ -234,6 +234,10 @@ _FRENCH_CREDIT_PREFIX = re.compile(rf"^(?P<lead>\(?\s*)(?P<marker>{_FRENCH_ATTRI
 _FRENCH_CREDIT_SUFFIX = re.compile(rf"(?P<lead>\(\s*|,\s*)(?P<marker>{_FRENCH_ATTRIBUTION})(?P<tail>\s*\)?)$", re.IGNORECASE)
 _CREDIT_BIOGRAPHY = re.compile(r"\s*\([^)]*\b\d{4}\b[^)]*\)\s*")
 _BILINGUAL_AFTER = re.compile(r"\bnach\s*[-–—/]\s*after\b", re.IGNORECASE)
+_PUNCTUATED_CREDIT_SUFFIX = re.compile(
+    r"^(?P<name>.+?)(?:,\s*|\s+)(?P<marker>after|attributed\s+to)\."
+    r"(?:\s+Jacques\s+Villon)?$", re.IGNORECASE,
+)
 # Explicit auction-credit alias; retain strict full-name matching in titles.
 _CREDIT_NAME_ALIASES = {("harmensz", "rembrandt", "rijn", "van"): ("rembrandt",)}
 
@@ -243,6 +247,12 @@ def _attribution_credit(value: object) -> tuple[str, str]:
     text = clean_display_text(value, strip_lot_markers=True)
     text = " ".join(_CREDIT_BIOGRAPHY.sub(" ", text).split())
     text = _BILINGUAL_AFTER.sub("After", text)
+    # Forum ends these credit qualifiers with a full stop and can append
+    # printmaker Jacques Villon. Normalize only this explicit credit wording;
+    # the original source stays intact and title credits still require a name match.
+    punctuated = _PUNCTUATED_CREDIT_SUFFIX.fullmatch(text)
+    if punctuated:
+        text = f"{punctuated['name']}, {punctuated['marker']}"
     # Translate only explicit credit-position markers, never the stored source.
     def translate_marker(match):
         label = "After" if match["marker"].casefold().startswith("d") else "Attributed to"

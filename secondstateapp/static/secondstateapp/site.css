@@ -245,6 +245,9 @@ body{
       color: var(--muted);
       line-height:1.55;
     }
+    .about-card p{
+      max-width:68ch;
+    }
     .contact-card p + p,
     .about-card + .about-card{
       margin-top:12px;

@@ -77,6 +77,20 @@ class SavedCalendarImageValidationTests(SimpleTestCase):
         self.assertEqual(_calendar_image_url("https://other.blob.core.windows.net/123.jpg"), "")
         self.assertEqual(_calendar_image_url("https://dist.phillips.com.evil.test/123.jpg"), "")
 
+    def test_forum_images_require_the_exact_public_bucket_and_lot_path(self):
+        base = "https://am-s3-bucket-assets.s3.eu-west-2.amazonaws.com"
+        valid = base + "/forum/prod/lot_images/large/123/456.webp"
+        self.assertEqual(_calendar_image_url(valid), valid)
+        for url in (
+            base + "/other/123.jpg", base + "/forum/prod/lot_images/../private.jpg",
+            base + "/forum/prod/lot_images/%2e%2e/private.jpg",
+            base + "/forum/prod/lot_images/large%5cprivate.jpg",
+            valid.replace(".amazonaws.com", ".amazonaws.com.evil.test"),
+            valid.replace("https:", "http:"),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(_calendar_image_url(url), "")
+
 
 @override_settings(CALENDAR_TIME_ZONE="America/New_York")
 @patch.dict(os.environ, {"CATALOG_API_KEY": "saved-image-test-key"}, clear=False)

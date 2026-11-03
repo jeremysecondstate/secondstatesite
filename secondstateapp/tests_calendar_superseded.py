@@ -223,6 +223,101 @@ class CalendarSupersededLotTests(TestCase):
         self.assertFalse(AuctionEmailBatchItem.objects.filter(lot=old).exists())
         self.assertTrue(AuctionEmailBatchItem.objects.filter(pk=replacement_item.pk).exists())
 
+    def test_canonical_card_links_saved_child_work_without_reassigning_it(self):
+        old, replacement = self.replacement_pair()
+        artprice, board, tray = self.save_research_and_email(old)
+        records_before = list(AuctionWatchLot.objects.order_by("id").values())
+
+        response = self.calendar(day="2026-07-25", view="catalog")
+
+        canonical, = response.context["calendar_data"]["2026-07-25"]
+        self.assertEqual(canonical["id"], replacement.pk)
+        work, = canonical["retained_saved_work"]
+        self.assertEqual(work["id"], old.pk)
+        self.assertTrue(work["saved_bid_board"])
+        self.assertTrue(work["email_tray_selected"])
+        self.assertIn(f"lot={old.pk}", work["research_url"])
+        self.assertIsNone(response.context["retained_research_lot"])
+        self.assertEqual(response.context["synced_lot_count"], 1)
+        self.assertEqual(list(AuctionWatchLot.objects.order_by("id").values()), records_before)
+        for saved in (artprice, board, tray):
+            saved.refresh_from_db()
+            self.assertEqual(saved.lot_id, old.pk)
+
+    def test_explicit_retained_research_keeps_original_source_fields_and_action_ids(self):
+        old, replacement = self.replacement_pair()
+        self.save_research_and_email(old)
+
+        response = self.calendar(day="2026-07-25", view="research", lot=old.pk)
+
+        retained = response.context["retained_research_lot"]
+        self.assertEqual(retained["id"], old.pk)
+        self.assertEqual(retained["lot_url"], old.lot_url)
+        self.assertEqual(retained["title"], old.title)
+        self.assertEqual(retained["retained_listing"]["canonical_id"], replacement.pk)
+        self.assertEqual(retained["retained_listing"]["canonical_source_url"], replacement.lot_url)
+        self.assertIn(f"/{old.pk}/", retained["bid_board_url"])
+        self.assertIn(f"retained_for={replacement.pk}", retained["email_tray_update_url"])
+        self.assertEqual(retained["saved_bid_board"]["selected_bid"], "1400.00")
+        self.assertTrue(retained["email_tray_selected"])
+        self.assertEqual([lot["id"] for lot in response.context["calendar_data"]["2026-07-25"]], [replacement.pk])
+
+    def test_two_retained_boards_remain_separate_and_unrelated_requests_do_not_project_them(self):
+        old, replacement = self.replacement_pair()
+        second = watch_lot(source="Drouot", source_lot_id="another-provider", superseded_by=replacement)
+        _artprice, first_board, _tray = self.save_research_and_email(old)
+        AuctionBidBoardAnalysis.objects.create(lot=second, analysis=first_board.analysis)
+        for child in (old, second):
+            response = self.calendar(day="2026-07-25", view="research", lot=child.pk)
+            canonical, = response.context["calendar_data"]["2026-07-25"]
+            self.assertEqual({work["id"] for work in canonical["retained_saved_work"]}, {old.pk, second.pk})
+            self.assertEqual(response.context["retained_research_lot"]["id"], child.pk)
+        for params in (
+            {"day": "2026-07-25", "view": "catalog", "lot": old.pk},
+            {"day": "2026-07-26", "view": "research", "lot": old.pk},
+            {"day": "2026-07-25", "view": "research", "lot": replacement.pk},
+        ):
+            self.assertIsNone(self.calendar(**params).context["retained_research_lot"])
+        self.assertEqual(AuctionBidBoardAnalysis.objects.count(), 2)
+
+    def test_retained_email_selection_uses_only_the_verified_current_replacement_context(self):
+        old, replacement = self.replacement_pair()
+        old.artprice_url = "https://www.artprice.com/artist/1/example/lots/pasts"
+        old.save(update_fields=("artprice_url",))
+        endpoint = reverse("auction_email_lot_selection", args=(old.pk,))
+        wrong = self.client.post(endpoint + "?retained_for=99999", {"selected": "true"})
+        self.assertEqual(wrong.status_code, 409)
+        selected = self.client.post(endpoint + f"?retained_for={replacement.pk}", {"selected": "true"})
+        self.assertEqual(selected.status_code, 200)
+        self.assertTrue(AuctionEmailBatchItem.objects.filter(lot=old).exists())
+        self.assertFalse(AuctionEmailBatchItem.objects.filter(lot=replacement).exists())
+
+    def test_retained_research_uses_the_auction_end_state_without_changing_saved_source_or_purchase(self):
+        old, replacement = self.replacement_pair()
+        old.active = False
+        old.won_by_us = True
+        old.current_bid = Decimal("125.00")
+        old.bid_count = 2
+        old.save(update_fields=("active", "won_by_us", "current_bid", "bid_count"))
+        records_before = list(AuctionWatchLot.objects.order_by("id").values())
+
+        retained = self.calendar(day="2026-07-25", view="research", lot=old.pk).context["retained_research_lot"]
+
+        self.assertFalse(retained["ended"], "an inactive duplicate is not an ended auction")
+        self.assertEqual(retained["bid"], "Current bid: $125 · 2 bids")
+        self.assertEqual(retained["current_bid"], "125.00")
+        self.assertTrue(retained["won_by_us"], "retained research must keep confirmed-purchase styling")
+        self.assertEqual(retained["lot_url"], old.lot_url)
+        self.assertEqual(retained["id"], old.pk)
+        self.assertEqual(list(AuctionWatchLot.objects.order_by("id").values()), records_before)
+
+        replacement.active = False
+        replacement.save(update_fields=("active",))
+        ended = self.calendar(day="2026-07-25", view="research", lot=old.pk).context["retained_research_lot"]
+        self.assertTrue(ended["ended"])
+        self.assertEqual(ended["bid"], "Sale ended · Sold price unavailable")
+        self.assertTrue(ended["won_by_us"])
+
 
 class ClarsCatalogSupersessionMigrationTests(TestCase):
     def setUp(self):

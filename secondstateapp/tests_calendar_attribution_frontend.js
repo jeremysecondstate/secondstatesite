@@ -42,6 +42,7 @@ function renderer() {
     return parent.appendChild(child);
   };
   const source = productionBlock("  const externalLink =", "  const formatAnalysisMoney =")
+    + productionBlock("  const appendRetainedSavedWork =", "  const galleryCard =")
     + productionBlock("  const galleryCard =", "  const renderGalleryCards =");
   const render = new Function("document", "appendText", "galleryResearchUrl", "galleryImage",
     "updateGalleryEmailButton", "toggleGalleryEmail", "appendCurrencyPrice", "window", "csrfToken",
@@ -128,4 +129,21 @@ test("attribution does not remove confirmed-purchase or ended state", () => {
   assert.equal(withClass(card, "lot-won-badge")[0].textContent, "✓ Won by SECONDSTATE");
   assert.equal(withClass(card, "lot-attribution-badge")[0].textContent, "Attributed to");
   assert.equal(withClass(card, "lot-artist-link")[0].href, artistUrl);
+});
+
+test("a canonical card exposes each retained provider's saved work without adding another card or changing state", () => {
+  const source = lot({retained_saved_work: [
+    {id: 10, source: "Drouot", research_url: "/calendar/?view=research&day=2026-11-04&lot=10", saved_bid_board: true},
+    {id: 11, source: "Invaluable", research_url: "/calendar/?view=research&day=2026-11-04&lot=11", saved_bid_board: true, email_tray_selected: true},
+  ]});
+  const before = JSON.stringify(source);
+  const card = renderer().galleryCard(source, 0);
+  const retained = descendants(card).filter(node => node.tagName === "a" && /saved work/.test(node.textContent));
+  assert.equal(card.dataset.galleryLotId, "123");
+  assert.equal(retained.length, 2);
+  assert.deepEqual(retained.map(link => link.href), source.retained_saved_work.map(work => work.research_url));
+  assert.match(retained[0].textContent, /Drouot.*Bid Board/);
+  assert.match(retained[1].textContent, /Invaluable.*Email Tray/);
+  retained.forEach(link => { assert.equal(link.target, "_blank"); assert.equal(link.rel, "noopener noreferrer"); });
+  assert.equal(JSON.stringify(source), before);
 });

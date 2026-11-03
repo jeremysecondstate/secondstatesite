@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'secondstateapp/home-media.css' %}?v=3">
+<link rel="stylesheet" href="{% static 'secondstateapp/home-media.css' %}?v=4">
 {% endblock %}
 
 {% block before_nav %}
@@ -17,7 +17,8 @@
 <div class="etching-scene" aria-hidden="true">
   <video class="etching-video" muted loop playsinline preload="none"
          disablepictureinpicture disableremoteplayback tabindex="-1"
-         data-src="{% static 'secondstateapp/etching-vid-classical_v2.mp4' %}"></video>
+         poster="{% static 'secondstateapp/bg-vid-workers-poster.jpg' %}"
+         data-src="{% static 'secondstateapp/bg-vid-workers.mp4' %}"></video>
 </div>
 
 <section id="etching-intro" class="hero hero--video">

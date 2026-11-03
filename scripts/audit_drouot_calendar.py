@@ -261,6 +261,50 @@ def inside_horizon(row, coverage):
             < datetime.fromisoformat(coverage["event_end_exclusive"]))
 
 
+def replaced_source_url_aliases(before_keys, after_keys, accepted, old, saved, prior_dom, dom):
+    """Prove a changed Drouot slug without excusing any lost lot identity.
+
+    Global keys contain both provider IDs and URL aliases. A source can change
+    its slug while the source ID and Calendar row stay fixed. Require the fresh
+    accepted URL and exact before/after DOM database identity to distinguish
+    that change from deletion, recreation, or an unexplained missing key.
+    """
+    def source_id(url):
+        parts = urlsplit(str(url or ""))
+        match = re.fullmatch(r"/en/l/([1-9][0-9]*)(?:-[^/]+)?/?", parts.path)
+        if (parts.scheme != "https" or parts.netloc != "drouot.com"
+                or parts.query or parts.fragment or not match):
+            return None
+        return match[1]
+
+    resolved = []
+    for alias in sorted(before_keys - after_keys):
+        if not alias.startswith("drouot:https://"):
+            continue
+        prior_url = alias[len("drouot:"):]
+        lot_id = source_id(prior_url)
+        identity = f"drouot:{lot_id}"
+        if not lot_id or identity not in accepted or identity not in before_keys or identity not in after_keys:
+            continue
+        incoming_url = accepted[identity].get("lot_url")
+        if source_id(incoming_url) != lot_id or canonical("lot_url", incoming_url) == canonical("lot_url", prior_url):
+            continue
+        new_alias = f"drouot:{canonical('lot_url', incoming_url)}"
+        prior, current = prior_dom.get(identity, {}), dom.get(identity, {})
+        database_id = prior.get("calendar_id")
+        if (new_alias not in after_keys or type(database_id) is not int or database_id < 1
+                or current.get("calendar_id") != database_id
+                or canonical("lot_url", prior.get("lot_url")) != canonical("lot_url", prior_url)
+                or canonical("lot_url", current.get("lot_url")) != canonical("lot_url", incoming_url)):
+            continue
+        if any(identity in records and canonical("lot_url", records[identity].get("lot_url")) != canonical("lot_url", url)
+               for records, url in ((old, prior_url), (saved, incoming_url))):
+            continue
+        resolved.append({"key": identity, "calendar_id": database_id,
+                         "old_alias": alias, "new_alias": new_alias})
+    return resolved
+
+
 def normalized(value):
     value = unicodedata.normalize("NFKD", str(value or "")).casefold()
     return " ".join(re.sub(r"[^a-z0-9]+", " ", "".join(c for c in value if not unicodedata.combining(c))).split())
@@ -344,7 +388,7 @@ def superseded_records(proof, historical_dom, before, after, accepted, dom):
     return result
 
 
-def compare_snapshots(before, after, preview, sync, dom=None, superseded_db=None, historical_dom=None):
+def compare_snapshots(before, after, preview, sync, dom=None, superseded_db=None, historical_dom=None, baseline_dom=None):
     old, saved, accepted = indexed(before["lots"]), indexed(after["lots"]), indexed(preview["lots"])
     if any(not identity.startswith("drouot:") for identity in accepted):
         raise ValueError("The Drouot preview includes another source.")
@@ -360,11 +404,16 @@ def compare_snapshots(before, after, preview, sync, dom=None, superseded_db=None
     if accepted and (sync.get("summary", {}).get("mode") != "synced" or not confirmed or int(confirmed[1]) != len(accepted)):
         errors.append("Synchronization receipt does not confirm every accepted observation.")
     global_before, global_after = set(before["calendar_lot_keys"]), set(after["calendar_lot_keys"])
-    absent_global, lost = sorted(set(accepted) - global_after), sorted(global_before - global_after)
+    absent_global = sorted(set(accepted) - global_after)
+    raw_missing_before_keys = sorted(global_before - global_after)
     mismatches, verified_api, verified_dom, unavailable, stale = [], [], [], [], []
     verified_superseded, absent_public = [], []
     actual_changes, unchanged_drouot, concurrent, unreverified_drouot = [], [], [], []
     dom = dom or {}
+    resolved_url_alias_changes = replaced_source_url_aliases(
+        global_before, global_after, accepted, old, saved, baseline_dom or {}, dom)
+    resolved_aliases = {row["old_alias"] for row in resolved_url_alias_changes}
+    lost = sorted(set(raw_missing_before_keys) - resolved_aliases)
     superseded = superseded_records(superseded_db, historical_dom or {}, before, after, accepted, dom)
     for identity, incoming in accepted.items():
         prior = old.get(identity)
@@ -444,7 +493,10 @@ def compare_snapshots(before, after, preview, sync, dom=None, superseded_db=None
         "new_global_source_ids": sorted((set(accepted) - global_before) & global_after),
         "all_accepted_source_ids_saved": not missing, "missing_accepted_global_ids": missing,
         "accepted_absent_from_public_global_keys": absent_global,
-        "prior_global_identity_keys_lost": lost, "accepted_api_fields_verified": len(verified_api),
+        "prior_global_identity_keys_lost": lost,
+        "raw_missing_before_keys": raw_missing_before_keys,
+        "resolved_url_alias_changes": resolved_url_alias_changes,
+        "accepted_api_fields_verified": len(verified_api),
         "accepted_dom_fields_verified": len(verified_dom), "verified_calendar_ids": verified_dom + verified_superseded,
         "accepted_superseded_db_fields_verified": len(verified_superseded), "verified_superseded_records": verified_superseded,
         "accepted_without_api_or_dom_readback": absent_public,
@@ -463,6 +515,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--dom", action="append", default=[], type=Path, help="Public after-sync Calendar DOM JSON row array; repeat for multiple months.")
+    parser.add_argument("--before-dom", action="append", default=[], type=Path, help="Public before-sync Calendar DOM rows; required to prove a changed source URL alias retained its database ID.")
     parser.add_argument("--superseded-db", type=Path, help="Read-only public database proof for preexisting inactive superseded observations.")
     parser.add_argument("--prior-dom", action="append", default=[], type=Path, help="Earlier public monthly DOM evidence for original Calendar database IDs; used only with --superseded-db.")
     parser.add_argument("--calendar-time-zone", default="America/Los_Angeles", help="Confirm this timezone against the Calendar UI header.")
@@ -475,7 +528,9 @@ def main(argv=None):
     else:
         result = compare_snapshots(load(args.run_dir / "calendar-before.json"), load(args.run_dir / "calendar-after.json"),
                                    load(args.run_dir / "preview-report.json"), load(args.run_dir / "sync-report.json"), read_dom(args.dom),
-                                   load(args.superseded_db) if args.superseded_db else None, read_dom(args.prior_dom))
+                                   load(args.superseded_db) if args.superseded_db else None, read_dom(args.prior_dom), read_dom(args.before_dom))
+        if args.before_dom:
+            result["baseline_dom_evidence"] = [str(path.resolve()) for path in args.before_dom]
         if args.superseded_db:
             result["superseded_db_evidence"] = str(args.superseded_db.resolve())
             result["historical_identity_evidence"] = [str(path.resolve()) for path in args.prior_dom]

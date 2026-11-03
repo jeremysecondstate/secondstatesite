@@ -8,10 +8,11 @@ import os
 import re
 import secrets
 from collections import defaultdict
+from copy import copy
 from datetime import date, datetime, time, timedelta, timezone as datetime_timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from urllib.parse import urlencode, urlparse
+from urllib.parse import unquote, urlencode, urlparse
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -296,6 +297,54 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
     }
 
 
+def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, research_queue_state, request):
+    """Link saved work on explicitly superseded listings without moving its owner."""
+    visible = {lot["id"]: (day, lot) for day, lots in calendar_data.items() for lot in lots}
+    if not visible:
+        return None
+    saved_children = AuctionWatchLot.objects.filter(superseded_by_id__in=visible).filter(
+        Q(max_bid_analysis__isnull=False) | Q(liveart_resale_analysis__isnull=False)
+        | Q(bid_board_analysis__isnull=False) | Q(email_batch_items__isnull=False)
+        | Q(research_queue_item__isnull=False) | Q(research_run_items__isnull=False)
+        | ~Q(artprice_url="") | Q(won_by_us=True) | Q(sold_price__isnull=False)
+    ).select_related("watchlist_artist", "bid_board_analysis").defer(
+        "bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids",
+    ).distinct().order_by("source", "id")
+    requested_id = request.GET.get("lot", "")
+    retained = None
+    for child in saved_children:
+        day, canonical = visible[child.superseded_by_id]
+        research_url = reverse("auction_calendar") + "?" + urlencode({
+            "day": day, "view": "research", "lot": child.pk, "look": "workbench",
+        })
+        work = {
+            "id": child.pk, "source": child.source, "research_url": research_url,
+            "saved_bid_board": hasattr(child, "bid_board_analysis"),
+            "email_tray_selected": child.pk in selected_lot_ids,
+            "research_queue_selected": child.pk in research_queue_state,
+        }
+        canonical.setdefault("retained_saved_work", []).append(work)
+        if (request.GET.get("view") == "research" and requested_id == str(child.pk)
+                and request.GET.get("day") == day):
+            # Display suppression does not mean the underlying auction ended.
+            # Keep the historical source values and saved-work owner untouched.
+            display_child = copy(child)
+            display_child.active = not canonical["ended"]
+            retained = _lot_json(display_child, zone, selected_lot_ids, research_queue_state)
+            retained["retained_listing"] = {
+                "source": child.source, "canonical_id": canonical["id"],
+                "canonical_url": reverse("auction_calendar") + "?" + urlencode({
+                    "day": day, "view": "research", "lot": canonical["id"], "look": "workbench",
+                }),
+                "canonical_source_url": canonical["url"],
+                "canonical_house": canonical["auction_house"],
+            }
+            retained["email_tray_update_url"] += "?" + urlencode({"retained_for": canonical["id"]})
+    if retained is not None:
+        retained["retained_saved_work"] = visible[retained["retained_listing"]["canonical_id"]][1]["retained_saved_work"]
+    return retained
+
+
 @never_cache
 @staff_member_required
 @require_http_methods(["GET"])
@@ -432,6 +481,10 @@ def auction_calendar(request):
         calendar_data[day_iso] = [_lot_json(lot, zone, selected_lot_ids, research_queue_state) for lot in day_lots]
         calendar_sales_data[day_iso] = [_sale_json(group) for group in _group_lots(day_lots, zone)]
 
+    retained_research_lot = _attach_retained_calendar_work(
+        calendar_data, zone, selected_lot_ids, research_queue_state, request,
+    )
+
     in_month_days = sorted(day for day in lots_by_day if selected_month <= day < following_month)
     if now_local.date() in in_month_days:
         initial_day = now_local.date().isoformat()
@@ -458,6 +511,7 @@ def auction_calendar(request):
         "weeks": weeks,
         "calendar_data": calendar_data,
         "calendar_sales_data": calendar_sales_data,
+        "retained_research_lot": retained_research_lot,
         "initial_day": initial_day,
         "upcoming_groups": visible_upcoming_groups,
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
@@ -606,7 +660,12 @@ def update_auction_email_selection(request, lot_id: int):
 
     with transaction.atomic():
         lot = get_object_or_404(AuctionWatchLot.objects.select_for_update(), pk=lot_id)
-        if selected and lot.superseded_by_id is not None:
+        retained_context = (
+            request.GET.get("retained_for") == str(lot.superseded_by_id)
+            and lot.superseded_by_id is not None
+            and AuctionWatchLot.objects.filter(pk=lot.superseded_by_id, superseded_by__isnull=True).exists()
+        )
+        if selected and lot.superseded_by_id is not None and not retained_context:
             return JsonResponse(
                 {"ok": False, "error": "This listing was replaced. Reload the Calendar to select the current lot."},
                 status=409,
@@ -2280,6 +2339,13 @@ def _calendar_image_url(value) -> str:
     parsed = urlparse(candidate)
     host = (parsed.hostname or "").casefold()
     if parsed.scheme != "https":
+        return ""
+    if host == "am-s3-bucket-assets.s3.eu-west-2.amazonaws.com":
+        path = unquote(parsed.path)
+        if (path.startswith("/forum/prod/lot_images/")
+                and not any(segment in {".", ".."} for segment in path.split("/"))
+                and "\\" not in path):
+            return candidate
         return ""
     if any(host == domain or host.endswith(f".{domain}") for domain in CALENDAR_IMAGE_DOMAINS):
         return candidate

@@ -59,6 +59,40 @@ class ArtistAttributionLabelTests(SimpleTestCase):
             with self.subTest(credit=credit):
                 self.assertEqual(artist_attribution_label(credit), "")
 
+    def test_forum_punctuated_artist_credits_retain_their_attribution(self):
+        cases = {
+            "Lucio Fontana (1899-1965) after.": "After",
+            "Roy Lichtenstein (1923-1997) after.": "After",
+            "Marc Chagall (1887-1985) after.": "After",
+            "Gaston Bernheim de Villers (1870-1853) after. Jacques Villon": "After",
+            "Marcel Duchamp (1887-1968) after. Jacques Villon": "After",
+            "Marcel Gromaire (1892-1971) after. Jacques Villon": "After",
+            "Marie Laurencin (1883-1956) after. Jacques Villon": "After",
+            "Joan Miró (1893-1983) after.": "After",
+            "Pablo Picasso (1881-1973) after.": "After",
+            "Pablo Picasso (1881-1973) after. Jacques Villon": "After",
+            "Pierre-Auguste Renoir (1841-1919) after. Jacques Villon": "After",
+            "Hubert Robert (1733-1808), Attributed to.": "Attributed to",
+        }
+        for credit, expected in cases.items():
+            with self.subTest(credit=credit):
+                self.assertEqual(artist_attribution_label(credit), expected)
+
+    def test_punctuated_title_credits_still_require_the_complete_current_artist(self):
+        cases = (
+            ("Pablo Picasso", "Pablo Picasso after. — Composition", "After"),
+            ("Hubert Robert", "Hubert Robert, Attributed to. — Roman Villa", "Attributed to"),
+            ("Andy Warhol", "Pablo Picasso after. — Composition", ""),
+            ("Pablo Picasso", "Pablo Picasso Jr. after. — Composition", ""),
+            ("Jacques Villon", "Pablo Picasso after. Jacques Villon", ""),
+            ("Pablo Picasso", "Life After Picasso", ""),
+            ("Pablo Picasso", "The day after.", ""),
+            ("Pablo Picasso", "After the Party.", ""),
+        )
+        for artist, title, expected in cases:
+            with self.subTest(artist=artist, title=title):
+                self.assertEqual(artist_attribution_label(artist, title=title), expected)
+
     def test_bilingual_after_credit_stays_bound_to_the_complete_artist(self):
         for credit in ("Nach - After Pablo Picasso", "Pablo Picasso (Nach / After)",
                        "Picasso, Pablo, NACH – AFTER"):
@@ -117,6 +151,8 @@ class CalendarAttributionPayloadTests(SimpleTestCase):
             ("Pablo Picasso", "Pablo Picasso", "Attribuée à Pablo Picasso — Bouquet", "Attributed to"),
             ("Pablo Picasso", "Pablo Picasso", "After the Party", ""),
             ("Rembrandt", "Rembrandt", 'REMBRANDT VAN RIJN, HARMENSZ, Nach - After: "Die drei Bäume".', "After"),
+            ("Pablo Picasso (1881-1973) after. Jacques Villon", "Pablo Picasso", "Composition", "After"),
+            ("Hubert Robert (1733-1808), Attributed to.", "Hubert Robert", "Roman Villa", "Attributed to"),
         )
         with patch("django.db.backends.utils.CursorWrapper.execute", side_effect=AssertionError("Unexpected database query")), \
                 patch("secondstateapp.calendar_views.artist_research_urls", return_value=(artist_url, "")):

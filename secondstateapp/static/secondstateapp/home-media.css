@@ -26,19 +26,23 @@
 /* Avoid a separate stacking context: copy sits above the shared video. */
 .hero--video {
   border: 0;
+  background-image: url("bg-vid-workers-poster.jpg");
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
 .hero--video.has-video { background-image: none; }
 
-/* Soften the window edge without blurring the moving scene or its copy. */
+/* A dark reveal gives each opening depth without blurring the scene. */
 .hero--video::before {
   inset: 0;
   z-index: 3;
   border-radius: inherit;
   background: none;
-  box-shadow: inset 0 0 16px 4px rgba(7, 8, 11, .92);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, .8),
+    inset 0 8px 18px rgba(0, 0, 0, .28),
+    inset 0 0 16px 4px rgba(7, 8, 11, .92);
   opacity: 1;
   filter: none;
   pointer-events: none;

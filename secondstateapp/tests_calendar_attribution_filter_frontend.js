@@ -60,6 +60,10 @@ function page(lots, view = "catalog") {
   const elements = new Map();
   const listeners = new Map();
   const monthLinks = [{href: "https://secondstate.art/calendar/?month=2026-12"}];
+  const catalogLinks = [
+    {href: "https://secondstate.art/calendar/?month=2026-11&day=2026-11-05&view=catalog"},
+    {href: "https://secondstate.art/calendar/?month=2026-12&day=2026-12-01&view=catalog&hide_attributed=1"},
+  ];
   const context = vm.createContext({
     URL, URLSearchParams, data: {[day]: lots}, selectedDay: day, activeView: view,
     researchScope: "", researchIndex: 0, researchLook: "dossier", restoringHistory: false,
@@ -78,7 +82,8 @@ function page(lots, view = "catalog") {
         if (!elements.has(id)) elements.set(id, new Element());
         return elements.get(id);
       },
-      querySelectorAll: selector => selector === ".month-nav a" ? monthLinks : [],
+      querySelectorAll: selector => selector === ".month-nav a" ? monthLinks
+        : selector === ".day-catalog-link" ? catalogLinks : [],
     },
     gallerySort: Object.assign(new Element("select"), {value: "catalog"}),
     galleryArtistSort: Object.assign(new Element("select"), {value: "count_desc"}),
@@ -107,6 +112,7 @@ function page(lots, view = "catalog") {
   context.render = () => context.run("renderGalleryFilters(); renderGalleryArtists(); renderGalleryCards()");
   context.listeners = listeners;
   context.monthLinks = monthLinks;
+  context.catalogLinks = catalogLinks;
   return context;
 }
 
@@ -228,6 +234,39 @@ test("attribution URL state survives month and research links independently of t
   assert.equal(new URL(p.run("galleryResearchUrl(dayLots()[0])")).searchParams.has("hide_attributed"), false);
 });
 
+for (const view of ["catalog", "oliver", "calendar", "research"]) {
+  test(`${view} day catalog links preserve attribution browsing state and their own destination`, () => {
+    const lots = [lot(1, {attribution_label: "After", email_tray_selected: true}),
+      lot(2, {saved_bid_board: {qualifies: true}})];
+    const before = JSON.stringify(lots);
+    const p = page(lots, view);
+    const destinations = p.catalogLinks.map(link => {
+      const url = new URL(link.href);
+      url.searchParams.delete("hide_attributed");
+      return url.href;
+    });
+    for (const filter of ["house:Phillips", "artist:artist 1", "tray", "bidboards"]) {
+      p.galleryFilter = filter;
+      for (const hidden of [true, false, true]) {
+        p.galleryHideAttributed = hidden;
+        p.run("updateCalendarLocation()");
+        p.catalogLinks.forEach((link, index) => {
+          const url = new URL(link.href);
+          assert.equal(url.searchParams.get("hide_attributed"), hidden ? "1" : null);
+          url.searchParams.delete("hide_attributed");
+          assert.equal(url.href, destinations[index], "retain the target day and catalog view without copying filters");
+        });
+        const destination = page(lots);
+        destination.window.location.search = new URL(p.catalogLinks[0].href).search;
+        vm.runInContext(between("  const initialParams =", "  const requestedView ="), destination);
+        assert.deepEqual(destination.visible().map(entry => entry.id), hidden ? [2] : [1, 2]);
+        assert.equal(p.galleryFilter, filter);
+        assert.equal(JSON.stringify(lots), before, "navigation must preserve saved selections");
+      }
+    }
+  });
+}
+
 test("clicking the actual toggle resets pagination, composes with the current filter and restores selected lots", () => {
   const lots = [lot(1, {attribution_label: "After", email_tray_selected: true}), lot(2, {email_tray_selected: true})];
   const before = JSON.stringify(lots);
@@ -273,7 +312,50 @@ test("Back and Forward restore the hide state before rendering without changing 
     p.listeners.get("popstate")();
     assert.deepEqual(p.galleryGrid.children.map(card => card.id), ids);
     assert.equal(p.galleryAttributionToggle.attributes["aria-pressed"], pressed);
+    p.catalogLinks.forEach(link => assert.equal(new URL(link.href).searchParams.has("hide_attributed"), pressed === "true"));
     assert.equal(p.restoringHistory, false);
   }
   assert.equal(JSON.stringify(lots), before);
+});
+
+test("retained saved boards and tray selections keep a single canonical card discoverable in filters", () => {
+  const lots = [lot(1, {retained_saved_work: [
+    {id: 10, saved_bid_board: true, email_tray_selected: true},
+    {id: 11, saved_bid_board: true, email_tray_selected: false},
+  ]}), lot(2)];
+  const before = JSON.stringify(lots);
+  const p = page(lots);
+  p.render();
+  const counts = Object.fromEntries(p.galleryFilters.children.map(button => [button.dataset.galleryFilter, button.children[1].textContent]));
+  assert.equal(counts.bidboards, "1");
+  assert.equal(counts.tray, "1");
+  for (const filter of ["bidboards", "tray"]) {
+    p.galleryFilter = filter;
+    assert.deepEqual(p.visible().map(entry => entry.id), [1]);
+  }
+  assert.equal(JSON.stringify(lots), before);
+});
+
+test("only explicit retained research replaces its canonical slot and preserves original action IDs", () => {
+  const lots = [lot(1), lot(2)];
+  const p = page(lots);
+  const retained = lot(10, {retained_listing: {canonical_id: 1}, artprice_analysis_url: "/calendar/lots/10/artprice-analysis/"});
+  p.retainedResearchLot = retained;
+  p.retainedResearchId = 10;
+  p.activeView = "research";
+  assert.deepEqual(p.ids("dayLots()"), [10, 2]);
+  assert.equal(p.run("dayLots()[0]"), retained);
+  assert.equal(p.run("dayLots()[0].artprice_analysis_url"), "/calendar/lots/10/artprice-analysis/");
+  p.researchIndex = 0;
+  p.run("updateCalendarLocation()");
+  assert.equal(new URL(p.window.history.url).searchParams.get("lot"), "10");
+  p.researchIndex = 1;
+  p.run("updateCalendarLocation()");
+  assert.equal(new URL(p.window.history.url).searchParams.get("lot"), "2");
+  p.activeView = "catalog";
+  assert.deepEqual(p.ids("dayLots()"), [1, 2]);
+  p.activeView = "research";
+  p.retainedResearchId = null;
+  assert.deepEqual(p.ids("dayLots()"), [1, 2]);
+  assert.deepEqual(lots.map(source => source.id), [1, 2]);
 });
