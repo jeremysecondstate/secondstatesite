@@ -120,6 +120,81 @@ class CalendarSupersededLotTests(TestCase):
         self.assertTrue(details[historical.pk]["ended"])
         self.assertEqual(response.context["synced_lot_count"], 2)
 
+    def test_replacement_keeps_verified_source_qualification_without_saved_work_or_source_edits(self):
+        for day in ("2026-07-25", "2026-08-03"):
+            with self.subTest(day=day):
+                event_at = datetime.fromisoformat(day).replace(hour=13, tzinfo=CALENDAR_ZONE)
+                replacement = watch_lot(
+                    source_lot_id=f"richter-invaluable-{day}", artist="Gerhard Richter",
+                    artist_watchlist_name="Gerhard Richter", title='RICHTER, GERHARD: "Abstraktes Bild".',
+                    lot_number="2459", event_at=event_at,
+                )
+                child = watch_lot(
+                    source="Drouot", source_lot_id=f"richter-drouot-{day}",
+                    artist="RICHTER, GERHARD, After", artist_watchlist_name="Gerhard Richter",
+                    title="Abstract Painting", lot_number="2459", event_at=event_at,
+                    active=False, superseded_by=replacement,
+                )
+                before = list(AuctionWatchLot.objects.filter(pk__in=[replacement.pk, child.pk]).order_by("pk").values())
+
+                response = self.calendar(day=day, view="catalog")
+
+                payload = next(lot for lot in response.context["calendar_data"][day] if lot["id"] == replacement.pk)
+                self.assertEqual(payload["attribution_label"], "After")
+                self.assertEqual(payload["title"], replacement.title)
+                self.assertEqual(payload["artist_source"], "Gerhard Richter")
+                self.assertEqual(payload["lot_url"], replacement.lot_url)
+                self.assertNotIn("retained_saved_work", payload)
+                self.assertNotIn(child.pk, {lot["id"] for lot in response.context["calendar_data"][day]})
+                self.assertEqual(
+                    list(AuctionWatchLot.objects.filter(pk__in=[replacement.pk, child.pk]).order_by("pk").values()),
+                    before,
+                )
+
+    def test_replacement_reads_bound_title_credit_and_preserves_primary_qualification(self):
+        child, replacement = self.replacement_pair(artist="Gerhard Richter", artist_watchlist_name="Gerhard Richter")
+        child.title = 'RICHTER, GERHARD, Nach - After: "Abstraktes Bild".'
+        child.save(update_fields=["title"])
+
+        response = self.calendar()
+        payload = response.context["calendar_data"]["2026-07-25"][0]
+        self.assertEqual(payload["attribution_label"], "After")
+
+        replacement.artist = "Attributed to Gerhard Richter"
+        replacement.save(update_fields=["artist"])
+        response = self.calendar()
+        payload = response.context["calendar_data"]["2026-07-25"][0]
+        self.assertEqual(payload["attribution_label"], "Attributed to")
+
+    def test_qualification_does_not_propagate_from_unrelated_lots_or_another_artist(self):
+        child, replacement = self.replacement_pair(artist="Gerhard Richter", artist_watchlist_name="Gerhard Richter")
+        child.artist = "After Pablo Picasso"
+        child.save(update_fields=["artist"])
+        unrelated = watch_lot(
+            source="Drouot", source_lot_id="unrelated-qualified-richter",
+            artist="After Gerhard Richter", artist_watchlist_name="Gerhard Richter",
+        )
+
+        response = self.calendar()
+
+        payloads = {lot["id"]: lot for lot in response.context["calendar_data"]["2026-07-25"]}
+        self.assertEqual(payloads[replacement.pk]["attribution_label"], "")
+        self.assertEqual(payloads[unrelated.pk]["attribution_label"], "After")
+
+    def test_conflicting_superseded_qualifications_are_not_chosen_arbitrarily(self):
+        child, replacement = self.replacement_pair(artist="Gerhard Richter", artist_watchlist_name="Gerhard Richter")
+        child.artist = "After Gerhard Richter"
+        child.save(update_fields=["artist"])
+        watch_lot(
+            source="Drouot", source_lot_id="conflicting-qualified-richter",
+            artist="Attributed to Gerhard Richter", artist_watchlist_name="Gerhard Richter",
+            superseded_by=replacement,
+        )
+
+        response = self.calendar()
+
+        self.assertEqual(response.context["calendar_data"]["2026-07-25"][0]["attribution_label"], "")
+
     def test_outside_month_upcoming_catalog_and_sale_counts_exclude_superseded_listing(self):
         event_at = datetime(2026, 8, 3, 14, tzinfo=CALENDAR_ZONE)
         old, replacement = self.replacement_pair(event_at=event_at)

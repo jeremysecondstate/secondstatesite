@@ -297,6 +297,33 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
     }
 
 
+def _attach_superseded_attribution(calendar_data):
+    """Retain a verified duplicate's bound credit without rewriting either source."""
+    unqualified = {
+        lot["id"]: lot for lots in calendar_data.values() for lot in lots
+        if not lot["attribution_label"]
+    }
+    if not unqualified:
+        return
+    labels = defaultdict(set)
+    children = AuctionWatchLot.objects.filter(superseded_by_id__in=unqualified).values_list(
+        "superseded_by_id", "artist", "title",
+    )
+    for survivor_id, artist, title in children:
+        # The explicit replacement link establishes lot identity. Still require
+        # the qualified credit to name the survivor's artist, not a title mention.
+        survivor_artist = unqualified[survivor_id]["artist_source"]
+        label = artist_attribution_label(survivor_artist, title=artist) or artist_attribution_label(
+            survivor_artist, title=title,
+        )
+        if label:
+            labels[survivor_id].add(label)
+    for survivor_id, source_labels in labels.items():
+        # Conflicting source qualifications need review, not an arbitrary choice.
+        if len(source_labels) == 1:
+            unqualified[survivor_id]["attribution_label"] = next(iter(source_labels))
+
+
 def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, research_queue_state, request):
     """Link saved work on explicitly superseded listings without moving its owner."""
     visible = {lot["id"]: (day, lot) for day, lots in calendar_data.items() for lot in lots}
@@ -538,6 +565,7 @@ def auction_calendar(request):
         if sale_lots:
             group.update(_group_lots(sale_lots, zone)[0])
 
+    _attach_superseded_attribution(calendar_data)
     retained_research_lot = _attach_retained_calendar_work(
         calendar_data, zone, selected_lot_ids, research_queue_state, request,
     )
