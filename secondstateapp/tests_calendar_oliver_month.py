@@ -176,4 +176,3 @@ class OliverMonthCalendarTests(TestCase):
         self.assertNotIn("_calendar_sale_identity", group)
         self.assertEqual(len(context["calendar_data"]["2026-08-04"]), 1003)
         self.assertEqual(context["oliver_calendar_sales_data"]["2026-08-04"][0]["lot_count"], 1002)
-
