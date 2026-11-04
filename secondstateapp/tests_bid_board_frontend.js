@@ -27,6 +27,7 @@ class Element {
   get childElementCount() {return this.children.length;}
   append(...nodes) {nodes.forEach(node => {node.parentElement = this; this.children.push(node);});}
   appendChild(node) {this.append(node); return node;}
+  contains(node) {return node === this || this.children.some(child => child.contains(node));}
   prepend(...nodes) {nodes.forEach(node => {node.parentElement = this;}); this.children.unshift(...nodes);}
   replaceChildren(...nodes) {this.children = []; this.text = ""; this.append(...nodes);}
   setAttribute(name, value) {this.attributes[name] = String(value);}
@@ -267,7 +268,7 @@ function renderRetained(page, lot) {
     }});
   vm.runInContext(calendarBlock("  const externalLink =", "  const appendArtistLabel =")
     + calendarBlock("  const appendRetainedSavedWork =", "  const galleryCard =")
-    + "appendRetainedSavedWork(retainedRoot, retainedLot);", page.context);
+    + "appendLotControls(retainedRoot, retainedLot);", page.context);
 }
 
 for (const openIndex of [0, 1]) {
@@ -302,8 +303,8 @@ test("retained research does not repeat its own board and keeps other retained b
   const retained = [retainedBoard(10, "Drouot", "300.00"), retainedBoard(11, "Invaluable", "500.00")];
   const page = environment({});
   renderRetained(page, {...retained[0], retained_saved_work: retained});
-  assert.deepEqual(page.root.querySelectorAll(".sb-catalog-summary").map(node => node.dataset.savedBidBoardLotId), ["11"]);
-  assert.equal(page.root.querySelectorAll("a").length, 2, "both original research links remain accessible");
+  assert.deepEqual(page.root.querySelectorAll(".sb-catalog-summary").map(node => node.dataset.savedBidBoardLotId), ["10", "11"]);
+  assert.equal(page.root.querySelectorAll("a").length, 1, "the other original research link remains accessible beside the current listing board");
 });
 
 test("a saved-board deep link restores a retained snapshot with its original owner", () => {

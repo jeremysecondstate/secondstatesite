@@ -495,9 +495,28 @@
         if (String(work.id) === lotId) work.saved_bid_board = event.detail.savedBoard;
       });
     });
+    if (retainedResearchLot && String(retainedResearchLot.id) === lotId) {
+      retainedResearchLot.saved_bid_board = event.detail.savedBoard;
+    }
+    const focusOrigin = event.detail.focusOrigin || document.activeElement;
+    const focusedCardId = focusOrigin?.closest?.(".day-gallery-work")?.dataset.galleryLotId;
+    const focusedFilter = focusOrigin?.closest?.("[data-gallery-filter]")?.dataset.galleryFilter;
+    refreshLotControls(lotId, focusOrigin);
     if (membershipChanged && isGalleryView()) {
       renderGalleryFilters();
-      if (["bidboards", "qualifying"].includes(galleryFilter)) renderGalleryCards();
+      if (["bidboards", "qualifying"].includes(galleryFilter)) {
+        renderGalleryCards();
+        if (focusedCardId) {
+          const card = Array.from(galleryGrid.children).find((item) => item.dataset.galleryLotId === focusedCardId);
+          const nextControl = card?.querySelector(".lot-controls")?.querySelector("input, button, a");
+          const activeFilter = Array.from(galleryFilters.children).find((item) => item.dataset.galleryFilter === galleryFilter);
+          (nextControl || activeFilter)?.focus({preventScroll: true});
+        }
+      }
+      if (focusedFilter) {
+        Array.from(galleryCatalog.querySelectorAll("[data-gallery-filter]"))
+          .find((item) => item.dataset.galleryFilter === focusedFilter)?.focus({preventScroll: true});
+      }
     }
   });
   const auctionCalendar = document.querySelector(".auction-calendar");
@@ -3494,21 +3513,70 @@
   };
 
   const appendRetainedSavedWork = (target, lot) => {
-    if (!lot.retained_saved_work?.length) return;
-    appendText(target, "p", "day-gallery-meta", "Saved work from previous listings");
-    lot.retained_saved_work.forEach((work) => {
-      const links = document.createElement("div");
-      links.className = "day-gallery-actions";
+    const retained = (lot.retained_saved_work || []).filter((work) => String(work.id) !== String(lot.id));
+    if (!retained.length) return;
+    const links = document.createElement("div");
+    links.className = "lot-retained-work";
+    retained.forEach((work) => {
       const details = [work.saved_bid_board ? "Bid Board" : "", work.email_tray_selected ? "Email Tray" : "", work.research_queue_selected ? "Research Queue" : ""].filter(Boolean);
-      const link = externalLink(work.research_url, "day-gallery-auction-link", `${work.source} saved work${details.length ? ` · ${details.join(" / ")}` : ""} ↗`);
+      const link = externalLink(work.research_url, "lot-retained-link", `${work.source} saved work${details.length ? ` · ${details.join(" / ")}` : ""} ↗`);
       link.setAttribute("aria-label", `Open saved ${work.source} work for ${lot.title} (opens in a new tab)`);
       links.appendChild(link);
-      target.appendChild(links);
-      if (window.SavedBidBoard && String(work.id) !== String(lot.id)) {
-        const savedBoard = document.createElement("div");
-        window.SavedBidBoard.mountSummary(savedBoard, {lot: work, csrfToken});
-        target.appendChild(savedBoard);
+    });
+    target.appendChild(links);
+  };
+
+  // Weak references let detached Archive cards stay current without retaining old galleries.
+  const lotControlViews = new Set();
+  const lotBoardOwners = (lot) => [lot, ...(lot.retained_saved_work || [])]
+    .filter((work, index, works) => works.findIndex((other) => String(other.id) === String(work.id)) === index);
+  const renderLotControls = (view, focusOrigin = document.activeElement) => {
+    const {root, lot, group} = view;
+    const owners = lotBoardOwners(group);
+    const boards = owners.filter((work) => work.saved_bid_board);
+    view.boardIds = boards.map((work) => String(work.id)).join(",");
+    const restoreFocus = root.contains(focusOrigin);
+    root.replaceChildren();
+    view.summaries = new Map();
+    boards.forEach((work) => {
+      const savedBoard = document.createElement("div");
+      if (window.SavedBidBoard) window.SavedBidBoard.mountSummary(savedBoard, {lot: work, csrfToken});
+      view.summaries.set(String(work.id), savedBoard);
+      if (String(work.id) !== String(group.id)) {
+        const provenance = externalLink(work.research_url, "lot-board-provenance", `Saved with ${work.source} ↗`);
+        provenance.setAttribute("aria-label", `Open saved ${work.source} work for ${lot.title} (opens in a new tab)`);
+        savedBoard.appendChild(provenance);
       }
+      root.appendChild(savedBoard);
+    });
+    if (!boards.length && window.ResearchQueue) root.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
+    // Keep the original sources and any other saved work reachable after deleting a board.
+    const otherWork = (group.retained_saved_work || []).filter((work) => !work.saved_bid_board);
+    appendRetainedSavedWork(root, {...group, retained_saved_work: otherWork});
+    if (restoreFocus) root.querySelector("input, button, a")?.focus({preventScroll: true});
+  };
+  const appendLotControls = (target, lot, group = lot) => {
+    if (lot.retained_listing && group === lot) {
+      group = Object.values(data).flat().find((canonical) => String(canonical.id) === String(lot.retained_listing.canonical_id)) || lot;
+    }
+    const root = document.createElement("section");
+    root.className = "lot-controls";
+    root.setAttribute("aria-label", "Saved Bid Boards and research");
+    const view = {root, lot, group, boardIds: ""};
+    root.lotControlsView = view;
+    lotControlViews.add(new WeakRef(view));
+    renderLotControls(view);
+    target.appendChild(root);
+  };
+  const refreshLotControls = (lotId, focusOrigin) => {
+    lotControlViews.forEach((reference) => {
+      const view = reference.deref();
+      if (!view) { lotControlViews.delete(reference); return; }
+      const owners = lotBoardOwners(view.group);
+      if (!owners.some((work) => String(work.id) === lotId)) return;
+      const boardIds = owners.filter((work) => work.saved_bid_board).map((work) => String(work.id)).join(",");
+      if (boardIds !== view.boardIds) renderLotControls(view, focusOrigin);
+      else view.summaries.get(lotId)?.updateSavedBoard?.(owners.find((work) => String(work.id) === lotId).saved_bid_board);
     });
   };
 
@@ -3544,13 +3612,7 @@
     appendText(caption, "p", "day-gallery-meta", [lot.medium, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.time].filter(Boolean).join(" · "));
     appendCurrencyPrice(caption, lot, "estimate", "day-gallery-estimate");
     appendCurrencyPrice(caption, lot, "bid", "day-gallery-bid");
-    if (window.SavedBidBoard) {
-      const savedBoard = document.createElement("div");
-      window.SavedBidBoard.mountSummary(savedBoard, {lot, csrfToken});
-      caption.appendChild(savedBoard);
-    }
-    if (window.ResearchQueue) caption.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
-    appendRetainedSavedWork(caption, lot);
+    appendLotControls(caption, lot);
     const actions = document.createElement("div");
     actions.className = "day-gallery-actions";
     const quickLook = externalLink(researchUrl, "day-gallery-quick-look", "Research this lot ↗");
@@ -4124,8 +4186,7 @@
     }
     if (lot.artprice_url) actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
     overview.appendChild(actionLinks);
-    appendRetainedSavedWork(overview, lot);
-    if (window.ResearchQueue) overview.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
+    appendLotControls(overview, lot);
     content.appendChild(overview);
     const workflow = document.createElement("section");
     workflow.className = "lot-browser-workflow";
@@ -4204,7 +4265,7 @@
       actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
     }
     copy.appendChild(actionLinks);
-    if (window.ResearchQueue) copy.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
+    appendLotControls(copy, lot);
     lotBrowserCard.appendChild(copy);
 
     const workflow = document.createElement("section");
@@ -4617,8 +4678,7 @@
         actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
       }
       item.appendChild(actionLinks);
-      appendRetainedSavedWork(item, lot);
-      if (window.ResearchQueue) item.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
+      appendLotControls(item, lot);
       appendArtpriceEditor(item, lot, actionLinks);
       appendArtpriceAnalysis(item, lot);
       list.appendChild(item);

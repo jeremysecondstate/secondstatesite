@@ -72,6 +72,13 @@
     const actions = el("div", null, "ab-actions");
     const preview = el("button", "Update grid"), save = el("button", "Save Bid Board", "ab-primary");
     preview.type = "submit"; save.type = "button";
+    save.dataset.bidBoardSaveLotId = String(options.lot.id);
+    save.dataset.bidBoardLocalBusy = "true";
+    window.SavedBidBoard?.registerSaveButton(save);
+    function setSaveDisabled(value) {
+      save.dataset.bidBoardLocalBusy = String(value);
+      save.disabled = value || Boolean(window.SavedBidBoard?.isBusy(options.lot.id));
+    }
     actions.append(preview, save);
     form.append(controls, notice, costSummary, status, result, assumptions, actions);
     root.replaceChildren(heading, form);
@@ -110,7 +117,7 @@
       revision++;
       controller?.abort();
       controller = null;
-      save.disabled = !loaded || saving;
+      setSaveDisabled(!loaded || saving);
     }
     function markStale(message = "Previous calculation — update the grid before using these bids.") {
       stale = true;
@@ -274,6 +281,11 @@
       clearTimeout(timer);
       if (!loaded || saving) return;
       if (!form.checkValidity()) {assumptions.open = true; markStale(); form.reportValidity(); return;}
+      const saveCoordinator = action === "save" ? window.SavedBidBoard : null;
+      if (saveCoordinator && !saveCoordinator.beginSave(options.lot.id)) {
+        stateText("A Bid Board change is in progress. Please try saving when it finishes.");
+        return;
+      }
       invalidate();
       const current = revision;
       const restoreFocus = focusRequested; focusRequested = false;
@@ -283,7 +295,7 @@
       if (saving) lockAssumptions(true);
       markStale("Previous calculation — recalculation is in progress.");
       stateText(action === "save" ? "Saving analysis…" : "Calculating…");
-      save.disabled = true;
+      setSaveDisabled(true);
       try {
         const assumptions = readAssumptions();
         const evidence = await options.getEvidence();
@@ -313,7 +325,8 @@
         status.textContent = error.message; status.classList.add("is-error");
         markStale("Previous calculation — correct the error and update before using these bids.");
       } finally {
-        if (current === revision) {saving = false; lockAssumptions(false); save.disabled = false; result.inert = stale; controller = null;}
+        saveCoordinator?.endSave(options.lot.id);
+        if (current === revision) {saving = false; lockAssumptions(false); setSaveDisabled(false); result.inert = stale; controller = null;}
       }
     }
     function choose(bid, key) {if (stale || saving) return; selectedBid = bid; selectedCase = key; focusRequested = true; persistDraft(); update("focus");}
@@ -335,7 +348,7 @@
       if (loadingPromise) return loadingPromise;
       loadingPromise = (async () => {
         invalidate(); const current = revision;
-        controller = new AbortController(); lockAssumptions(true); save.disabled = true;
+        controller = new AbortController(); lockAssumptions(true); setSaveDisabled(true);
         try {
           const data = await request(null, controller.signal); if (current !== revision) return;
           render(data); setFields(data.assumptions || {}); loaded = true;
@@ -352,14 +365,14 @@
             page = draft.page || 0; selectedBid = draft.selected_bid || null; selectedCase = draft.selected_case || "working"; dirty = true;
             stateText("Restored this browser’s unsaved Bid Board draft."); markStale();
           } else stateText(data.saved ? "Saved Bid Board loaded." : "Review costs and house bid rules before saving.");
-          lockAssumptions(false); save.disabled = false;
+          lockAssumptions(false); setSaveDisabled(false);
           await update(draft ? "preview" : "focus", false);
         } catch (error) {if (error.name !== "AbortError") {status.textContent = error.message; status.classList.add("is-error");}}
         finally {loadingPromise = null;}
       })();
       return loadingPromise;
     }
-    lockAssumptions(true); save.disabled = true;
+    lockAssumptions(true); setSaveDisabled(true);
     return {refresh, get dirty() {return dirty;}};
   }
   window.ArchiveBidBoard = {mount};

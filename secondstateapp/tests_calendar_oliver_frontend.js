@@ -95,7 +95,7 @@ function page(data, view = "oliver") {
     querySelectorAll: () => [],
   };
   const context = vm.createContext({
-    data, document, oliverHouseNames, selectedDay: Object.keys(data)[0], activeView: view, researchScope: "",
+    data, document, oliverHouseNames, retainedResearchLot: null, refreshLotControls() {}, selectedDay: Object.keys(data)[0], activeView: view, researchScope: "",
     researchLook: "dossier", researchIndex: 0, galleryFilter: "all", galleryVisibleCount: 24,
     galleryHideAttributed: false, galleryAttributionToggle: new Element(), galleryAttributionStatus: new Element(),
     galleryArtistsDay: "", galleryArtistsExpanded: false, URL, URLSearchParams,

@@ -202,8 +202,29 @@ def auction_lot_bid_board(request, lot_id):
 
 @never_cache
 @staff_member_required
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "DELETE"])
 def auction_lot_saved_bid_board(request, lot_id):
+    if request.method == "DELETE":
+        with transaction.atomic():
+            # Serialize with saves, keeping the original source lot as the
+            # owner even when its board is displayed on a replacement card.
+            lot = AuctionWatchLot.objects.select_for_update().filter(pk=lot_id).first()
+            if lot is None:
+                return JsonResponse({"ok": False, "error": "Auction lot not found."}, status=404)
+            # Match email dispatch's batch lock so deletion cannot change the
+            # board while the send-time snapshot is being composed.
+            batch = AuctionEmailBatch.objects.select_for_update().filter(is_active=True).first()
+            record = AuctionBidBoardAnalysis.objects.select_for_update().filter(lot=lot).first()
+            if record is not None:
+                if batch and batch.status == AuctionEmailBatch.Status.SENDING and batch.items.filter(lot=lot).exists():
+                    return JsonResponse({
+                        "ok": False,
+                        "error": "This lot's Bid Board cannot be deleted while its email batch is sending.",
+                    }, status=409)
+                record.delete()
+        # Retrying a completed deletion is safe. Research, queue selections,
+        # lot provenance, and previously sent email snapshots remain intact.
+        return JsonResponse({"ok": True, "saved_board": None})
     record = AuctionBidBoardAnalysis.objects.filter(lot_id=lot_id).first()
     if record is None:
         return JsonResponse({"ok": False, "error": "No saved Bid Board is available for this lot."}, status=404)

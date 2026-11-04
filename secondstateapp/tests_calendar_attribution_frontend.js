@@ -23,6 +23,8 @@ class Element {
     for (const child of children) { child.parent = this; this.children.push(child); }
   }
   appendChild(child) { this.append(child); return child; }
+  replaceChildren(...children) { this.children = []; this.append(...children); }
+  contains(node) { return node === this || this.children.some(child => child.contains(node)); }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, listener) { this.events[name] = listener; }
 }
@@ -138,12 +140,12 @@ test("a canonical card exposes each retained provider's saved work without addin
   ]});
   const before = JSON.stringify(source);
   const card = renderer().galleryCard(source, 0);
-  const retained = descendants(card).filter(node => node.tagName === "a" && /saved work/.test(node.textContent));
+  const retained = descendants(card).filter(node => node.tagName === "a" && /Saved with/.test(node.textContent));
   assert.equal(card.dataset.galleryLotId, "123");
   assert.equal(retained.length, 2);
   assert.deepEqual(retained.map(link => link.href), source.retained_saved_work.map(work => work.research_url));
-  assert.match(retained[0].textContent, /Drouot.*Bid Board/);
-  assert.match(retained[1].textContent, /Invaluable.*Email Tray/);
+  assert.match(retained[0].textContent, /Saved with Drouot/);
+  assert.match(retained[1].textContent, /Saved with Invaluable/);
   retained.forEach(link => { assert.equal(link.target, "_blank"); assert.equal(link.rel, "noopener noreferrer"); });
   assert.equal(JSON.stringify(source), before);
 });

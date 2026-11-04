@@ -153,7 +153,7 @@ function page(data, view = "calendar") {
     },
     externalLink(url, className, text) { return Object.assign(new Element("a"), {href: url, className, textContent: text}); },
     appendArtistLabel(parent, source) { parent.lotId = source.id; },
-    appendCurrencyPrice() {}, appendRetainedSavedWork() {}, appendArtpriceEditor() {}, appendArtpriceAnalysis() {},
+    appendCurrencyPrice() {}, appendLotControls() {}, appendArtpriceEditor() {}, appendArtpriceAnalysis() {},
   });
   for (const name of ["calendarLayout", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle", "oliverCalendarViewToggle",
     "researchViewToggle", "auctionCalendar", "calendarPageShell", "galleryCatalog", "researchWorkspace", "researchTitle",

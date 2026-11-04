@@ -3685,3 +3685,46 @@ button.day-gallery-visual {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The same saved-board/research block is used in every lot presentation. */
+.lot-controls {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 12px 0 16px;
+}
+
+.lot-controls > .sb-catalog-summary,
+.lot-controls > .research-queue-selection {
+  margin: 0;
+}
+
+.lot-board-provenance,
+.lot-retained-link {
+  color: var(--calendar-gold);
+  font-size: 11px;
+  line-height: 1.5;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.lot-board-provenance {
+  display: block;
+  margin-top: 10px;
+  color: var(--calendar-muted);
+}
+
+.lot-retained-work {
+  display: grid;
+  gap: 6px;
+}
+
+.day-gallery-caption > .lot-controls {
+  margin-top: 0;
+}
+
+@media (min-width: 701px) {
+  .day-gallery-title {
+    min-height: 2.7em;
+  }
+}
