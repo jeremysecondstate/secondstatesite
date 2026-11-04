@@ -44,7 +44,7 @@ function page(source, retainedResearchLot = null) {
   const listeners = new Map(), requests = [];
   const document = {createElement: tag => new Element(tag), activeElement: null, body: new Element("body"), querySelectorAll: () => []};
   currentDocument = document;
-  const window = {document, fetch: (...args) => {requests.push(args); throw new Error("Rendering must not write selections");},
+  const window = {CalendarArtists: require("./static/secondstateapp/calendar_artists.js"), document, fetch: (...args) => {requests.push(args); throw new Error("Rendering must not write selections");},
     addEventListener: (event, callback) => listeners.set(event, callback),
     SavedBidBoard: {mountSummary(root, {lot: owner}) {
       root.className = "sb-catalog-summary";
@@ -54,7 +54,7 @@ function page(source, retainedResearchLot = null) {
       root.updateSavedBoard(owner.saved_bid_board);
     }},
   };
-  const context = vm.createContext({window, document, data: {"2026-11-04": [source]}, retainedResearchLot,
+  const context = vm.createContext({window, document, galleryArtists: {dataset: {timeZone: "America/Los_Angeles"}}, data: {"2026-11-04": [source]}, retainedResearchLot,
     csrfToken: "test-csrf", activeView: "catalog", galleryFilter: "all", selectedDay: "2026-11-04",
     dayLots: () => [retainedResearchLot || source], isGalleryView: () => context.activeView === "catalog",
     renderGalleryFilters: () => {

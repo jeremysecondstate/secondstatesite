@@ -85,6 +85,7 @@ function page(lots, view = "catalog") {
       querySelectorAll: selector => selector === ".month-nav a" ? monthLinks
         : selector === ".day-catalog-link" ? catalogLinks : [],
     },
+    galleryGroup: Object.assign(new Element("select"), {value: ""}),
     gallerySort: Object.assign(new Element("select"), {value: "catalog"}),
     galleryArtistSort: Object.assign(new Element("select"), {value: "count_desc"}),
     galleryGrid: new Element(), galleryMore: new Element(), gallerySortNote: new Element(),
@@ -164,7 +165,7 @@ test("artist summaries and filter counts reflect browsable lots with an explicit
   p.render();
   const filters = Object.fromEntries(p.galleryFilters.children.map(button => [button.dataset.galleryFilter, button.children[1].textContent]));
   assert.deepEqual(filters, {all: "1", tray: "1", bidboards: "0", qualifying: "0"});
-  assert.equal(p.galleryHouseFilters.children.length, 1);
+  assert.equal(p.galleryHouseFilters.children.length, 2, "All auction houses plus the visible house");
   assert.equal(p.galleryArtistSummary.textContent, "1 artist · 1 watched lot");
   assert.equal(p.galleryAttributionToggle.attributes["aria-pressed"], "true");
   assert.equal(p.galleryAttributionStatus.hidden, false);
@@ -428,4 +429,124 @@ test("qualifying filter is carried on month and day catalog links and removed af
   for (const href of [p.window.history.url, ...p.monthLinks.map(link => link.href), ...p.catalogLinks.map(link => link.href)]) {
     assert.equal(new URL(href).searchParams.has("filter"), false);
   }
+});
+
+const organizedLots = () => [
+  lot(1, {auction_house: "Z House", oliver_house: false, artist_sort_key: "a", lot_number: "1", event_at: `${day}T00:00:00Z`, estimate_low: "1", saved_bid_board: {qualifying_bid: "100"}}),
+  lot(2, {artist_sort_key: "z", lot_number: "100", event_at: `${day}T18:00:00Z`, estimate_low: "900", saved_bid_board: {qualifying_bid: "300", qualifies: false}}),
+  lot(3, {auction_house: "Bonhams", artist_sort_key: "a", lot_number: "2", event_at: `${day}T15:00:00Z`, estimate_low: "90", retained_saved_work: [{id: 30, saved_bid_board: {qualifying_bid: "400"}, saved_bid_board_url: "/original/30/"}]}),
+  lot(4, {artist_sort_key: "m", lot_number: "10A", event_at: null, estimate_low: null, saved_bid_board: {qualifying_bid: "0"}}),
+  lot(5, {artist_sort_key: "a", lot_number: "3", event_at: `${day}T15:00:00Z`, estimate_low: "100", attribution_label: "After", saved_bid_board: {qualifying_bid: "500"}}),
+  lot(6, {auction_house: "Bonhams", saved_bid_board: {qualifying_bid: null, qualifies: true}}),
+  lot(7),
+];
+
+for (const view of ["catalog", "oliver"]) {
+  test(`${view} qualifying sorts and house grouping preserve all canonical/retained identities`, () => {
+    const lots = organizedLots(), before = JSON.stringify(lots), p = page(lots, view);
+    p.galleryFilter = "qualifying";
+    const expected = {
+      catalog: [1, 2, 3, 4, 5], artist: [1, 3, 5, 4, 2], artist_desc: [2, 4, 1, 3, 5],
+      house: [3, 2, 4, 5, 1], lot_asc: [1, 3, 5, 4, 2], lot_desc: [2, 4, 5, 3, 1],
+      time_asc: [1, 3, 5, 2, 4], time_desc: [2, 3, 5, 1, 4],
+      arrival_asc: [1, 3, 5, 2, 4], arrival_desc: [2, 5, 3, 1, 4],
+      price_asc: [1, 3, 5, 2, 4], price_desc: [2, 5, 3, 1, 4],
+    };
+    for (const [sort, allIds] of Object.entries(expected)) {
+      const ids = allIds.filter(id => view !== "oliver" || id !== 1);
+      p.gallerySort.value = sort;
+      p.run('galleryOrganization.group = ""');
+      assert.deepEqual(p.visible().map(item => item.id), ids, sort);
+      p.run('galleryOrganization.group = "house"');
+      const grouped = [3, ...ids.filter(id => [2, 4, 5].includes(id)), ...(view === "catalog" ? [1] : [])];
+      assert.deepEqual(p.visible().map(item => item.id), grouped, `${sort} within houses`);
+      for (const item of p.visible()) assert.equal(p.run("dayLots()")[item.index].id, item.id);
+    }
+    p.render();
+    assert.deepEqual(p.galleryGrid.children.filter(node => node.className === "day-gallery-house-heading").map(node => node.textContent),
+      ["Bonhams · 1 lot", "Phillips · 3 lots", ...(view === "catalog" ? ["Z House · 1 lot"] : [])]);
+    assert.equal(JSON.stringify(lots), before);
+  });
+
+  test(`${view} selecting a house retains qualifying and attribution filters with accurate house counts`, () => {
+    const lots = organizedLots(), before = JSON.stringify(lots), p = page(lots, view);
+    p.galleryFilter = "qualifying";
+    p.galleryHideAttributed = true;
+    p.render();
+    const house = name => p.galleryHouseFilters.children.find(node => node.dataset.galleryFilter === `house:${name}`);
+    assert.equal(house("Phillips").children[1].textContent, "2");
+    assert.equal(house("Bonhams").children[1].textContent, "1", "unsuitable saved board is excluded from house count");
+    house("Phillips").events.click();
+    assert.equal(p.galleryFilter, "qualifying");
+    assert.equal(p.galleryHideAttributed, true);
+    assert.deepEqual(p.visible().map(item => item.id), [2, 4]);
+    const counts = () => Object.fromEntries(p.galleryFilters.children.map(node => [node.dataset.galleryFilter, node.children[1].textContent]));
+    assert.deepEqual(counts(), {all: "3", tray: "0", bidboards: "2", qualifying: "2"}, "top chips count prospective results within selected house and attribution state");
+    p.galleryHideAttributed = false;
+    p.render();
+    assert.deepEqual(p.visible().map(item => item.id), [2, 4, 5]);
+    assert.deepEqual(counts(), {all: "4", tray: "0", bidboards: "3", qualifying: "3"});
+    house("Bonhams").events.click();
+    assert.deepEqual(p.visible().map(item => item.id), [3], "retained board keeps canonical card");
+    assert.deepEqual(counts(), {all: "2", tray: "0", bidboards: "2", qualifying: "1"});
+    house("").events.click();
+    assert.equal(p.galleryFilter, "qualifying");
+    assert.deepEqual(p.visible().map(item => item.id), view === "oliver" ? [2, 3, 4, 5] : [1, 2, 3, 4, 5]);
+    assert.equal(JSON.stringify(lots), before);
+  });
+
+  test(`${view} organization round-trips URL, month/day links and history without changing saved state`, () => {
+    const lots = organizedLots(), before = JSON.stringify(lots), p = page(lots, view);
+    const params = new URLSearchParams({house: "Phillips", group: "house", sort: "price_desc", hide_attributed: "1"});
+    p.window.location.search = `?${params}`;
+    vm.runInContext(between("  const initialParams =", "  const requestedView ="), p);
+    p.galleryFilter = "qualifying";
+    p.run("updateCalendarLocation()");
+    for (const value of [p.window.history.url, ...p.monthLinks.map(x => x.href), ...p.catalogLinks.map(x => x.href)]) {
+      const url = new URL(value);
+      assert.equal(url.searchParams.get("sort"), "price_desc");
+      assert.equal(url.searchParams.get("group"), "house");
+      assert.equal(url.searchParams.get("house"), "Phillips");
+      assert.equal(url.searchParams.get("filter"), "qualifying");
+      assert.equal(url.searchParams.get("hide_attributed"), "1");
+    }
+    p.setCalendarView = value => { p.activeView = value || "calendar"; p.render(); };
+    p.showDay = value => { p.selectedDay = value; };
+    vm.runInContext(between('  window.addEventListener("popstate"', '  researchPrevious.addEventListener("click"'), p);
+    for (const [sort, house, ids] of [["price_desc", "Phillips", [2, 4]], ["artist", "Bonhams", [3]], ["price_desc", "Phillips", [2, 4]]]) {
+      p.window.location.search = `?day=${day}&view=${view}&filter=qualifying&hide_attributed=1&group=house&sort=${sort}&house=${house}`;
+      p.listeners.get("popstate")();
+      assert.equal(p.gallerySort.value, sort);
+      assert.equal(p.galleryGroup.value, "house");
+      assert.equal(p.run("galleryOrganization.house"), house);
+      assert.deepEqual(p.visible().map(item => item.id), ids);
+      assert.equal(p.restoringHistory, false);
+    }
+    p.run('restoreGalleryOrganization(new URLSearchParams("sort=invalid&group=invalid"))');
+    assert.equal(p.gallerySort.value, "catalog");
+    assert.equal(p.run("galleryOrganization.group"), "");
+    assert.equal(p.run("galleryOrganization.house"), "");
+    assert.equal(JSON.stringify(lots), before);
+  });
+}
+
+test("grouped qualifying results sort the complete set before pagination and preserve stable ties", () => {
+  const lots = Array.from({length: 70}, (_, index) => lot(index + 1, {
+    auction_house: index % 2 ? "Phillips" : "Bonhams", estimate_low: String(100 - index),
+    saved_bid_board: index % 3 === 0 ? null : {qualifying_bid: "100"},
+  }));
+  const p = page(lots), before = JSON.stringify(lots);
+  p.galleryFilter = "qualifying";
+  p.gallerySort.value = "price_asc";
+  p.run('galleryOrganization.group = "house"');
+  const expected = ["Bonhams", "Phillips"].flatMap(house => lots.filter(l => l.auction_house === house && l.saved_bid_board).reverse().map(l => l.id));
+  p.render();
+  assert.deepEqual(p.galleryGrid.children.filter(node => node.id).map(node => node.id), expected.slice(0, 24));
+  assert.equal(p.galleryMore.hidden, false);
+  p.galleryVisibleCount = 72;
+  p.render();
+  assert.deepEqual(p.galleryGrid.children.filter(node => node.id).map(node => node.id), expected);
+  assert.equal(p.galleryMore.hidden, true);
+  for (const node of p.galleryGrid.children.filter(node => node.id)) assert.equal(lots[node.index].id, node.id);
+  assert.equal(JSON.stringify(lots), before);
 });

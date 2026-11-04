@@ -3728,3 +3728,21 @@ button.day-gallery-visual {
     min-height: 2.7em;
   }
 }
+
+/* Independent grouping for both catalogs. */
+.day-gallery-house-heading {
+  grid-column: 1 / -1;
+  margin: 16px 0 0;
+  padding: 14px 0 8px;
+  border-bottom: 1px solid var(--calendar-line);
+  color: var(--calendar-gold);
+  font-size: 17px;
+  font-weight: 500;
+}
+.day-gallery-house-heading:first-child { margin-top: 0; }
+.day-gallery-lot-arrival {
+  margin: 6px 0 12px;
+  color: var(--calendar-gold);
+  font-size: 12px;
+  line-height: 1.5;
+}

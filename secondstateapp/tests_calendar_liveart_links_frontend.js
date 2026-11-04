@@ -47,7 +47,8 @@ function renderer(lot) {
     + productionBlock("  const appendRetainedSavedWork =", "  const renderGalleryCards =")
     + productionBlock("  const renderResearchWorkspace =", "  const openResearchWorkspace =");
   const context = {
-    document, appendText, window: {}, csrfToken: "test-csrf", readDraft: () => undefined,
+    document, appendText, window: {CalendarArtists: require("./static/secondstateapp/calendar_artists.js")},
+    galleryArtists: {dataset: {timeZone: "America/Los_Angeles"}}, csrfToken: "test-csrf", readDraft: () => undefined,
     registerLotInstance() {}, artpriceEditorInstances: new Map(),
     galleryResearchUrl: () => "https://secondstate.test/calendar/?view=research&lot=123",
     galleryImage: () => [new Element("img")], updateGalleryEmailButton() {}, toggleGalleryEmail() {},
