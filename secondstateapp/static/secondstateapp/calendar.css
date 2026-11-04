@@ -3685,3 +3685,64 @@ button.day-gallery-visual {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The same saved-board/research block is used in every lot presentation. */
+.lot-controls {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 12px 0 16px;
+}
+
+.lot-controls > .sb-catalog-summary,
+.lot-controls > .research-queue-selection {
+  margin: 0;
+}
+
+.lot-board-provenance,
+.lot-retained-link {
+  color: var(--calendar-gold);
+  font-size: 11px;
+  line-height: 1.5;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.lot-board-provenance {
+  display: block;
+  margin-top: 10px;
+  color: var(--calendar-muted);
+}
+
+.lot-retained-work {
+  display: grid;
+  gap: 6px;
+}
+
+.day-gallery-caption > .lot-controls {
+  margin-top: 0;
+}
+
+@media (min-width: 701px) {
+  .day-gallery-title {
+    min-height: 2.7em;
+  }
+}
+
+/* Independent grouping for both catalogs. */
+.day-gallery-house-heading {
+  grid-column: 1 / -1;
+  margin: 16px 0 0;
+  padding: 14px 0 8px;
+  border-bottom: 1px solid var(--calendar-line);
+  color: var(--calendar-gold);
+  font-size: 17px;
+  font-weight: 500;
+}
+.day-gallery-house-heading:first-child { margin-top: 0; }
+.day-gallery-lot-arrival {
+  margin: 6px 0 12px;
+  color: var(--calendar-gold);
+  font-size: 12px;
+  line-height: 1.5;
+}

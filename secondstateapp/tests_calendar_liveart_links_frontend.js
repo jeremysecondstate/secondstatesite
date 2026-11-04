@@ -24,6 +24,7 @@ class Element {
     for (const child of children) { child.parent = this; this.children.push(child); }
   }
   appendChild(child) { this.append(child); return child; }
+  contains(node) { return node === this || this.children.some(child => child.contains(node)); }
   replaceChildren(...children) { this.children = []; this.append(...children); }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, callback) { this.events[name] = callback; }
@@ -46,7 +47,8 @@ function renderer(lot) {
     + productionBlock("  const appendRetainedSavedWork =", "  const renderGalleryCards =")
     + productionBlock("  const renderResearchWorkspace =", "  const openResearchWorkspace =");
   const context = {
-    document, appendText, window: {}, csrfToken: "test-csrf", readDraft: () => undefined,
+    document, appendText, window: {CalendarArtists: require("./static/secondstateapp/calendar_artists.js")},
+    galleryArtists: {dataset: {timeZone: "America/Los_Angeles"}}, csrfToken: "test-csrf", readDraft: () => undefined,
     registerLotInstance() {}, artpriceEditorInstances: new Map(),
     galleryResearchUrl: () => "https://secondstate.test/calendar/?view=research&lot=123",
     galleryImage: () => [new Element("img")], updateGalleryEmailButton() {}, toggleGalleryEmail() {},

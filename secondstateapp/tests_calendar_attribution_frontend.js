@@ -23,6 +23,8 @@ class Element {
     for (const child of children) { child.parent = this; this.children.push(child); }
   }
   appendChild(child) { this.append(child); return child; }
+  replaceChildren(...children) { this.children = []; this.append(...children); }
+  contains(node) { return node === this || this.children.some(child => child.contains(node)); }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, listener) { this.events[name] = listener; }
 }
@@ -45,13 +47,13 @@ function renderer() {
     + productionBlock("  const appendRetainedSavedWork =", "  const galleryCard =")
     + productionBlock("  const galleryCard =", "  const renderGalleryCards =");
   const render = new Function("document", "appendText", "galleryResearchUrl", "galleryImage",
-    "updateGalleryEmailButton", "toggleGalleryEmail", "appendCurrencyPrice", "window", "csrfToken",
+    "updateGalleryEmailButton", "toggleGalleryEmail", "appendCurrencyPrice", "window", "galleryArtists", "csrfToken",
     source + "\nreturn {appendArtistLabel, galleryCard};")(
       document, appendText, lot => `https://secondstate.test/calendar/?lot=${lot.id}`,
       () => [new Element("img")], () => {},
       (lot, index) => emailCalls.push({id: lot.id, index}),
       (parent, lot, kind, className) => appendText(parent, "p", className, lot[kind]),
-      {}, "test-csrf",
+      {CalendarArtists: require("./static/secondstateapp/calendar_artists.js")}, {dataset: {timeZone: "America/Los_Angeles"}}, "test-csrf",
     );
   return {...render, emailCalls};
 }
@@ -67,6 +69,18 @@ function lot(overrides = {}) {
     ...overrides,
   };
 }
+
+test("every catalog lot exposes an estimated arrival separately from the listed time without requiring a board", () => {
+  for (const saved_bid_board of [null, {qualifying_bid: "300"}, {qualifying_bid: null}]) {
+    const source = lot({event_at: "2026-11-04T13:00:00Z", time: "5:00 AM", lot_number: "39", saved_bid_board});
+    const before = JSON.stringify(source), card = renderer().galleryCard(source, 0);
+    assert.equal(withClass(card, "day-gallery-lot-arrival")[0].textContent, "Est. lot arrival: ≈ 5:39 AM");
+    assert(withClass(card, "day-gallery-meta").some(node => node.textContent.includes("5:00 AM")), "listed source time remains visible");
+    assert.equal(JSON.stringify(source), before);
+  }
+  const unknown = renderer().galleryCard(lot({event_at: null}), 0);
+  assert.equal(withClass(unknown, "day-gallery-lot-arrival")[0].textContent, "Est. lot arrival: Unavailable");
+});
 
 for (const attribution of ["After", "Attributed to"]) {
   test(`${attribution} is readable without changing the artist name or Artprice link`, () => {
@@ -138,12 +152,12 @@ test("a canonical card exposes each retained provider's saved work without addin
   ]});
   const before = JSON.stringify(source);
   const card = renderer().galleryCard(source, 0);
-  const retained = descendants(card).filter(node => node.tagName === "a" && /saved work/.test(node.textContent));
+  const retained = descendants(card).filter(node => node.tagName === "a" && /Saved with/.test(node.textContent));
   assert.equal(card.dataset.galleryLotId, "123");
   assert.equal(retained.length, 2);
   assert.deepEqual(retained.map(link => link.href), source.retained_saved_work.map(work => work.research_url));
-  assert.match(retained[0].textContent, /Drouot.*Bid Board/);
-  assert.match(retained[1].textContent, /Invaluable.*Email Tray/);
+  assert.match(retained[0].textContent, /Saved with Drouot/);
+  assert.match(retained[1].textContent, /Saved with Invaluable/);
   retained.forEach(link => { assert.equal(link.target, "_blank"); assert.equal(link.rel, "noopener noreferrer"); });
   assert.equal(JSON.stringify(source), before);
 });

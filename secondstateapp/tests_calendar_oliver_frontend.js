@@ -95,7 +95,7 @@ function page(data, view = "oliver") {
     querySelectorAll: () => [],
   };
   const context = vm.createContext({
-    data, document, oliverHouseNames, selectedDay: Object.keys(data)[0], activeView: view, researchScope: "",
+    data, document, oliverHouseNames, retainedResearchLot: null, refreshLotControls() {}, selectedDay: Object.keys(data)[0], activeView: view, researchScope: "",
     researchLook: "dossier", researchIndex: 0, galleryFilter: "all", galleryVisibleCount: 24,
     galleryHideAttributed: false, galleryAttributionToggle: new Element(), galleryAttributionStatus: new Element(),
     galleryArtistsDay: "", galleryArtistsExpanded: false, URL, URLSearchParams,
@@ -105,6 +105,7 @@ function page(data, view = "oliver") {
       history: {state: {}, replaceState(state, _title, url) { this.state = state; this.url = String(url); }},
       matchMedia: () => ({matches: false}),
     },
+    galleryGroup: Object.assign(new Element("select"), {value: ""}),
     gallerySort: Object.assign(new Element("select"), {value: "catalog"}),
     galleryArtistSort: Object.assign(new Element("select"), {value: "count_desc"}),
     galleryGrid: new Element(), galleryMore: new Element(), gallerySortNote: new Element(),
@@ -219,7 +220,7 @@ test("Oliver house, artist and Email Tray counts use its complete scoped day bef
   const context = page({[dayA]: lots});
   context.gallerySort.value = "price_asc";
   context.run("renderGalleryFilters(); renderGalleryArtists(); renderGalleryCards()");
-  assert.equal(context.galleryHouseFilters.children.length, 17);
+  assert.equal(context.galleryHouseFilters.children.length, 18);
   const phillips = context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:Phillips");
   assert.equal(phillips.children[1].textContent, "30");
   assert.equal(context.galleryFilters.children[1].children[1].textContent, "10");
@@ -245,17 +246,17 @@ test("Oliver always shows all 17 workbook houses in stable order, including zero
   });
   assert.equal(oliverHouseNames.length, 17);
   context.run("renderGalleryFilters()");
-  const labels = () => context.galleryHouseFilters.children.map(button => button.children[0].textContent);
-  const counts = () => context.galleryHouseFilters.children.map(button => button.children[1].textContent);
+  const labels = () => context.galleryHouseFilters.children.slice(1).map(button => button.children[0].textContent);
+  const counts = () => context.galleryHouseFilters.children.slice(1).map(button => button.children[1].textContent);
   assert.deepEqual(labels(), oliverHouseNames);
   assert.deepEqual(counts(), oliverHouseNames.map(name => name === "Phillips" ? "1" : "0"));
-  assert.equal(context.galleryFilters.children[0].children[1].textContent, "17");
+  assert.equal(context.galleryFilters.children[0].children[1].textContent, String(context.run("dayLots().length")));
   assert.match(context.galleryHousesSummary.textContent, /^17 houses · 1 with lots/);
   context.selectedDay = dayB;
   context.run("renderGalleryFilters()");
   assert.deepEqual(labels(), oliverHouseNames, "house order must survive day changes");
   assert.deepEqual(counts(), Array(17).fill("0"));
-  assert.equal(context.galleryFilters.children[0].children[1].textContent, "17");
+  assert.equal(context.galleryFilters.children[0].children[1].textContent, String(context.run("dayLots().length")));
   assert.match(context.galleryHousesSummary.textContent, /^17 houses · 0 with lots/);
 });
 
@@ -269,17 +270,18 @@ test("Oliver combines verified aliases under one canonical house while regular G
   const context = page({[dayA]: lots});
   context.run("renderGalleryFilters()");
   const rago = context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:Rago Auctions");
-  assert.equal(context.galleryHouseFilters.children.length, 17);
+  assert.equal(context.galleryHouseFilters.children.length, 18);
   assert.equal(rago.children[1].textContent, "2");
   assert.equal(context.galleryHouseFilters.children.some(button => button.children[0].textContent === "Rago Arts and Auction Center"), false);
   rago.click();
   assert.deepEqual(context.ids("visibleGalleryLots().map(entry => entry.lot)"), [1, 2]);
   context.activeView = "catalog";
   context.galleryFilter = "all";
+  context.run('galleryOrganization.house = ""');
   context.run("renderGalleryFilters()");
   assert.deepEqual(context.galleryHouseFilters.children.map(button => button.children[0].textContent),
-    ["Rago Arts and Auction Center", "Rago Auctions", "Other"]);
-  assert.deepEqual(context.galleryHouseFilters.children.map(button => button.children[1].textContent), ["1", "1", "1"]);
+    ["All auction houses", "Rago Arts and Auction Center", "Rago Auctions", "Other"]);
+  assert.deepEqual(context.galleryHouseFilters.children.map(button => button.children[1].textContent), ["3", "1", "1", "1"]);
   assert.equal(context.galleryFilters.children[0].children[1].textContent, "3");
   assert.equal(JSON.stringify(lots), before, "canonical labels must not rewrite source names or lot records");
 });
@@ -299,7 +301,7 @@ test("a zero-count Oliver house stays selected with no lot cards and All houses 
   const zeroHouse = oliverHouseNames.find(name => name !== "Phillips");
   context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === `house:${zeroHouse}`).click();
   context.run("renderGalleryCatalog()");
-  assert.equal(context.galleryFilter, `house:${zeroHouse}`, "a full catalog refresh must preserve a valid zero-count house filter");
+  assert.equal(context.run("galleryOrganization.house"), zeroHouse, "a full catalog refresh preserves the independent zero-count house");
   assert.equal(context.run("visibleGalleryLots().length"), 0);
   assert.equal(context.galleryGrid.children.filter(card => card.id !== undefined).length, 0);
   assert.equal(context.galleryResults.textContent, "0 watched lots");
@@ -307,7 +309,7 @@ test("a zero-count Oliver house stays selected with no lot cards and All houses 
   assert.equal(selected.getAttribute("aria-pressed"), "true");
   assert.equal(selected.children[1].textContent, "0");
   assert(context.galleryGrid.children[0].textContent.includes(zeroHouse));
-  context.galleryFilters.children.find(button => button.dataset.galleryFilter === "all").click();
+  context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:").click();
   assert.equal(context.galleryFilter, "all");
   assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
   assert.equal(context.galleryFilters.children[0].getAttribute("aria-pressed"), "true");
@@ -657,7 +659,7 @@ test("an artist card in Oliver's Calendar never reveals the same artist at unrel
   assert.deepEqual(context.galleryGrid.children.map(card => card.id), [2, 3]);
 });
 
-test("a full catalog refresh preserves the selected artist while another house or tray selection clears it", () => {
+test("a full catalog refresh preserves the selected artist and house selection intersects it while tray replaces it", () => {
   const context = page({[dayA]: [
     lot(1, "Phillips", true, {artist: "Max, Peter"}),
     lot(2, "Swann", true, {artist: "Max, Peter"}),
@@ -675,9 +677,9 @@ test("a full catalog refresh preserves the selected artist while another house o
   assert.equal(context.galleryFilter, "artist:max, peter");
   assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1, 2]);
   context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:Phillips").click();
-  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1, 3]);
-  assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "false");
-  assert.equal(context.galleryArtistClear.hidden, true);
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
+  assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "true");
+  assert.equal(context.galleryArtistClear.hidden, false);
   context.run('chooseGalleryArtist("max, peter")');
   context.galleryFilters.children.find(button => button.dataset.galleryFilter === "tray").click();
   assert.deepEqual(context.galleryGrid.children.map(card => card.id), [3]);
@@ -909,7 +911,7 @@ for (const view of ["catalog", "oliver"]) {
     assert.equal(month.searchParams.get("view"), view);
     assert.equal(month.searchParams.get("hide_attributed"), "1");
     assert.equal(month.searchParams.has("filter"), false, "month navigation keeps its existing fresh-filter behavior");
-    context.galleryFilters.children.find(button => button.dataset.galleryFilter === "all").click();
+    context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:").click();
     assert.equal(context.galleryFilter, "all");
     assert.equal(new URL(context.window.location.href).searchParams.has("filter"), false);
     assert.equal(new URL(context.window.location.href).searchParams.get("hide_attributed"), "1");
@@ -933,6 +935,32 @@ for (const [view, house] of [["catalog", "L'Atelier & Co.: Z\u00fcrich"], ["oliv
     navigation.restore(galleryUrl);
     assert.equal(context.galleryFilter, `house:${house}`);
     assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
+    assert.equal(JSON.stringify(lots), before);
+  });
+}
+
+for (const view of ["catalog", "oliver"]) {
+  test(`${view} legacy house link keeps its house when Qualifying bids is selected`, () => {
+    const lots = [
+      lot(1, "Phillips", true, {saved_bid_board: {qualifying_bid: "100"}}),
+      lot(2, "Phillips", true, {saved_bid_board: {qualifying_bid: null}}),
+      lot(3, "Bonhams", true, {saved_bid_board: {qualifying_bid: "200"}}),
+      lot(4, "Other", false, {saved_bid_board: {qualifying_bid: "300"}}),
+    ];
+    const before = JSON.stringify(lots), navigation = houseNavigationPage(lots, view), {context} = navigation;
+    navigation.initialize("house:Phillips");
+    assert.equal(context.run("galleryOrganization.house"), "Phillips");
+    const qualifying = () => context.galleryFilters.children.find(node => node.dataset.galleryFilter === "qualifying");
+    assert.equal(qualifying().children[1].textContent, "1");
+    qualifying().click();
+    assert.equal(context.galleryFilter, "qualifying");
+    assert.deepEqual(context.galleryGrid.children.filter(node => node.id).map(node => node.id), [1]);
+    const url = new URL(context.window.location.href);
+    assert.equal(url.searchParams.get("house"), "Phillips");
+    assert.equal(url.searchParams.get("filter"), "qualifying");
+    context.galleryHouseFilters.children.find(node => node.dataset.galleryFilter === "house:").click();
+    assert.equal(context.galleryFilter, "qualifying");
+    assert.deepEqual(context.galleryGrid.children.filter(node => node.id).map(node => node.id), view === "oliver" ? [1, 3] : [1, 3, 4]);
     assert.equal(JSON.stringify(lots), before);
   });
 }

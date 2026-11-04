@@ -141,7 +141,7 @@ function page(data, view = "calendar") {
     oliverSalesData: Object.fromEntries(Object.keys(data).map(day => [day, data[day].some(item => item.oliver_house === true) ? [sale("Phillips", 1)] : []])),
     researchScope: "", researchIndex: 0, researchLook: "dossier", researchRenderedKey: "",
     researchDaySelection: new Map(), researchLookButtons: [], restoringHistory: false,
-    galleryFilter: "all", galleryHideAttributed: false, galleryVisibleCount: 24, galleryArtistsDay: "",
+    gallerySort: {value: "catalog"}, galleryFilter: "all", galleryHideAttributed: false, galleryVisibleCount: 24, galleryArtistsDay: "",
     sidebarRenderedDay: "", sidebarRenderedScope: "", csrfToken: "test-token",
     window: {location, history, addEventListener: (name, callback) => listeners.set(name, callback), matchMedia: () => ({matches: false})},
     formatCalendarDay: day => `Date ${day}`,
@@ -153,13 +153,13 @@ function page(data, view = "calendar") {
     },
     externalLink(url, className, text) { return Object.assign(new Element("a"), {href: url, className, textContent: text}); },
     appendArtistLabel(parent, source) { parent.lotId = source.id; },
-    appendCurrencyPrice() {}, appendRetainedSavedWork() {}, appendArtpriceEditor() {}, appendArtpriceAnalysis() {},
+    appendCurrencyPrice() {}, appendLotControls() {}, appendArtpriceEditor() {}, appendArtpriceAnalysis() {},
   });
   for (const name of ["calendarLayout", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle", "oliverCalendarViewToggle",
     "researchViewToggle", "auctionCalendar", "calendarPageShell", "galleryCatalog", "researchWorkspace", "researchTitle",
     "researchBack", "researchPrevious", "researchSearch", "title", "list", "salesSection", "salesCount", "salesList",
     "lotBrowserLaunch", "researchLaunch"]) context[name] = new Element();
-  const functions = ["isGalleryView", "inOliverScope", "dayLots", "renderCalendarScope", "renderDaySales", "renderSidebarLots",
+  const functions = ["galleryOrganization", "gallerySortOrders", "restoreGalleryOrganization", "writeGalleryOrganization", "isGalleryView", "inOliverScope", "dayLots", "renderCalendarScope", "renderDaySales", "renderSidebarLots",
     "updateSidebarLaunches", "showDay", "setCalendarView", "updateCalendarLocation", "openResearchWorkspace"];
   vm.runInContext(functions.map(declaration).join("\n"), context);
   vm.runInContext(between('  researchBack.addEventListener("click"', '  researchPrevious.addEventListener("click"'), context);

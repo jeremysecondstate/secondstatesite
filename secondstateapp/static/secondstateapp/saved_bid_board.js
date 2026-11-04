@@ -11,28 +11,72 @@
   const el = (tag, text, className) => {const node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node;};
   const qualification = summary => summary.qualifies === true ? "Meets both minimums" : summary.qualifies === false ? "Below saved minimums" : "Qualification unavailable";
   const pending = new Map();
+  const deleting = new Set();
+  const saving = new Set();
+  const busyControls = new Set();
+  const deletionRevisions = new Map();
   const revisions = new Map();
   let activeDialog = null;
 
-  function publish(lot, summary) {
+  function publish(lot, summary, focusOrigin = null) {
     lot.saved_bid_board = summary;
-    window.dispatchEvent(new CustomEvent("archive-bid-board-saved", {detail: {lotId: lot.id, savedBoard: summary}}));
+    window.dispatchEvent(new CustomEvent("archive-bid-board-saved", {detail: {lotId: lot.id, savedBoard: summary, ...(focusOrigin ? {focusOrigin} : {})}}));
+  }
+
+  const isBusy = lotId => pending.has(String(lotId)) || deleting.has(String(lotId)) || saving.has(String(lotId));
+  const trackBusyControl = control => busyControls.add(new WeakRef(control));
+  function syncBusy(lotId) {
+    const busy = isBusy(lotId);
+    // Archive views are cached while detached. Update their controls as well
+    // as the visible view, without retaining discarded cards in memory.
+    for (const ref of busyControls) {
+      const control = ref.deref();
+      if (!control) {busyControls.delete(ref); continue;}
+      if (control.dataset.bidBoardEmailLotId === lotId) control.disabled = busy;
+      if (control.dataset.savedBoardDeleteLotId === lotId) {
+        control.disabled = busy;
+        control.textContent = deleting.has(lotId) ? "Deleting…" : "Delete Bid Board";
+      }
+      if (control.dataset.bidBoardSaveLotId === lotId) control.disabled = busy || control.dataset.bidBoardLocalBusy === "true";
+    }
+  }
+  function registerSaveButton(button) {
+    trackBusyControl(button);
+    syncBusy(button.dataset.bidBoardSaveLotId);
+  }
+
+  // Save and Delete share an owner even when their controls live in different
+  // Calendar views. Hold this lock through the complete Save operation.
+  function beginSave(lotId) {
+    lotId = String(lotId);
+    if (isBusy(lotId)) return false;
+    saving.add(lotId);
+    syncBusy(lotId);
+    return true;
+  }
+  function endSave(lotId) {
+    lotId = String(lotId);
+    saving.delete(lotId);
+    syncBusy(lotId);
   }
 
   function emailControl(lot, csrfToken) {
     const wrap = el("div", null, "sb-email-control"), label = el("label", null, "sb-email-label");
     const checkbox = el("input"); checkbox.type = "checkbox";
     checkbox.dataset.bidBoardEmailLotId = String(lot.id);
+    trackBusyControl(checkbox);
     checkbox.checked = pending.get(String(lot.id)) ?? Boolean(lot.saved_bid_board?.include_in_email);
-    checkbox.disabled = pending.has(String(lot.id));
+    checkbox.disabled = isBusy(lot.id);
     label.append(checkbox, el("span", "Include Bid Board & qualifying bid in this lot’s email"));
     const status = el("p", "", "sb-email-status"); status.setAttribute("role", "status");
     wrap.append(label, status);
     checkbox.addEventListener("change", async () => {
       const lotId = String(lot.id), requested = checkbox.checked;
+      if (isBusy(lotId) || !lot.saved_bid_board) return;
+      const deletionRevision = deletionRevisions.get(lotId) || 0;
       const restoreFocus = document.activeElement === checkbox;
       pending.set(lotId, requested);
-      document.querySelectorAll("[data-bid-board-email-lot-id]").forEach(input => {if (input.dataset.bidBoardEmailLotId === lotId) input.disabled = true;});
+      syncBusy(lotId);
       status.textContent = "Saving email preference…";
       status.classList.remove("is-error");
       try {
@@ -43,6 +87,7 @@
           body: new URLSearchParams({include_in_email: String(requested)}),
         });
         const payload = await response.json().catch(() => ({}));
+        if (deletionRevision !== (deletionRevisions.get(lotId) || 0)) return;
         if (!response.ok || !payload.ok || !payload.saved_board) throw new Error(payload.error || "The email preference could not be saved. Please try again.");
         publish(lot, payload.saved_board);
         status.textContent = requested ? "Included when this lot is emailed." : "Bid Board excluded from this lot’s email.";
@@ -52,17 +97,57 @@
         status.classList.add("is-error");
       } finally {
         pending.delete(lotId);
-        document.querySelectorAll("[data-bid-board-email-lot-id]").forEach(input => {
-          if (input.dataset.bidBoardEmailLotId === lotId) {
-            input.disabled = false;
+        syncBusy(lotId);
+        for (const ref of busyControls) {
+          const input = ref.deref();
+          if (input?.dataset.bidBoardEmailLotId === lotId) {
             input.checked = Boolean(lot.saved_bid_board?.include_in_email);
           }
-        });
+        }
         const focus = document.activeElement;
         if (restoreFocus && checkbox.isConnected && (!focus || focus === document.body || focus === document.documentElement || focus === activeDialog)) checkbox.focus({preventScroll: true});
       }
     });
     return wrap;
+  }
+
+  async function remove(lot, csrfToken, status) {
+    const lotId = String(lot.id);
+    if (isBusy(lotId) || !lot.saved_bid_board) return;
+    const focusOrigin = document.activeElement;
+    deleting.add(lotId);
+    syncBusy(lotId);
+    status.textContent = "Deleting saved Bid Board…";
+    status.classList.remove("is-error");
+    try {
+      if (!lot.saved_bid_board_url) throw new Error("Reload the page to delete this Bid Board.");
+      const response = await fetch(lot.saved_bid_board_url, {
+        method: "DELETE", credentials: "same-origin",
+        headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest"},
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok || payload.saved_board !== null) throw new Error(payload.error || "The Bid Board could not be deleted. Please try again.");
+      // Disabling or hiding the focused Delete button can move focus to body
+      // before the Calendar replaces these controls. Retain its origin without
+      // stealing focus when the user moved elsewhere while the request ran.
+      const focus = document.activeElement;
+      const restoreFocus = focusOrigin?.dataset?.savedBoardDeleteLotId === lotId
+        && (!focus || focus === focusOrigin || focus === document.body || focus === document.documentElement);
+      publish(lot, null, restoreFocus ? focusOrigin : null);
+      status.textContent = "Bid Board deleted.";
+    } catch (error) {
+      status.textContent = error.message || "The Bid Board could not be deleted.";
+      status.classList.add("is-error");
+    } finally {
+      deleting.delete(lotId);
+      syncBusy(lotId);
+      const focus = document.activeElement;
+      if (lot.saved_bid_board && focusOrigin?.isConnected
+          && focusOrigin.dataset?.savedBoardDeleteLotId === lotId
+          && (!focus || focus === document.body || focus === document.documentElement)) {
+        focusOrigin.focus({preventScroll: true});
+      }
+    }
   }
 
   function mountSummary(root, options) {
@@ -75,11 +160,19 @@
     button.setAttribute("aria-haspopup", "dialog");
     button.setAttribute("aria-label", `See saved Bid Board for ${lot.title}`);
     button.addEventListener("click", () => open(lot, {csrfToken}));
-    actions.append(button);
-    root.append(copy, actions, emailControl(lot, csrfToken));
+    const deleteButton = el("button", "Delete Bid Board", "sb-delete-button"); deleteButton.type = "button";
+    deleteButton.dataset.savedBoardDeleteLotId = String(lot.id);
+    trackBusyControl(deleteButton);
+    deleteButton.setAttribute("aria-label", `Delete Bid Board for ${lot.title}`);
+    const status = el("p", "", "sb-catalog-status"); status.setAttribute("role", "status");
+    deleteButton.addEventListener("click", () => remove(lot, csrfToken, status));
+    actions.append(button, deleteButton);
+    root.append(copy, actions, status, emailControl(lot, csrfToken));
     root.updateSavedBoard = summary => {
       lot.saved_bid_board = summary;
       root.hidden = !summary;
+      deleteButton.disabled = isBusy(lot.id);
+      deleteButton.textContent = deleting.has(String(lot.id)) ? "Deleting…" : "Delete Bid Board";
       if (!summary) return;
       copy.replaceChildren(el("strong", summary.qualifying_bid == null ? (summary.qualifies == null ? "Qualifying Bid: Unavailable" : "Qualifying Bid: No qualifying bid") : `Qualifying Bid: ${money(summary.qualifying_bid)}`, "sb-qualifying-bid"));
       if (summary.qualifying_coverage_limited) copy.append(el("small", "At known tier limit; higher bids not evaluated.", "ab-muted"));
@@ -198,6 +291,7 @@
     if (activeDialog) activeDialog.close();
     const opener = document.activeElement, controller = new AbortController();
     const dialog = el("dialog", null, "sb-dialog"); activeDialog = dialog;
+    dialog.dataset.savedBidBoardLotId = String(lot.id);
     dialog.setAttribute("aria-labelledby", "saved-bid-board-title");
     const inner = el("div", null, "archive-board sb-dialog-inner"), header = el("header", null, "sb-dialog-header");
     const heading = el("div");
@@ -231,6 +325,7 @@
         const revision = revisions.get(String(lot.id)) || 0;
         const response = await fetch(lot.saved_bid_board_url, {credentials: "same-origin", headers: {"X-Requested-With": "XMLHttpRequest"}, signal: controller.signal});
         payload = await response.json().catch(() => ({}));
+        if (controller.signal.aborted) return;
         if (!response.ok || !payload.ok || !payload.board) throw new Error(payload.error || "This saved Bid Board could not be loaded. Close and try again.");
         if (revision === (revisions.get(String(lot.id)) || 0)) break;
         if (attempt) throw new Error("The saved Bid Board changed while loading. Close and reopen to see the latest saved board.");
@@ -250,8 +345,15 @@
   window.addEventListener("archive-bid-board-saved", event => {
     const {lotId, savedBoard} = event.detail;
     revisions.set(String(lotId), (revisions.get(String(lotId)) || 0) + 1);
+    if (!savedBoard) {
+      deletionRevisions.set(String(lotId), (deletionRevisions.get(String(lotId)) || 0) + 1);
+      if (activeDialog?.dataset.savedBidBoardLotId === String(lotId)) activeDialog.close();
+    }
     document.querySelectorAll("[data-saved-bid-board-lot-id]").forEach(root => {if (root.dataset.savedBidBoardLotId === String(lotId)) root.updateSavedBoard?.(savedBoard);});
-    document.querySelectorAll("[data-bid-board-email-lot-id]").forEach(input => {if (input.dataset.bidBoardEmailLotId === String(lotId)) input.checked = pending.get(String(lotId)) ?? Boolean(savedBoard?.include_in_email);});
+    for (const ref of busyControls) {
+      const input = ref.deref();
+      if (input?.dataset.bidBoardEmailLotId === String(lotId)) input.checked = pending.get(String(lotId)) ?? Boolean(savedBoard?.include_in_email);
+    }
   });
-  window.SavedBidBoard = {mountSummary, open};
+  window.SavedBidBoard = {mountSummary, open, isBusy, beginSave, endSave, registerSaveButton};
 })();

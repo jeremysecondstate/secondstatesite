@@ -1,6 +1,7 @@
 """Saved Bid Board catalog data and per-lot email opt-in regressions."""
 
 import json
+import uuid
 from copy import deepcopy
 from datetime import datetime, timezone as datetime_timezone
 from unittest.mock import patch
@@ -20,6 +21,9 @@ from .models import (
     AuctionEmailBatchItem,
     AuctionWatchLot,
     LiveArtResaleAnalysis,
+    ResearchQueueItem,
+    ResearchQueueRun,
+    ResearchQueueRunItem,
 )
 
 
@@ -214,10 +218,12 @@ class SavedBidBoardCatalogTests(TestCase):
             if user:
                 self.client.force_login(user)
             self.assertEqual(self.client.get(self.saved_url).status_code, 302)
+            self.assertEqual(self.client.delete(self.saved_url).status_code, 302)
             self.assertEqual(self.set_email_preference(True).status_code, 302)
         guarded = Client(enforce_csrf_checks=True)
         guarded.force_login(self.staff)
         self.assertEqual(guarded.get(self.saved_url).status_code, 200)
+        self.assertEqual(guarded.delete(self.saved_url).status_code, 403)
         self.assertEqual(guarded.post(
             self.email_url, '{"include_in_email":true}', content_type="application/json",
         ).status_code, 403)
@@ -225,9 +231,121 @@ class SavedBidBoardCatalogTests(TestCase):
         self.assertFalse(record.include_in_email)
 
     def test_saved_read_and_preference_reject_wrong_http_methods(self):
-        self.save_board()
+        record = self.save_board()
         self.assertEqual(self.client.post(self.saved_url).status_code, 405)
+        self.assertEqual(self.client.put(self.saved_url).status_code, 405)
+        self.assertEqual(self.client.patch(self.saved_url).status_code, 405)
         self.assertEqual(self.client.get(self.email_url).status_code, 405)
+        self.assertTrue(AuctionBidBoardAnalysis.objects.filter(pk=record.pk).exists())
+
+    def test_delete_only_removes_saved_board_preserving_research_queue_and_email_history(self):
+        from .tests_calendar import stored_analysis
+
+        record = self.save_board()
+        record.include_in_email = True
+        record.save(update_fields=["include_in_email"])
+        self.lot.artprice_url = "https://www.artprice.com/artist/123/test/lots/pasts"
+        self.lot.won_by_us = True
+        self.lot.sold_price = "1200.00"
+        self.lot.sold_currency = "USD"
+        self.lot.save()
+        artprice = stored_analysis(self.lot, created_by=self.staff)
+        queue_item = ResearchQueueItem.objects.create(
+            lot=self.lot, selected=True, status=ResearchQueueItem.Status.DONE,
+            latest_result={"reason": "Saved research"}, requeue_history=[{"generation": 1}],
+        )
+        run = ResearchQueueRun.objects.create(
+            request_id=uuid.uuid4(), owner_token=uuid.uuid4(), status="completed",
+        )
+        run_item = ResearchQueueRunItem.objects.create(
+            run=run, queue_item=queue_item, lot=self.lot, queue_generation=1,
+            position=0, status="done", outcome={"board_saved": True},
+        )
+        draft = AuctionEmailBatch.objects.create()
+        draft_item = AuctionEmailBatchItem.objects.create(batch=draft, lot=self.lot, selected_by=self.staff)
+        sent = AuctionEmailBatch.objects.create(
+            is_active=False, status=AuctionEmailBatch.Status.SENT,
+            subject_snapshot="Previous email", html_body_snapshot="Saved board included",
+            text_body_snapshot="Saved board included", gmail_message_id="sent-message",
+        )
+        sent_item = AuctionEmailBatchItem.objects.create(
+            batch=sent, lot=self.lot, selected_by=self.staff,
+            lot_snapshot={"title": "Print", "bid_board": saved_board_snapshot(record)},
+        )
+        protected = [
+            self.lot, artprice, LiveArtResaleAnalysis.objects.get(lot=self.lot),
+            queue_item, run, run_item, draft, draft_item, sent, sent_item,
+        ]
+        snapshots = [obj.__class__.objects.filter(pk=obj.pk).values().get() for obj in protected]
+        with patch("secondstateapp.bid_board_views.build_board") as rebuild, patch(
+            "secondstateapp.bid_board_views._evidence"
+        ) as evidence_lookup, patch("secondstateapp.calendar_views._research_liveart_lot") as paid_lookup:
+            response = self.client.delete(self.saved_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True, "saved_board": None})
+        self.assertFalse(AuctionBidBoardAnalysis.objects.filter(pk=record.pk).exists())
+        self.assertEqual(self.client.get(self.saved_url).status_code, 404)
+        for obj, snapshot in zip(protected, snapshots):
+            with self.subTest(model=obj.__class__.__name__):
+                self.assertEqual(obj.__class__.objects.filter(pk=obj.pk).values().get(), snapshot)
+        rebuild.assert_not_called()
+        evidence_lookup.assert_not_called()
+        paid_lookup.assert_not_called()
+        payload = _lot_json(AuctionWatchLot.objects.get(pk=self.lot.pk), ZoneInfo("UTC"))
+        self.assertIsNone(payload["saved_bid_board"])
+        self.assertTrue(payload["won_by_us"])
+
+    def test_delete_is_idempotent_for_an_existing_lot_but_unknown_lot_is_404(self):
+        self.save_board()
+        for attempt in range(2):
+            with self.subTest(attempt=attempt):
+                response = self.client.delete(self.saved_url)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json(), {"ok": True, "saved_board": None})
+        unknown_url = reverse("auction_lot_saved_bid_board", args=(self.lot.pk + 10000,))
+        response = self.client.delete(unknown_url)
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(response.json()["ok"])
+
+    def test_delete_retained_board_uses_original_owner_and_preserves_other_boards(self):
+        canonical_board = self.save_board()
+        original = self.create_lot("retained-board-owner")
+        target_board = self.save_board(lot=original)
+        original.superseded_by = self.lot
+        original.active = False
+        original.save(update_fields=["superseded_by", "active"])
+        sibling = self.create_lot("other-retained-owner")
+        sibling_board = self.save_board(lot=sibling)
+        sibling.superseded_by = self.lot
+        sibling.save(update_fields=["superseded_by"])
+        untouched = {record.pk: record.__class__.objects.filter(pk=record.pk).values().get()
+                     for record in (canonical_board, sibling_board)}
+        lots_before = list(AuctionWatchLot.objects.order_by("pk").values())
+        research_before = list(LiveArtResaleAnalysis.objects.order_by("pk").values())
+        response = self.client.delete(reverse("auction_lot_saved_bid_board", args=(original.pk,)))
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(AuctionBidBoardAnalysis.objects.filter(pk=target_board.pk).exists())
+        for pk, expected in untouched.items():
+            self.assertEqual(AuctionBidBoardAnalysis.objects.filter(pk=pk).values().get(), expected)
+        self.assertEqual(list(AuctionWatchLot.objects.order_by("pk").values()), lots_before)
+        self.assertEqual(list(LiveArtResaleAnalysis.objects.order_by("pk").values()), research_before)
+
+    def test_delete_cannot_change_a_board_while_its_email_batch_is_sending(self):
+        record = self.save_board()
+        batch = AuctionEmailBatch.objects.create(status=AuctionEmailBatch.Status.SENDING)
+        AuctionEmailBatchItem.objects.create(batch=batch, lot=self.lot, selected_by=self.staff)
+        original = AuctionBidBoardAnalysis.objects.filter(pk=record.pk).values().get()
+        response = self.client.delete(self.saved_url)
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("sending", response.json()["error"])
+        self.assertEqual(AuctionBidBoardAnalysis.objects.filter(pk=record.pk).values().get(), original)
+        unrelated = self.create_lot("unrelated-to-sending-batch")
+        self.save_board(lot=unrelated)
+        response = self.client.delete(reverse("auction_lot_saved_bid_board", args=(unrelated.pk,)))
+        self.assertEqual(response.status_code, 200)
+        batch.status = AuctionEmailBatch.Status.FAILED
+        batch.save(update_fields=["status"])
+        self.assertEqual(self.client.delete(self.saved_url).status_code, 200)
 
     def test_email_preference_is_strict_boolean_for_json(self):
         record = self.save_board()

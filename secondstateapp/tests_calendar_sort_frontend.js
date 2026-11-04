@@ -27,11 +27,11 @@ function catalog(lots, sort = "price_asc", filter = "all") {
     galleryArtistClear: {},
     galleryGrid: {cards: [], replaceChildren() { this.cards = []; }, appendChild(card) { this.cards.push(card); }},
     galleryCard: (lot, index) => ({id: lot.id, index}), appendText() {},
-    loadCurrencyPrices() {},
+    loadCurrencyPrices() {}, updateCalendarLocation() {},
   });
   context.dayLots = () => context.data[context.selectedDay] || [];
   context.inOliverScope = () => false;
-  vm.runInContext(`${sortFunctions}\n${renderFunction}\n${sortListener}`, context);
+  vm.runInContext(`${template.slice(template.indexOf("  const hasQualifyingBid ="), template.indexOf("  const savedBoardFilterMembership ="))}\n${sortFunctions}\n${renderFunction}\n${sortListener}`, context);
   context.visible = () => Array.from(vm.runInContext("visibleGalleryLots()", context), ({lot, index}) => ({id: lot.id, index}));
   context.render = () => vm.runInContext("renderGalleryCards()", context);
   return context;
