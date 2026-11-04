@@ -234,7 +234,7 @@ test("attribution URL state survives month and research links independently of t
   assert.equal(new URL(p.run("galleryResearchUrl(dayLots()[0])")).searchParams.has("hide_attributed"), false);
 });
 
-for (const view of ["catalog", "oliver", "calendar", "research"]) {
+for (const view of ["catalog", "oliver", "oliver-calendar", "calendar", "research"]) {
   test(`${view} day catalog links preserve attribution browsing state and their own destination`, () => {
     const lots = [lot(1, {attribution_label: "After", email_tray_selected: true}),
       lot(2, {saved_bid_board: {qualifies: true}})];
@@ -243,6 +243,7 @@ for (const view of ["catalog", "oliver", "calendar", "research"]) {
     const destinations = p.catalogLinks.map(link => {
       const url = new URL(link.href);
       url.searchParams.delete("hide_attributed");
+      url.searchParams.set("view", ["oliver", "oliver-calendar"].includes(view) ? "oliver" : "catalog");
       return url.href;
     });
     for (const filter of ["house:Phillips", "artist:artist 1", "tray", "bidboards"]) {

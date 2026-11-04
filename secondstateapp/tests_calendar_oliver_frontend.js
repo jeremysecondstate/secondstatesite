@@ -116,6 +116,9 @@ function page(data, view = "oliver") {
     researchSearch: new Element("input"), researchLotCard: new Element(),
     renderResearchWorkspace() { context.lastResearchLot = context.data[context.selectedDay]?.find(l => l.id === context.lastResearchLot?.id); },
     updateCalendarLocation() {}, loadCurrencyPrices() {}, refreshCurrencyPrices() {}, restoringHistory: false,
+    renderCalendarScope() {}, renderDaySales() {}, formatCalendarDay: day => day,
+    oliverCalendarViewToggle: new Element(), sidebarRenderedScope: "",
+    lotBrowserLaunch: new Element(), researchLaunch: new Element(),
     galleryCard: (item, index) => ({id: item.id, index}),
     appendText(parent, tag, className, text) {
       const node = Object.assign(new Element(tag), {className, textContent: text});
@@ -123,7 +126,7 @@ function page(data, view = "oliver") {
       return node;
     },
   });
-  const functions = ["hasQualifyingBid", "savedBoardFilterMembership", "isGalleryView", "inOliverScope", "dayLots"];
+  const functions = ["hasQualifyingBid", "savedBoardFilterMembership", "isGalleryView", "inOliverScope", "dayLots", "updateSidebarLaunches"];
   vm.runInContext(functions.map(declaration).join("\n"), context);
   vm.runInContext(between("  const galleryPrice =", "  const renderGalleryFilters ="), context);
   vm.runInContext(declaration("renderGalleryFilters"), context);

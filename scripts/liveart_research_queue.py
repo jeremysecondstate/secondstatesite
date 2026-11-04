@@ -84,7 +84,7 @@ def pointer(config):
     path = pointer_path(config)
     if not path.exists():
         return {"schema_version": 1, "current": None, "history": []}
-    value = lifecycle.read_json(path)
+    value = lifecycle.read_json(path, max_bytes=lifecycle.MAX_QUEUE_POINTER_BYTES)
     if (value.get("schema_version") != 1 or not isinstance(value.get("history"), list)
             or value.get("current") is not None and not isinstance(value["current"], dict)):
         raise QueueError("Manual queue pointer is invalid; preserve it for reconciliation.")

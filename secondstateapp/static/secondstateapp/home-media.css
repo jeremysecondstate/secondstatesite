@@ -52,6 +52,13 @@
 .hero--video .hero-overlay,
 .hero--video .hero-copy { z-index: 4; }
 
+/* Keep the hero links' pill shape and make keyboard focus visible. */
+.hero--video .hero-overlay .btn:focus-visible {
+  outline: 2px solid var(--gold-soft);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
 /* Keep wrapped editorial captions readable and aligned with the copy. */
 #etching-detail .kicker {
   line-height: 1.5;

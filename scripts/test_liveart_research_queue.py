@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import sqlite3
 import unittest
+from unittest import mock
 from uuid import uuid4
 
 from scripts import liveart_research_queue as queue
@@ -544,6 +545,38 @@ class ManualQueueTests(unittest.TestCase):
         self.assertEqual(result["lifecycle"]["status"], "finished")
         self.assertTrue(queue.pointer(self.config)["current"]["finished"])
         self.assertNotIn(ident, lifecycle.discover(self.config))
+
+    def test_large_retained_pointer_history_survives_status_and_finish(self):
+        ident, _ = self.human()
+        queue.start(self.config, self.api, ident)
+        data = queue.pointer(self.config)
+        history = [{"run_id": str(uuid4()), "operations": [{
+            "operation_id": str(uuid4()), "status": "intent", "usage_unknown": True}],
+            "retained_evidence": "x" * lifecycle.MAX_JSON_BYTES}]
+        data["history"] = history
+        queue.persist(self.config, data)
+        path = queue.pointer_path(self.config)
+        self.assertGreater(path.stat().st_size, lifecycle.MAX_JSON_BYTES)
+        # Only the cumulative queue ledger gets a larger read allowance.
+        with self.assertRaises(lifecycle.LifecycleError):
+            lifecycle.read_json(path)
+        before_control = self.f.control.read_bytes()
+        for item in self.api.run["items"]:
+            item["status"] = "done"
+        queue.coordinate(self.config, self.api, ident, "status")
+        result = queue.coordinate(self.config, self.api, ident, "finish", audit_path=self.audit(ident))
+        self.assertEqual(result["lifecycle"]["status"], "finished")
+        saved = queue.pointer(self.config)
+        self.assertEqual(saved["history"], history)
+        self.assertTrue(saved["current"]["finished"])
+        self.assertEqual(self.f.control.read_bytes(), before_control)
+
+    def test_queue_pointer_larger_allowance_is_still_bounded(self):
+        queue.persist(self.config, {"schema_version": 1, "current": None,
+                                    "history": [{"retained_evidence": "x" * 1024}]})
+        with mock.patch.object(lifecycle, "MAX_QUEUE_POINTER_BYTES", 1024):
+            with self.assertRaises(lifecycle.LifecycleError):
+                queue.pointer(self.config)
 
     def test_new_intent_guard_checked_after_claim_but_exact_replay_remains_nonexecutable(self):
         ident, _ = self.human()

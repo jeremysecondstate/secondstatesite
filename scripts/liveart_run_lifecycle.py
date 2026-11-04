@@ -63,6 +63,9 @@ NATIVE_HEADER = (
 TERMINAL = {"completed", "failed", "interrupted"}
 KNOWN_EDGES = {"open", "closed"}
 MAX_JSON_BYTES = 10 * 1024 * 1024
+# This local ledger retains full snapshots of every prior manual run. Its
+# cumulative history can exceed an individual request/config/response limit.
+MAX_QUEUE_POINTER_BYTES = 64 * 1024 * 1024
 MAX_TREE = 1024
 DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "private_data/liveart-worker-runs/config.json"
 
@@ -89,11 +92,11 @@ def thread_uuid(value):
     return result
 
 
-def read_json(path):
+def read_json(path, *, max_bytes=MAX_JSON_BYTES):
     try:
         with Path(path).open("rb") as stream:
-            raw = stream.read(MAX_JSON_BYTES + 1)
-        if len(raw) > MAX_JSON_BYTES:
+            raw = stream.read(max_bytes + 1)
+        if len(raw) > max_bytes:
             raise ValueError
         value = json.loads(raw.decode("utf-8-sig"))
         if not isinstance(value, dict):
@@ -423,7 +426,7 @@ def completion_audit(config, ident, audit_path=None):
     if record.get("manual_queue"):
         queue_path = config.path.parent / "manual-queue.json"
         if queue_path.exists():
-            pointer = read_json(queue_path).get("current")
+            pointer = read_json(queue_path, max_bytes=MAX_QUEUE_POINTER_BYTES).get("current")
             if pointer is not None and not isinstance(pointer, dict):
                 raise LifecycleError("Manual queue pointer is invalid; preserve it for reconciliation.")
             if isinstance(pointer, dict) and pointer.get("owner_thread_id") == ident:

@@ -89,7 +89,7 @@ class CalendarDayCatalogLinkTests(TestCase):
                     parse_qs(urlsplit(link["href"]).query),
                     {"month": ["2026-07"], "day": [iso_day], "view": ["catalog"]},
                 )
-                self.assertIn("Gallery Catalog", link.get_text())
+                self.assertIn("Jeremy’s Catalog", link.get_text())
 
         crowded_cell = page.select_one('[data-calendar-day="2026-07-25"]').parent
         self.assertEqual(crowded_cell.select_one(".more-events").get_text(), "+1 more auction")

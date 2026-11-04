@@ -48,13 +48,15 @@
         || (highlight.fullyHighlighted !== undefined && typeof highlight.fullyHighlighted !== "boolean")) return null;
     let activeTag = null;
     let invalid = false;
-    const plain = highlight.value.replace(/<\/?(?:em|ais-highlight-0000000000)>/g, (tag) => {
-      if (tag.startsWith("</")) {
-        if (activeTag !== tag.slice(2, -1)) invalid = true;
+    const plain = highlight.value.replace(/<\/?(?:em|ais-highlight-0000000000)>|__\/?ais-highlight__/g, (tag) => {
+      const closing = tag.startsWith("</") || tag.startsWith("__/");
+      const name = tag.startsWith("__") ? "ais-highlight-token" : tag.slice(closing ? 2 : 1, -1);
+      if (closing) {
+        if (activeTag !== name) invalid = true;
         activeTag = null;
       } else {
         if (activeTag !== null) invalid = true;
-        activeTag = tag.slice(1, -1);
+        activeTag = name;
       }
       return "";
     });

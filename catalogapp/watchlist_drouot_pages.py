@@ -140,7 +140,15 @@ def select_drouot_entries(html: str) -> list[BookmarkEntry]:
     """Use readable bookmark identities; query aliases are search terms only."""
     entries = []
     for entry in parse_netscape_bookmarks(html):
-        if entry.folder != "DROUOT \u2014 PRINTS":
+        # Bookmark exports can escape an already encoded folder label again.
+        # Decode only for the exact folder comparison; retain the source entry.
+        folder = entry.folder
+        for _ in range(6):
+            decoded = unescape(folder)
+            if decoded == folder:
+                break
+            folder = decoded
+        if folder != "DROUOT \u2014 PRINTS":
             continue
         parts = urlsplit(entry.url)
         if parts.hostname not in {"drouot.com", "www.drouot.com"}:

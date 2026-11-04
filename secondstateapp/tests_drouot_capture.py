@@ -295,6 +295,21 @@ class DrouotCaptureTests(TestCase):
         self.assertEqual(entries[0].artist, "Mary Corita Kent")
         self.assertEqual(entries[0].source, "Drouot")
 
+    def test_reescaped_folder_label_preserves_exact_scope_and_source_entry(self):
+        anchor = '<DT><A HREF="https://drouot.com/en/c/50/lithographs?query=Corita+Kent">Mary Corita Kent: Drouot &mdash; Prints</A>'
+        for label in ("DROUOT &amp;mdash; PRINTS", "DROUOT &amp;amp;mdash; PRINTS"):
+            with self.subTest(label=label):
+                html = '<DL><DT><H3>' + label + '</H3><DL>' + anchor + '</DL></DL>'
+                entries = select_drouot_entries(html)
+                self.assertEqual(len(entries), 1)
+                self.assertEqual(entries[0].artist, "Mary Corita Kent")
+                self.assertEqual(entries[0].url, "https://drouot.com/en/c/50/lithographs?query=Corita+Kent")
+                self.assertIn("&", entries[0].folder)
+        for label in ("DROUOT &amp;mdash; PRINTS ARCHIVE", "DROUOT", "INVALUABLE BULK 1"):
+            with self.subTest(excluded_folder=label):
+                html = '<DL><DT><H3>' + label + '</H3><DL>' + anchor + '</DL></DL>'
+                self.assertEqual(select_drouot_entries(html), [])
+
     def test_based_on_primary_credit_is_visible_and_requires_both_source_fields(self):
         for prefix in ("Based on", "Based on a work by", "Based on works by", "(based on)"):
             with self.subTest(prefix=prefix):

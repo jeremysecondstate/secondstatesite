@@ -82,5 +82,30 @@
     }).format(artist.arrivalTime);
   };
 
-  return {artistKey, summarize, sorted, formatArrival};
+  // Planning estimate only: listed auction time + lot number at one minute
+  // per lot. Letter suffixes (191A) use the numeric part (191); source labels
+  // and artist-level summaries are left intact. No session offset is inferred.
+  const estimateLotArrival = (lot) => {
+    if (!lot || lot.is_all_day || typeof lot.event_at !== "string") return null;
+    const event = lot.event_at.trim();
+    // A date or a timezone-less time must not become the browser's midnight.
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/i.test(event)) return null;
+    // Date.parse otherwise silently normalizes dates such as February 30.
+    const calendarDate = new Date(event.slice(0, 10) + "T00:00:00Z");
+    if (!Number.isFinite(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== event.slice(0, 10)) return null;
+    const time = Date.parse(event);
+    const match = /^(\d+)[a-z]*$/i.exec(String(lot.lot_number ?? "").trim());
+    const number = match ? Number(match[1]) : null;
+    if (!Number.isFinite(time) || !Number.isSafeInteger(number) || number <= 0) return null;
+    const arrival = time + number * 60000;
+    return Number.isFinite(new Date(arrival).getTime()) ? arrival : null;
+  };
+
+  const formatLotArrival = (lot, timeZone) => {
+    const arrivalTime = estimateLotArrival(lot);
+    if (arrivalTime === null) return "Unavailable";
+    return formatArrival({earliestTime: Date.parse(lot.event_at), arrivalTime}, timeZone);
+  };
+
+  return {artistKey, summarize, sorted, formatArrival, estimateLotArrival, formatLotArrival};
 });

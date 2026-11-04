@@ -161,6 +161,8 @@ test("the browser build exposes the same summary API without CommonJS", () => {
   vm.runInContext(source, context);
   assert.equal(typeof context.window.CalendarArtists.summarize, "function");
   assert.equal(typeof context.window.CalendarArtists.sorted, "function");
+  assert.equal(typeof context.window.CalendarArtists.estimateLotArrival, "function");
+  assert.equal(typeof context.window.CalendarArtists.formatLotArrival, "function");
   const result = context.window.CalendarArtists.summarize([{artist: "Banksy"}]);
   assert.equal(result[0].name, "Banksy");
   assert.equal(result[0].count, 1);
@@ -310,4 +312,50 @@ test("arrival summaries and formatting preserve source records and artist summar
   assert.deepEqual(names(sorted), ["Albers, Josef", "Banksy"]);
   assert.equal(JSON.stringify(lots), originalLots);
   assert.equal(JSON.stringify(artists), originalArtists);
+});
+
+test("per-lot arrival uses each lot's own listed time and numeric or suffixed lot number", () => {
+  const base = {event_at: "2026-11-04T13:00:00Z"};
+  assert.equal(CalendarArtists.estimateLotArrival({...base, lot_number: "39"}), Date.parse("2026-11-04T13:39:00Z"));
+  assert.equal(CalendarArtists.formatLotArrival({...base, lot_number: "39"}, "America/Los_Angeles"), "5:39 AM");
+  for (const lot_number of ["191A", "191a", "00191B", " 191AB ", 191]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...base, lot_number}), Date.parse("2026-11-04T16:11:00Z"));
+  }
+  assert.equal(CalendarArtists.estimateLotArrival({event_at: "2026-11-04T17:00:00+02:00", lot_number: "39"}), Date.parse("2026-11-04T15:39:00Z"));
+});
+
+test("per-lot arrival requires a known explicit-zone time and never invents all-day timing", () => {
+  for (const event_at of [undefined, null, "", " ", "invalid", "2026-11-04", "2026-11-04T13:00:00", "2026-11-04 13:00:00Z", "2026-11-04T25:00:00Z", "2026-02-30T13:00:00Z", "2026-02-29T13:00:00Z"]) {
+    const lot = {event_at, lot_number: "39"};
+    assert.equal(CalendarArtists.estimateLotArrival(lot), null, String(event_at));
+    assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), "Unavailable");
+  }
+  assert.equal(CalendarArtists.estimateLotArrival({event_at: "2026-11-04T00:00:00Z", is_all_day: true, lot_number: "39"}), null);
+  assert.equal(CalendarArtists.estimateLotArrival(null), null);
+  assert.equal(CalendarArtists.formatLotArrival(undefined, "America/Los_Angeles"), "Unavailable");
+  assert.equal(CalendarArtists.estimateLotArrival({event_at: "2026-11-04T00:00:00Z", lot_number: "1"}), Date.parse("2026-11-04T00:01:00Z"));
+});
+
+test("per-lot arrival rejects ambiguous numbers and out-of-range dates", () => {
+  for (const lot_number of [undefined, null, "", "0", "-1", "+1", "1.5", "100-101", "100/1", "Lot 100", "1,000", "1e2", "Infinity", "9007199254740992", "144000000000"]) {
+    assert.equal(CalendarArtists.estimateLotArrival({event_at: "2026-11-04T13:00:00Z", lot_number}), null, String(lot_number));
+  }
+});
+
+test("per-lot arrival shows its local rollover date, including large lot numbers", () => {
+  const lot = {event_at: "2026-11-05T07:30:00Z", lot_number: "70"};
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), "Nov 5, 12:40 AM");
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/New_York"), "3:40 AM");
+  const large = {event_at: "2026-11-04T08:00:00Z", lot_number: "8063"};
+  assert.equal(CalendarArtists.estimateLotArrival(large), Date.parse("2026-11-09T22:23:00Z"));
+  assert.equal(CalendarArtists.formatLotArrival(large, "America/Los_Angeles"), "Nov 9, 2:23 PM");
+});
+
+test("per-lot arrival preserves source data and calculates elapsed minutes through DST", () => {
+  const lot = Object.freeze({id: 19, event_at: "2026-11-01T01:30:00-04:00", lot_number: "60A", is_all_day: false,
+    saved_bid_board: Object.freeze({qualifying_bid: "30"}), email_tray_selected: true, won_by_us: true});
+  const before = JSON.stringify(lot);
+  assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse("2026-11-01T06:30:00Z"));
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/New_York"), "1:30 AM");
+  assert.equal(JSON.stringify(lot), before);
 });

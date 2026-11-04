@@ -132,6 +132,28 @@ test("natural bulk responses identify artists and public text from Algolia highl
   }
 });
 
+test("token-style source highlights preserve category and description text without markup", () => {
+  const data = bulkFixture(BULK_URLS[0]);
+  Object.assign(data.body.requests[0].params, {
+    highlightPreTag: "__ais-highlight__", highlightPostTag: "__/ais-highlight__",
+  });
+  const hit = data.payload.results[0].hits[0];
+  const artist = hit.artistName;
+  hit._highlightResult = {
+    artistName: highlight(`__ais-highlight__${artist}__/ais-highlight__`),
+    supercategoryName: highlight("__ais-highlight__Fine__/ais-highlight__ __ais-highlight__Art__/ais-highlight__"),
+    categoryName: highlight("Prints"),
+    lotDescription: highlight("A __ais-highlight__fine art__/ais-highlight__ print."),
+  };
+  delete hit.artistName;
+  const saved = makeSnapshot(data).results[0].hits[0];
+  assert.equal(saved.artistName, artist);
+  assert.equal(saved.supercategoryName, "Fine Art");
+  assert.equal(saved.categoryName, "Prints");
+  assert.equal(saved.lotDescription, "A fine art print.");
+  assert.ok(!JSON.stringify(saved).includes("ais-highlight"));
+});
+
 test("highlight artist text decodes known entities once and strips only balanced known markers", () => {
   const data = bulkFixture(BULK_URLS[0]);
   const hit = data.payload.results[0].hits[0];
@@ -140,6 +162,7 @@ test("highlight artist text decodes known entities once and strips only balanced
     "Albrecht (1471) D&#252;rer", "Albrecht&#32;(1471) D&#xFC;rer",
     "<ais-highlight-0000000000>Albrecht</ais-highlight-0000000000> (1471) Dürer",
     "<em>Albrecht</em>&nbsp;(1471) Dürer",
+    "__ais-highlight__Albrecht__/ais-highlight__ (1471) Dürer",
   ]) {
     hit._highlightResult = { artistName: highlight(value) };
     assert.equal(makeSnapshot(data).results[0].hits[0].artistName, "Albrecht (1471) Dürer", value);
@@ -182,6 +205,9 @@ test("bulk highlight attribution rejects ambiguous arrays, malformed objects, un
     highlight(name, { matchedWords: [{}] }), highlight(name, { fullyHighlighted: "yes" }),
     highlight(`<strong>${name}</strong>`), highlight(`<em>${name}`), highlight(`${name}</em>`),
     highlight(`<em><em>${name}</em></em>`), highlight(`<em>${name}</ais-highlight-0000000000>`),
+    highlight(`__ais-highlight__${name}`), highlight(`${name}__/ais-highlight__`),
+    highlight(`__ais-highlight____ais-highlight__${name}__/ais-highlight____/ais-highlight__`),
+    highlight(`__ais-highlight__${name}</em>`), highlight(`<em>${name}__/ais-highlight__`),
     highlight(`&lt;em&gt;${name}&lt;/em&gt;`), highlight(`&#0;${name}`),
     highlight(`&#xD800;${name}`), highlight(`&#x110000;${name}`), highlight(`&unknown;${name}`),
   ];
