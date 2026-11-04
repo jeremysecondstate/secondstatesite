@@ -212,7 +212,7 @@ test("month scope swaps pre-grouped chips, meaningful counts, accessible labels,
   assert.equal(mixed.cell.scopes[1].hidden, true);
   assert.match(mixed.getAttribute("aria-label"), /2 watched lots in 2 auctions/);
   assert.equal(empty.cell.link.hidden, false);
-  assert.equal(empty.cell.link.textContent, "Gallery Catalog →");
+  assert.equal(empty.cell.link.textContent, "Jeremy’s Catalog →");
   assert.equal(new URL(empty.cell.link.href).searchParams.get("view"), "catalog");
   assert.deepEqual(p.upcoming.map(node => node.hidden), [false, true]);
 });

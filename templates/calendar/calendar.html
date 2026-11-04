@@ -90,8 +90,8 @@
 
   <div class="calendar-view-switch" role="group" aria-label="Auction calendar view">
     <span>View day as</span>
-    <button id="calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="true">Calendar</button>
-    <button id="catalog-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Gallery Catalog</button>
+    <button id="calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="true">Jeremy’s Calendar</button>
+    <button id="catalog-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Jeremy’s Catalog</button>
     <button id="research-view-toggle" type="button" aria-controls="day-research-workspace" aria-pressed="false">Archive Research</button>
     <button id="oliver-calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="false">Oliver’s Calendar</button>
     <button id="oliver-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Oliver’s Catalog</button>
@@ -119,7 +119,7 @@
         <div class="calendar-weekdays" aria-hidden="true">
           <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
         </div>
-        <div class="calendar-grid" role="grid" data-month-label="{{ month_title }}" aria-label="{{ month_title }} auction calendar">
+        <div class="calendar-grid" role="grid" data-month-label="{{ month_title }}" aria-label="{{ month_title }} Jeremy’s auction calendar">
           {% for week in weeks %}
             {% for day in week %}
               <div
@@ -163,8 +163,8 @@
                   <a
                     class="day-catalog-link"
                     href="?month={{ month_value }}&amp;day={{ day.iso }}&amp;view=catalog"
-                    aria-label="Gallery Catalog for {{ day.date|date:'l, F j, Y' }}"
-                  >Gallery Catalog <span aria-hidden="true">→</span></a>
+                    aria-label="Jeremy’s Catalog for {{ day.date|date:'l, F j, Y' }}"
+                  >Jeremy’s Catalog <span aria-hidden="true">→</span></a>
                 {% endif %}
               </div>
             {% endfor %}
@@ -241,7 +241,7 @@
     <header class="day-gallery-header">
       <div>
         <p id="day-gallery-date" class="calendar-kicker">Auction Calendar</p>
-        <h2 id="day-gallery-title" tabindex="-1">The day’s catalog<span aria-hidden="true">.</span></h2>
+        <h2 id="day-gallery-title" tabindex="-1">Jeremy’s Catalog<span aria-hidden="true">.</span></h2>
         <p id="day-gallery-summary">Choose a day to browse its watched lots.</p>
       </div>
       <div class="day-gallery-header-actions">
@@ -3586,7 +3586,7 @@
         : galleryFilter === "qualifying" ? "No saved Bid Boards have a qualifying bid in this catalog on this date. Choose Bid Boards to see all saved results."
         : galleryFilter === "bidboards" ? "No lots have a saved Bid Board in this catalog on this date."
         : galleryFilter.startsWith("house:") ? `No lots from ${galleryFilter.slice(6)} on this date.`
-        : activeView === "oliver" ? "No lots from Oliver’s auction houses on this date. Choose another watched day or switch to Gallery Catalog."
+        : activeView === "oliver" ? "No lots from Oliver’s auction houses on this date. Choose another watched day or switch to Jeremy’s Catalog."
         : "No watched lots match this view.");
     }
     const artistSelected = galleryFilter.startsWith("artist:");
@@ -3676,7 +3676,7 @@
   };
 
   const renderGalleryCatalog = () => {
-    document.getElementById("day-gallery-title").firstChild.textContent = activeView === "oliver" ? "Oliver’s Catalog" : "The day’s catalog";
+    document.getElementById("day-gallery-title").firstChild.textContent = activeView === "oliver" ? "Oliver’s Catalog" : "Jeremy’s Catalog";
     document.getElementById("day-gallery-scope").hidden = activeView !== "oliver";
     document.getElementById("day-gallery-artists-scope").textContent = activeView === "oliver"
       ? "Full-day counts across Oliver’s houses." : "Full-day counts across all houses.";
@@ -4055,7 +4055,7 @@
       : "Research workspace";
     researchSubtitle.textContent = lots.length
       ? `${lots.length} watched lot${lots.length === 1 ? "" : "s"} · Collect sources, compare sales, and set conditional bid ceilings`
-      : "Choose a day with watched lots in the Calendar or Gallery Catalog.";
+      : "Choose a day with watched lots in Jeremy’s Calendar or Jeremy’s Catalog.";
     researchPrevious.disabled = lots.length < 2 || researchIndex <= 0;
     researchNext.disabled = lots.length < 2 || researchIndex >= lots.length - 1;
     if (!lots.length) {
@@ -4063,7 +4063,7 @@
       researchRenderedKey = "";
       researchLotCard.replaceChildren();
       researchLotCard.classList.remove("is-won", "is-ended");
-      appendText(researchLotCard, "p", "research-empty", "No watched lots on this date. Choose another day in the Calendar or Gallery Catalog.");
+      appendText(researchLotCard, "p", "research-empty", "No watched lots on this date. Choose another day in Jeremy’s Calendar or Jeremy’s Catalog.");
       renderResearchRail();
       return;
     }
@@ -4347,7 +4347,7 @@
       ? "Auctions and suggested lots from Oliver’s auction houses."
       : "Choose a day to see every auction and its suggested lots.";
     const grid = document.querySelector(".calendar-grid");
-    grid.setAttribute("aria-label", `${grid.dataset.monthLabel}${oliver ? " Oliver’s" : ""} auction calendar`);
+    grid.setAttribute("aria-label", `${grid.dataset.monthLabel}${oliver ? " Oliver’s" : " Jeremy’s"} auction calendar`);
     dayButtons.forEach((button) => {
       const cell = button.closest(".calendar-day");
       const count = Number(oliver ? button.dataset.oliverLotCount : button.dataset.lotCount);
@@ -4360,8 +4360,8 @@
       const link = cell.querySelector(".day-catalog-link");
       if (link) {
         link.hidden = count === 0;
-        link.textContent = `${oliver ? "Oliver’s Catalog" : "Gallery Catalog"} →`;
-        link.setAttribute("aria-label", `${oliver ? "Oliver’s Catalog" : "Gallery Catalog"} for ${button.dataset.dateLabel}`);
+        link.textContent = `${oliver ? "Oliver’s Catalog" : "Jeremy’s Catalog"} →`;
+        link.setAttribute("aria-label", `${oliver ? "Oliver’s Catalog" : "Jeremy’s Catalog"} for ${button.dataset.dateLabel}`);
       }
     });
     document.querySelectorAll("[data-calendar-upcoming-scope]").forEach((node) => {

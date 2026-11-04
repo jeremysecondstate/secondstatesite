@@ -25,7 +25,7 @@
       <a class="research-queue-back" href="{% url 'auction_calendar' %}">← Auction Calendar</a>
       <p class="calendar-kicker">Saved across all dates</p>
       <h1 id="research-queue-title" tabindex="-1">LiveArt Research Queue</h1>
-      <p>Choose lots in the Calendar, then review their order and notes here.</p>
+      <p>Choose lots in Jeremy’s Calendar, then review their order and notes here.</p>
     </div>
     <nav class="research-queue-nav" aria-label="Calendar tools">
       <a href="{% url 'auction_research_queue' %}" aria-current="page">LiveArt Queue · <span data-research-queue-count>{{ research_queue_count }}</span></a>
@@ -128,8 +128,8 @@
     <div class="research-queue-empty">
       <p class="calendar-kicker">Your next research session</p>
       <h2>No lots in the queue yet</h2>
-      <p>Use <strong>Add to research</strong> on any Calendar lot, including Gallery Catalog and Oliver’s Calendar. Selections stay together across sale dates.</p>
-      <a href="{% url 'auction_calendar' %}">Choose lots in the Calendar →</a>
+      <p>Use <strong>Add to research</strong> on lots in Jeremy’s Calendar, Jeremy’s Catalog, Oliver’s Calendar, or Oliver’s Catalog. Selections stay together across sale dates.</p>
+      <a href="{% url 'auction_calendar' %}">Choose lots in Jeremy’s Calendar →</a>
     </div>
   {% endif %}
   <p class="research-queue-footer">Queued = waiting for a worker · Researching = worker started · Done = outcome saved · Needs attention = review the outcome before continuing.</p>
