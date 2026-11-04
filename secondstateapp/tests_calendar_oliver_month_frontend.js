@@ -314,6 +314,7 @@ test("research from the Oliver month stays scoped and browser Back returns to th
   p.researchBack.events.click();
   assert.equal(p.window.location.href, monthUrl);
   assert.equal(p.activeView, "oliver-calendar");
+  assert.equal(p.oliverCalendarViewToggle.focused, true, "Back should focus the restored Oliver month control");
   assert.equal(p.calendarLayout.hidden, false);
   assert.equal(p.researchWorkspace.hidden, true);
   assert.deepEqual(p.sidebarIds(), [2, 3]);

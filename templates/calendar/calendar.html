@@ -4585,7 +4585,8 @@
       galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : (["tray", "bidboards", "qualifying"].includes(params.get("filter")) || params.get("filter")?.startsWith("house:")) ? params.get("filter") : "all";
       setCalendarView(view);
       const focusTarget = view === "research" ? researchTitle
-        : isGalleryView() ? document.getElementById("day-gallery-title") : calendarViewToggle;
+        : isGalleryView() ? document.getElementById("day-gallery-title")
+        : activeView === "oliver-calendar" ? oliverCalendarViewToggle : calendarViewToggle;
       focusTarget.focus({preventScroll: true});
     } finally {
       restoringHistory = false;
