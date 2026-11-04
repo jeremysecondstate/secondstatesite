@@ -427,6 +427,8 @@ def auction_calendar(request):
         for day in week:
             day_lots = lots_by_day.get(day, [])
             event_groups = _group_lots(day_lots, zone)
+            oliver_day_lots = [lot for lot in day_lots if is_oliver_house(lot.auction_house)]
+            oliver_event_groups = _group_lots(oliver_day_lots, zone)
             week_items.append(
                 {
                     "date": day,
@@ -438,6 +440,10 @@ def auction_calendar(request):
                     "more_count": max(0, len(event_groups) - 3),
                     "sale_count": len(event_groups),
                     "lot_count": len(day_lots),
+                    "oliver_event_groups": oliver_event_groups[:3],
+                    "oliver_more_count": max(0, len(oliver_event_groups) - 3),
+                    "oliver_sale_count": len(oliver_event_groups),
+                    "oliver_lot_count": len(oliver_day_lots),
                 }
             )
         weeks.append(week_items)
@@ -450,30 +456,59 @@ def auction_calendar(request):
         day.isoformat(): [_sale_json(group) for group in _group_lots(lots, zone)]
         for day, lots in sorted(lots_by_day.items())
     }
+    oliver_calendar_sales_data = {
+        day.isoformat(): [
+            _sale_json(group)
+            for group in _group_lots([lot for lot in lots if is_oliver_house(lot.auction_house)], zone)
+        ]
+        for day, lots in sorted(lots_by_day.items())
+    }
 
     today_start, upcoming_end = _utc_bounds(now_local.date(), now_local.date() + timedelta(days=181), zone)
+    upcoming_query = AuctionWatchLot.objects.filter(
+        superseded_by__isnull=True, active=True, event_at__gte=today_start, event_at__lt=upcoming_end,
+    )
     upcoming_lots = list(
-        AuctionWatchLot.objects.filter(superseded_by__isnull=True, active=True, event_at__gte=today_start, event_at__lt=upcoming_end)
+        upcoming_query
         .select_related("watchlist_artist")
         .order_by("event_at", "auction_house", "artist", "id")[:1000]
     )
-    upcoming_by_day_and_sale: dict[tuple[date, str], list[AuctionWatchLot]] = {}
-    for lot in upcoming_lots:
-        local_day = timezone.localtime(lot.event_at, zone).date()
-        upcoming_by_day_and_sale.setdefault((local_day, _sale_identity(lot)), []).append(lot)
+    # Recognize the actual stored names before the lot cap, so a busy unrelated
+    # house cannot crowd Oliver's later sales out of his upcoming list.
+    oliver_upcoming_house_names = [
+        name for name in upcoming_query.order_by().values_list("auction_house", flat=True).distinct()
+        if is_oliver_house(name)
+    ]
+    oliver_upcoming_lots = list(
+        upcoming_query.filter(auction_house__in=oliver_upcoming_house_names)
+        .select_related("watchlist_artist")
+        .order_by("event_at", "auction_house", "artist", "id")[:1000]
+    )
 
-    upcoming_groups = []
-    for (local_day, _identity), sale_lots in upcoming_by_day_and_sale.items():
-        group = _group_lots(sale_lots, zone)[0]
-        group["date_iso"] = local_day.isoformat()
-        group["date_label"] = local_day.strftime("%a, %b %d").replace(" 0", " ")
-        upcoming_groups.append(group)
-    upcoming_groups.sort(key=lambda item: (item["date_iso"], item["sort_at"], item["auction_house"]))
-    visible_upcoming_groups = upcoming_groups[:10]
+    def upcoming_groups_for(lots, *, track_identity=False):
+        upcoming_by_day_and_sale: dict[tuple[date, str], list[AuctionWatchLot]] = {}
+        for lot in lots:
+            local_day = timezone.localtime(lot.event_at, zone).date()
+            upcoming_by_day_and_sale.setdefault((local_day, _sale_identity(lot)), []).append(lot)
+        groups = []
+        for (local_day, _identity), sale_lots in upcoming_by_day_and_sale.items():
+            group = _group_lots(sale_lots, zone)[0]
+            group["date_iso"] = local_day.isoformat()
+            group["date_label"] = local_day.strftime("%a, %b %d").replace(" 0", " ")
+            if track_identity:
+                group["_calendar_sale_identity"] = _identity
+            groups.append(group)
+        groups.sort(key=lambda item: (item["date_iso"], item["sort_at"], item["auction_house"]))
+        return groups[:10]
+
+    visible_upcoming_groups = upcoming_groups_for(upcoming_lots)
+    oliver_upcoming_groups = upcoming_groups_for(oliver_upcoming_lots, track_identity=True)
 
     # The upcoming list is capped for display, but each date it can select must
     # include every lot even when the initial upcoming query stops at 1,000.
-    for day_iso in sorted({group["date_iso"] for group in visible_upcoming_groups}):
+    upcoming_days = {group["date_iso"] for group in visible_upcoming_groups + oliver_upcoming_groups}
+    complete_day_lots = {day.isoformat(): lots for day, lots in lots_by_day.items()}
+    for day_iso in sorted(upcoming_days):
         if day_iso in calendar_data:
             continue
         local_day = date.fromisoformat(day_iso)
@@ -484,8 +519,24 @@ def auction_calendar(request):
             .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
             .order_by("event_at", "auction_house", "artist", "id")
         )
+        complete_day_lots[day_iso] = day_lots
         calendar_data[day_iso] = [_lot_json(lot, zone, selected_lot_ids, research_queue_state) for lot in day_lots]
         calendar_sales_data[day_iso] = [_sale_json(group) for group in _group_lots(day_lots, zone)]
+        oliver_calendar_sales_data[day_iso] = [
+            _sale_json(group)
+            for group in _group_lots([lot for lot in day_lots if is_oliver_house(lot.auction_house)], zone)
+        ]
+
+    # The first scoped query chooses the ten sessions; complete day loads supply
+    # their counts and artists even if a session crossed its 1,000-lot boundary.
+    for group in oliver_upcoming_groups:
+        identity = group.pop("_calendar_sale_identity")
+        sale_lots = [
+            lot for lot in complete_day_lots[group["date_iso"]]
+            if lot.active and is_oliver_house(lot.auction_house) and _sale_identity(lot) == identity
+        ]
+        if sale_lots:
+            group.update(_group_lots(sale_lots, zone)[0])
 
     retained_research_lot = _attach_retained_calendar_work(
         calendar_data, zone, selected_lot_ids, research_queue_state, request,
@@ -500,6 +551,18 @@ def auction_calendar(request):
         initial_day = visible_upcoming_groups[0]["date_iso"]
     else:
         initial_day = next(iter(calendar_data), "")
+    oliver_in_month_days = [
+        day for day in in_month_days
+        if any(is_oliver_house(lot.auction_house) for lot in lots_by_day[day])
+    ]
+    if now_local.date() in oliver_in_month_days:
+        initial_oliver_day = now_local.date().isoformat()
+    elif oliver_in_month_days:
+        initial_oliver_day = oliver_in_month_days[0].isoformat()
+    elif oliver_upcoming_groups:
+        initial_oliver_day = oliver_upcoming_groups[0]["date_iso"]
+    else:
+        initial_oliver_day = initial_day
 
     last_sent_batch = (
         AuctionEmailBatch.objects.filter(status=AuctionEmailBatch.Status.SENT, is_active=False)
@@ -517,9 +580,12 @@ def auction_calendar(request):
         "weeks": weeks,
         "calendar_data": calendar_data,
         "calendar_sales_data": calendar_sales_data,
+        "oliver_calendar_sales_data": oliver_calendar_sales_data,
         "retained_research_lot": retained_research_lot,
         "initial_day": initial_day,
+        "initial_oliver_day": initial_oliver_day,
         "upcoming_groups": visible_upcoming_groups,
+        "oliver_upcoming_groups": oliver_upcoming_groups,
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
         "calendar_timezone": str(zone),
         "oliver_house_count": len(oliver_house_names()),
