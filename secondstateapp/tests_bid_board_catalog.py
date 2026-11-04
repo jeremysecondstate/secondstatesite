@@ -301,10 +301,10 @@ class SavedBidBoardCatalogTests(TestCase):
         self.assertIsNone(next(item for item in data if item["id"] == no_board.pk)["saved_bid_board"])
 
     def test_calendar_loads_saved_boards_without_one_query_per_month_lot(self):
-        self.assert_calendar_board_queries(month=10, expected_board_queries=1)
+        self.assert_calendar_board_queries(month=10, expected_board_queries=2)
 
     def test_calendar_loads_saved_boards_without_one_query_per_upcoming_day_lot(self):
-        self.assert_calendar_board_queries(month=11, expected_board_queries=2)
+        self.assert_calendar_board_queries(month=11, expected_board_queries=3)
 
     def assert_calendar_board_queries(self, *, month, expected_board_queries):
         self.lot.event_at = datetime(2026, month, 15, 15, tzinfo=datetime_timezone.utc)
@@ -326,5 +326,29 @@ class SavedBidBoardCatalogTests(TestCase):
             else:
                 self.assertEqual(item["saved_bid_board"]["qualifying_bid"], "1800.00")
         board_queries = [query["sql"] for query in queries if "secondstateapp_auctionbidboardanalysis" in query["sql"]]
+        # Visible listings and retained source listings each use a bulk join;
+        # an upcoming day outside the month needs a second visible-lot query.
         self.assertEqual(len(board_queries), expected_board_queries, board_queries)
         self.assertTrue(all("JOIN" in sql for sql in board_queries), board_queries)
+
+        retained_records = []
+        for index in range(3):
+            child = self.create_lot(f"retained-source-{index}", month=month)
+            retained_records.append(self.save_board(lot=child))
+            child.superseded_by = self.lot
+            child.save(update_fields=["superseded_by"])
+        with patch("secondstateapp.calendar_views.timezone.now", return_value=datetime(
+            2026, 10, 15, 12, tzinfo=datetime_timezone.utc,
+        )), CaptureQueriesContext(connection) as retained_queries:
+            response = self.client.get(reverse("auction_calendar"), {"month": "2026-10", "view": "catalog"})
+        self.assertEqual(response.status_code, 200)
+        day_data = response.context["calendar_data"][f"2026-{month:02d}-15"]
+        self.assertEqual(len(day_data), 3)
+        canonical = next(item for item in day_data if item["id"] == self.lot.pk)
+        retained_work = {work["id"]: work for work in canonical["retained_saved_work"]}
+        self.assertEqual(set(retained_work), {record.lot_id for record in retained_records})
+        for record in retained_records:
+            self.assertEqual(retained_work[record.lot_id]["saved_bid_board"], saved_board_summary(record))
+        retained_board_queries = [query["sql"] for query in retained_queries if "secondstateapp_auctionbidboardanalysis" in query["sql"]]
+        self.assertEqual(len(retained_board_queries), len(board_queries), retained_board_queries)
+        self.assertTrue(all("JOIN" in sql for sql in retained_board_queries), retained_board_queries)

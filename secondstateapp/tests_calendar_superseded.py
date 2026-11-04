@@ -2,6 +2,7 @@
 
 import json
 import os
+from copy import deepcopy
 from datetime import datetime
 from decimal import Decimal
 from importlib import import_module
@@ -14,6 +15,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .bid_board import build_board
+from .bid_board_snapshot import saved_board_summary
 from .models import (
     AuctionBidBoardAnalysis, AuctionEmailBatch, AuctionEmailBatchItem, AuctionWatchLot,
     LiveArtResaleAnalysis,
@@ -225,8 +227,11 @@ class CalendarSupersededLotTests(TestCase):
 
     def test_canonical_card_links_saved_child_work_without_reassigning_it(self):
         old, replacement = self.replacement_pair()
+        old.title = "Original provider title"
+        old.save(update_fields=("title",))
         artprice, board, tray = self.save_research_and_email(old)
         records_before = list(AuctionWatchLot.objects.order_by("id").values())
+        board_before = AuctionBidBoardAnalysis.objects.values().get(pk=board.pk)
 
         response = self.calendar(day="2026-07-25", view="catalog")
 
@@ -234,12 +239,23 @@ class CalendarSupersededLotTests(TestCase):
         self.assertEqual(canonical["id"], replacement.pk)
         work, = canonical["retained_saved_work"]
         self.assertEqual(work["id"], old.pk)
-        self.assertTrue(work["saved_bid_board"])
+        self.assertEqual(work["title"], old.title)
+        self.assertEqual(work["artist"], canonical["artist"])
+        self.assertEqual(work["auction_house"], old.auction_house)
+        self.assertEqual(work["lot_number"], old.lot_number)
+        self.assertEqual(work["saved_bid_board"], saved_board_summary(board))
+        self.assertEqual(work["saved_bid_board"]["selected_bid"], "1400.00")
+        self.assertEqual(work["saved_bid_board_url"], reverse("auction_lot_saved_bid_board", args=(old.pk,)))
+        self.assertEqual(work["bid_board_email_url"], reverse("auction_lot_bid_board_email", args=(old.pk,)))
         self.assertTrue(work["email_tray_selected"])
         self.assertIn(f"lot={old.pk}", work["research_url"])
         self.assertIsNone(response.context["retained_research_lot"])
         self.assertEqual(response.context["synced_lot_count"], 1)
         self.assertEqual(list(AuctionWatchLot.objects.order_by("id").values()), records_before)
+        snapshot = self.client.get(work["saved_bid_board_url"])
+        self.assertEqual(snapshot.status_code, 200)
+        self.assertEqual(snapshot.json()["board"]["summary"], work["saved_bid_board"])
+        self.assertEqual(AuctionBidBoardAnalysis.objects.values().get(pk=board.pk), board_before)
         for saved in (artprice, board, tray):
             saved.refresh_from_db()
             self.assertEqual(saved.lot_id, old.pk)
@@ -266,11 +282,21 @@ class CalendarSupersededLotTests(TestCase):
         old, replacement = self.replacement_pair()
         second = watch_lot(source="Drouot", source_lot_id="another-provider", superseded_by=replacement)
         _artprice, first_board, _tray = self.save_research_and_email(old)
-        AuctionBidBoardAnalysis.objects.create(lot=second, analysis=first_board.analysis)
+        second_analysis = deepcopy(first_board.analysis)
+        second_analysis["selected_bid"] = "1700.00"
+        second_board = AuctionBidBoardAnalysis.objects.create(lot=second, analysis=second_analysis)
+        boards_before = list(AuctionBidBoardAnalysis.objects.order_by("pk").values())
         for child in (old, second):
             response = self.calendar(day="2026-07-25", view="research", lot=child.pk)
             canonical, = response.context["calendar_data"]["2026-07-25"]
             self.assertEqual({work["id"] for work in canonical["retained_saved_work"]}, {old.pk, second.pk})
+            by_id = {work["id"]: work for work in canonical["retained_saved_work"]}
+            for saved_board in (first_board, second_board):
+                work = by_id[saved_board.lot_id]
+                self.assertEqual(work["saved_bid_board"], saved_board_summary(saved_board))
+                self.assertEqual(work["saved_bid_board_url"], reverse("auction_lot_saved_bid_board", args=(saved_board.lot_id,)))
+                self.assertEqual(work["bid_board_email_url"], reverse("auction_lot_bid_board_email", args=(saved_board.lot_id,)))
+            self.assertNotEqual(by_id[old.pk]["saved_bid_board"], by_id[second.pk]["saved_bid_board"])
             self.assertEqual(response.context["retained_research_lot"]["id"], child.pk)
         for params in (
             {"day": "2026-07-25", "view": "catalog", "lot": old.pk},
@@ -279,6 +305,18 @@ class CalendarSupersededLotTests(TestCase):
         ):
             self.assertIsNone(self.calendar(**params).context["retained_research_lot"])
         self.assertEqual(AuctionBidBoardAnalysis.objects.count(), 2)
+        self.assertEqual(list(AuctionBidBoardAnalysis.objects.order_by("pk").values()), boards_before)
+
+    def test_retained_research_without_a_board_has_no_display_summary(self):
+        old, _replacement = self.replacement_pair()
+        stored_analysis(old, created_by=self.staff)
+
+        canonical, = self.calendar().context["calendar_data"]["2026-07-25"]
+
+        work, = canonical["retained_saved_work"]
+        self.assertEqual(work["id"], old.pk)
+        self.assertIsNone(work["saved_bid_board"])
+        self.assertFalse(AuctionBidBoardAnalysis.objects.exists())
 
     def test_retained_email_selection_uses_only_the_verified_current_replacement_context(self):
         old, replacement = self.replacement_pair()

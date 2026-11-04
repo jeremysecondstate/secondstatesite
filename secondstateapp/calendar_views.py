@@ -319,7 +319,13 @@ def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, resear
         })
         work = {
             "id": child.pk, "source": child.source, "research_url": research_url,
-            "saved_bid_board": hasattr(child, "bid_board_analysis"),
+            "title": clean_display_text(child.title, strip_lot_markers=True) or "Untitled lot",
+            "artist": artist_display_name(_artist_label(child)),
+            "auction_house": clean_display_text(child.auction_house or child.source or "Auction"),
+            "lot_number": child.lot_number,
+            "saved_bid_board": saved_board_summary(getattr(child, "bid_board_analysis", None)),
+            "saved_bid_board_url": reverse("auction_lot_saved_bid_board", args=(child.pk,)),
+            "bid_board_email_url": reverse("auction_lot_bid_board_email", args=(child.pk,)),
             "email_tray_selected": child.pk in selected_lot_ids,
             "research_queue_selected": child.pk in research_queue_state,
         }

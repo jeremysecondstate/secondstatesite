@@ -43,7 +43,7 @@ function renderer(lot) {
   );
   const source = productionBlock("  const externalLink =", "  const formatAnalysisMoney =")
     + productionBlock("  const appendArtpriceEditor =", "  const appendLiveArtResearch =")
-    + productionBlock("  const galleryCard =", "  const renderGalleryCards =")
+    + productionBlock("  const appendRetainedSavedWork =", "  const renderGalleryCards =")
     + productionBlock("  const renderResearchWorkspace =", "  const openResearchWorkspace =");
   const context = {
     document, appendText, window: {}, csrfToken: "test-csrf", readDraft: () => undefined,

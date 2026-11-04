@@ -442,20 +442,18 @@
   let retainedResearchId = retainedResearchLot?.id || null;
   const oliverHouseNames = JSON.parse(document.getElementById("oliver-house-names").textContent);
   // Board widgets update their shared lot before publishing the saved event.
-  const savedBoardMembership = new Map(Object.values(data).flat().map((lot) => [String(lot.id), Boolean(lot.saved_bid_board)]));
+  const savedBoardMembership = new Map(Object.values(data).flat()
+    .flatMap((lot) => [lot, ...(lot.retained_saved_work || [])])
+    .map((lot) => [String(lot.id), Boolean(lot.saved_bid_board)]));
   window.addEventListener("archive-bid-board-saved", (event) => {
-    let membershipChanged = false;
+    const lotId = String(event.detail.lotId);
+    const membershipChanged = savedBoardMembership.has(lotId)
+      && savedBoardMembership.get(lotId) !== Boolean(event.detail.savedBoard);
+    if (savedBoardMembership.has(lotId)) savedBoardMembership.set(lotId, Boolean(event.detail.savedBoard));
     Object.values(data).flat().forEach((lot) => {
-      const retained = lot.retained_saved_work?.find((work) => String(work.id) === String(event.detail.lotId));
-      if (retained) {
-        membershipChanged ||= retained.saved_bid_board !== Boolean(event.detail.savedBoard);
-        retained.saved_bid_board = Boolean(event.detail.savedBoard);
-      }
-      if (String(lot.id) === String(event.detail.lotId)) {
-        membershipChanged ||= savedBoardMembership.get(String(lot.id)) !== Boolean(event.detail.savedBoard);
-        savedBoardMembership.set(String(lot.id), Boolean(event.detail.savedBoard));
-        lot.saved_bid_board = event.detail.savedBoard;
-      }
+      [lot, ...(lot.retained_saved_work || [])].forEach((work) => {
+        if (String(work.id) === lotId) work.saved_bid_board = event.detail.savedBoard;
+      });
     });
     if (membershipChanged && isGalleryView()) {
       renderGalleryFilters();
@@ -3451,15 +3449,20 @@
   const appendRetainedSavedWork = (target, lot) => {
     if (!lot.retained_saved_work?.length) return;
     appendText(target, "p", "day-gallery-meta", "Saved work from previous listings");
-    const links = document.createElement("div");
-    links.className = "day-gallery-actions";
     lot.retained_saved_work.forEach((work) => {
+      const links = document.createElement("div");
+      links.className = "day-gallery-actions";
       const details = [work.saved_bid_board ? "Bid Board" : "", work.email_tray_selected ? "Email Tray" : "", work.research_queue_selected ? "Research Queue" : ""].filter(Boolean);
       const link = externalLink(work.research_url, "day-gallery-auction-link", `${work.source} saved work${details.length ? ` · ${details.join(" / ")}` : ""} ↗`);
       link.setAttribute("aria-label", `Open saved ${work.source} work for ${lot.title} (opens in a new tab)`);
       links.appendChild(link);
+      target.appendChild(links);
+      if (window.SavedBidBoard && String(work.id) !== String(lot.id)) {
+        const savedBoard = document.createElement("div");
+        window.SavedBidBoard.mountSummary(savedBoard, {lot: work, csrfToken});
+        target.appendChild(savedBoard);
+      }
     });
-    target.appendChild(links);
   };
 
   const galleryCard = (lot, index) => {
@@ -4611,7 +4614,8 @@
   setCalendarView(requestedView);
   const requestedSavedBoard = initialParams.get("saved_bid_board");
   if (requestedSavedBoard && window.SavedBidBoard) {
-    const savedLot = dayLots().find((lot) => String(lot.id) === requestedSavedBoard);
+    const savedLot = dayLots().flatMap((lot) => [lot, ...(lot.retained_saved_work || [])])
+      .find((lot) => String(lot.id) === requestedSavedBoard);
     if (savedLot?.saved_bid_board) window.SavedBidBoard.open(savedLot, {csrfToken});
   }
 })();

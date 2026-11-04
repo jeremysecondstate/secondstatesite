@@ -26,6 +26,7 @@ class Element {
   get textContent() {return (this.text || "") + this.children.map(node => node.textContent).join(" ");}
   get childElementCount() {return this.children.length;}
   append(...nodes) {nodes.forEach(node => {node.parentElement = this; this.children.push(node);});}
+  appendChild(node) {this.append(node); return node;}
   prepend(...nodes) {nodes.forEach(node => {node.parentElement = this;}); this.children.unshift(...nodes);}
   replaceChildren(...nodes) {this.children = []; this.text = ""; this.append(...nodes);}
   setAttribute(name, value) {this.attributes[name] = String(value);}
@@ -242,4 +243,79 @@ test("existing three-case saved snapshots keep their original three scenario col
   assert.equal(rows[1].children.length, 5);
   assert.equal(grid.classList.contains("ab-expanded-cases"), false);
   assert.doesNotMatch(grid.textContent, /Upside ⅓|Upside ⅔/);
+});
+
+const calendarTemplate = fs.readFileSync(path.join(__dirname, "../templates/calendar/calendar.html"), "utf8");
+function calendarBlock(startMarker, endMarker) {
+  const start = calendarTemplate.indexOf(startMarker);
+  const end = calendarTemplate.indexOf(endMarker, start);
+  assert.ok(start >= 0 && end > start, `Missing Calendar block: ${startMarker}`);
+  return calendarTemplate.slice(start, end);
+}
+
+function retainedBoard(id, source, qualifyingBid) {
+  return {id, source, title: `${source} saved title`, artist: "Sonia Delaunay", auction_house: "Forum Auctions", lot_number: "126",
+    research_url: `/calendar/?view=research&lot=${id}`, saved_bid_board_url: `/calendar/lots/${id}/saved-bid-board/`,
+    bid_board_email_url: `/calendar/lots/${id}/bid-board-email/`,
+    saved_bid_board: {qualifying_bid: qualifyingBid, qualifies: true, include_in_email: source === "Drouot"}};
+}
+
+function renderRetained(page, lot) {
+  Object.assign(page.context, {retainedLot: lot, retainedRoot: page.root, csrfToken: "retained-csrf",
+    appendText(parent, tag, className, textContent) {
+      return parent.appendChild(Object.assign(new Element(tag), {className, textContent}));
+    }});
+  vm.runInContext(calendarBlock("  const externalLink =", "  const appendArtistLabel =")
+    + calendarBlock("  const appendRetainedSavedWork =", "  const galleryCard =")
+    + "appendRetainedSavedWork(retainedRoot, retainedLot);", page.context);
+}
+
+for (const openIndex of [0, 1]) {
+  test(`retained board ${openIndex + 1} is displayed on the canonical card and opens its original saved snapshot`, async () => {
+    const retained = [retainedBoard(10, "Drouot", "300.00"), retainedBoard(11, "Invaluable", "500.00")];
+    const lot = {id: 123, title: "Humanité", retained_saved_work: retained};
+    const before = JSON.stringify(lot);
+    const page = environment({ok: true, board: {analysis: board(), summary: retained[openIndex].saved_bid_board}});
+    renderRetained(page, lot);
+    const summaries = page.root.querySelectorAll(".sb-catalog-summary");
+    assert.equal(summaries.length, 2);
+    assert.deepEqual(summaries.map(node => node.hidden), [false, false]);
+    assert.match(summaries[0].textContent, /Qualifying Bid: \$300\.00/);
+    assert.match(summaries[1].textContent, /Qualifying Bid: \$500\.00/);
+    assert.deepEqual(summaries.map(node => node.querySelector("input").checked), [true, false]);
+    assert.deepEqual(page.root.querySelectorAll("a").map(node => node.href), retained.map(work => work.research_url));
+    assert.equal(JSON.stringify(lot), before, "displaying saved boards must not change saved state");
+    const button = summaries[openIndex].querySelector(".sb-view-button");
+    assert.equal(button.textContent, "See Bid Board");
+    assert.equal(button.dataset.savedBoardOpenLotId, String(retained[openIndex].id));
+    await button.dispatch("click");
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(page.requests.length, 1);
+    assert.equal(page.requests[0].url, retained[openIndex].saved_bid_board_url);
+    assert.equal(page.requests[0].options.method, undefined, "opening a saved board is read-only");
+    assert.match(page.context.document.body.querySelector(".sb-dialog").textContent,
+      new RegExp(retained[openIndex].title));
+  });
+}
+
+test("retained research does not repeat its own board and keeps other retained boards visible", () => {
+  const retained = [retainedBoard(10, "Drouot", "300.00"), retainedBoard(11, "Invaluable", "500.00")];
+  const page = environment({});
+  renderRetained(page, {...retained[0], retained_saved_work: retained});
+  assert.deepEqual(page.root.querySelectorAll(".sb-catalog-summary").map(node => node.dataset.savedBidBoardLotId), ["11"]);
+  assert.equal(page.root.querySelectorAll("a").length, 2, "both original research links remain accessible");
+});
+
+test("a saved-board deep link restores a retained snapshot with its original owner", () => {
+  const retained = retainedBoard(11, "Invaluable", "500.00");
+  const opened = [];
+  const context = vm.createContext({
+    initialParams: new URLSearchParams("saved_bid_board=11"), csrfToken: "test-csrf",
+    dayLots: () => [{id: 123, retained_saved_work: [retained]}],
+    window: {SavedBidBoard: {open: (lot, options) => opened.push({lot, options})}},
+  });
+  vm.runInContext(calendarBlock("  const requestedSavedBoard =", "\n})();"), context);
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0].lot, retained);
+  assert.equal(opened[0].lot.saved_bid_board_url, "/calendar/lots/11/saved-bid-board/");
 });

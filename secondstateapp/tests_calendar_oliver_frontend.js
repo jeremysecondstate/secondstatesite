@@ -994,3 +994,39 @@ test("saved-board events tolerate publisher mutations and update membership with
   assert.equal(count(), "1");
   assert.equal(context.galleryGrid.children, unfilteredCards, "other gallery filters need count updates without replacing cards");
 });
+
+test("retained saved-board updates keep full summaries and count each canonical lot once", () => {
+  const retained = [
+    {id: 10, saved_bid_board: {qualifying_bid: "300.00", include_in_email: false}},
+    {id: 11, saved_bid_board: {qualifying_bid: "500.00", include_in_email: true}},
+  ];
+  const context = page({[dayA]: [lot(1, "Phillips", true, {retained_saved_work: retained})]}, "catalog");
+  const listeners = new Map();
+  context.window.addEventListener = (name, callback) => listeners.set(name, callback);
+  vm.runInContext(between('  const savedBoardMembership =', '  const auctionCalendar ='), context);
+  const emit = (lotId, savedBoard) => listeners.get("archive-bid-board-saved")({detail: {lotId, savedBoard}});
+  const count = () => context.galleryFilters.children.find(button => button.dataset.galleryFilter === "bidboards").children[1].textContent;
+  context.galleryFilter = "bidboards";
+  context.run("renderGalleryFilters(); renderGalleryCards()");
+  assert.equal(count(), "1");
+  const cards = context.galleryGrid.children, controls = context.galleryFilters.children;
+  const updated = {qualifying_bid: "700.00", include_in_email: true};
+  retained[0].saved_bid_board = updated; // The widget publishes after updating its shared lot.
+  emit("10", updated);
+  assert.equal(retained[0].saved_bid_board, updated, "the full summary must survive the event");
+  assert.equal(context.galleryGrid.children, cards);
+  assert.equal(context.galleryFilters.children, controls, "preference updates preserve focused controls");
+  retained[0].saved_bid_board = null;
+  emit(10, null);
+  assert.equal(count(), "1", "the second source still has a board");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
+  retained[1].saved_bid_board = null;
+  emit(11, null);
+  assert.equal(count(), "0");
+  assert.equal(context.galleryGrid.children.some(card => card.id !== undefined), false);
+  retained[1].saved_bid_board = updated;
+  emit(11, updated);
+  assert.equal(count(), "1");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
+  assert.equal(retained[1].saved_bid_board, updated);
+});
