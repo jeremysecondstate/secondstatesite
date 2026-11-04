@@ -123,7 +123,7 @@ function page(data, view = "oliver") {
       return node;
     },
   });
-  const functions = ["isGalleryView", "inOliverScope", "dayLots"];
+  const functions = ["hasQualifyingBid", "savedBoardFilterMembership", "isGalleryView", "inOliverScope", "dayLots"];
   vm.runInContext(functions.map(declaration).join("\n"), context);
   vm.runInContext(between("  const galleryPrice =", "  const renderGalleryFilters ="), context);
   vm.runInContext(declaration("renderGalleryFilters"), context);
@@ -1029,4 +1029,164 @@ test("retained saved-board updates keep full summaries and count each canonical 
   assert.equal(count(), "1");
   assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
   assert.equal(retained[1].saved_bid_board, updated);
+});
+
+for (const view of ["catalog", "oliver"]) {
+  test(`${view} Qualifying bids chip counts the full scope, preserves sort and paginates before research indices`, () => {
+    const lots = Array.from({length: 90}, (_, index) => lot(index + 1,
+      index % 3 ? "Phillips" : "Other", index % 3 !== 0, {
+        estimate_low: String(100 - index), artist: index % 2 ? "Artist A" : "Artist B",
+        saved_bid_board: index % 5 === 0 ? null : {qualifying_bid: String(500 + index), qualifies: false, include_in_email: index % 2 === 0},
+        email_tray_selected: index % 7 === 0,
+      }));
+    const before = JSON.stringify(lots);
+    const context = page({[dayA]: lots}, view);
+    const matching = lots.filter(item => item.saved_bid_board && (view !== "oliver" || item.oliver_house)).reverse();
+    const filter = key => context.galleryFilters.children.find(button => button.dataset.galleryFilter === key);
+    context.galleryCatalog.querySelectorAll = () => [...context.galleryFilters.children, ...context.galleryHouseFilters.children];
+    context.gallerySort.value = "price_asc";
+    context.run('chooseGalleryArtist("artist a")');
+    context.galleryVisibleCount = 72;
+    assert.equal(filter("qualifying").children[0].textContent, "Qualifying bids");
+    assert.equal(filter("qualifying").children[1].textContent, String(matching.length));
+    assert.equal(filter("qualifying").getAttribute("aria-pressed"), "false");
+    filter("qualifying").click();
+    assert.equal(context.galleryFilter, "qualifying");
+    assert.equal(context.galleryVisibleCount, 24);
+    assert.equal(context.gallerySort.value, "price_asc");
+    assert.equal(filter("qualifying").getAttribute("aria-pressed"), "true");
+    assert.equal(filter("qualifying").focused, true);
+    assert.equal(context.gallerySendLaunch.hidden, true);
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), matching.slice(0, 24).map(item => item.id));
+    context.galleryVisibleCount += 72;
+    context.run("renderGalleryCards()");
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), matching.map(item => item.id));
+    for (const card of context.galleryGrid.children) assert.equal(context.run("dayLots()")[card.index].id, card.id);
+    assert.equal(context.galleryMore.hidden, true);
+    filter("all").click();
+    assert.equal(context.galleryFilter, "all");
+    assert.equal(filter("qualifying").getAttribute("aria-pressed"), "false");
+    assert.equal(JSON.stringify(lots), before);
+  });
+
+  test(`${view} qualifying URL restores after research and remains selected on a day without qualifying bids`, () => {
+    const lots = [
+      lot(1, "Other", false, {saved_bid_board: {qualifying_bid: "100.00", qualifies: false}}),
+      lot(2, "Phillips", true, {saved_bid_board: {qualifying_bid: "200.00", qualifies: false}}),
+      lot(3, "Phillips", true, {saved_bid_board: {qualifying_bid: null, qualifies: true}}),
+      lot(4, "Phillips", true, {attribution_label: "After", saved_bid_board: {qualifying_bid: "400.00"}}),
+    ];
+    const before = JSON.stringify(lots);
+    const navigation = houseNavigationPage(lots, view);
+    const {context} = navigation;
+    navigation.initialize("qualifying", {hide_attributed: "1"});
+    assert.equal(context.galleryFilter, "qualifying");
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), view === "oliver" ? [2] : [1, 2]);
+    const galleryUrl = context.window.location.href;
+    assert.equal(new URL(galleryUrl).searchParams.get("filter"), "qualifying");
+    assert.equal(new URL(navigation.monthLinks[0].href).searchParams.get("filter"), "qualifying");
+    context.run("openResearchWorkspace()");
+    assert.equal(new URL(context.window.location.href).searchParams.has("filter"), false);
+    navigation.restore(galleryUrl);
+    assert.equal(context.galleryFilter, "qualifying");
+    assert.equal(context.galleryHideAttributed, true);
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), view === "oliver" ? [2] : [1, 2]);
+    assert.equal(context.restoringHistory, false);
+    assert.equal(navigation.pushes(), 1);
+    context.data[dayB] = [lot(5, "Phillips", true, {saved_bid_board: {qualifying_bid: null, qualifies: true}})];
+    context.selectedDay = dayB;
+    context.run("renderGalleryCatalog(); updateCalendarLocation()");
+    assert.equal(context.galleryFilter, "qualifying");
+    assert.equal(context.galleryResults.textContent, "0 watched lots");
+    assert.match(context.galleryGrid.children[0].textContent, /After & Attributed/);
+    context.galleryAttributionToggle.click();
+    assert.match(context.galleryGrid.children[0].textContent, /qualifying bid/i);
+    assert.equal(context.galleryMore.hidden, true);
+    assert.equal(new URL(context.window.location.href).searchParams.get("filter"), "qualifying");
+    context.galleryFilters.children.find(button => button.dataset.galleryFilter === "bidboards").click();
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), [5], "All Bid Boards still includes no-qualifying results");
+    assert.equal(JSON.stringify(lots), before);
+  });
+}
+
+test("qualifying membership refreshes after publisher mutations without replacing controls for preference-only saves", () => {
+  const retained = [{id: 10, saved_bid_board: {qualifying_bid: null, qualifies: true}}];
+  const context = page({
+    [dayA]: [lot(1, "Phillips", true, {saved_bid_board: {qualifying_bid: null}, retained_saved_work: retained}),
+      lot(2, "Phillips", true, {saved_bid_board: null})],
+    [dayB]: [lot(3, "Phillips", true, {saved_bid_board: null})],
+  }, "catalog");
+  const listeners = new Map();
+  context.window.addEventListener = (name, callback) => listeners.set(name, callback);
+  vm.runInContext(between('  const savedBoardMembership =', '  const auctionCalendar ='), context);
+  const emit = (lotId, savedBoard) => listeners.get("archive-bid-board-saved")({detail: {lotId, savedBoard}});
+  const count = () => context.galleryFilters.children.find(button => button.dataset.galleryFilter === "qualifying").children[1].textContent;
+  const ids = () => context.galleryGrid.children.filter(card => card.id !== undefined).map(card => card.id);
+  context.galleryFilter = "qualifying";
+  context.run("renderGalleryFilters(); renderGalleryCards()");
+  assert.equal(count(), "0");
+  const qualified = {qualifying_bid: "300.00", qualifies: false, include_in_email: false};
+  context.data[dayA][0].saved_bid_board = qualified;
+  emit(1, qualified);
+  assert.equal(count(), "1");
+  assert.deepEqual(ids(), [1]);
+  const cards = context.galleryGrid.children, controls = context.galleryFilters.children;
+  const preferenceOnly = {...qualified, qualifying_bid: "400.00", include_in_email: true};
+  context.data[dayA][0].saved_bid_board = preferenceOnly;
+  emit("1", preferenceOnly);
+  assert.equal(context.galleryGrid.children, cards);
+  assert.equal(context.galleryFilters.children, controls, "valid-to-valid and preference changes preserve focused controls");
+  retained[0].saved_bid_board = qualified;
+  emit(10, qualified);
+  assert.equal(count(), "1", "two qualifying saved sources count once");
+  const noQualifying = {qualifying_bid: null, qualifies: true};
+  context.data[dayA][0].saved_bid_board = noQualifying;
+  emit(1, noQualifying);
+  assert.deepEqual(ids(), [1], "the retained board still makes the canonical card qualify");
+  retained[0].saved_bid_board = noQualifying;
+  emit(10, noQualifying);
+  assert.equal(count(), "0");
+  assert.deepEqual(ids(), []);
+  context.data[dayB][0].saved_bid_board = qualified;
+  emit(3, qualified);
+  assert.equal(count(), "0", "another date cannot enter the selected day");
+  context.data[dayA][1].saved_bid_board = qualified;
+  emit(2, qualified);
+  assert.deepEqual(ids(), [2]);
+  context.data[dayA][1].saved_bid_board = null;
+  emit(2, null);
+  assert.equal(count(), "0");
+  assert.deepEqual(ids(), []);
+});
+
+test("qualifying selection survives actual day navigation and both gallery scopes", () => {
+  const navigation = houseNavigationPage([
+    lot(1, "Phillips", true, {saved_bid_board: {qualifying_bid: "100.00"}}),
+    lot(2, "Other", false, {saved_bid_board: {qualifying_bid: "200.00"}}),
+  ], "catalog");
+  const {context} = navigation;
+  context.data[dayB] = [lot(3, "Phillips", true, {saved_bid_board: {qualifying_bid: null}}),
+    lot(4, "Other", false, {saved_bid_board: {qualifying_bid: "400.00", qualifies: false}}),
+    lot(5, "Phillips", true, {saved_bid_board: {qualifying_bid: "500.00"}})];
+  const before = JSON.stringify(context.data);
+  for (const name of ["title", "list", "lotBrowserLaunch", "researchLaunch"]) context[name] = new Element();
+  Object.assign(context, {sidebarRenderedDay: "", researchRenderedKey: "", researchDaySelection: new Map(),
+    renderDaySales() {}, renderSidebarLots() {}});
+  vm.runInContext(declaration("showDay"), context);
+  navigation.initialize("qualifying");
+  context.galleryVisibleCount = 72;
+  context.run(`showDay("${dayB}")`);
+  assert.equal(context.selectedDay, dayB);
+  assert.equal(context.galleryFilter, "qualifying");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [4, 5]);
+  assert.equal(new URL(context.window.location.href).searchParams.get("filter"), "qualifying");
+  context.run('setCalendarView("oliver")');
+  assert.equal(context.galleryFilter, "qualifying");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [5]);
+  context.run('setCalendarView("catalog")');
+  assert.equal(context.galleryFilter, "qualifying");
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [4, 5]);
+  context.run(`showDay("${dayA}")`);
+  assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1, 2]);
+  assert.equal(JSON.stringify(context.data), before);
 });

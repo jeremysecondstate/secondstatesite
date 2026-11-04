@@ -103,7 +103,7 @@ function page(lots, view = "catalog") {
       return parent.appendChild(element);
     },
   });
-  vm.runInContext(["isGalleryView", "inOliverScope", "dayLots"].map(declaration).join("\n"), context);
+  vm.runInContext(["hasQualifyingBid", "savedBoardFilterMembership", "isGalleryView", "inOliverScope", "dayLots"].map(declaration).join("\n"), context);
   vm.runInContext(between("  const galleryPrice =", "  const renderGalleryFilters ="), context);
   vm.runInContext(["renderGalleryFilters", "renderGalleryArtists", "renderGalleryCards", "galleryResearchUrl", "updateCalendarLocation"].map(declaration).join("\n"), context);
   context.run = expression => vm.runInContext(expression, context);
@@ -163,7 +163,7 @@ test("artist summaries and filter counts reflect browsable lots with an explicit
   p.galleryHideAttributed = true;
   p.render();
   const filters = Object.fromEntries(p.galleryFilters.children.map(button => [button.dataset.galleryFilter, button.children[1].textContent]));
-  assert.deepEqual(filters, {all: "1", tray: "1", bidboards: "0"});
+  assert.deepEqual(filters, {all: "1", tray: "1", bidboards: "0", qualifying: "0"});
   assert.equal(p.galleryHouseFilters.children.length, 1);
   assert.equal(p.galleryArtistSummary.textContent, "1 artist · 1 watched lot");
   assert.equal(p.galleryAttributionToggle.attributes["aria-pressed"], "true");
@@ -358,4 +358,73 @@ test("only explicit retained research replaces its canonical slot and preserves 
   p.retainedResearchId = null;
   assert.deepEqual(p.ids("dayLots()"), [1, 2]);
   assert.deepEqual(lots.map(source => source.id), [1, 2]);
+});
+
+test("qualifying bids use the saved ceiling, independently of the selected bid outcome", () => {
+  const amounts = ["1542.61", 250, "0.00", 0, null, undefined, "", "  ", "NaN", "Infinity", Infinity, -1, "-0.01", true, {}, []];
+  const lots = amounts.map((qualifying_bid, index) => lot(index + 1, {
+    saved_bid_board: {qualifying_bid, qualifies: index >= 4, selected_bid: "9000.00", include_in_email: index % 2 === 0},
+  }));
+  lots.push(lot(50, {saved_bid_board: null}), lot(51, {saved_bid_board: {qualifies: true}}));
+  const before = JSON.stringify(lots);
+  const p = page(lots);
+  assert.equal(p.galleryFilter, "all", "qualified-only browsing is opt-in");
+  assert.equal(p.visible().length, lots.length);
+  p.galleryFilter = "qualifying";
+  assert.deepEqual(p.visible(), [{id: 1, index: 0}, {id: 2, index: 1}, {id: 3, index: 2}, {id: 4, index: 3}]);
+  p.render();
+  const button = p.galleryFilters.children.find(button => button.dataset.galleryFilter === "qualifying");
+  assert.equal(button.children[1].textContent, "4");
+  assert.equal(button.attributes["aria-pressed"], "true");
+  assert.equal(JSON.stringify(lots), before, "filtering must not recalculate or change saved selections");
+});
+
+for (const view of ["catalog", "oliver"]) {
+  test(`${view} qualifying bids compose with attribution hiding and retain original source actions`, () => {
+    const lots = [
+      lot(1, {attribution_label: "After", won_by_us: true, email_tray_selected: true,
+        saved_bid_board: {qualifying_bid: "100.00", qualifies: false, qualifying_coverage_limited: true}}),
+      lot(2, {saved_bid_board: {qualifying_bid: null, qualifies: true}}),
+      lot(3, {retained_saved_work: [
+        {id: 30, saved_bid_board: {qualifying_bid: "300.00", qualifies: false}, saved_bid_board_url: "/original/30/"},
+        {id: 31, saved_bid_board: {qualifying_bid: "400.00", qualifies: true}, saved_bid_board_url: "/original/31/"},
+      ]}),
+      lot(4, {oliver_house: false, auction_house: "Other", saved_bid_board: {qualifying_bid: "200.00"}}),
+    ];
+    const before = JSON.stringify(lots);
+    const p = page(lots, view);
+    p.galleryFilter = "qualifying";
+    p.renderGalleryCatalog = () => p.render();
+    p.render();
+    const expected = view === "oliver" ? [1, 3] : [1, 3, 4];
+    assert.deepEqual(p.visible().map(entry => entry.id), expected);
+    const count = () => p.galleryFilters.children.find(button => button.dataset.galleryFilter === "qualifying").children[1].textContent;
+    assert.equal(count(), String(expected.length), "multiple retained boards count as one canonical card");
+    vm.runInContext(between('  galleryAttributionToggle.addEventListener("click"', '  gallerySort.addEventListener("change"'), p);
+    p.galleryAttributionToggle.events.click();
+    assert.equal(p.galleryFilter, "qualifying");
+    assert.deepEqual(p.visible().map(entry => entry.id), expected.filter(id => id !== 1));
+    assert.equal(count(), String(expected.length - 1));
+    p.galleryAttributionToggle.events.click();
+    assert.deepEqual(p.visible().map(entry => entry.id), expected);
+    for (const {id, index} of p.visible()) assert.equal(p.run("dayLots()")[index].id, id);
+    assert.equal(JSON.stringify(lots), before);
+  });
+}
+
+test("qualifying filter is carried on month and day catalog links and removed after choosing all lots", () => {
+  const p = page([lot(1, {saved_bid_board: {qualifying_bid: "100.00"}})]);
+  p.galleryFilter = "qualifying";
+  p.galleryHideAttributed = true;
+  p.run("updateCalendarLocation()");
+  for (const href of [p.window.history.url, ...p.monthLinks.map(link => link.href), ...p.catalogLinks.map(link => link.href)]) {
+    const url = new URL(href);
+    assert.equal(url.searchParams.get("filter"), "qualifying");
+    assert.equal(url.searchParams.get("hide_attributed"), "1");
+  }
+  p.galleryFilter = "all";
+  p.run("updateCalendarLocation()");
+  for (const href of [p.window.history.url, ...p.monthLinks.map(link => link.href), ...p.catalogLinks.map(link => link.href)]) {
+    assert.equal(new URL(href).searchParams.has("filter"), false);
+  }
 });
