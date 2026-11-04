@@ -3830,6 +3830,9 @@
     galleryNext.disabled = !nextGalleryDay();
     galleryBrowserLaunch.disabled = !lots.length;
     const availableHouses = activeView === "oliver" ? new Set(oliverHouseNames) : houses;
+    if (activeView === "oliver" && galleryOrganization.house && !availableHouses.has(galleryOrganization.house)) {
+      galleryOrganization.house = "";
+    }
     if (galleryFilter.startsWith("house:") && !availableHouses.has(galleryFilter.slice(6))) {
       if (galleryOrganization.house === galleryFilter.slice(6)) galleryOrganization.house = "";
       galleryFilter = "all";

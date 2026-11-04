@@ -42,7 +42,7 @@ _PRINT_MEDIUM = re.compile(
     r"screen\s?print(?:ed|s)?|silk\s?screen[s]?|serigraph(?:ie|y|s|ies)?|s[eé]rigraphie[s]?|"
     r"gravure[s]?|estampe[s]?|eau[x]?[ -]forte[s]?|aquatin[dt](?:e|s)?|drypoint|"
     r"pointe[ -]s[eè]che|woodcut[s]?|woodblock|stencil\s+print[s]?|linocut[s]?|linogravure[s]?|"
-    r"monotype[s]?|monoprint[s]?|gicl[eé]e[s]?|phototype[s]?|photogravure[s]?|zincograph(?:y|s)?|burin|(?:photo|foto)print[s]?|collotype[s]?|pochoir|h[eé]liogravure[s]?|letterpress|offset|printed(?=\s+poster\b)|print[s]?)\b",
+    r"monotype[s]?|monoprint[s]?|gicl[eé]e[s]?|phototype[s]?|photogravure[s]?|zincograph(?:y|s)?|burin|(?:photo|foto)print[s]?|collotype[s]?|pochoir|h[eé]liogravure[s]?|letterpress|offset|printed(?=\s+poster\b)|engraved(?=\s+(?:colou?r\s+)?poster\b)|print[s]?)\b",
     re.IGNORECASE,
 )
 _QUALIFIED_CREDIT = re.compile(
@@ -538,6 +538,33 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
     return None
 
 
+def _corroborated_short_credit(description: str, heading: str, artist: str) -> tuple[str, tuple[str, str, str] | None] | None:
+    """Resolve a verified short heading only from its explicit offered-work credit.
+
+    These are not global surname aliases. Both source fields must repeat the
+    same primary heading, and an anchored offered-object sentence must supply
+    the full creator name before reference or biography sections.
+    """
+    lines = [line.strip() for line in description.splitlines() if line.strip()]
+    if not lines or lines[0] != heading.strip():
+        return None
+    work = _offered_work_prefix(description)
+    work = re.split(r"(?im)^\s*(?:shipping|registered\s+colissimo|notes?|references?)\s*:", work, maxsplit=1)[0]
+    key = artist_identity_key(artist)
+    if key == "alphonse mucha" and re.match(r"^Mucha\s+[-\u2013\u2014]\s+\S", heading, re.IGNORECASE):
+        if re.search(r"(?im)^This\s+(?:attractive\s+)?colou?r\s+lithograph\s+is\s+by\s+Alphonse\s+Mucha\b", work):
+            return "Mucha", None
+    if key == "battista giovanni piranesi" and re.match(r"^Piranesi,\s+Folio\s+[-\u2013\u2014]\s+\S", heading, re.IGNORECASE):
+        if re.search(r"(?im)^This\s+(?:extraordinary\s+)?large\s+folio\s+etching\s+is\s+from\s+Giovanni\s+Battista\s+Piranesi['\u2019]s\s+[\"\u201c]Vedute\s+di\s+Roma[\"\u201d]", work):
+            return "Piranesi", None
+    if key == "chagall marc":
+        joint = re.fullmatch(r"(?P<credit>Chagall\s+&\s+Fontaine)\s+[-\u2013\u2014]\s+(?P<title>[1-9][0-9]?\s+Etchings\s+of\s+Fables)", heading, re.IGNORECASE)
+        if joint and re.search(r"(?im)^This\s+(?:striking\s+)?etching\s+is\s+from\s+Marc\s+Chagall['\u2019]s\s+illustrations\s+for\s+Jean\s+de\s+la\s+Fontaine['\u2019]s\s+Fables\b", work):
+            credit = joint.group("credit")
+            return credit, (credit, joint.group("title"), "")
+    return None
+
+
 def _resolved_collaboration(description: str, aliases: Iterable[str]) -> tuple[str, str, str] | None:
     """Resolve a co-credit attached to one explicitly described print work.
 
@@ -712,7 +739,10 @@ def _normalized_lot(raw: dict, card: dict, entry: BookmarkEntry, captured_at: da
     description, heading = _text(raw.get("description", "")), _text(card.get("heading", ""))
     aliases = (*_SOURCE_CREDIT_ALIASES.get(artist_identity_key(entry.artist), ()),
                entry.artist, _source_query(entry.url))
-    collaboration = _resolved_collaboration(description, aliases)
+    short_credit = _corroborated_short_credit(description, heading, entry.artist)
+    if short_credit:
+        aliases += (short_credit[0],)
+    collaboration = short_credit[1] if short_credit and short_credit[1] else _resolved_collaboration(description, aliases)
     if not _leading_credit_matches(description, aliases) or not _leading_credit_matches(heading, aliases):
         # A joint heading can identify one explicitly described work. Require
         # the same resolved full credit at the start of both source fields;

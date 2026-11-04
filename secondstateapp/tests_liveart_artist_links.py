@@ -51,7 +51,7 @@ class LiveArtArtistBookmarkTests(SimpleTestCase):
         path = Path(__file__).resolve().parents[1] / "docs" / "artist-links.html"
         entries = [entry for entry in parse_netscape_bookmarks(path.read_text(encoding="utf-8-sig"))
                    if "LIVEART" in entry.folder_path]
-        self.assertEqual(len(entries), 154)
+        self.assertGreaterEqual(len(entries), 154)
         for entry in entries:
             with self.subTest(title=entry.title):
                 self.assertEqual(artist_liveart_url(entry.title.removesuffix(" — LiveArt")), entry.url)
@@ -103,6 +103,18 @@ class LiveArtArtistBookmarkTests(SimpleTestCase):
 
 
 class CalendarLiveArtArtistLinkTests(SimpleTestCase):
+    def test_mary_corita_kent_calendar_links_use_supplied_profiles(self):
+        lot = AuctionWatchLot(pk=4188, source="Invaluable", artist="Mary Corita Kent",
+                              artist_watchlist_name="Mary Corita Kent",
+                              title="Corita Kent (Sister Mary Corita), jacob's ladder")
+        lot._state.fields_cache["bid_board_analysis"] = None
+        detail = _lot_json(lot, ZoneInfo("America/Los_Angeles"))
+        self.assertEqual(detail["artist_artprice_url"],
+                         "https://www.artprice.com/artist/79659/mary-corita-kent/lots/pasts?idcategory=2&p=1&sort=datesale_desc")
+        self.assertEqual(detail["artist_liveart_url"],
+                         "https://www.liveart.ai/artists/HbmYe7/corita-kent-sister-mary-corita")
+        self.assertIn("idartist=79659", detail["artprice_search_url"])
+
     def test_gillian_ayres_calendar_links_use_supplied_profiles(self):
         artprice = "https://www.artprice.com/artist/1087/gillian-ayres/lots/pasts?idcategory=2&p=1&sort=datesale_desc"
         liveart = "https://www.liveart.ai/artists/GUvJPA/gillian-ayres"

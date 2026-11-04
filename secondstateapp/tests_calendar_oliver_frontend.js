@@ -985,6 +985,85 @@ test("Oliver URL validation retains a valid zero-count house but rejects unknown
   assert.equal(new URL(navigation.context.window.location.href).searchParams.has("filter"), false);
 });
 
+test("Oliver clears a Jeremy-only independent house on scope changes without clearing other organization state", () => {
+  const lots = [
+    lot(1, "Jeremy-only House", false, {saved_bid_board: {qualifying_bid: "100"}}),
+    lot(2, "Phillips", true, {saved_bid_board: {qualifying_bid: "200"}}),
+    lot(3, "Bonhams", true, {attribution_label: "After", saved_bid_board: {qualifying_bid: "300"}}),
+  ];
+  const before = JSON.stringify(lots);
+  const navigation = houseNavigationPage(lots, "catalog"), {context} = navigation;
+  navigation.initialize("qualifying", {house: "Jeremy-only House", group: "house", sort: "price_desc", hide_attributed: "1"});
+  assert.deepEqual(context.ids("visibleGalleryLots().map(entry => entry.lot)"), [1]);
+  context.run('setCalendarView("oliver")');
+  assert.equal(context.run("galleryOrganization.house"), "");
+  assert.equal(context.galleryFilter, "qualifying");
+  assert.equal(context.run("galleryOrganization.group"), "house");
+  assert.equal(context.gallerySort.value, "price_desc");
+  assert.equal(context.galleryHideAttributed, true);
+  assert.deepEqual(context.ids("visibleGalleryLots().map(entry => entry.lot)"), [2]);
+  assert.equal(context.galleryHouseFilters.children.length, oliverHouseNames.length + 1);
+  assert.equal(context.galleryHouseFilters.children.some(button => button.dataset.galleryFilter === "house:Jeremy-only House"), false);
+  const url = new URL(context.window.location.href);
+  assert.equal(url.searchParams.has("house"), false);
+  for (const [key, value] of Object.entries({view: "oliver", filter: "qualifying", group: "house", sort: "price_desc", hide_attributed: "1"})) {
+    assert.equal(url.searchParams.get(key), value);
+  }
+  context.galleryAttributionToggle.click();
+  assert.deepEqual(context.ids("visibleGalleryLots().map(entry => entry.lot)"), [3, 2]);
+  assert.equal(JSON.stringify(lots), before);
+});
+
+test("Oliver validates independent houses from initial URLs and history while preserving tray and qualifying filters", () => {
+  const lots = [
+    lot(1, "Other", false, {email_tray_selected: true, saved_bid_board: {qualifying_bid: "100"}}),
+    lot(2, "Phillips", true, {email_tray_selected: true, saved_bid_board: {qualifying_bid: "200"}}),
+    lot(3, "Bonhams", true, {email_tray_selected: true, attribution_label: "After", saved_bid_board: {qualifying_bid: "300"}}),
+  ];
+  const before = JSON.stringify(lots);
+  for (const filter of ["tray", "qualifying"]) {
+    const navigation = houseNavigationPage(lots, "oliver"), {context} = navigation;
+    navigation.initialize(filter, {house: "Other", group: "house", sort: "arrival_desc", hide_attributed: "1"});
+    const invalidUrl = `https://secondstate.art/calendar/?${new URLSearchParams({day: dayA, view: "oliver", filter, house: "Other", group: "house", sort: "arrival_desc", hide_attributed: "1"})}`;
+    for (const restore of [false, true]) {
+      if (restore) {
+        navigation.restore(invalidUrl.replace("house=Other", "house=Phillips"));
+        assert.equal(context.run("galleryOrganization.house"), "Phillips");
+        navigation.restore(invalidUrl);
+      }
+      assert.equal(context.run("galleryOrganization.house"), "");
+      assert.equal(context.galleryFilter, filter);
+      assert.equal(context.run("galleryOrganization.group"), "house");
+      assert.equal(context.gallerySort.value, "arrival_desc");
+      assert.equal(context.galleryHideAttributed, true);
+      assert.deepEqual(context.ids("visibleGalleryLots().map(entry => entry.lot)"), [2]);
+      const url = new URL(context.window.location.href);
+      assert.equal(url.searchParams.has("house"), false);
+      assert.equal(url.searchParams.get("filter"), filter);
+      assert.equal(context.restoringHistory, false);
+    }
+  }
+  assert.equal(JSON.stringify(lots), before);
+});
+
+test("Oliver preserves shared and zero-count canonical independent house selections across scope changes", () => {
+  const lots = [lot(1, "Other", false), lot(2, "Phillips", true)];
+  const before = JSON.stringify(lots);
+  for (const house of ["Phillips", "Sotheby's"]) {
+    const navigation = houseNavigationPage(lots, "catalog"), {context} = navigation;
+    navigation.initialize("all", {house});
+    context.run('setCalendarView("oliver")');
+    assert.equal(context.run("galleryOrganization.house"), house);
+    assert.deepEqual(context.ids("visibleGalleryLots().map(entry => entry.lot)"), house === "Phillips" ? [2] : []);
+    const selected = context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === `house:${house}`);
+    assert.equal(selected.getAttribute("aria-pressed"), "true");
+    assert.equal(selected.children[1].textContent, house === "Phillips" ? "1" : "0");
+    assert.equal(new URL(context.window.location.href).searchParams.get("house"), house);
+    assert.equal(context.galleryHouseFilters.children.length, oliverHouseNames.length + 1);
+  }
+  assert.equal(JSON.stringify(lots), before);
+});
+
 test("saved-board events tolerate publisher mutations and update membership without rerendering existing-board preferences", () => {
   const context = page({
     [dayA]: [lot(1, "Phillips", true, {saved_bid_board: null}), lot(2, "Phillips", true, {saved_bid_board: null})],

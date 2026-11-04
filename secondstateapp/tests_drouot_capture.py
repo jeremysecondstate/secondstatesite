@@ -127,6 +127,76 @@ class DrouotCaptureTests(TestCase):
         self.assertEqual(report["summary"]["artists"], 1)
         self.assertEqual(len(report["attribution_notes"]), 1)
 
+    def _validate_named_source(self, artist, heading, description):
+        entry = replace(ENTRY, artist=artist, url="https://drouot.com/en/c/50/lithographs?" + urlencode({"query": artist}))
+        raw, card = evidence(credit=heading)
+        raw["description"] = description
+        payload = bundle((raw, card))
+        search = payload["searches"][0]
+        search.update(artist=artist, source_url=entry.url)
+        search["pages"][0].update(page_url=entry.url, request_url="https://api.drouot.com/drouot/gingolem/neoGingo/lot/search?" + urlencode({"lang": "en", "q": artist, "cat": "50", "page": "1", "facet": "false"}))
+        return validate_drouot_capture(payload, [entry], now=NOW)
+
+    def test_short_headings_require_direct_full_offered_work_credit_in_both_source_fields(self):
+        cases = [
+            ("Alphonse Mucha", "Mucha - Illustrated pages", "This attractive color lithograph is by Alphonse Mucha as part of Ilsee.", "lithograph"),
+            ("Giovanni Battista Piranesi", "Piranesi, Folio - View of Rome", 'This extraordinary large folio etching is from Giovanni Battista Piranesi\'s "Vedute di Roma".', "etching"),
+        ]
+        for artist, heading, statement, medium in cases:
+            with self.subTest(artist=artist):
+                result = self._validate_named_source(artist, heading, heading + "\n\nDescription of the work:\n" + statement)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].artist, artist)
+                self.assertEqual(result.lots[0].medium, medium)
+                self.assertEqual(result.lots[0].source_lot_id, "100")
+                self.assertFalse(result.attribution_notes)
+
+    def test_short_names_do_not_accept_references_mismatched_headings_or_other_creators(self):
+        heading = "Mucha - Illustrated pages"
+        offered = "This attractive color lithograph is by Alphonse Mucha as part of Ilsee."
+        cases = [
+            (heading, heading + "\nPoster. Bibliography:\n" + offered),
+            (heading, heading + "\nColor lithograph mentioning Alphonse Mucha."),
+            (heading, heading + "\n" + offered.replace("Alphonse Mucha", "Jiri Mucha")),
+            ("Another Artist - Illustrated pages", heading + "\n" + offered),
+            (heading, "Another Artist - Illustrated pages\n" + offered),
+            ("After " + heading, "After " + heading + "\n" + offered),
+            (heading, heading + '\n"' + offered + '"'),
+            (heading, heading + "\nLithograph.\nShipping:\n" + offered),
+            (heading, heading + "\nLithograph.\nNotes:\n" + offered),
+            (heading, heading + "\nLithograph.\nReferences:\n" + offered),
+        ]
+        for card_heading, description in cases:
+            with self.subTest(description=description):
+                self.assertEqual(self._validate_named_source("Alphonse Mucha", card_heading, description).lots, [])
+
+    def test_short_joint_book_credit_retains_both_named_roles_only_with_explicit_confirmation(self):
+        heading = "Chagall & Fontaine - 3 Etchings of Fables"
+        statement = "This striking etching is from Marc Chagall's illustrations for Jean de la Fontaine's Fables."
+        result = self._validate_named_source("Marc Chagall", heading, heading + "\nDescription of the work:\n" + statement)
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].artist, "Chagall & Fontaine")
+        self.assertEqual(result.lots[0].title, "Chagall & Fontaine — 3 Etchings of Fables")
+        self.assertEqual(len(result.attribution_notes), 1)
+        for altered in [statement.replace("Jean de la Fontaine", "another author"), "Bibliography:\n" + statement, "Shipping:\n" + statement, "Notes:\n" + statement, "Color etching; a book by Marc Chagall is also mentioned."]:
+            with self.subTest(altered=altered):
+                self.assertEqual(self._validate_named_source("Marc Chagall", heading, heading + "\n" + altered).lots, [])
+
+    def test_engraved_requires_offered_poster_context_not_an_engraved_object_or_reference(self):
+        for statement, accepted in [
+            ("Engraved color poster for Château MOUTON ROTHSCHILD, 1988", True),
+            ("Engraved poster, 40 x 60 cm", True),
+            ("Engraved silver plaque", False),
+            ("Poster. Bibliography: Engraved color poster from 1988", False),
+            ('"Engraved color poster". Exhibition display card.', False),
+            ("Poster.\nShipping: Engraved color poster may fit in tube.", False),
+        ]:
+            with self.subTest(statement=statement):
+                result = self._validate_named_source("Keith Haring", "Keith HARING (1958-1990)", "Keith HARING (1958-1990)\n" + statement)
+                self.assertEqual(bool(result.lots), accepted)
+                if accepted:
+                    self.assertEqual(result.lots[0].medium, "Engraved")
+
     def test_offered_print_processes_are_distinct_from_signature_and_original_work_references(self):
         positive = [
             ("A large photogravure from a portfolio.", "photogravure"),
