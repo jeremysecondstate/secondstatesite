@@ -51,7 +51,7 @@ class LiveArtArtistBookmarkTests(SimpleTestCase):
         path = Path(__file__).resolve().parents[1] / "docs" / "artist-links.html"
         entries = [entry for entry in parse_netscape_bookmarks(path.read_text(encoding="utf-8-sig"))
                    if "LIVEART" in entry.folder_path]
-        self.assertEqual(len(entries), 153)
+        self.assertEqual(len(entries), 154)
         for entry in entries:
             with self.subTest(title=entry.title):
                 self.assertEqual(artist_liveart_url(entry.title.removesuffix(" — LiveArt")), entry.url)
@@ -103,6 +103,20 @@ class LiveArtArtistBookmarkTests(SimpleTestCase):
 
 
 class CalendarLiveArtArtistLinkTests(SimpleTestCase):
+    def test_gillian_ayres_calendar_links_use_supplied_profiles(self):
+        artprice = "https://www.artprice.com/artist/1087/gillian-ayres/lots/pasts?idcategory=2&p=1&sort=datesale_desc"
+        liveart = "https://www.liveart.ai/artists/GUvJPA/gillian-ayres"
+        for name in ("Gillian Ayres", "Ayres, Gillian", "Gillian Ayres (1930–2018)"):
+            with self.subTest(name=name):
+                lot = AuctionWatchLot(pk=9003, source="Forum", source_lot_id="gillian-ayres",
+                                      artist=name, title="Untitled")
+                lot._state.fields_cache["bid_board_analysis"] = None
+                with patch("requests.sessions.Session.request", side_effect=AssertionError("Offline lookup")):
+                    detail = _lot_json(lot, ZoneInfo("America/New_York"))
+                self.assertEqual(detail["artist_artprice_url"], artprice)
+                self.assertEqual(detail["artist_liveart_url"], liveart)
+                self.assertIn("idartist=1087", detail["artprice_search_url"])
+
     def test_lot_payload_has_saved_liveart_url_and_preserves_artprice_and_qualified_lot(self):
         saved_work = "https://www.artprice.com/lots/7777/saved-work"
         lot = AuctionWatchLot(
