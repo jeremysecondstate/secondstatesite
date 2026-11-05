@@ -103,6 +103,22 @@ class LiveArtArtistBookmarkTests(SimpleTestCase):
 
 
 class CalendarLiveArtArtistLinkTests(SimpleTestCase):
+    def test_leonard_baskin_calendar_links_use_supplied_profiles(self):
+        lot = AuctionWatchLot(pk=9005, source="Invaluable", source_lot_id="baskin",
+                              artist="Leonard Baskin", artist_watchlist_name="Leonard Baskin",
+                              title="Owl")
+        lot._state.fields_cache["bid_board_analysis"] = None
+        before = dict(lot.__dict__)
+        with patch("requests.sessions.Session.request", side_effect=AssertionError("Offline lookup")):
+            detail = _lot_json(lot, ZoneInfo("America/New_York"))
+        self.assertEqual(detail["artist_artprice_url"],
+                         "https://www.artprice.com/artist/1606/leonard-baskin/lots/pasts?idcategory=2&p=1&sort=datesale_desc")
+        self.assertEqual(detail["artist_liveart_url"],
+                         "https://www.liveart.ai/artists/4CyrUQ/leonard-baskin")
+        self.assertIn("idartist=1606", detail["artprice_search_url"])
+        self.assertEqual(detail["artist_source"], "Leonard Baskin")
+        self.assertEqual(lot.__dict__, before)
+
     def test_pierre_bonnard_calendar_links_preserve_source_attribution(self):
         artprice = "https://www.artprice.com/artist/3193/pierre-bonnard/lots/pasts?idcategory=2&p=1&sort=datesale_desc"
         liveart = "https://www.liveart.ai/artists/B93i6a/pierre-bonnard"
