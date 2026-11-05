@@ -82,6 +82,25 @@ test("every catalog lot exposes an estimated arrival separately from the listed 
   assert.equal(withClass(unknown, "day-gallery-lot-arrival")[0].textContent, "Est. lot arrival: Unavailable");
 });
 
+test("published arrival blocks have an explicit source link and retain source time and saved controls", () => {
+  const source = lot({event_at: "2026-11-06T08:00:00Z", time: "12:00 AM", lot_number: "3466", won_by_us: true,
+    research_queue_selected: true, arrival_schedule: {
+      kind: "published_timetable", at: "2026-11-06T13:30:00Z", session_start_at: "2026-11-06T13:00:00Z",
+      first_lot: 3446, last_lot: 3467, source_url: "https://www.dobiaschofsky.com/g246.html",
+    }});
+  const before = JSON.stringify(source);
+  const card = renderer().galleryCard(source, 0);
+  assert.equal(withClass(card, "day-gallery-lot-arrival")[0].textContent, "House timetable: ≈ 5:30 AM · lots 3446–3467");
+  const link = withClass(card, "day-gallery-auction-link").find(node => node.textContent === "House timetable ↗");
+  assert.equal(link.href, "https://www.dobiaschofsky.com/g246.html");
+  assert.equal(link.target, "_blank");
+  assert.equal(link.rel, "noopener noreferrer");
+  assert(withClass(card, "day-gallery-meta").some(node => node.textContent.includes("Listed auction: 12:00 AM")));
+  assert.equal(withClass(card, "lot-won-badge").length, 1);
+  assert.equal(withClass(card, "lot-attribution-badge")[0].textContent, "After");
+  assert.equal(JSON.stringify(source), before);
+});
+
 for (const attribution of ["After", "Attributed to"]) {
   test(`${attribution} is readable without changing the artist name or Artprice link`, () => {
     const parent = new Element("div");

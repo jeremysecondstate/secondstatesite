@@ -215,7 +215,7 @@ test("simultaneous auction times choose the lowest lot numerically and retain it
 test("an unusable earliest-sale lot number never falls forward to a later auction", () => {
   for (const earliestFirst of [true, false]) {
     const lots = [
-      {artist: "Banksy", event_at: "2026-10-24T08:00:00-04:00", lot_number: "100A", auction_house: "First House"},
+      {artist: "Banksy", event_at: "2026-10-24T08:00:00-04:00", lot_number: "100/1", auction_house: "First House"},
       {artist: "Banksy", event_at: "2026-10-24T09:00:00-04:00", lot_number: "10", auction_house: "Later House"},
     ];
     if (!earliestFirst) lots.reverse();
@@ -228,7 +228,7 @@ test("an unusable earliest-sale lot number never falls forward to a later auctio
 });
 
 test("missing and ambiguous lot numbers cannot produce arrival estimates", () => {
-  const invalidNumbers = [undefined, null, "", " ", "0", "000", "-1", "+1", "1.5", "100A",
+  const invalidNumbers = [undefined, null, "", " ", "0", "000", "-1", "+1", "1.5", "100/1",
     "100-101", "Lot 100", "1,000", "1e2", "Infinity", "9007199254740992", "144000000000"];
   for (const lotNumber of invalidNumbers) {
     const [artist] = CalendarArtists.summarize([
@@ -255,7 +255,7 @@ test("unknown times do not block the first known auction or create estimates the
 
 test("arrival sorting is chronological with unavailable estimates last and surname ties", () => {
   const artists = CalendarArtists.summarize([
-    {artist: "Miró, Joan", artist_sort_key: "miro, joan", event_at: "2026-10-24T08:00:00-04:00", lot_number: "100A"},
+    {artist: "Miró, Joan", artist_sort_key: "miro, joan", event_at: "2026-10-24T08:00:00-04:00", lot_number: "100/1"},
     {artist: "Dürer, Albrecht", artist_sort_key: "durer, albrecht", event_at: "2026-10-24T08:00:00-04:00", lot_number: "100"},
     {artist: "Banksy", artist_sort_key: "banksy", event_at: "2026-10-24T09:00:00-04:00", lot_number: "20"},
     {artist: "Albers, Josef", artist_sort_key: "albers, josef", event_at: "2026-10-24T08:00:00-04:00", lot_number: "80"},
@@ -358,4 +358,84 @@ test("per-lot arrival preserves source data and calculates elapsed minutes throu
   assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse("2026-11-01T06:30:00Z"));
   assert.equal(CalendarArtists.formatLotArrival(lot, "America/New_York"), "1:30 AM");
   assert.equal(JSON.stringify(lot), before);
+});
+
+test("explicit numbering baselines subtract the sale offset without guessing from watched lots", () => {
+  const lot = Object.freeze({artist: "Example", event_at: "2026-11-06T08:00:00Z", lot_number: "3325", numbering_baseline: 3000});
+  const expected = Date.parse("2026-11-06T13:25:00Z");
+  assert.equal(CalendarArtists.estimateLotArrival(lot), expected);
+  const [artist] = CalendarArtists.summarize([lot]);
+  assert.equal(artist.arrivalTime, expected);
+  assert.equal(artist.arrivalMinutes, 325);
+  assert.equal(CalendarArtists.estimateLotArrival({...lot, lot_number: "3325A"}), expected);
+  assert.equal(CalendarArtists.estimateLotArrival({...lot, lot_number: "3000"}), Date.parse(lot.event_at));
+  for (const numbering_baseline of [-1, 3326, 1.5, "3000", Infinity]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...lot, numbering_baseline}), null);
+  }
+  const withoutBaseline = {...lot};
+  delete withoutBaseline.numbering_baseline;
+  assert.equal(CalendarArtists.estimateLotArrival(withoutBaseline), Date.parse(lot.event_at) + 3325 * 60000);
+  assert.equal(CalendarArtists.summarize([{...lot, lot_number: "3340"}])[0].arrivalMinutes, 340);
+});
+
+const houseTimetable = (at = "2026-11-06T13:30:00Z", first = 3446, last = 3467) => ({
+  kind: "published_timetable", at, session_start_at: "2026-11-06T13:00:00Z",
+  first_lot: first, last_lot: last, source_url: "https://www.dobiaschofsky.com/g246.html",
+});
+
+test("artist summaries share per-lot suffix handling for timetable and fallback arrivals", () => {
+  for (const lot of [
+    {artist: "Miró", event_at: "2026-11-06T08:00:00Z", lot_number: "3466A", arrival_schedule: houseTimetable()},
+    {artist: "Example", event_at: "2026-11-06T08:00:00Z", lot_number: "3325A", numbering_baseline: 3000},
+    {artist: "Example", event_at: "2026-11-06T08:00:00Z", lot_number: "100A"},
+  ]) {
+    const before = JSON.stringify(lot);
+    const [artist] = CalendarArtists.summarize([lot]);
+    assert.equal(artist.arrivalTime, CalendarArtists.estimateLotArrival(lot));
+    assert.equal(CalendarArtists.formatArrival(artist, "America/Los_Angeles"), CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"));
+    assert.equal(artist.arrivalLotNumber, Number.parseInt(lot.lot_number, 10));
+    assert.equal(JSON.stringify(lot), before);
+  }
+});
+
+test("published timetable overrides provider day-start differences without changing records", () => {
+  const schedule = Object.freeze(houseTimetable());
+  for (const event_at of ["2026-11-06T08:00:00Z", "2026-11-06T13:00:00Z"]) {
+    const lot = Object.freeze({event_at, lot_number: "3466", arrival_schedule: schedule, won_by_us: true, email_tray_selected: true});
+    const before = JSON.stringify(lot);
+    assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse("2026-11-06T13:30:00Z"));
+    assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), "5:30 AM");
+    assert.equal(CalendarArtists.formatLotArrival(lot, "America/New_York"), "8:30 AM");
+    assert.equal(CalendarArtists.lotArrivalDetails(lot).kind, "published_timetable");
+    assert.equal(JSON.stringify(lot), before);
+  }
+});
+
+test("artist summaries compare the same verified session and select the earliest block", () => {
+  const lots = [
+    {artist: "Miró", event_at: "2026-11-06T08:00:00Z", time: "12:00 AM", lot_number: "3468", arrival_schedule: houseTimetable("2026-11-06T13:45:00Z", 3468, 3490)},
+    {artist: "Miró", event_at: "2026-11-06T13:00:00Z", time: "5:00 AM", lot_number: "3466", arrival_schedule: houseTimetable()},
+    {artist: "Miró", event_at: "2026-11-06T08:00:00Z", time: "12:00 AM", lot_number: "3463", arrival_schedule: houseTimetable()},
+  ];
+  for (const input of [lots, [...lots].reverse()]) {
+    const [artist] = CalendarArtists.summarize(input);
+    assert.equal(artist.earliestTime, Date.parse("2026-11-06T08:00:00Z"));
+    assert.equal(artist.timeLabel, "12:00 AM");
+    assert.equal(artist.arrivalStartTime, Date.parse("2026-11-06T13:00:00Z"));
+    assert.equal(artist.arrivalTime, Date.parse("2026-11-06T13:30:00Z"));
+    assert.equal(artist.arrivalLotNumber, 3463);
+    assert.equal(artist.arrivalKind, "published_timetable");
+    assert.equal(artist.arrivalSourceUrl, "https://www.dobiaschofsky.com/g246.html");
+  }
+});
+
+test("unknown dates and invalid timetable ranges never invent a house time", () => {
+  const lot = {event_at: "2026-11-06T08:00:00Z", lot_number: "3466", arrival_schedule: houseTimetable()};
+  for (const changes of [{event_at: null}, {is_all_day: true}, {lot_number: "3499"}, {lot_number: "3466/1"}]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...lot, ...changes}), null);
+  }
+  for (const changes of [{at: "2026-11-06"}, {session_start_at: "2026-11-06T15:00:00Z"}, {source_url: "https://example.test"}, {first_lot: "3446"}]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...lot, arrival_schedule: {...lot.arrival_schedule, ...changes}}), null);
+  }
+  assert.equal(CalendarArtists.estimateLotArrival({...lot, lot_number: "3466A"}), Date.parse("2026-11-06T13:30:00Z"));
 });

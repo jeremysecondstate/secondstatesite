@@ -37,6 +37,25 @@ function catalog(lots, sort = "price_asc", filter = "all") {
   return context;
 }
 
+test("arrival sorting uses published blocks and explicit offsets across provider timestamps", () => {
+  const schedule = (at, first_lot, last_lot) => ({kind: "published_timetable", at,
+    session_start_at: "2026-11-06T13:00:00Z", first_lot, last_lot,
+    source_url: "https://www.dobiaschofsky.com/g246.html"});
+  const lots = [
+    {id: "later-drouot", event_at: "2026-11-06T08:00:00Z", lot_number: "3468", arrival_schedule: schedule("2026-11-06T13:45:00Z", 3468, 3490)},
+    {id: "unknown", event_at: null, lot_number: "1"},
+    {id: "earlier-invaluable", event_at: "2026-11-06T13:00:00Z", lot_number: "3466", arrival_schedule: schedule("2026-11-06T13:30:00Z", 3446, 3467)},
+    {id: "offset", event_at: "2026-11-06T08:00:00Z", lot_number: "3325", numbering_baseline: 3000},
+  ];
+  const before = JSON.stringify(lots);
+  const page = catalog(lots, "arrival_asc");
+  assert.deepEqual(page.visible().map(item => item.id), ["offset", "earlier-invaluable", "later-drouot", "unknown"]);
+  page.gallerySort.value = "arrival_desc";
+  assert.deepEqual(page.visible().map(item => item.id), ["later-drouot", "earlier-invaluable", "offset", "unknown"]);
+  for (const item of page.visible()) assert.equal(lots[item.index].id, item.id);
+  assert.equal(JSON.stringify(lots), before);
+});
+
 test("prices sort numerically in both directions, preserve ties and place missing prices last", () => {
   const lots = [
     {id: "unknown", estimate_low: null},
