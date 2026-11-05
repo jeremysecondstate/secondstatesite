@@ -8,26 +8,46 @@ from zoneinfo import ZoneInfo
 
 
 TIMETABLE_URL = "https://www.dobiaschofsky.com/g246.html"
-# A-142, Friday 6 November 2026, published house timetable. Each time is
+# A-142, 5-6 November 2026, published house timetable. Each time is
 # the start of a numbered block, not an exact promise for every lot in it.
 # Captured 2026-11-05; the date and sale checks below prevent later-sale reuse.
-_BLOCKS = (
-    (3001, 3030, "09:00", "09:00"), (3031, 3060, "09:15", "09:00"),
-    (3061, 3090, "09:30", "09:00"), (3091, 3120, "09:45", "09:00"),
-    (3121, 3150, "10:00", "09:00"), (3151, 3180, "10:15", "09:00"),
-    (3181, 3210, "10:30", "09:00"), (3211, 3240, "10:45", "09:00"),
-    (3241, 3270, "11:00", "09:00"), (3271, 3290, "11:15", "09:00"),
-    (3401, 3422, "14:00", "14:00"), (3423, 3445, "14:15", "14:00"),
-    (3446, 3467, "14:30", "14:00"), (3468, 3490, "14:45", "14:00"),
-    (3491, 3512, "15:00", "14:00"), (3513, 3535, "15:15", "14:00"),
-    (3536, 3557, "15:30", "14:00"), (3558, 3580, "15:45", "14:00"),
-    (3581, 3587, "16:00", "14:00"),
-    (3701, 3723, "18:00", "18:00"), (3724, 3745, "18:15", "18:00"),
-    (3746, 3768, "18:30", "18:00"), (3769, 3790, "18:45", "18:00"),
-    (3791, 3813, "19:00", "18:00"), (3814, 3835, "19:15", "18:00"),
-    (3836, 3858, "19:30", "18:00"), (3859, 3880, "19:45", "18:00"),
-    (3881, 3903, "20:00", "18:00"),
-)
+_BLOCKS = {
+    date(2026, 11, 5): (
+        (2001, 2032, "09:00", "09:00"), (2033, 2043, "09:15", "09:00"),
+        (2044, 2057, "09:20", "09:00"),
+        (2201, 2230, "09:25", "09:00"), (2231, 2261, "09:40", "09:00"),
+        (2262, 2291, "09:55", "09:00"), (2292, 2321, "10:10", "09:00"),
+        (2322, 2351, "10:25", "09:00"), (2352, 2382, "10:40", "09:00"),
+        (2383, 2412, "10:55", "09:00"), (2413, 2442, "11:10", "09:00"),
+        (2443, 2472, "14:00", "14:00"), (2473, 2501, "14:15", "14:00"),
+        (2502, 2531, "14:30", "14:00"), (2532, 2559, "14:45", "14:00"),
+        (2560, 2589, "15:00", "14:00"), (2601, 2617, "15:15", "14:00"),
+        (2701, 2731, "15:25", "14:00"), (2732, 2762, "15:40", "14:00"),
+        (2763, 2794, "15:55", "14:00"), (2795, 2804, "16:10", "14:00"),
+        (2901, 2927, "16:15", "14:00"), (2928, 2936, "16:30", "14:00"),
+    ),
+    date(2026, 11, 6): (
+        (3001, 3030, "09:00", "09:00"), (3031, 3060, "09:15", "09:00"),
+        (3061, 3090, "09:30", "09:00"), (3091, 3120, "09:45", "09:00"),
+        (3121, 3150, "10:00", "09:00"), (3151, 3180, "10:15", "09:00"),
+        (3181, 3210, "10:30", "09:00"), (3211, 3240, "10:45", "09:00"),
+        (3241, 3270, "11:00", "09:00"), (3271, 3290, "11:15", "09:00"),
+        (3401, 3422, "14:00", "14:00"), (3423, 3445, "14:15", "14:00"),
+        (3446, 3467, "14:30", "14:00"), (3468, 3490, "14:45", "14:00"),
+        (3491, 3512, "15:00", "14:00"), (3513, 3535, "15:15", "14:00"),
+        (3536, 3557, "15:30", "14:00"), (3558, 3580, "15:45", "14:00"),
+        (3581, 3587, "16:00", "14:00"),
+        (3701, 3723, "18:00", "18:00"), (3724, 3745, "18:15", "18:00"),
+        (3746, 3768, "18:30", "18:00"), (3769, 3790, "18:45", "18:00"),
+        (3791, 3813, "19:00", "18:00"), (3814, 3835, "19:15", "18:00"),
+        (3836, 3858, "19:30", "18:00"), (3859, 3880, "19:45", "18:00"),
+        (3881, 3903, "20:00", "18:00"),
+    ),
+}
+_SALE_IDS = {
+    date(2026, 11, 5): ("186531", "JS1Q8ZMLH2"),
+    date(2026, 11, 6): ("186532", "A4TLQ5DFCI"),
+}
 # These two original Invaluable observations omit sale_url. Their source
 # IDs, catalogue lot numbers and public lot links were independently verified.
 _MISSING_SALE_LOTS = {
@@ -40,7 +60,8 @@ def published_lot_arrival(lot):
     event = lot.event_at
     if lot.is_all_day or not event or event.utcoffset() is None:
         return None
-    if event.astimezone(ZoneInfo("Europe/Zurich")).date() != date(2026, 11, 6):
+    sale_day = event.astimezone(ZoneInfo("Europe/Zurich")).date()
+    if sale_day not in _BLOCKS:
         return None
     house = " ".join(unicodedata.normalize("NFKC", lot.auction_house).casefold().split())
     if house not in {"dobiaschofsky auktionen", "dobiaschofsky auktionen ag"}:
@@ -49,19 +70,20 @@ def published_lot_arrival(lot):
     if not number_match:
         return None
     number = int(number_match[1])
+    drouot_sale, invaluable_sale = _SALE_IDS[sale_day]
     try:
         sale = urlsplit(lot.sale_url)
         if lot.source == "Drouot":
             matches_sale = sale.scheme == "https" and sale.hostname in {"drouot.com", "www.drouot.com"} and bool(
-                re.fullmatch(r"/(?:[a-z]{2}/)?v/186532/?", sale.path)
+                re.fullmatch(rf"/(?:[a-z]{{2}}/)?v/{drouot_sale}/?", sale.path)
             )
         elif lot.source == "Invaluable":
-            # This catalogue is the afternoon International Art session;
-            # the Drouot catalogue covers all three sessions of the day.
-            if not 3401 <= number <= 3587:
+            # Nov 5's catalogue covers the whole print day. Nov 6's
+            # Invaluable catalogue is only the afternoon International Art session.
+            if sale_day == date(2026, 11, 6) and not 3401 <= number <= 3587:
                 return None
-            matches_sale = sale.scheme == "https" and sale.hostname in {"invaluable.com", "www.invaluable.com"} and sale.path.rstrip("/") == "/catalog/A4TLQ5DFCI"
-            if not lot.sale_url and str(lot.source_lot_id) in _MISSING_SALE_LOTS:
+            matches_sale = sale.scheme == "https" and sale.hostname in {"invaluable.com", "www.invaluable.com"} and sale.path.rstrip("/") == f"/catalog/{invaluable_sale}"
+            if sale_day == date(2026, 11, 6) and not lot.sale_url and str(lot.source_lot_id) in _MISSING_SALE_LOTS:
                 expected_number, ref = _MISSING_SALE_LOTS[str(lot.source_lot_id)]
                 link = urlsplit(lot.lot_url)
                 matches_sale = number == expected_number and link.scheme == "https" and link.hostname in {"invaluable.com", "www.invaluable.com"} and link.path.rstrip("/").endswith(f"-{number}-c-{ref}")
@@ -71,11 +93,11 @@ def published_lot_arrival(lot):
         return None
     if not matches_sale:
         return None
-    for first, last, block_time, session_time in _BLOCKS:
+    for first, last, block_time, session_time in _BLOCKS[sale_day]:
         if first <= number <= last:
             def instant(clock):
                 hour, minute = map(int, clock.split(":"))
-                return datetime(2026, 11, 6, hour, minute, tzinfo=ZoneInfo("Europe/Zurich")).astimezone(timezone.utc).isoformat()
+                return datetime(sale_day.year, sale_day.month, sale_day.day, hour, minute, tzinfo=ZoneInfo("Europe/Zurich")).astimezone(timezone.utc).isoformat()
 
             return {
                 "kind": "published_timetable",

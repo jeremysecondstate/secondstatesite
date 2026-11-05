@@ -19,6 +19,52 @@ def source_lot(**changes):
 
 
 class PublishedCalendarArrivalTests(SimpleTestCase):
+    def test_november_fifth_uses_the_published_morning_and_resumed_afternoon_blocks(self):
+        for source, sale_url in (
+            ("Drouot", "https://drouot.com/en/v/186531"),
+            ("Invaluable", "https://www.invaluable.com/catalog/JS1Q8ZMLH2"),
+        ):
+            for number, expected, session in (
+                (2001, "08:00", "08:00"), (2040, "08:15", "08:00"),
+                (2057, "08:20", "08:00"), (2201, "08:25", "08:00"),
+                (2268, "08:55", "08:00"), (2376, "09:40", "08:00"),
+                (2442, "10:10", "08:00"), (2443, "13:00", "13:00"),
+                (2472, "13:00", "13:00"), (2473, "13:15", "13:00"),
+                (2531, "13:30", "13:00"), (2532, "13:45", "13:00"),
+                (2589, "14:00", "13:00"), (2617, "14:15", "13:00"),
+                (2804, "15:10", "13:00"), (2936, "15:30", "13:00"),
+            ):
+                with self.subTest(source=source, number=number):
+                    lot = source_lot(source=source, sale_url=sale_url, lot_number=str(number),
+                                     event_at=datetime(2026, 11, 5, 8, tzinfo=timezone.utc))
+                    before = vars(lot).copy()
+                    result = published_lot_arrival(lot)
+                    self.assertIsNotNone(result)
+                    self.assertEqual(result["at"], f"2026-11-05T{expected}:00+00:00")
+                    self.assertEqual(result["session_start_at"], f"2026-11-05T{session}:00+00:00")
+                    self.assertEqual(result["source_url"], TIMETABLE_URL)
+                    self.assertEqual(vars(lot), before)
+
+    def test_november_fifth_requires_its_own_sale_date_and_published_number_range(self):
+        base = dict(source="Invaluable", sale_url="https://www.invaluable.com/catalog/JS1Q8ZMLH2",
+                    source_lot_id="206829153", lot_number="2376",
+                    event_at=datetime(2026, 11, 5, 8, tzinfo=timezone.utc))
+        for changes in (
+            {"sale_url": "https://www.invaluable.com/catalog/A4TLQ5DFCI"},
+            {"sale_url": "https://www.invaluable.com.evil.test/catalog/JS1Q8ZMLH2"},
+            {"source": "Drouot", "sale_url": "https://drouot.com/en/v/186532"},
+            {"event_at": datetime(2026, 11, 6, 8, tzinfo=timezone.utc)},
+            {"event_at": datetime(2027, 11, 5, 8, tzinfo=timezone.utc)},
+            {"lot_number": "2058"}, {"lot_number": "2200"},
+            {"lot_number": "2590"}, {"lot_number": "2937"}, {"lot_number": "3466"},
+            {"sale_url": "", "source_lot_id": "206829045", "lot_number": "2268",
+             "lot_url": "https://www.invaluable.com/auction-lot/dali-salvador-nach-after-normandie-2268-c-f0edf01163"},
+            {"sale_url": "", "source_lot_id": "206830784", "lot_number": "3443",
+             "lot_url": "https://www.invaluable.com/auction-lot/catalogue-3443-c-217ffff078"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(published_lot_arrival(source_lot(**(base | changes))))
+
     def test_provider_day_and_afternoon_timestamps_produce_the_same_published_block(self):
         drouot = source_lot()
         invaluable = source_lot(
