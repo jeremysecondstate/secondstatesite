@@ -103,6 +103,31 @@ class LiveArtArtistBookmarkTests(SimpleTestCase):
 
 
 class CalendarLiveArtArtistLinkTests(SimpleTestCase):
+    def test_pierre_bonnard_calendar_links_preserve_source_attribution(self):
+        artprice = "https://www.artprice.com/artist/3193/pierre-bonnard/lots/pasts?idcategory=2&p=1&sort=datesale_desc"
+        liveart = "https://www.liveart.ai/artists/B93i6a/pierre-bonnard"
+        cases = (
+            ("Invaluable", "Pierre (1867) Bonnard", "Pierre (1867) Bonnard", ""),
+            ("Drouot", "Pierre Bonnard", "Pierre Bonnard", ""),
+            ("Drouot", "(after) BONNARD, Pierre", "Pierre Bonnard", "After"),
+            ("Drouot", "BONNARD Pierre, after", "Pierre Bonnard", "After"),
+        )
+        for source, artist, watchlist_name, attribution in cases:
+            with self.subTest(artist=artist):
+                lot = AuctionWatchLot(pk=9004, source=source, source_lot_id="bonnard",
+                                      artist=artist, artist_watchlist_name=watchlist_name,
+                                      title="L'enfant à la lampe")
+                lot._state.fields_cache["bid_board_analysis"] = None
+                before = dict(lot.__dict__)
+                with patch("requests.sessions.Session.request", side_effect=AssertionError("Offline lookup")):
+                    detail = _lot_json(lot, ZoneInfo("America/New_York"))
+                self.assertEqual(detail["artist_artprice_url"], artprice)
+                self.assertEqual(detail["artist_liveart_url"], liveart)
+                self.assertIn("idartist=3193", detail["artprice_search_url"])
+                self.assertEqual(detail["artist_source"], watchlist_name)
+                self.assertEqual(detail["attribution_label"], attribution)
+                self.assertEqual(lot.__dict__, before)
+
     def test_mary_corita_kent_calendar_links_use_supplied_profiles(self):
         lot = AuctionWatchLot(pk=4188, source="Invaluable", artist="Mary Corita Kent",
                               artist_watchlist_name="Mary Corita Kent",
