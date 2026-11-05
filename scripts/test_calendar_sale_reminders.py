@@ -90,6 +90,7 @@ class ScheduleTests(unittest.TestCase):
         for message in plan["messages"]:
             self.assertEqual(message["sales"], [])
             self.assertEqual(message["lead_status"][0]["state"], "no_sales")
+            self.assertTrue(message["gmail"]["subject"].endswith(" · No sales"))
             self.assertIn(f"in {message['days_away']} days ({message['sale_date']})",
                           message["gmail"]["payload"]["body"]["content"])
 
@@ -103,9 +104,10 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(set(streams), {"jeremy", "oliver"})
         self.assertEqual(len(streams["jeremy"]["sales"]), 2)
         self.assertEqual(len(streams["oliver"]["sales"]), 1)
-        self.assertEqual(streams["jeremy"]["gmail"]["from_address"], "jeremy@secondstate.art")
+        self.assertEqual(streams["jeremy"]["gmail"]["from_address"], "sales@secondstate.art")
         self.assertEqual(streams["jeremy"]["gmail"]["to"], "jeremy@secondstate.art, alex@secondstate.art")
-        self.assertEqual(streams["oliver"]["gmail"]["from_address"], "oliver@secondstate.art")
+        self.assertEqual(streams["oliver"]["gmail"]["from_address"], "sales@secondstate.art")
+        self.assertEqual(streams["jeremy"]["gmail"]["link_id"], streams["oliver"]["gmail"]["link_id"])
         self.assertEqual(streams["oliver"]["gmail"]["to"],
                          "oliver@secondstate.art, alex@secondstate.art, OliverGDonson@gmail.com, oliver1@vt.edu")
         self.assertIn("view=oliver", streams["oliver"]["sales"][0]["catalog_links"][0])
@@ -278,6 +280,60 @@ class LedgerTests(unittest.TestCase):
             self.assertTrue(reminders.claim(db, other, now() + timedelta(minutes=59, seconds=59)))
             self.assertFalse(reminders.claim(db, self.message, now() + timedelta(minutes=59, seconds=59)))
             self.assertEqual(db.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0], 2)
+        finally:
+            db.close()
+
+    def test_claim_rejects_previous_owner_sender(self):
+        db = reminders.connect(self.path)
+        try:
+            for owner in reminders.OWNERS:
+                slot = now().astimezone(ZoneInfo(reminders.OWNERS[owner]["zone"]))
+                message, _ = reminders.compose(owner, slot, {1}, [])
+                message["gmail"]["from_address"] = owner + "@secondstate.art"
+                with self.assertRaisesRegex(ValueError, "sender"):
+                    reminders.claim(db, message, now())
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0], 0)
+        finally:
+            db.close()
+
+    def test_sender_switch_preserves_completed_key_and_payload(self):
+        db = reminders.connect(self.path)
+        try:
+            config = reminders.OWNERS["jeremy"]
+            with patch.dict(config, {"from_address": "jeremy@secondstate.art", "link_id": "old-account"}):
+                old_message, _ = reminders.compose("jeremy", now(), {1}, [row()])
+                self.assertTrue(reminders.claim(db, old_message, now()))
+                reminders.mark(db, old_message["key"], "sent", message_id="old-confirmed-id")
+            fresh, _ = reminders.compose("jeremy", now(), {1}, [row()])
+            self.assertEqual(fresh["gmail"]["from_address"], "sales@secondstate.art")
+            self.assertFalse(reminders.claim(db, fresh, now()))
+            stored = db.execute("SELECT payload,message_id FROM deliveries").fetchone()
+            self.assertEqual(json.loads(stored["payload"]), old_message)
+            self.assertEqual(stored["message_id"], "old-confirmed-id")
+        finally:
+            db.close()
+
+    def test_repeated_subject_uses_distinct_body_references_and_claims(self):
+        noon = now("2026-11-04T12:00:00-08:00")
+        later, _ = reminders.compose("jeremy", noon, {1}, [row()])
+        self.assertNotEqual(self.message["reference"], later["reference"])
+        db = reminders.connect(self.path)
+        try:
+            for message, moment in ((self.message, now()), (later, noon)):
+                self.assertEqual(message["gmail"]["subject"], "🟥 1-DAY REMINDER · Jeremy · Nov 5, 2026")
+                self.assertIn("Reference: " + message["reference"], message["gmail"]["payload"]["body"]["content"])
+                self.assertTrue(reminders.claim(db, message, moment))
+                self.assertFalse(reminders.claim(db, message, moment))
+        finally:
+            db.close()
+
+    def test_claim_rejects_old_tagged_plan_before_reserving(self):
+        self.message["gmail"]["subject"] += f" [{self.message['reference']}]"
+        db = reminders.connect(self.path)
+        try:
+            with self.assertRaisesRegex(ValueError, "fresh plan"):
+                reminders.claim(db, self.message, now())
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0], 0)
         finally:
             db.close()
 

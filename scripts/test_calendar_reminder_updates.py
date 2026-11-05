@@ -75,11 +75,14 @@ class UpdateTests(unittest.TestCase):
         item = group(result)
         self.assertEqual(item["pending_events"][0]["changed_fields"], ["current_bid", "bid_count"])
         gmail = item["draft_action"]["gmail"]
-        self.assertIn("🟥 1-DAY UPDATE DRAFT", gmail["subject"])
+        self.assertEqual(gmail["subject"], "🟥 1-DAY UPDATE DRAFT · Jeremy · Nov 5, 2026")
+        self.assertIn("Reference: SS-CALENDAR-UPDATES-JEREMY-1D", gmail["payload"]["body"]["content"])
         self.assertIn("2026-11-05", gmail["payload"]["body"]["content"])
         self.assertIn("50 → 75", gmail["payload"]["body"]["content"])
         self.assertNotIn("oliver1@vt.edu", gmail["to"])
         self.assertIn("oliver1@vt.edu", group(result, "oliver")["draft_action"]["gmail"]["to"])
+        for owner in ("jeremy", "oliver"):
+            self.assertEqual(group(result, owner)["draft_action"]["gmail"]["from_address"], "sales@secondstate.art")
 
     def test_additions_respect_house_and_separate_categories(self):
         self.scan([])
@@ -205,6 +208,23 @@ class UpdateTests(unittest.TestCase):
             self.record(refresh)
             self.assertIsNone(group(updates.draft_status(self.ledger, self.now))["draft_action"])
 
+    def test_subject_change_refreshes_existing_draft_without_new_events(self):
+        result = self.make_changed()
+        tagged = "🟥 1-DAY UPDATE DRAFT · Jeremy · Nov 5, 2026 [SS-CALENDAR-UPDATES-JEREMY-1D]"
+        with patch.object(updates._helper(), "category_subject", return_value=tagged):
+            first = self.claim(result)
+            self.assertEqual(first["gmail"]["subject"], tagged)
+            self.record(first)
+        current = updates.draft_status(self.ledger, self.now + timedelta(hours=2))
+        self.assertEqual(group(current)["pending_event_count"], 0)
+        refresh = self.claim(current)
+        self.assertTrue(refresh["claimed"])
+        self.assertEqual(refresh["gmail"]["draft_id"], "draft-one")
+        self.assertEqual(refresh["gmail"]["subject"], "🟥 1-DAY UPDATE DRAFT · Jeremy · Nov 5, 2026")
+        self.assertEqual(refresh["reference"], first["reference"])
+        self.record(refresh)
+        self.assertFalse(self.claim(current)["claimed"])
+
     def test_existing_draft_rolls_target_date_and_clears_old_content(self):
         first = self.claim(self.make_changed())
         self.record(first)
@@ -296,6 +316,109 @@ class UpdateTests(unittest.TestCase):
         with closing(sqlite3.connect(self.ledger)) as db:
             prior = json.loads(db.execute("SELECT previous_state FROM reminder_update_draft_recoveries").fetchone()[0])
         self.assertEqual(prior["draft_id"], "draft-one")
+
+    def test_sender_change_blocks_wrong_mailbox_update_then_retires_with_audit(self):
+        config = updates._helper().OWNERS["jeremy"]
+        with patch.dict(config, from_address="jeremy@secondstate.art", link_id="old-link"):
+            first = self.claim(self.make_changed())
+            self.record(first)
+        current = updates.draft_status(self.ledger, self.now + timedelta(hours=2))
+        item = group(current)
+        self.assertIsNone(item["draft_action"])
+        self.assertEqual(item["migration_required"]["previous_sender"], "jeremy@secondstate.art")
+        self.assertFalse(self.claim(current)["claimed"])
+        retired = updates.retire_draft(self.ledger, "jeremy", 1, "draft-one", confirmed_retired=True,
+                                       reason="Readback confirmed matching old draft was moved to TRASH.")
+        self.assertTrue(retired["retired"])
+        current = updates.draft_status(self.ledger, self.now + timedelta(hours=2))
+        replacement = self.claim(current)
+        self.assertTrue(replacement["claimed"])
+        self.assertEqual(replacement["kind"], "create")
+        self.assertNotIn("draft_id", replacement["gmail"])
+        self.assertEqual(replacement["gmail"]["from_address"], "sales@secondstate.art")
+        self.record(replacement, "sales-draft")
+        final = group(updates.draft_status(self.ledger, self.now + timedelta(hours=2)))
+        self.assertEqual(final["draft_sender"], "sales@secondstate.art")
+        self.assertIsNone(final["draft_action"])
+        self.assertIsNone(final["migration_required"])
+        with closing(sqlite3.connect(self.ledger)) as db:
+            audit = db.execute("SELECT previous_sender,replacement_sender,previous_state,proof_reason FROM reminder_update_draft_retirements").fetchone()
+        self.assertEqual(audit[0], "jeremy@secondstate.art")
+        self.assertEqual(audit[1], "sales@secondstate.art")
+        self.assertEqual(json.loads(audit[2])["draft_id"], "draft-one")
+        self.assertIn("TRASH", audit[3])
+        with self.assertRaises(ValueError):
+            updates.retire_draft(self.ledger, "jeremy", 1, "draft-one", confirmed_retired=True, reason="Old ID")
+
+    def test_sender_change_preserves_uncertain_immutable_operation(self):
+        config = updates._helper().OWNERS["jeremy"]
+        with patch.dict(config, from_address="jeremy@secondstate.art", link_id="old-link"):
+            result = self.make_changed()
+            claim = self.claim(result)
+            updates.unknown_draft(self.ledger, "jeremy", 1, claim["claim_token"], "timeout")
+        blocked = self.claim(result)
+        self.assertFalse(blocked["claimed"])
+        self.assertEqual(blocked["operation"]["payload"]["gmail"], claim["gmail"])
+        self.record(claim)
+        current = group(updates.draft_status(self.ledger, self.now + timedelta(hours=2)))
+        self.assertEqual(current["draft_sender"], "jeremy@secondstate.art")
+        self.assertIsNotNone(current["migration_required"])
+
+    def test_retirement_requires_exact_id_proof_sender_change_and_no_operation(self):
+        config = updates._helper().OWNERS["jeremy"]
+        with patch.dict(config, from_address="jeremy@secondstate.art"):
+            first = self.claim(self.make_changed())
+            self.record(first)
+            with self.assertRaises(ValueError):
+                updates.retire_draft(self.ledger, "jeremy", 1, "draft-one", confirmed_retired=True, reason="Same mailbox")
+            changed = self.scan([lot(current_bid=100, bid_count=3)], 2)
+            pending = self.claim(changed, at=self.now + timedelta(hours=2))
+        with self.assertRaises(ValueError):
+            updates.retire_draft(self.ledger, "jeremy", 1, "draft-one", confirmed_retired=True, reason="Pending operation")
+        self.record(pending)
+        for draft_id, options in (("draft-one", {"reason": "No confirmation"}),
+                                  ("draft-one", {"confirmed_retired": True}),
+                                  ("wrong-id", {"confirmed_retired": True, "reason": "Wrong ID"})):
+            with self.assertRaises(ValueError):
+                updates.retire_draft(self.ledger, "jeremy", 1, draft_id, **options)
+        current = group(updates.draft_status(self.ledger, self.now + timedelta(hours=2)))
+        self.assertEqual(current["draft_id"], "draft-one")
+
+    def test_retired_draft_recreated_even_after_empty_date_rollover(self):
+        config = updates._helper().OWNERS["jeremy"]
+        with patch.dict(config, from_address="jeremy@secondstate.art"):
+            self.record(self.claim(self.make_changed()))
+        updates.retire_draft(self.ledger, "jeremy", 1, "draft-one", confirmed_retired=True, reason="Verified old draft in Trash")
+        rolled_at = moment("2026-11-05T17:00:00+00:00")
+        current = updates.draft_status(self.ledger, rolled_at)
+        self.assertEqual(group(current)["through_event_id"], 0)
+        claim = self.claim(current, at=rolled_at)
+        self.assertTrue(claim["claimed"])
+        self.assertEqual(claim["kind"], "create")
+        self.assertIn("No recorded catalog changes", claim["gmail"]["payload"]["body"]["content"])
+        self.assertNotIn("Picasso", claim["gmail"]["payload"]["body"]["content"])
+
+    def test_legacy_draft_schema_assumes_original_owner_mailbox(self):
+        with closing(sqlite3.connect(self.ledger)) as db:
+            db.execute("""CREATE TABLE reminder_update_drafts (
+                owner TEXT NOT NULL, days INTEGER NOT NULL, draft_id TEXT, target_date TEXT,
+                through_event_id INTEGER NOT NULL DEFAULT 0, revision TEXT, updated_at TEXT,
+                operation_token TEXT, operation_payload TEXT, operation_state TEXT, operation_reason TEXT,
+                PRIMARY KEY(owner,days))""")
+            db.execute("INSERT INTO reminder_update_drafts(owner,days,draft_id,target_date) VALUES ('jeremy',1,'legacy-id','2026-11-05')")
+            db.commit()
+        item = group(updates.draft_status(self.ledger, self.now))
+        self.assertEqual(item["draft_sender"], "jeremy@secondstate.art")
+        self.assertEqual(item["migration_required"]["draft_id"], "legacy-id")
+        self.assertIsNone(item["draft_action"])
+
+    def test_rotating_connector_link_does_not_refresh_same_mailbox_draft(self):
+        self.record(self.claim(self.make_changed()))
+        config = updates._helper().OWNERS["jeremy"]
+        with patch.dict(config, link_id="replacement-connection-same-mailbox"):
+            item = group(updates.draft_status(self.ledger, self.now + timedelta(hours=2)))
+            self.assertIsNone(item["draft_action"])
+            self.assertIsNone(item["migration_required"])
 
 
 if __name__ == "__main__":

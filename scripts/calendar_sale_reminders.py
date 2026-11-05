@@ -38,10 +38,12 @@ SCHEDULE = {
 }
 OWNERS = {
     "jeremy": {"zone": "America/Los_Angeles", "view": "catalog",
-               "link_id": "link_6ad41eae32d081918462849699f226a2",
+               "link_id": "link_6ad03baaefe88191a874bcac06ff4fdd",
+               "from_address": "sales@secondstate.art",
                "to": ["jeremy@secondstate.art", "alex@secondstate.art"]},
     "oliver": {"zone": "America/New_York", "view": "oliver",
-               "link_id": "link_6aeb8f025d2081918f927770c4dd0a06",
+               "link_id": "link_6ad03baaefe88191a874bcac06ff4fdd",
+               "from_address": "sales@secondstate.art",
                "to": ["oliver@secondstate.art", "alex@secondstate.art", "OliverGDonson@gmail.com", "oliver1@vt.edu"]},
 }
 GRACE = timedelta(hours=1)
@@ -59,12 +61,12 @@ def category_date_label(sale_date: date | str) -> str:
     return f"{day:%b} {day.day}, {day.year}"
 
 
-def category_subject(days_away: int, owner: str, sale_date: date | str, reference: str,
+def category_subject(days_away: int, owner: str, sale_date: date | str,
                      *, kind: str = "REMINDER", no_sales: bool = False) -> str:
     style = CATEGORY_STYLES[days_away]
     empty = " · No sales" if no_sales else ""
     return (f"{style['emoji']} {days_away}-DAY {kind.upper()} · {owner.title()} · "
-            f"{category_date_label(sale_date)}{empty} [{reference}]")
+            f"{category_date_label(sale_date)}{empty}")
 
 
 def category_banner(days_away: int, owner: str, sale_date: date | str,
@@ -244,7 +246,7 @@ def compose(owner: str, scheduled: datetime, lead_days: set[int], lots: list[dic
     key = f"{owner}|{config['zone']}|{slot}|days:{days_away}"
     token = "SSR-" + hashlib.sha256(key.encode()).hexdigest()[:16].upper()
     target_date = scheduled.date() + timedelta(days=days_away)
-    subject = category_subject(days_away, owner, target_date, token, no_sales=not groups and not ambiguous)
+    subject = category_subject(days_away, owner, target_date, no_sales=not groups and not ambiguous)
     html = ['<div style="max-width:760px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;'
             'font-size:15px;line-height:1.6;color:#1F2937;background-color:#FFFFFF;">',
             category_banner(days_away, owner, target_date),
@@ -290,7 +292,7 @@ def compose(owner: str, scheduled: datetime, lead_days: set[int], lots: list[dic
             "reference": token, "days_away": days_away, "sale_date": str(target_date),
             "sales": sales, "lead_status": lead_status,
             "ambiguous_date_count": ambiguous,
-            "gmail": {"link_id": config["link_id"], "from_address": owner + "@secondstate.art",
+            "gmail": {"link_id": config["link_id"], "from_address": config["from_address"],
                       "to": ", ".join(config["to"]), "subject": subject,
                       "payload": {"mime_type": "text/html", "charset": "UTF-8",
                                   "body": {"content": "\n".join(html)}}}}, ambiguous
@@ -337,9 +339,13 @@ def claim(db: sqlite3.Connection, message: dict, now: datetime) -> bool:
         raise ValueError("Reminder must belong to the current scheduled local hour.")
     expected = OWNERS[owner]
     gmail = message["gmail"]
-    if (gmail["link_id"] != expected["link_id"] or gmail["from_address"] != owner + "@secondstate.art"
+    if (gmail["link_id"] != expected["link_id"] or gmail["from_address"] != expected["from_address"]
             or gmail["to"] != ", ".join(expected["to"])):
         raise ValueError("Reminder sender or recipients do not match the configured stream.")
+    subject = category_subject(days_away, owner, local_slot.date() + timedelta(days=days_away),
+                               no_sales=not message["sales"] and not message["ambiguous_date_count"])
+    if gmail["subject"] != subject:
+        raise ValueError("Reminder subject is out of date. Generate a fresh plan.")
     stamp = now.astimezone(UTC).isoformat()
     with db:
         inserted = db.execute("""INSERT OR IGNORE INTO deliveries

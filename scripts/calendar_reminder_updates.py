@@ -4,7 +4,7 @@ This module performs no external mail operations. Normal live scans call
 ``scan_updates(lots, now, ledger_path)`` after fetching a complete snapshot.
 Before a connector draft mutation, use ``draft-claim``; acknowledge the returned
 immutable operation with ``draft-record`` only after confirming its draft ID.
-Uncertain mutations stay reserved for reconciliation by the stable subject.
+Uncertain mutations stay reserved for reconciliation by the reference in the draft body.
 """
 from __future__ import annotations
 
@@ -66,13 +66,28 @@ def _connect(path):
             draft_id TEXT, target_date TEXT, through_event_id INTEGER NOT NULL DEFAULT 0,
             revision TEXT, updated_at TEXT, operation_token TEXT,
             operation_payload TEXT, operation_state TEXT, operation_reason TEXT,
+            draft_sender TEXT, replacement_pending INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY(owner,days));
         CREATE TABLE IF NOT EXISTS reminder_update_draft_recoveries (
             recovery_id INTEGER PRIMARY KEY AUTOINCREMENT,
             owner TEXT NOT NULL, days INTEGER NOT NULL, operation_token TEXT NOT NULL UNIQUE,
             operation_payload TEXT NOT NULL, previous_state TEXT NOT NULL,
             missing_draft INTEGER NOT NULL, proof_reason TEXT NOT NULL, released_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS reminder_update_draft_retirements (
+            retirement_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner TEXT NOT NULL, days INTEGER NOT NULL, draft_id TEXT NOT NULL,
+            previous_sender TEXT NOT NULL, replacement_sender TEXT NOT NULL,
+            previous_state TEXT NOT NULL, proof_reason TEXT NOT NULL, retired_at TEXT NOT NULL);
     """)
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(reminder_update_drafts)")}
+    for name, declaration in (("draft_sender", "TEXT"),
+                              ("replacement_pending", "INTEGER NOT NULL DEFAULT 0")):
+        if name not in columns:
+            try:
+                db.execute(f"ALTER TABLE reminder_update_drafts ADD COLUMN {name} {declaration}")
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc):
+                    raise
     return db
 
 
@@ -157,11 +172,10 @@ def _target_events(db, owner, target):
     return result
 
 
-def _draft_payload(owner, days, target, events, now, draft_id):
+def _draft_payload(owner, days, target, events, now, draft_id, subject):
     helper = _helper()
     config = helper.OWNERS[owner]
     reference = f"SS-CALENDAR-UPDATES-{owner.upper()}-{days}D"
-    subject = helper.category_subject(days, owner, target, reference, kind="UPDATE DRAFT")
     local = now.astimezone(ZoneInfo(config["zone"]))
     html = [helper.category_banner(days, owner, target, kind="UPDATE DRAFT"),
             f"<p>Sales on <strong>{target}</strong>. Updated {escape(local.strftime('%B %d, %Y at %I:%M %p %Z'))}.</p>",
@@ -206,7 +220,7 @@ def _draft_payload(owner, days, target, events, now, draft_id):
             if url := helper.public_url(value):
                 html.append(f'<p><a href="{escape(url, quote=True)}">{label}</a></p>')
     html.append(f"<p>Reference: {reference}</p>")
-    gmail = {"link_id": config["link_id"], "from_address": owner + "@secondstate.art",
+    gmail = {"link_id": config["link_id"], "from_address": config["from_address"],
              "to": ", ".join(config["to"]), "subject": subject,
              "payload": {"mime_type": "text/html", "charset": "UTF-8", "body": {"content": "\n".join(html)}}}
     if draft_id:
@@ -217,25 +231,36 @@ def _draft_payload(owner, days, target, events, now, draft_id):
 
 
 def _group(db, owner, days, now):
-    config = _helper().OWNERS[owner]
+    helper = _helper()
+    config = helper.OWNERS[owner]
     target = (now.astimezone(ZoneInfo(config["zone"])).date() + timedelta(days=days)).isoformat()
     events = _target_events(db, owner, target)
     through = events[-1]["event_id"] if events else 0
-    # A recipient change must refresh an open draft even when the catalog is unchanged.
-    revision = hashlib.sha256(json.dumps([owner, days, target, through, config["to"]]).encode()).hexdigest()
+    # Sender identity is durable; connector link IDs may rotate for the same mailbox.
+    subject = helper.category_subject(days, owner, target, kind="UPDATE DRAFT")
+    revision = hashlib.sha256(json.dumps([owner, days, target, through, config["to"], subject,
+                                         config["from_address"]]).encode()).hexdigest()
     row = db.execute("SELECT * FROM reminder_update_drafts WHERE owner=? AND days=?", (owner, days)).fetchone()
     state = dict(row) if row else {}
     same_date = state.get("target_date") == target
     pending = [event for event in events if not same_date or event["event_id"] > state.get("through_event_id", 0)]
-    needs_action = state.get("revision") != revision and (bool(events) or bool(state.get("draft_id")))
-    action = _draft_payload(owner, days, target, events, now, state.get("draft_id")) if needs_action else None
+    draft_sender = (state.get("draft_sender") or owner + "@secondstate.art") if state.get("draft_id") else None
+    migration = None
+    if draft_sender and draft_sender.casefold() != config["from_address"].casefold():
+        migration = {"draft_id": state["draft_id"], "previous_sender": draft_sender,
+                     "replacement_sender": config["from_address"],
+                     "reference": f"SS-CALENDAR-UPDATES-{owner.upper()}-{days}D"}
+    needs_action = state.get("revision") != revision and (bool(events) or bool(state.get("draft_id"))
+                                                          or bool(state.get("replacement_pending")))
+    action = _draft_payload(owner, days, target, events, now, state.get("draft_id"), subject) if needs_action and not migration else None
     operation = None
     if state.get("operation_token"):
         operation = {"claim_token": state["operation_token"], "state": state["operation_state"],
                      "reason": state.get("operation_reason"), "payload": json.loads(state["operation_payload"])}
     return {"days_away": days, "target_date": target, "through_event_id": through,
             "pending_event_count": len(pending), "pending_events": pending,
-            "draft_id": state.get("draft_id"), "draft_action": action,
+            "draft_id": state.get("draft_id"), "draft_sender": draft_sender,
+            "migration_required": migration, "draft_action": action,
             "operation": operation, "revision": revision}
 
 
@@ -335,6 +360,11 @@ def claim_draft(ledger_path, owner, days, target_date, through_event_id, now=Non
                 db.commit()
                 return {"claimed": False, "reason": "Reconcile the reserved draft operation before another mutation.",
                         "operation": group["operation"]}
+            if group["migration_required"]:
+                db.commit()
+                return {"claimed": False,
+                        "reason": "Retire the verified old-mailbox draft before claiming its replacement.",
+                        "migration_required": group["migration_required"]}
             if group["target_date"] != target_date or group["through_event_id"] != through_event_id:
                 raise ValueError("The draft plan changed; refresh draft-status before claiming.")
             if not group["draft_action"]:
@@ -369,10 +399,11 @@ def record_draft(ledger_path, owner, days, draft_id, through_event_id, claim_tok
             if action["kind"] == "update" and action["gmail"]["draft_id"] != draft_id:
                 raise ValueError("An update must acknowledge the same existing draft ID.")
             db.execute("""UPDATE reminder_update_drafts SET draft_id=?,target_date=?,through_event_id=?,
-                revision=?,updated_at=?,operation_token=NULL,operation_payload=NULL,
+                revision=?,updated_at=?,draft_sender=?,replacement_pending=0,
+                operation_token=NULL,operation_payload=NULL,
                 operation_state=NULL,operation_reason=NULL WHERE owner=? AND days=?""",
                        (draft_id, action["target_date"], through_event_id, action["revision"],
-                        datetime.now(UTC).isoformat(), owner, days))
+                        datetime.now(UTC).isoformat(), action["gmail"]["from_address"], owner, days))
             db.commit()
         except BaseException:
             db.rollback()
@@ -427,11 +458,54 @@ def release_draft(ledger_path, owner, days, claim_token, *, confirmed_not_applie
             "missing_draft_reset": bool(missing_draft), "reason": reason.strip()}
 
 
+def retire_draft(ledger_path, owner, days, draft_id, *, confirmed_retired=False, reason=""):
+    """Retire a verified old-mailbox draft before creating its sender-migrated replacement.
+
+    The caller must verify the exact task-owned draft is no longer active in the
+    old mailbox. Trashing it is reversible; a timeout or empty search is not proof.
+    """
+    if owner not in _helper().OWNERS or days not in range(1, 6):
+        raise ValueError("Choose a configured owner and a 1–5 day category.")
+    if not confirmed_retired or not reason.strip():
+        raise ValueError("Explicit confirmation and evidence that the old-mailbox draft was retired are required.")
+    with closing(_connect(ledger_path)) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            row = db.execute("SELECT * FROM reminder_update_drafts WHERE owner=? AND days=?", (owner, days)).fetchone()
+            if not row or not draft_id or row["draft_id"] != draft_id:
+                raise ValueError("The verified retired draft must match the currently tracked draft ID.")
+            if row["operation_token"]:
+                raise ValueError("Reconcile the reserved draft operation before retiring its draft.")
+            previous_sender = row["draft_sender"] or owner + "@secondstate.art"
+            replacement_sender = _helper().OWNERS[owner]["from_address"]
+            if previous_sender.casefold() == replacement_sender.casefold():
+                raise ValueError("Retirement requires a sender-mailbox change.")
+            stamp = datetime.now(UTC).isoformat()
+            db.execute("""INSERT INTO reminder_update_draft_retirements
+                (owner,days,draft_id,previous_sender,replacement_sender,previous_state,proof_reason,retired_at)
+                VALUES (?,?,?,?,?,?,?,?)""", (owner, days, draft_id, previous_sender, replacement_sender,
+                    json.dumps(dict(row), ensure_ascii=False), reason.strip(), stamp))
+            db.execute("""UPDATE reminder_update_drafts SET draft_id=NULL,draft_sender=NULL,
+                revision=NULL,replacement_pending=1,updated_at=? WHERE owner=? AND days=?""", (stamp, owner, days))
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
+    return {"retired": True, "owner": owner, "days_away": days, "draft_id": draft_id,
+            "previous_sender": previous_sender, "replacement_sender": replacement_sender}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ledger", type=Path, default=_helper().LEDGER)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("draft-status")
+    retire = commands.add_parser("draft-retire")
+    retire.add_argument("--owner", choices=tuple(_helper().OWNERS), required=True)
+    retire.add_argument("--days", type=int, choices=range(1, 6), required=True)
+    retire.add_argument("--draft-id", required=True)
+    retire.add_argument("--confirmed-retired", action="store_true")
+    retire.add_argument("--reason", required=True)
     for name in ("draft-claim", "draft-record", "draft-unknown", "draft-release"):
         command = commands.add_parser(name)
         command.add_argument("--owner", choices=tuple(_helper().OWNERS), required=True)
@@ -458,6 +532,9 @@ def main(argv=None):
             result = release_draft(args.ledger, args.owner, args.days, args.claim_token,
                                    confirmed_not_applied=args.confirmed_not_applied,
                                    reason=args.reason, missing_draft=args.missing_draft)
+        elif args.command == "draft-retire":
+            result = retire_draft(args.ledger, args.owner, args.days, args.draft_id,
+                                  confirmed_retired=args.confirmed_retired, reason=args.reason)
         else:
             result = unknown_draft(args.ledger, args.owner, args.days, args.claim_token, args.reason)
         # Windows pipe stdout can be cp1252; JSON escapes preserve emoji without
