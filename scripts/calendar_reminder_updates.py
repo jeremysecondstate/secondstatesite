@@ -217,10 +217,12 @@ def _draft_payload(owner, days, target, events, now, draft_id):
 
 
 def _group(db, owner, days, now):
-    target = (now.astimezone(ZoneInfo(_helper().OWNERS[owner]["zone"])).date() + timedelta(days=days)).isoformat()
+    config = _helper().OWNERS[owner]
+    target = (now.astimezone(ZoneInfo(config["zone"])).date() + timedelta(days=days)).isoformat()
     events = _target_events(db, owner, target)
     through = events[-1]["event_id"] if events else 0
-    revision = hashlib.sha256(f"{owner}|{days}|{target}|{through}".encode()).hexdigest()
+    # A recipient change must refresh an open draft even when the catalog is unchanged.
+    revision = hashlib.sha256(json.dumps([owner, days, target, through, config["to"]]).encode()).hexdigest()
     row = db.execute("SELECT * FROM reminder_update_drafts WHERE owner=? AND days=?", (owner, days)).fetchone()
     state = dict(row) if row else {}
     same_date = state.get("target_date") == target

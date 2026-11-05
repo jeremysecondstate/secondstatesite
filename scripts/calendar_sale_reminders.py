@@ -36,13 +36,13 @@ SCHEDULE = {
     2: ("07:00", "11:00", "15:00", "18:00"),
     1: ("06:00", "09:00", "12:00", "15:00", "18:00"),
 }
-INTERNAL = ["jeremy@secondstate.art", "oliver@secondstate.art", "alex@secondstate.art"]
 OWNERS = {
     "jeremy": {"zone": "America/Los_Angeles", "view": "catalog",
-               "link_id": "link_6ad41eae32d081918462849699f226a2", "to": INTERNAL},
+               "link_id": "link_6ad41eae32d081918462849699f226a2",
+               "to": ["jeremy@secondstate.art", "alex@secondstate.art"]},
     "oliver": {"zone": "America/New_York", "view": "oliver",
                "link_id": "link_6aeb8f025d2081918f927770c4dd0a06",
-               "to": INTERNAL + ["OliverGDonson@gmail.com", "oliver1@vt.edu"]},
+               "to": ["oliver@secondstate.art", "alex@secondstate.art", "OliverGDonson@gmail.com", "oliver1@vt.edu"]},
 }
 GRACE = timedelta(hours=1)
 CATEGORY_STYLES = {

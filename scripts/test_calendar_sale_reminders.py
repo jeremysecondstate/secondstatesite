@@ -104,8 +104,10 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(len(streams["jeremy"]["sales"]), 2)
         self.assertEqual(len(streams["oliver"]["sales"]), 1)
         self.assertEqual(streams["jeremy"]["gmail"]["from_address"], "jeremy@secondstate.art")
-        self.assertNotIn("vt.edu", streams["jeremy"]["gmail"]["to"])
-        self.assertIn("oliver1@vt.edu", streams["oliver"]["gmail"]["to"])
+        self.assertEqual(streams["jeremy"]["gmail"]["to"], "jeremy@secondstate.art, alex@secondstate.art")
+        self.assertEqual(streams["oliver"]["gmail"]["from_address"], "oliver@secondstate.art")
+        self.assertEqual(streams["oliver"]["gmail"]["to"],
+                         "oliver@secondstate.art, alex@secondstate.art, OliverGDonson@gmail.com, oliver1@vt.edu")
         self.assertIn("view=oliver", streams["oliver"]["sales"][0]["catalog_links"][0])
 
     def test_midnight_dates_use_owner_zone_and_pacific_catalog_day(self):
@@ -261,9 +263,10 @@ class LedgerTests(unittest.TestCase):
             for moment in (now() - timedelta(seconds=1), now() + timedelta(hours=1)):
                 with self.assertRaises(ValueError):
                     reminders.claim(db, self.message, moment)
-            self.message["gmail"]["to"] = "unapproved@example.com"
-            with self.assertRaises(ValueError):
+            self.message["gmail"]["to"] = "jeremy@secondstate.art, oliver@secondstate.art, alex@secondstate.art"
+            with self.assertRaisesRegex(ValueError, "recipients"):
                 reminders.claim(db, self.message, now())
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0], 0)
         finally:
             db.close()
 

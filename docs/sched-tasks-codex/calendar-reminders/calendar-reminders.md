@@ -8,10 +8,10 @@ The user explicitly authorized sending these recurring sales reminders through t
 
 | Stream | Sender | Recipients | Reminder clock |
 | --- | --- | --- | --- |
-| Jeremy | jeremy@secondstate.art | jeremy@secondstate.art, oliver@secondstate.art, alex@secondstate.art | America/Los_Angeles (PST/PDT) |
-| Oliver | oliver@secondstate.art | jeremy@secondstate.art, oliver@secondstate.art, alex@secondstate.art, OliverGDonson@gmail.com, oliver1@vt.edu | America/New_York (EST/EDT) |
+| Jeremy | jeremy@secondstate.art | jeremy@secondstate.art, alex@secondstate.art | America/Los_Angeles (PST/PDT) |
+| Oliver | oliver@secondstate.art | oliver@secondstate.art, alex@secondstate.art, OliverGDonson@gmail.com, oliver1@vt.edu | America/New_York (EST/EDT) |
 
-The timezone belongs to the stream. Everyone on a given email receives that same email together; there is no separate Alex stream. Jeremy's catalog includes all Calendar houses. Oliver's catalog uses the site's current `is_oliver_house()` filter. Their overlap is intentional.
+Use these lists for scheduled reminders and open update drafts. Jeremy receives only Jeremy's stream. Oliver receives only Oliver's stream at his three addresses. Alex receives both streams. The timezone belongs to the stream. Jeremy's catalog includes all Calendar houses. Oliver's catalog uses the site's current `is_oliver_house()` filter. Their overlap is intentional.
 
 ## Send times
 

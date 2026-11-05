@@ -181,6 +181,30 @@ class UpdateTests(unittest.TestCase):
         self.record(next_claim)
         self.assertIsNone(group(updates.draft_status(self.ledger, self.now + timedelta(hours=3)))["draft_action"])
 
+    def test_recipient_change_refreshes_existing_draft_without_new_events(self):
+        result = self.make_changed()
+        config = updates._helper().OWNERS["jeremy"]
+        with patch.dict(config, to=["jeremy@secondstate.art", "oliver@secondstate.art", "alex@secondstate.art"]):
+            first = self.claim(result)
+            updates.unknown_draft(self.ledger, "jeremy", 1, first["claim_token"], "timeout")
+        recipients = ["jeremy@secondstate.art", "alex@secondstate.art"]
+        with patch.dict(config, to=recipients):
+            reserved = self.claim(result)
+            self.assertFalse(reserved["claimed"])
+            self.assertEqual(reserved["operation"]["payload"]["gmail"], first["gmail"])
+            self.record(first)
+            current = self.scan([lot(current_bid=75, bid_count=2)], 2)
+            self.assertEqual(current["new_event_count"], 0)
+            self.assertEqual(group(current)["pending_event_count"], 0)
+            self.assertIsNone(group(current, days=2)["draft_action"])
+            refresh = self.claim(current)
+            self.assertTrue(refresh["claimed"])
+            self.assertEqual(refresh["kind"], "update")
+            self.assertEqual(refresh["gmail"]["draft_id"], "draft-one")
+            self.assertEqual(refresh["gmail"]["to"], ", ".join(recipients))
+            self.record(refresh)
+            self.assertIsNone(group(updates.draft_status(self.ledger, self.now))["draft_action"])
+
     def test_existing_draft_rolls_target_date_and_clears_old_content(self):
         first = self.claim(self.make_changed())
         self.record(first)
