@@ -129,6 +129,27 @@ class ArtistAttributionLabelTests(SimpleTestCase):
             with self.subTest(artist=artist, title=title):
                 self.assertEqual(artist_attribution_label(artist, title=title), expected)
 
+    def test_after_credit_before_a_quoted_title_requires_the_complete_artist(self):
+        cases = (
+            ("Andy Warhol", "Andy Warhol After “Mao Yellow”", "After"),
+            ("Warhol, Andy", "Andy Warhol After “Vegetable from Campbell’s soup”", "After"),
+            ("Andy Warhol", 'Warhol, Andy AFTER "Mao Yellow"', "After"),
+            ("Andy Warhol", "Andy Warhol (1928-1987) After “Mao Yellow”", "After"),
+            ("Pablo Picasso", "Andy Warhol After “Mao Yellow”", ""),
+            ("Andy Warhol", "Andy Warhol Jr. After “Mao Yellow”", ""),
+            ("Andy Warhol", "Andy Warhol After the Party", ""),
+            ("Andy Warhol", "Andy Warhol “After the Party”", ""),
+            ("Andy Warhol", "Andy Warhol “Two dollars” 1976", ""),
+            ("Andy Warhol", "Composition by Andy Warhol After “Mao Yellow”", ""),
+            ("Andy Warhol", 'Andy Warhol After "Mao Yellow', ""),
+            ("Andy Warhol", "Andy Warhol After “Mao Yellow\"", ""),
+            ("Andy Warhol", "Andy Warhol After “Mao Yellow” and another artist", ""),
+            ("", "Andy Warhol After “Mao Yellow”", ""),
+        )
+        for artist, title, expected in cases:
+            with self.subTest(artist=artist, title=title):
+                self.assertEqual(artist_attribution_label(artist, title=title), expected)
+
     def test_ordinary_work_titles_and_later_mentions_are_not_credits(self):
         titles = ("After the Party", "He Enquired After the Quality", "Life After Picasso",
                   "The day after", "Composition by Pablo Picasso, after Andy Warhol",
@@ -153,6 +174,9 @@ class CalendarAttributionPayloadTests(SimpleTestCase):
             ("Rembrandt", "Rembrandt", 'REMBRANDT VAN RIJN, HARMENSZ, Nach - After: "Die drei Bäume".', "After"),
             ("Pablo Picasso (1881-1973) after. Jacques Villon", "Pablo Picasso", "Composition", "After"),
             ("Hubert Robert (1733-1808), Attributed to.", "Hubert Robert", "Roman Villa", "Attributed to"),
+            ("Andy Warhol", "Andy Warhol", "Andy Warhol After “Mao Yellow”", "After"),
+            ("Andy Warhol", "Andy Warhol", "Andy Warhol After “Vegetable from Campbell’s soup”", "After"),
+            ("Andy Warhol", "Andy Warhol", "Andy Warhol “Two dollars” 1976", ""),
         )
         with patch("django.db.backends.utils.CursorWrapper.execute", side_effect=AssertionError("Unexpected database query")), \
                 patch("secondstateapp.calendar_views.artist_research_urls", return_value=(artist_url, "")):

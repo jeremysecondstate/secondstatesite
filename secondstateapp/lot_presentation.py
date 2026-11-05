@@ -238,6 +238,9 @@ _PUNCTUATED_CREDIT_SUFFIX = re.compile(
     r"^(?P<name>.+?)(?:,\s*|\s+)(?P<marker>after|attributed\s+to)\."
     r"(?:\s+Jacques\s+Villon)?$", re.IGNORECASE,
 )
+_QUOTED_TITLE_AFTER_CREDIT = re.compile(
+    r'^(?P<name>.+?)\s+after\s+(?:"[^"]+"|“[^”]+”)$', re.IGNORECASE,
+)
 # Explicit auction-credit alias; retain strict full-name matching in titles.
 _CREDIT_NAME_ALIASES = {("harmensz", "rembrandt", "rijn", "van"): ("rembrandt",)}
 
@@ -297,6 +300,11 @@ def artist_attribution_label(*artists: object, title: object = "") -> str:
     names.discard(())
     if not names:
         return ""
+    # Felima separates its full artist credit from the work with quotation
+    # marks: Andy Warhol After “Mao Yellow”. Keep unquoted After titles out.
+    quoted_credit = _QUOTED_TITLE_AFTER_CREDIT.fullmatch(text)
+    if quoted_credit and _credit_name_key(quoted_credit["name"]) in names:
+        return "After"
     candidates = [text, *str(title or "").splitlines()]
     candidates.extend(re.split(r"\s+[—–-]\s+|[:;]", text))
     candidates.extend(match[1] for match in re.finditer(r"\(([^()]*)\)", text))
