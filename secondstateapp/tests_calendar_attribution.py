@@ -59,6 +59,83 @@ class ArtistAttributionLabelTests(SimpleTestCase):
             with self.subTest(credit=credit):
                 self.assertEqual(artist_attribution_label(credit), "")
 
+    def test_unpunctuated_french_suffixes_and_biographies_are_credits(self):
+        for marker in ("d'après", "d’après", "D'APRES", "dapres", "dʼaprès",
+                       "d ‘ après", "d'apre\u0300s", "d’après."):
+            credit = f"Jean-Michel Basquiat (1960–1988) {marker}"
+            with self.subTest(credit=credit):
+                self.assertEqual(artist_attribution_label(credit), "After")
+                self.assertEqual(artist_attribution_label("Jean-Michel Basquiat", title=credit), "After")
+        for credit, expected in (("Jean-Michel Basquiat after", "After"),
+                                 ("Joan Miró (1893–1983) attribué à", "Attributed to"),
+                                 ("Joan Miró attributed to", "Attributed to")):
+            with self.subTest(credit=credit):
+                self.assertEqual(artist_attribution_label(credit), expected)
+
+    def test_bare_title_qualifiers_require_the_complete_credited_artist(self):
+        cases = (
+            ("Jean Michel Basquiat", "Jean-Michel Basquiat (1960-1988) d'après", "After"),
+            ("Jean-Michel Basquiat", "BASQUIAT, Jean-Michel (1960–1988) d'après", "After"),
+            ("Jean-Michel Basquiat", "Jean-Michel Basquiat d'après — Untitled", "After"),
+            ("Jean-Michel Basquiat", "D ’ après Jean-Michel Basquiat — Untitled", "After"),
+            ("Joan Miró", "Joan Miró (1893–1983) attribuée à", "Attributed to"),
+            ("Jean-Michel Basquiat", "Andy Warhol (1928–1987) d'après", ""),
+            ("Jean-Michel Basquiat", "Jean-Michel Basquiat Jr. (1960–1988) d'après", ""),
+            ("Jean-Michel Basquiat", "Basquiat d'après", ""),
+            ("Jean-Michel Basquiat", "Composition by Jean-Michel Basquiat d'après", ""),
+            ("Jean-Michel Basquiat", "Jean-Michel Basquiat d'après la pluie", ""),
+            ("Jean-Michel Basquiat", "Jean-Michel Basquiat “d'après”", ""),
+            ("Jean-Michel Basquiat", "Le jour d'après", ""),
+            ("Jean-Michel Basquiat", "D'après les archives de Jean-Michel Basquiat", ""),
+            ("", "Jean-Michel Basquiat (1960–1988) d'après", ""),
+        )
+        for artist, title, expected in cases:
+            with self.subTest(artist=artist, title=title):
+                self.assertEqual(artist_attribution_label(artist, title=title), expected)
+
+    def test_structured_french_catalogue_credits_bind_to_the_full_artist(self):
+        cases = (
+            ("Takashi Murakami", '"An Homage to Monogold" Takashi Murakami (né en 1962) d\'après'),
+            ("Andy Warhol", '"Mao" Andy Warhol (1928-1987) d\'après'),
+            ("Keith Haring", "Keith Haring (1958-1990) d'après / Éventail Tokyo"),
+            ("Andy Warhol", "Andy Warhol (d'après) Mick Jagger"),
+            ("Henri Matisse", "MATISSE HENRI (1869 - 1954) - (D'APRES) MEMORY OF OCEANIA"),
+            ("Salvador Dalí", 'LITHOGRAPHIE "LA DÉCOUVERTE DE L\'AMÉRIQUE" d\'après Salvador DALI (1904-1989)'),
+            ("Salvador Dalí", 'TABLEAU "MYTHOLOGIE" d\'après Salvador DALI (1904-1989)'),
+            ("Keith Haring", 'OEUVRE "SERIE METRO" d\'après Keith HARING (1958-1990)'),
+            ("Andy Warhol", 'D\'APRÈS UNE LITHOGRAPHIE "BEETHOVEN, 1987" d\'Andy WARHOL (1928-1987)'),
+            ("Keith Haring", "Keith Haring (1958-1990) & Banksy d'après"),
+            ("Keith Haring", "Keith Haring (1958-1990) & Banksy d'après (blanc)"),
+            ("Banksy", "Keith Haring (1958-1990) & Banksy d'après"),
+            ("Sonia Delaunay", 'CARRÉ "BLUES\' d\'après Sonia DELAUNAY (1885-1979) ÉDITION ARTCURIAL.'),
+        )
+        for artist, title in cases:
+            with self.subTest(artist=artist, title=title):
+                self.assertEqual(artist_attribution_label(artist, title=title), "After")
+
+    def test_french_work_titles_and_other_artist_references_remain_unflagged(self):
+        cases = (
+            ("Francis Bacon", "Etude du Corps Humain d'apres Ingres. Color lithograph on Arches paper. Signed and numbered."),
+            ("Francis Bacon (1909-1992)", "Œdipe et le Sphinx d'après Ingres (see Sabatier 18)"),
+            ("Pablo Picasso", "Pablo Picasso (Spanish, 1881–1973) Le Déjeuner sur l'herbe, d'après Manet I, 1962"),
+            ("Wou-Ki Zao", "ZAO WOU KI (1920-2013) Saint-Tropez, 2006 Estampe au pochoir sur vélin BFK Rives d'après l'aquarelle éponyme Signée et numérotée 19/99"),
+            ("Andy Warhol", '"Mao" Andy Warhol Jr. d\'après'),
+            ("Andy Warhol", '"Mao" Roy Lichtenstein d\'après'),
+            ("Andy Warhol", "Andy Warhol Jr. (d'après) Mick Jagger"),
+            ("Andy Warhol", "Composition by Andy Warhol (d'après) Mick Jagger"),
+            ("Andy Warhol", 'D\'APRÈS UNE LITHOGRAPHIE "Mao" d\'Andy Warhol Jr.'),
+            ("Andy Warhol", 'LITHOGRAPHIE "Mao" d\'après Roy Lichtenstein'),
+            ("Andy Warhol", 'LITHOGRAPHIE "Mao" d\'après les archives de Andy Warhol'),
+            ("Andy Warhol", 'TABLEAU "Life d\'après Andy Warhol"'),
+            ("Andy Warhol", 'CARRÉ "BLUES\' d\'après Sonia DELAUNAY (1885-1979) ÉDITION ARTCURIAL.'),
+            ("Keith Haring", "Keith Haring & Banksy d'après (Andy Warhol)"),
+            ("Keith Haring", "Keith Haring Jr. & Banksy d'après"),
+            ("Keith Haring", "Keith Haring & the studio d'après"),
+        )
+        for artist, title in cases:
+            with self.subTest(artist=artist, title=title):
+                self.assertEqual(artist_attribution_label(artist, title=title), "")
+
     def test_forum_punctuated_artist_credits_retain_their_attribution(self):
         cases = {
             "Lucio Fontana (1899-1965) after.": "After",
@@ -177,6 +254,9 @@ class CalendarAttributionPayloadTests(SimpleTestCase):
             ("Andy Warhol", "Andy Warhol", "Andy Warhol After “Mao Yellow”", "After"),
             ("Andy Warhol", "Andy Warhol", "Andy Warhol After “Vegetable from Campbell’s soup”", "After"),
             ("Andy Warhol", "Andy Warhol", "Andy Warhol “Two dollars” 1976", ""),
+            ("Jean Michel Basquiat", "Jean Michel Basquiat", "Jean-Michel Basquiat (1960-1988) d'après", "After"),
+            ("Jean-Michel Basquiat", "Jean-Michel Basquiat", "Jean-Michel Basquiat (1960–1988) d'après", "After"),
+            ("Jean-Michel Basquiat (1960–1988) d’après", "Jean-Michel Basquiat", "Untitled", "After"),
         )
         with patch("django.db.backends.utils.CursorWrapper.execute", side_effect=AssertionError("Unexpected database query")), \
                 patch("secondstateapp.calendar_views.artist_research_urls", return_value=(artist_url, "")):
