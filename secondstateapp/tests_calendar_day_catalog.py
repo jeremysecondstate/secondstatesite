@@ -74,13 +74,17 @@ class CalendarDayCatalogLinkTests(TestCase):
 
         response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
         page = BeautifulSoup(response.content, "html.parser")
+        calendar = page.select_one(".calendar-grid")
+        self.assertEqual(calendar["role"], "group")
+        self.assertEqual(calendar["aria-label"], "July 2026 Jeremy’s auction calendar")
         for iso_day in ("2026-07-25", "2026-07-26"):
             with self.subTest(day=iso_day):
                 button = page.select_one(f'.calendar-day-select[data-calendar-day="{iso_day}"]')
                 self.assertEqual(button.name, "button")
                 self.assertEqual(button["type"], "button")
                 cell = button.parent
-                self.assertEqual(cell["role"], "gridcell")
+                self.assertNotIn("role", cell.attrs)
+                self.assertIs(cell.parent, calendar)
                 link = cell.select_one(".day-catalog-link")
                 self.assertIs(link.parent, cell)
                 self.assertIs(button.find_next_sibling(), link)

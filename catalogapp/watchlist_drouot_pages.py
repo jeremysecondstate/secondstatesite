@@ -293,8 +293,48 @@ def _separate_line_qualifier(credit: str, following: str, aliases: Iterable[str]
     return (match.group("qualifier"), match.group("title")) if match else ("", following)
 
 
+def _repeated_catalogue_title(description: str, aliases: Iterable[str]) -> tuple[str, int] | None:
+    """Recognize a flattened title / artist / repeated title / date layout."""
+    lines = list(re.finditer(r"[^\r\n]+", description))
+    if len(lines) < 2:
+        return None
+    credit = lines[0].group().strip()
+    end = _credit_prefix_end(credit, aliases)
+    if end is None or _following_qualifier(credit[end:])[1].strip(" ,;:-"):
+        return None
+    line = lines[1].group()
+    for boundary in re.finditer(r"\s+(?=\w)", line):
+        title = line[:boundary.start()].strip()
+        following = line[boundary.end():]
+        end = _credit_prefix_end(following, aliases)
+        if end is None:
+            continue
+        repeated = following[end:].lstrip()
+        date = re.search(r",\s*(?:circa\s+)?[0-9]{4}\b\s+", repeated, re.IGNORECASE)
+        if date and normalize_artist_name(title) == normalize_artist_name(repeated[:date.start()]):
+            offset = lines[1].start() + boundary.end() + end + len(following[end:]) - len(repeated) + date.end()
+            return repeated[:date.start()].strip(), offset
+    return None
+
+
+def _labelled_catalogue_work(description: str, aliases: Iterable[str]):
+    """Use explicit contiguous artist/title/media labels for the offered work."""
+    match = re.search(
+        r"\u25a0artist:\s*(?P<artist>[^\r\n\u25a0]+)[\r\n]+"
+        r"\u25a0title:\s*(?P<title>[^\r\n\u25a0]+)[\r\n]+"
+        r"\u25a0media:\s*(?P<media>[^\r\n\u25a0]*)", description, re.IGNORECASE,
+    )
+    return match if match and _leading_credit_matches(match.group("artist"), aliases) else None
+
+
 def _title(description: str, heading: str, aliases: Iterable[str]) -> str:
     """Use a work title from the source's actual inline or repeated-credit layout."""
+    repeated = _repeated_catalogue_title(description, aliases)
+    if repeated:
+        return repeated[0].replace("*", "")[:500]
+    labelled = _labelled_catalogue_work(description, aliases)
+    if labelled and len(re.findall(r"\u25a0title:", description, re.IGNORECASE)) == 1 and not re.search(r"\bset\s+of\b", heading, re.IGNORECASE):
+        return labelled.group("title").strip().replace("*", "")[:500]
     lines = [line.strip(" *_\t") for line in description.splitlines() if line.strip(" *_\t")]
     for index, line in enumerate(lines):
         separate, separate_title = _separate_line_qualifier(lines[index - 1], line, aliases) if index else ("", line)
@@ -314,8 +354,10 @@ def _title(description: str, heading: str, aliases: Iterable[str]) -> str:
                 if value == before:
                     break
             if (not value or _biography_line(value)
-                    or re.fullmatch(r"(?:also\s+)?known\s+as\s+[^,;:()\n]+(?:\s*\([^)]*\d{4}[^)]*\))?",
-                                    value, re.IGNORECASE)):
+                    or re.fullmatch(r"(?:(?:also\s+)?known\s+as|aka)\s+[^,;:()\n]+(?:\s*\([^)]*\d{4}[^)]*\))?",
+                                    value, re.IGNORECASE)
+                    or (any(artist_identity_key(alias) == "fairey shepard" for alias in aliases)
+                        and re.fullmatch(r"\(OBEY(?:\s+GIANT)?\)", value, re.IGNORECASE))):
                 continue
             if re.match(r"^[\u2013\u2014-]?\s*Chalcographie\s+du\s+Louvre\b", value, re.IGNORECASE):
                 continue
@@ -327,6 +369,12 @@ def _title(description: str, heading: str, aliases: Iterable[str]) -> str:
         if re.match(r"^plate[ -]signed\b", value, re.IGNORECASE):
             # An intermediate repeated-credit line may describe only the
             # signature/printing; a later source line gives the actual title.
+            continue
+        if (re.fullmatch(r"Original\s+" + _PRINT_MEDIUM.pattern + r"\s*\([^()\n]+\s+studio\)",
+                         value, re.IGNORECASE)
+                and index + 2 < len(lines)
+                and not _PRINT_MEDIUM.search(lines[index + 1])
+                and re.match(r"^(?:signed|unsigned|numbered)\b", lines[index + 2], re.IGNORECASE)):
             continue
         if re.match(r"^(?:naar\s+)?prints?\b", value, re.IGNORECASE):
             quoted_work = re.search(r'["\u201c\u00ab](.+?)["\u201d\u00bb]', value)
@@ -340,6 +388,9 @@ def _title(description: str, heading: str, aliases: Iterable[str]) -> str:
         if quoted:
             value = quoted.group(1) + quoted.group(2)
         value = re.split(r"\s+[-\u2014]\s+(?=(?:color\s+|colour\s+)?(?:etching|aquatint|lithograph|engraving|screenprint)\b)", value, maxsplit=1, flags=re.IGNORECASE)[0]
+        if labelled:
+            value = re.split(r"\s*,?\s*\u25a0artist:", value, maxsplit=1, flags=re.IGNORECASE)[0]
+            value = re.sub(r"\s*,?\s*\uff08[0-9\uff10-\uff19]+\uff09\s*$", "", value)
         return value.replace("*", "")[:500]
     return (heading or description).replace("*", "")[:500]
 
@@ -427,6 +478,19 @@ def _qualified_source_credit(heading: str, description: str, aliases: Iterable[s
 def _print_technique(description: str, aliases: Iterable[str] = ()):
     """Find work-medium evidence before provenance or an artist biography."""
     work = _offered_work_prefix(description)
+    labelled = _labelled_catalogue_work(work, aliases)
+    repeated = _repeated_catalogue_title(work, aliases)
+    if labelled:
+        # Explicit media outranks title vocabulary such as "(estampe)".
+        # Keep only that source span; an unknown/nonprint media label must
+        # not fall back to a print word in the title or later catalogue text.
+        start, end = labelled.span("media")
+        work = re.sub(r"[^\r\n]", " ", work[:start]) + work[start:end]
+    elif repeated:
+        # Publication names such as L'Estampe Moderne are titles, not the
+        # technique of the offered sheet following the repeated title/date.
+        offset = repeated[1]
+        work = re.sub(r"[^\r\n]", " ", work[:offset]) + work[offset:]
     # A carrier's allowance for several lithographs is not this lot's medium.
     work = re.split(r"\n\s*(?:shipping|registered\s+colissimo)\b", work,
                     maxsplit=1, flags=re.IGNORECASE)[0]
@@ -471,6 +535,14 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
     work = "".join(lines)
     work = re.sub(r"\b(?:after|based\s+on)\s+(?:the\s+)?" + numbered_title,
                   lambda match: " " * len(match.group()), work, flags=re.IGNORECASE)
+    # A separate caption can describe the earlier painting being reproduced;
+    # only mask it when the next statement supplies this offered print's medium.
+    work = re.sub(
+        r"(?m)^\s*(?:after|based\s+on)\s+(?:an?\s+|the\s+)?(?:[0-9]{4}\s+)?"
+        + _NONPRINT_MEDIUM.pattern
+        + r"[^\n]*\n(?=\s*(?:(?:original|colou?r)\s+)*" + _PRINT_MEDIUM.pattern + r")",
+        lambda match: re.sub(r"[^\r\n]", " ", match.group()), work, flags=re.IGNORECASE,
+    )
     nonprint = _NONPRINT_MEDIUM.search(work)
     for positive in _PRINT_MEDIUM.finditer(work):
         # A lithographic pencil/crayon is a drawing implement; its name does
@@ -548,6 +620,14 @@ def _corroborated_short_credit(description: str, heading: str, artist: str) -> t
     lines = [line.strip() for line in description.splitlines() if line.strip()]
     if not lines or lines[0] != heading.strip():
         return None
+    # These observed spelling variants require the immediately repeated full
+    # canonical name, never an incidental name mention or a surname-only alias.
+    variant = {"albrecht durer": "Albert Durer", "alphonse mucha": "Alfons Mucha",
+               "kandinsky wassily": "Vassily Kandinsky"}.get(artist_identity_key(artist))
+    if variant and normalize_artist_name(heading) == normalize_artist_name(variant) and len(lines) >= 3:
+        end = _credit_prefix_end(lines[1], (artist,))
+        if end is not None and not _following_qualifier(lines[1][end:])[1].strip(" ,;:-"):
+            return heading.strip(), None
     work = _offered_work_prefix(description)
     work = re.split(r"(?im)^\s*(?:shipping|registered\s+colissimo|notes?|references?)\s*:", work, maxsplit=1)[0]
     key = artist_identity_key(artist)
@@ -592,6 +672,16 @@ def _resolved_collaboration(description: str, aliases: Iterable[str]) -> tuple[s
         # Some source headings place a full second name after the qualifier.
         # Retain that source relationship and read the next line as the work.
         named_after = re.fullmatch(r"after\s+([A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ -]+)", tail)
+        if named_after is None:
+            # A mixed-case second creator is also explicit when its name is
+            # followed by biographical dates, e.g. after Vincent VAN GOGH
+            # (1853–1890). Keep that name, but not the dates, in the credit.
+            # The required date span avoids treating ordinary "after" prose
+            # or a work title as a second named creator.
+            named_after = re.fullmatch(
+                r"after\s+([A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’ -]+?)\s+"
+                r"\([^)]*\d{4}[^)]*\)", tail,
+            )
         if (named_after and len(normalize_artist_name(named_after.group(1)).split()) >= 2
                 and index + 2 < len(lines) and _print_technique(lines[index + 2], aliases) is not None):
             suffix = " " + named_after.group(1)
@@ -690,6 +780,19 @@ def _resolved_collaboration(description: str, aliases: Iterable[str]) -> tuple[s
 def _contradictory_offered_creator(description: str, aliases: Iterable[str]) -> bool:
     """A direct offered-technique 'by' credit must not contradict its heading."""
     work = _offered_work_prefix(description)
+    lines = [line.strip() for line in work.splitlines() if line.strip()]
+    if len(lines) >= 4:
+        first_end = _credit_prefix_end(lines[0], aliases)
+        # An immediately repeated, explicitly qualified artist/date credit is
+        # source authorship, not a portrait title or later printer biography.
+        repeated = re.fullmatch(
+            r"[A-ZÀ-ÖØ-Þ][\w'’.-]+(?:\s+[A-ZÀ-ÖØ-Þ][\w'’.-]+){1,5}\s*"
+            r"\((?:c\.\s*)?[0-9]{4}\s*[-–—]\s*[0-9]{4}\)\s*\((?:after|attributed to)\)", lines[1],
+        )
+        if (first_end is not None and not _following_qualifier(lines[0][first_end:])[1].strip(" ,;:-")
+                and repeated and not _leading_credit_matches(lines[1], aliases)
+                and _PRINT_MEDIUM.search(lines[3])):
+            return True
     for match in re.finditer(_PRINT_MEDIUM.pattern + r"\s+by\s+([A-ZÀ-ÖØ-Þ][\w'’.-]+(?:\s+[A-ZÀ-ÖØ-Þ][\w'’.-]+){1,3})", work):
         named = normalize_artist_name(match.group(1)).split()
         wanted_names = [normalize_artist_name(alias).split() for alias in aliases]

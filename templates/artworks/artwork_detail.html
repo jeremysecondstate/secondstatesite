@@ -22,13 +22,18 @@
         <button id="closeFullscreenBtn" class="close-btn" onclick="closeFullscreen()">❌</button>
     </div>
 
-    {% if artwork.images.all %}
+    {% with photos=artwork.images.all %}
+    {% if photos %}
     <div class="artwork-photo-editor"{% if user.is_staff %} data-order-editor data-order-url="{% url 'artwork_image_reorder' artwork.id %}"{% endif %}>
     {% if user.is_staff %}{% csrf_token %}{% endif %}
     <div class="text-center image-stage">
+        {% if photos|length > 1 %}
         <button class="image-nav image-nav-left" onclick="showPrevImage(event)">&#10094;</button>
-        <img id="mainImage" src="{{ artwork.images.first.image.url }}" class="img-fluid main-img" alt="{{ artwork.title }}" onclick="openFullscreen(this)">
+        {% endif %}
+        <img id="mainImage" src="{{ photos.0.image.url }}" class="img-fluid main-img" alt="{{ artwork.title }}" onclick="openFullscreen(this)">
+        {% if photos|length > 1 %}
         <button class="image-nav image-nav-right" onclick="showNextImage(event)">&#10095;</button>
+        {% endif %}
     </div>
 
     {% if user.is_staff %}
@@ -43,7 +48,7 @@
     <p class="order-status" data-order-status role="status" aria-live="polite"></p>
     {% endif %}
     <div class="thumbnails text-center mt-3" data-order-list>
-        {% for image in artwork.images.all %}
+        {% for image in photos %}
             <div class="artwork-photo-item" data-order-item="{{ image.id }}" data-order-label="Photo {{ forloop.counter }}">
                 <button type="button" class="artwork-photo-select" data-order-drag aria-label="View photo {{ forloop.counter }} of {{ artwork.title }}"{% if forloop.first %} aria-current="true"{% endif %}>
                     <img src="{{ image.image.url }}" class="thumbnail-img" alt="{{ artwork.title }}, photo {{ forloop.counter }}" draggable="false">
@@ -60,6 +65,7 @@
 {% else %}
     <p class="text-center text-muted">No images available</p>
 {% endif %}
+    {% endwith %}
 
     <div class="artwork-info mt-4">
         <p><strong>{{ artwork.artist }}</strong></p>

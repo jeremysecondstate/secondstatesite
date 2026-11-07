@@ -119,12 +119,11 @@
         <div class="calendar-weekdays" aria-hidden="true">
           <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
         </div>
-        <div class="calendar-grid" role="grid" data-month-label="{{ month_title }}" aria-label="{{ month_title }} Jeremy’s auction calendar">
+        <div class="calendar-grid" role="group" data-month-label="{{ month_title }}" aria-label="{{ month_title }} Jeremy’s auction calendar">
           {% for week in weeks %}
             {% for day in week %}
               <div
                 class="calendar-day{% if not day.in_month %} is-outside{% endif %}{% if day.is_today %} is-today{% endif %}{% if day.lot_count %} has-events{% endif %}"
-                role="gridcell"
               >
                 <button
                   class="calendar-day-select"
@@ -4816,7 +4815,6 @@
       const selected = button.dataset.calendarDay === isoDate;
       const cell = button.closest(".calendar-day");
       cell.classList.toggle("is-selected", selected);
-      cell.setAttribute("aria-selected", String(selected));
       button.setAttribute("aria-pressed", String(selected));
     });
 

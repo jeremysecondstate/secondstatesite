@@ -132,7 +132,7 @@ def frozen_scope(run):
     return scope
 
 
-def record_response(config, data, response):
+def validate_response(data, response):
     run = response.get("run")
     scope = frozen_scope(run)
     current = data["current"]
@@ -161,6 +161,12 @@ def record_response(config, data, response):
                 updated = new_operations.get(operation.get("operation_id"))
                 if updated is None or operation.get("status") == "settled" and updated != operation:
                     raise QueueError("A recorded operation disappeared or changed; preserve its original receipt.")
+    return scope
+
+
+def record_response(config, data, response):
+    scope = validate_response(data, response)
+    run, current = response["run"], data["current"]
     current["run_id"] = run["id"]
     current["scope"] = scope
     current["run"] = copy.deepcopy(run)
@@ -184,8 +190,82 @@ def require_owner(config, ident, current, *, allow_settlement=False):
         raise QueueError("The current human stopped this pass; only settling known outcomes and cleanup are allowed.")
 
 
-def start(config, api, ident, authorization_item_id=None):
-    allowance = lifecycle.start_manual(config, ident, authorization_item_id)
+def deleted_completed_owner_receipt(config, api, ident, authorization_item_id=None):
+    """Verify a deleted finished predecessor without executing any server mutation."""
+    proof = lifecycle.manual_authorization(config, ident, authorization_item_id)
+    confirmation = lifecycle.deleted_owner_confirmation(config, ident, proof)
+    lifecycle.inspect_tree(config, ident, require_terminal=False, continuation=True, manual=True)
+    data = pointer(config)
+    current = data["current"] or {}
+    registry = lifecycle.registry(config)
+    previous = registry["active_thread_id"]
+    record = registry["runs"].get(previous, {})
+    if (not previous or previous == ident or record.get("status") != "finished"
+            or record.get("manual_queue") is not True or current.get("finished") is not True
+            or current.get("owner_thread_id") != previous
+            or current.get("run", {}).get("status") != "completed" or not lifecycle.business_clear(config)):
+        raise QueueError("Only a completed, fully accounted deleted predecessor can be reconciled.")
+    audit = lifecycle.queue_completion_audit(config, previous, current, record.get("completion_audit_path"))
+    if (not audit["passed"] or not audit.get("audit_sha256")
+            or audit["audit_sha256"] != record.get("completion_audit", {}).get("audit_sha256")):
+        raise QueueError("The original completed audit and receipts cannot be verified.")
+    response = api.call("status", {"run_id": current["run_id"]})
+    validate_response(data, response)  # Never update the old pointer during recovery.
+    run = response["run"]
+    if (run.get("status") != "completed" or run.get("thread_id") != previous or unsettled(run)
+            or any(item.get("status") != "done" for item in run["items"])):
+        raise QueueError("Deleted-owner recovery requires a completed server run with every item Done and no unsettled operations.")
+    digest = lambda value: lifecycle.hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+    evidence = {"schema_version": 1, "kind": "deleted_completed_owner", "actor_thread_id": ident,
+                "previous_thread_id": previous, "verified_at_ms": lifecycle.now_ms(), "authorization": proof,
+                "confirmation": confirmation, "registry_record_sha256": digest(record),
+                "pointer_current_sha256": digest(current), "audit_sha256": audit["audit_sha256"],
+                "original_registry_record": record, "server_run": public(run)}
+    path = config.business_control.parent / f"deleted-owner-{previous[:8]}-{uuid4()}.json"
+    lifecycle.atomic_json(path, evidence)
+    receipt = {"path": str(path), "sha256": lifecycle.hashlib.sha256(path.read_bytes()).hexdigest()}
+    lifecycle.inspect_deleted_completed_owner(config, previous, ident, proof, receipt)
+    return receipt
+
+
+def start_follow_on(config, api, ident, authorization_item_id=None):
+    """Consume one actual added-lots request only after the owned snapshot finishes."""
+    proof = lifecycle.follow_on_request(config, ident, authorization_item_id)
+    record = lifecycle.registry(config)["runs"].get(ident, {})
+    if record.get("follow_on_authorization", {}).get("authorization") == proof:
+        # Covers a lost start response and a crash after lifecycle acquisition.
+        # The ordinary path journals/reuses one request and refuses a finished replay.
+        return start(config, api, ident, proof["item_id"])
+    lifecycle.inspect_tree(config, ident, require_terminal=False, continuation=True)
+    with lifecycle.file_lock(config.path.parent / "manual-queue.lock"):
+        data = pointer(config)
+        current = data["current"] or {}
+        if (record.get("status") != "finished" or current.get("finished") is not True
+                or current.get("owner_thread_id") != ident or current.get("stopped")
+                or not lifecycle.business_clear(config)):
+            raise QueueError("Finish and audit the current snapshot before starting its explicitly requested successor.")
+        response = api.call("status", {"run_id": current["run_id"]})
+        validate_response(data, response)
+        if response["run"].get("status") != "completed" or unsettled(response["run"]):
+            raise QueueError("The current server snapshot must be completed with every operation settled.")
+        audit = lifecycle.queue_completion_audit(config, ident, current, record.get("completion_audit_path"))
+        if (not audit["passed"] or not audit.get("audit_sha256")
+                or audit["audit_sha256"] != record.get("completion_audit", {}).get("audit_sha256")):
+            raise QueueError("The original completed snapshot audit cannot be verified.")
+        digest = lambda value: lifecycle.hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+        path = config.business_control.parent / f"follow-on-{ident[:8]}-{uuid4()}.json"
+        lifecycle.atomic_json(path, {"schema_version": 1, "actor_thread_id": ident, "authorization": proof,
+                                    "verified_at_ms": lifecycle.now_ms(), "audit_sha256": audit["audit_sha256"],
+                                    "registry_record_sha256": digest(record), "pointer_current_sha256": digest(current),
+                                    "server_run": public(response["run"])})
+        lifecycle.activate_follow_on(config, ident, proof, path)
+    return start(config, api, ident, proof["item_id"])
+
+
+def start(config, api, ident, authorization_item_id=None, *, reconcile_deleted_owner=False):
+    receipt = (deleted_completed_owner_receipt(config, api, ident, authorization_item_id)
+               if reconcile_deleted_owner else None)
+    allowance = lifecycle.start_manual(config, ident, authorization_item_id, deleted_owner_receipt=receipt)
     if not allowance.get("work_allowed") or allowance.get("recovery_only"):
         return allowance
     with lifecycle.file_lock(config.path.parent / "manual-queue.lock"):
@@ -477,11 +557,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", type=Path, default=lifecycle.DEFAULT_CONFIG)
     sub = parser.add_subparsers(dest="action", required=True)
-    for action in ("start", "resume", "reconcile", "stop", "status", "claim", "intent", "settle", "outcome", "block", "amend", "finish"):
+    for action in ("start", "start-follow-on", "resume", "reconcile", "stop", "status", "claim", "intent", "settle", "outcome", "block", "amend", "finish"):
         command = sub.add_parser(action)
         command.add_argument("--thread-id", required=True)
-        if action in {"start", "resume"}:
+        if action in {"start", "start-follow-on", "resume"}:
             command.add_argument("--authorization-item-id")
+        if action == "start":
+            command.add_argument("--reconcile-deleted-owner", action="store_true",
+                                 help="Verify a human-confirmed deleted completed predecessor before a new snapshot.")
         if action in {"intent", "settle", "outcome", "block", "amend", "reconcile"}:
             command.add_argument("--payload", required=True, type=Path)
         if action == "reconcile":
@@ -495,11 +578,14 @@ def main(argv=None):
         config = lifecycle.load_config(args.config)
         ident = lifecycle.thread_uuid(args.thread_id)
         api = WorkerAPI(os.environ.get("SECONDSTATE_BASE_URL", "https://secondstate.art"), os.environ.get("CATALOG_API_KEY", ""))
-        if args.action in {"start", "resume"}:
+        if args.action == "start-follow-on":
+            result = start_follow_on(config, api, ident, args.authorization_item_id)
+        elif args.action in {"start", "resume"}:
             if args.action == "resume":
                 result = resume(config, api, ident, args.authorization_item_id, args.audit)
             else:
-                result = start(config, api, ident, args.authorization_item_id)
+                result = start(config, api, ident, args.authorization_item_id,
+                               reconcile_deleted_owner=args.reconcile_deleted_owner)
         elif args.action == "reconcile":
             result = reconcile(config, api, ident, lifecycle.read_json(args.payload), args.receipt)
         elif args.action == "stop":

@@ -224,6 +224,11 @@ body{
     }
 
     /* Page content cards */
+    /* Keep the About and Contact backgrounds from repeating below the viewport. */
+    html:has(.about-card, .contact-grid){
+      height:auto;
+      min-height:100%;
+    }
     .contact-grid{
       display:grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -624,6 +629,11 @@ body{
       background-color: #0d0d0d;
       text-decoration:none;
     }
+
+/* Keep the detail backdrop continuous without changing header scroll behavior. */
+body:has(.artwork-detail-page){
+  background-attachment: fixed;
+}
 
 .artwork-detail-page{
   padding-top: 4px;

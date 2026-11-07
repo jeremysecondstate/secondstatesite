@@ -258,10 +258,14 @@ test("nonpartner-only dates remain selectable and show scoped empty guidance wit
   assert.match(p.salesList.textContent, /No auctions from Oliver’s auction houses on this date/);
   assert.equal(p.researchLaunch.hidden, true);
   assert.equal(p.lotBrowserLaunch.hidden, true);
-  assert.equal(p.dayButtons[1].getAttribute("aria-pressed"), "true");
+  assert.deepEqual(p.dayButtons.map(button => button.getAttribute("aria-pressed")), ["false", "true"]);
+  assert.deepEqual(p.dayButtons.map(button => button.cell.getAttribute("aria-selected")), [null, null]);
   p.run('setCalendarView("calendar")');
   assert.deepEqual(p.sidebarIds(), [2]);
   assert.equal(p.researchLaunch.hidden, false);
+  p.run(`showDay("${dayA}")`);
+  assert.deepEqual(p.dayButtons.map(button => button.getAttribute("aria-pressed")), ["true", "false"]);
+  assert.deepEqual(p.dayButtons.map(button => button.cell.getAttribute("aria-selected")), [null, null]);
 });
 
 test("month URLs, scoped catalog links and history restoration retain view/date and attribution preference", () => {

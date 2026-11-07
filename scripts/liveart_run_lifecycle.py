@@ -775,6 +775,83 @@ RECONCILIATION_QUESTION = (
 )
 RECONCILIATION_ANSWER = "Reconcile that completed run and continue"
 
+FOLLOW_ON_COMMAND = "fyi: i've added some more lots to the liveart queue! please do those too"
+
+
+def follow_on_request(config, ident, item_id=None):
+    """Read the exact actual added-lots request in the current active root turn."""
+    ident = thread_uuid(ident)
+    with database(config.state_db) as state, database(config.history_db) as history:
+        root = scoped_root(state, config, ident, manual=True)
+        turn = history.execute("SELECT turn_id,status,started_at,completed_at FROM thread_turns "
+                               "WHERE thread_id=? ORDER BY rollout_ordinal DESC LIMIT 1", (ident,)).fetchone()
+        if root["archived"] or turn is None or turn["status"] != "inProgress" or turn["completed_at"] is not None:
+            raise LifecycleError("Follow-on work requires the current active root turn.")
+        rows = history.execute("SELECT item_id,created_at_ms,item_json FROM thread_items "
+                               "WHERE thread_id=? AND turn_id=? AND item_type='userMessage' "
+                               "ORDER BY created_at_ms DESC,rowid DESC", (ident, turn["turn_id"])).fetchall()
+        row = next((row for row in rows if not is_queue_acknowledgment(manual_message_text(row["item_json"]))), None)
+        if (row is None or item_id is not None and row["item_id"] != thread_uuid(item_id)
+                or manual_message_text(row["item_json"]) != FOLLOW_ON_COMMAND
+                or type(row["created_at_ms"]) is not int or row["created_at_ms"] < turn["started_at"] * 1000):
+            raise LifecycleError("The current actual human message must explicitly request the added LiveArt lots.")
+        return {"item_id": row["item_id"], "turn_id": turn["turn_id"], "created_at_ms": row["created_at_ms"]}
+
+
+def recorded_follow_on_authorization(config, ident, item_id, turn_id, raw):
+    """Validate a retained successor authority without turning wording into blanket permission."""
+    if manual_message_text(raw) != FOLLOW_ON_COMMAND:
+        return False
+    record = registry(config)["runs"].get(ident, {})
+    for entry in [record, *record.get("continuation_history", [])]:
+        follow_on = entry.get("follow_on_authorization", {})
+        proof = follow_on.get("authorization", {})
+        if proof.get("item_id") != item_id or proof.get("turn_id") != turn_id:
+            continue
+        with database(config.history_db) as history:
+            actual = history.execute("SELECT item_type,item_json,created_at_ms FROM thread_items "
+                                     "WHERE thread_id=? AND turn_id=? AND item_id=?", (ident, turn_id, item_id)).fetchone()
+            original = history.execute("SELECT item_type,item_json,created_at_ms FROM thread_items "
+                                       "WHERE thread_id=? AND item_id=?", (ident, follow_on.get("original_authorization_item_id"))).fetchone()
+        return bool(actual and original and actual["item_type"] == original["item_type"] == "userMessage"
+                    and actual["item_json"] == raw and actual["created_at_ms"] == proof.get("created_at_ms")
+                    and original["created_at_ms"] < actual["created_at_ms"]
+                    and manual_message_text(original["item_json"]) in {"process my liveart queue", "please process my liveart queue"})
+    return False
+
+DELETED_COMPLETED_CHAT_QUESTION = (
+    "The previous LiveArt run has a completed audit, but its Codex chat and execution history are missing. "
+    "Was the November 5 LiveArt chat deleted or moved? The queue’s ownership rule requires verifying "
+    "that old execution before starting a new run."
+)
+
+
+def deleted_completed_chat_reply(raw):
+    """This factual clarification retains an earlier command; it is not a command."""
+    try:
+        message = json.loads(raw)
+        content = message["content"]
+        if message.get("type") != "userMessage" or len(content) != 1:
+            return None
+        tagged = re.fullmatch(
+            r"\s*<send_user_message_question_reply>\s*(.*?)\s*</send_user_message_question_reply>\s*",
+            content[0]["text"], re.DOTALL)
+        replies = json.loads(tagged[1]) if tagged else None
+        if not isinstance(replies, list) or len(replies) != 1 or not isinstance(replies[0], dict):
+            return None
+        reply = replies[0]
+        question_id = json.loads(reply.get("questionItemId", "null"))
+        if (set(reply) != {"questionItemId", "question", "answer"}
+                or reply["question"] != DELETED_COMPLETED_CHAT_QUESTION
+                or reply["answer"] != "I deleted the completed chat"
+                or not isinstance(question_id, list) or len(question_id) != 3
+                or question_id[0] != "request_user_input_async" or question_id[2] != 0
+                or not isinstance(question_id[1], str) or not re.fullmatch(r"call_[A-Za-z0-9]+", question_id[1])):
+            return None
+        return reply
+    except (ValueError, KeyError, TypeError):
+        return None
+
 
 def annotated_reassessment_command(raw):
     """Recognize the desktop's annotated queue request for this specific correction."""
@@ -809,6 +886,8 @@ def validate_authorization_message(config, ident, item_id, turn_id, raw):
     if manual_message_text(raw) in {"process my liveart queue", "please process my liveart queue"}:
         return True
     if annotated_reassessment_command(raw):
+        return True
+    if recorded_follow_on_authorization(config, ident, item_id, turn_id, raw):
         return True
     try:
         ident, item_id, turn_id = map(thread_uuid, (ident, item_id, turn_id))
@@ -923,6 +1002,10 @@ def same_turn_queue_continuation(items):
     if any(is_stop_message(text) for text in texts):
         return None
     followups = list(zip(chronological[1:], texts[1:]))
+    if (any(deleted_completed_chat_reply(item["item_json"]) for item, _ in followups)
+            and all(deleted_completed_chat_reply(item["item_json"]) or is_queue_acknowledgment(text)
+                    for item, text in followups)):
+        return chronological[0]
     authorization = {"i'm authorizing you to do the work", "i am authorizing you to do the work"}
     if followups[-1][1] in authorization:
         followups.pop()
@@ -1024,7 +1107,149 @@ def manual_authorization(config, ident, authorization_item_id=None, *, command="
                 "created_at_ms": item["created_at_ms"]}
 
 
-def start_manual(config, ident, authorization_item_id=None):
+def deleted_owner_confirmation(config, ident, proof):
+    """Read the actual same-turn human deletion clarification and original command."""
+    if manual_authorization(config, ident, proof["item_id"]) != proof:
+        raise LifecycleError("The current queue authorization changed.")
+    with database(config.history_db) as history:
+        rows = history.execute(
+            "SELECT item_id,created_at_ms,item_json FROM thread_items WHERE thread_id=? AND turn_id=? "
+            "AND item_type='userMessage' ORDER BY created_at_ms DESC, rowid DESC",
+            (ident, proof["turn_id"])).fetchall()
+        for row in rows:
+            reply = deleted_completed_chat_reply(row["item_json"])
+            if reply and row["created_at_ms"] > proof["created_at_ms"]:
+                return {"thread_id": ident, "turn_id": proof["turn_id"], "item_id": row["item_id"],
+                        "created_at_ms": row["created_at_ms"], "reply": reply}
+    raise LifecycleError("An actual same-turn confirmation that the completed chat was deleted is required.")
+
+
+def inspect_deleted_completed_owner(config, previous, ident, proof, receipt):
+    """Narrow completed/deleted recovery; missing unfinished history remains closed.
+
+    The queue client supplies a fresh server-verified receipt. Revalidate local
+    completion, actual human provenance and absence while holding lifecycle lock.
+    This path never repairs or resumes an unfinished predecessor.
+    """
+    path = Path(receipt["path"]).resolve()
+    if not path.is_relative_to(config.business_control.parent.resolve()):
+        raise LifecycleError("Deleted-owner receipt must be inside the business-control directory.")
+    if hashlib.sha256(path.read_bytes()).hexdigest() != receipt["sha256"]:
+        raise LifecycleError("Deleted-owner verification receipt changed.")
+    evidence = read_json(path)
+    data = registry(config)
+    record = data["runs"].get(previous, {})
+    pointer_path = config.path.parent / "manual-queue.json"
+    pointer = read_json(pointer_path, max_bytes=MAX_QUEUE_POINTER_BYTES).get("current", {})
+    digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+    if (evidence.get("schema_version") != 1 or evidence.get("kind") != "deleted_completed_owner"
+            or evidence.get("actor_thread_id") != ident or evidence.get("previous_thread_id") != previous
+            or data["active_thread_id"] != previous or record.get("status") != "finished"
+            or record.get("manual_queue") is not True or pointer.get("finished") is not True
+            or pointer.get("owner_thread_id") != previous or pointer.get("run", {}).get("status") != "completed"
+            or evidence.get("registry_record_sha256") != digest(record)
+            or evidence.get("pointer_current_sha256") != digest(pointer)
+            or evidence.get("confirmation") != deleted_owner_confirmation(config, ident, proof)
+            or evidence.get("authorization") != proof or not business_clear(config)):
+        raise LifecycleError("Deleted-owner recovery requires unchanged, completed, fully accounted records.")
+    with database(config.state_db) as state, database(config.history_db) as history:
+        columns = {row[1] for row in state.execute("PRAGMA table_info(threads)")}
+        # Codex can retain parent provenance on a child even when its edge was
+        # removed. Such an orphan is still execution evidence, not deletion proof.
+        surviving_parent_reference = any(
+            state.execute(f"SELECT 1 FROM threads WHERE instr({column}, ?)>0 LIMIT 1", (previous,)).fetchone()
+            for column in ("source", "attached_thread_parent_id") if column in columns)
+        if (state.execute("SELECT 1 FROM threads WHERE id=?", (previous,)).fetchone()
+                or surviving_parent_reference
+                or state.execute("SELECT 1 FROM thread_spawn_edges WHERE parent_thread_id=? OR child_thread_id=?",
+                                 (previous, previous)).fetchone()
+                or history.execute("SELECT 1 FROM thread_turns WHERE thread_id=?", (previous,)).fetchone()
+                or history.execute("SELECT 1 FROM thread_items WHERE thread_id=?", (previous,)).fetchone()
+                or history.execute("SELECT 1 FROM thread_history_projection_state WHERE thread_id=?", (previous,)).fetchone()):
+            raise LifecycleError("The previous chat or descendants still have execution records; use ordinary verification.")
+    audit = queue_completion_audit(config, previous, pointer, record.get("completion_audit_path"))
+    if (not audit["passed"] or audit.get("audit_sha256") != record.get("completion_audit", {}).get("audit_sha256")
+            or audit.get("audit_sha256") != evidence.get("audit_sha256")):
+        raise LifecycleError("The original completed audit and receipts cannot be verified.")
+    remote = evidence.get("server_run", {})
+    local = pointer["run"]
+    if (remote.get("status") != "completed" or remote.get("id") != local.get("id")
+            or remote.get("thread_id") != previous or remote.get("request_id") != local.get("request_id")
+            or remote.get("items") is None or len(remote["items"]) != len(local["items"])
+            or any(item.get("status") != "done" or any(op.get("status") != "settled" for op in item.get("operations", []))
+                   for item in remote["items"])
+            or any(op.get("status") != "settled" for op in remote.get("operations", []))):
+        raise LifecycleError("The retained server verification is not a completed, settled run.")
+    return {"path": str(path), "sha256": receipt["sha256"], "confirmation": evidence["confirmation"]}
+
+
+def activate_follow_on(config, ident, proof, verification_path):
+    """Start a distinct successor after completion, honoring authorization given mid-run.
+
+    This does not relax reactivate's later-turn rule or change the old snapshot.
+    The queue client has just checked server completion; all local proof is
+    rechecked under the lifecycle lock before recording successor ownership.
+    """
+    with file_lock(config.lock):
+        current = inspect_tree(config, ident, require_terminal=False, continuation=True)
+        data = registry(config)
+        record = data["runs"].get(ident, {})
+        path = Path(verification_path).resolve()
+        if not path.is_relative_to(config.business_control.parent.resolve()):
+            raise LifecycleError("Follow-on verification must be inside the business-control directory.")
+        verification = read_json(path)
+        pointer = read_json(config.path.parent / "manual-queue.json", max_bytes=MAX_QUEUE_POINTER_BYTES)["current"]
+        digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+        if (data["active_thread_id"] != ident or record.get("status") != "finished"
+                or record.get("manual_queue") is not True or pointer.get("finished") is not True
+                or pointer.get("stopped") or pointer.get("owner_thread_id") != ident
+                or pointer.get("run", {}).get("status") != "completed"
+                or proof != follow_on_request(config, ident, proof["item_id"])
+                or proof["turn_id"] != pointer.get("authorization_turn_id")
+                or proof["item_id"] == pointer.get("authorization_item_id")
+                or proof["created_at_ms"] <= pointer.get("created_at_ms", 0)
+                or human_stop_requested(config, ident, pointer["authorization_item_id"])
+                or verification.get("authorization") != proof
+                or verification.get("registry_record_sha256") != digest(record)
+                or verification.get("pointer_current_sha256") != digest(pointer)
+                or not business_clear(config)):
+            raise LifecycleError("Follow-on work requires a distinct later request and an unchanged completed snapshot.")
+        original_id = pointer["authorization_item_id"]
+        with database(config.history_db) as history:
+            original = history.execute("SELECT item_type,item_json FROM thread_items WHERE thread_id=? AND item_id=?",
+                                       (ident, original_id)).fetchone()
+        if (original is None or original["item_type"] != "userMessage" or manual_message_text(original["item_json"])
+                not in {"process my liveart queue", "please process my liveart queue"}):
+            raise LifecycleError("Follow-on work must retain its original actual queue command.")
+        audit = queue_completion_audit(config, ident, pointer, record.get("completion_audit_path"))
+        remote = verification.get("server_run", {})
+        if (not audit["passed"] or not audit.get("audit_sha256")
+                or audit["audit_sha256"] != record.get("completion_audit", {}).get("audit_sha256")
+                or audit["audit_sha256"] != verification.get("audit_sha256")
+                or remote.get("status") != "completed" or remote.get("id") != pointer.get("run_id")
+                or remote.get("thread_id") != ident
+                or any(item.get("status") not in {"done", "needs_attention"}
+                       or any(op.get("status") != "settled" for op in item.get("operations", []))
+                       for item in remote.get("items", []))):
+            raise LifecycleError("Follow-on work requires the verified completed audit and settled server snapshot.")
+        again = inspect_tree(config, ident, require_terminal=False, continuation=True)
+        if current["signature"] != again["signature"] or not business_clear(config):
+            raise LifecycleError("Execution or business state changed during follow-on acquisition.")
+        prior = {key: value for key, value in record.items() if key != "continuation_history"}
+        record["continuation_history"] = [*record.get("continuation_history", []), prior]
+        record.update(status="active", started_at_ms=now_ms(), resumed_at_ms=now_ms(), recovery_only=False,
+                      authorization_item_id=proof["item_id"], authorization_turn_id=proof["turn_id"],
+                      follow_on_authorization={"authorization": proof, "prior_run_id": pointer["run_id"],
+                                               "original_authorization_item_id": original_id,
+                                               "verification_path": str(path),
+                                               "verification_sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+        record.pop("finished_at_ms", None)
+        atomic_json(config.registry, data)
+        event(config, "manual_follow_on_started", thread_id=ident, prior_run_id=pointer["run_id"],
+              authorization_item_id=proof["item_id"])
+
+
+def start_manual(config, ident, authorization_item_id=None, *, deleted_owner_receipt=None):
     """Acquire existing conservative guards for one finite, human selected queue."""
     ident = thread_uuid(ident)
     with file_lock(config.lock):
@@ -1049,7 +1274,10 @@ def start_manual(config, ident, authorization_item_id=None):
         recovery_only = False
         if previous:
             try:
-                inspect_prior_owner(config, previous)
+                if deleted_owner_receipt is None:
+                    inspect_prior_owner(config, previous)
+                else:
+                    inspect_deleted_completed_owner(config, previous, ident, proof, deleted_owner_receipt)
             except LifecycleError:
                 return {"status": "busy", "thread_id": ident, "work_allowed": False}
             recovery_only = not business_clear(config)
@@ -1062,7 +1290,11 @@ def start_manual(config, ident, authorization_item_id=None):
         if current["signature"] != again["signature"]:
             raise LifecycleError("Run or descendant state changed during manual startup.")
         if previous:
-            inspect_prior_owner(config, previous)
+            if deleted_owner_receipt is None:
+                inspect_prior_owner(config, previous)
+            else:
+                reconciliation = inspect_deleted_completed_owner(config, previous, ident, proof, deleted_owner_receipt)
+                data["runs"][previous]["deleted_owner_reconciliation"] = reconciliation
             data["runs"][previous]["status"] = "reconciled_terminal"
             data["runs"][previous]["reconciled_at_ms"] = now_ms()
         prior_record = data["runs"].get(ident)

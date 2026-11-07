@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from audit_drouot_calendar import (
-    PUBLIC_FIELDS, READBACK_FIELDS, compare_snapshots, expected_record, fetch_snapshot, key, projected_dom, public_row, read_dom,
+    PUBLIC_FIELDS, READBACK_FIELDS, compare_snapshots, expected_record, fetch_snapshot, key, projected_dom, public_row, read_dom, read_public_dom,
 )
 
 
@@ -229,6 +229,52 @@ class DrouotCalendarAuditTests(unittest.TestCase):
         proof["captured_at"] = "2026-11-01T05:59:00+00:00"
         with self.assertRaisesRegex(ValueError, "postdate"):
             compare_snapshots(before, after, *reports([incoming]), superseded_db=proof, historical_dom=historical)
+
+    def test_superseded_replacement_outside_api_horizon_requires_exact_before_and_after_monthly_identity(self):
+        incoming, before, after, proof, historical = superseded_fixture()
+        replacement = before["lots"][0]
+        replacement["end_at"] = "2026-11-14T15:00:00+00:00"
+        monthly = {789: {**projected_dom(replacement, "America/Los_Angeles"), "calendar_id": 789}}
+        before["lots"], after["lots"] = [], []
+        kwargs = dict(superseded_db=proof, historical_dom=historical,
+                      replacement_before_dom=monthly, replacement_after_dom=deepcopy(monthly))
+        result = compare_snapshots(before, after, *reports([incoming]), **kwargs)
+        self.assertTrue(result["passed"], result["errors"])
+        self.assertEqual(result["accepted_superseded_db_fields_verified"], 1)
+        for phase in ("replacement_before_dom", "replacement_after_dom"):
+            for field, value in (("calendar_id", 999), ("lot_url", "https://www.invaluable.com/wrong-lot"),
+                                 ("event_at", None), ("event_at", "2026-11-03T15:00:00+00:00")):
+                with self.subTest(phase=phase, field=field, value=value):
+                    changed = deepcopy(kwargs)
+                    changed[phase][789][field] = value
+                    with self.assertRaises(ValueError):
+                        compare_snapshots(before, after, *reports([incoming]), **changed)
+            missing = deepcopy(kwargs)
+            missing[phase] = {}
+            with self.assertRaisesRegex(ValueError, "monthly"):
+                compare_snapshots(before, after, *reports([incoming]), **missing)
+        missing_key = deepcopy(before)
+        missing_key["calendar_lot_keys"] = []
+        with self.assertRaisesRegex(ValueError, "identity"):
+            compare_snapshots(missing_key, after, *reports([incoming]), **kwargs)
+        conflicting_api = deepcopy(after)
+        conflicting_api["lots"] = [{**replacement, "lot_url": "https://www.invaluable.com/wrong-lot"}]
+        with self.assertRaisesRegex(ValueError, "API URL conflicts"):
+            compare_snapshots(before, conflicting_api, *reports([incoming]), **kwargs)
+
+    def test_all_provider_monthly_identity_projection_excludes_private_fields_and_rejects_conflicts(self):
+        row = {"id": 789, "lot_url": "https://www.invaluable.com/auction-lot/print-23-c-example",
+               "event_at": "2026-11-14T15:00:00+00:00", "staff_research": "PRIVATE_RESEARCH"}
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "public-dom.json"
+            path.write_text(json.dumps([row]), encoding="utf-8")
+            projected = read_public_dom([path])
+            self.assertEqual(projected[789]["calendar_id"], 789)
+            self.assertEqual(projected[789]["lot_url"], row["lot_url"])
+            self.assertNotIn("PRIVATE", json.dumps(projected))
+            path.write_text(json.dumps([row, {**row, "lot_url": "https://www.invaluable.com/other"}]), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "disagree"):
+                read_public_dom([path])
 
     def test_supersession_exception_rejects_unproven_identity_replacement_or_private_fields(self):
         for field, changed in (("active", True), ("id", 9999), ("replacement_id", 1234),

@@ -531,7 +531,7 @@ def auction_calendar(request):
         groups.sort(key=lambda item: (item["date_iso"], item["sort_at"], item["auction_house"]))
         return groups[:10]
 
-    visible_upcoming_groups = upcoming_groups_for(upcoming_lots)
+    visible_upcoming_groups = upcoming_groups_for(upcoming_lots, track_identity=True)
     oliver_upcoming_groups = upcoming_groups_for(oliver_upcoming_lots, track_identity=True)
 
     # The upcoming list is capped for display, but each date it can select must
@@ -557,16 +557,18 @@ def auction_calendar(request):
             for group in _group_lots([lot for lot in day_lots if is_oliver_house(lot.auction_house)], zone)
         ]
 
-    # The first scoped query chooses the ten sessions; complete day loads supply
-    # their counts and artists even if a session crossed its 1,000-lot boundary.
-    for group in oliver_upcoming_groups:
-        identity = group.pop("_calendar_sale_identity")
-        sale_lots = [
-            lot for lot in complete_day_lots[group["date_iso"]]
-            if lot.active and is_oliver_house(lot.auction_house) and _sale_identity(lot) == identity
-        ]
-        if sale_lots:
-            group.update(_group_lots(sale_lots, zone)[0])
+    # The capped queries choose each scope's ten sessions; complete day loads
+    # supply counts and artists even if a session crossed the 1,000-lot boundary.
+    for groups, oliver_only in ((visible_upcoming_groups, False), (oliver_upcoming_groups, True)):
+        for group in groups:
+            identity = group.pop("_calendar_sale_identity")
+            sale_lots = [
+                lot for lot in complete_day_lots[group["date_iso"]]
+                if lot.active and (not oliver_only or is_oliver_house(lot.auction_house))
+                and _sale_identity(lot) == identity
+            ]
+            if sale_lots:
+                group.update(_group_lots(sale_lots, zone)[0])
 
     _attach_superseded_attribution(calendar_data)
     retained_research_lot = _attach_retained_calendar_work(

@@ -250,6 +250,28 @@ def read_dom(paths):
     return result
 
 
+def read_public_dom(paths):
+    """Index only public monthly fields, preserving all providers' database IDs."""
+    result = {}
+    for path in paths:
+        rows = load(path)
+        if not isinstance(rows, list):
+            raise ValueError("--dom files must contain public Calendar row arrays.")
+        for raw in rows:
+            if not isinstance(raw, dict):
+                raise ValueError("Public DOM rows must be objects.")
+            database_id = raw.get("id")
+            if type(database_id) is not int or database_id < 1:
+                raise ValueError("Public DOM rows need their Calendar database ID.")
+            row = {field: raw.get(field) for field in DOM_FIELDS}
+            row["calendar_id"] = database_id
+            prior = result.get(database_id)
+            if prior and differences(prior, row, DOM_FIELDS):
+                raise ValueError(f"Public monthly DOM rows disagree for database ID {database_id}.")
+            result[database_id] = row
+    return result
+
+
 def inside_horizon(row, coverage):
     event = row.get("end_at") or row.get("start_at")
     if not event:
@@ -341,7 +363,8 @@ def cross_listing_candidates(accepted, existing):
     return results
 
 
-def superseded_records(proof, historical_dom, before, after, accepted, dom):
+def superseded_records(proof, historical_dom, before, after, accepted, dom,
+                       replacement_before_dom=None, replacement_after_dom=None):
     """Accept only proven preexisting supersessions, never infer a merge."""
     if proof is None:
         return {}
@@ -376,11 +399,23 @@ def superseded_records(proof, historical_dom, before, after, accepted, dom):
         if historical_dom.get(identity, {}).get("calendar_id") != database_id:
             raise ValueError("Superseded DB ID does not match historical public Calendar evidence.")
         replacement_key = key({"source": row["replacement_source"], "source_lot_id": row["replacement_source_lot_id"]})
-        if (replacement_key == identity or replacement_key not in original_keys or replacement_key not in current_keys
-                or replacement_key not in prior_public or replacement_key not in current_public
-                or any(canonical("lot_url", records[replacement_key].get("lot_url")) != canonical("lot_url", row["replacement_lot_url"])
-                       for records in (prior_public, current_public))):
+        replacement_url = canonical("lot_url", row["replacement_lot_url"])
+        if replacement_key == identity or replacement_key not in original_keys or replacement_key not in current_keys:
             raise ValueError("Superseded replacement lacks matching before/after public identity and URL proof.")
+        monthly_pair = (replacement_before_dom or {}, replacement_after_dom or {})
+        needs_monthly = replacement_key not in prior_public or replacement_key not in current_public
+        for snapshot, records, monthly in zip((before, after), (prior_public, current_public), monthly_pair):
+            public_row = records.get(replacement_key)
+            if public_row and canonical("lot_url", public_row.get("lot_url")) != replacement_url:
+                raise ValueError("Superseded replacement API URL conflicts with database identity proof.")
+            if needs_monthly:
+                visible = monthly.get(replacement_id)
+                if (not visible or visible.get("calendar_id") != replacement_id
+                        or canonical("lot_url", visible.get("lot_url")) != replacement_url):
+                    raise ValueError("Superseded replacement requires exact before/after monthly database ID and URL proof.")
+                if not public_row and (not visible.get("event_at")
+                        or inside_horizon({"end_at": visible["event_at"]}, snapshot["coverage"])):
+                    raise ValueError("Superseded replacement missing from API within its public date horizon.")
         public = {field: row[field] for field in fields}
         public.update(end_at=row["event_at"], last_seen_at=row["source_last_seen_at"])
         result[identity] = {"public": public, "calendar_id": database_id,
@@ -388,7 +423,8 @@ def superseded_records(proof, historical_dom, before, after, accepted, dom):
     return result
 
 
-def compare_snapshots(before, after, preview, sync, dom=None, superseded_db=None, historical_dom=None, baseline_dom=None):
+def compare_snapshots(before, after, preview, sync, dom=None, superseded_db=None, historical_dom=None, baseline_dom=None,
+                      replacement_before_dom=None, replacement_after_dom=None):
     old, saved, accepted = indexed(before["lots"]), indexed(after["lots"]), indexed(preview["lots"])
     if any(not identity.startswith("drouot:") for identity in accepted):
         raise ValueError("The Drouot preview includes another source.")
@@ -414,7 +450,8 @@ def compare_snapshots(before, after, preview, sync, dom=None, superseded_db=None
         global_before, global_after, accepted, old, saved, baseline_dom or {}, dom)
     resolved_aliases = {row["old_alias"] for row in resolved_url_alias_changes}
     lost = sorted(set(raw_missing_before_keys) - resolved_aliases)
-    superseded = superseded_records(superseded_db, historical_dom or {}, before, after, accepted, dom)
+    superseded = superseded_records(superseded_db, historical_dom or {}, before, after, accepted, dom,
+                                    replacement_before_dom, replacement_after_dom)
     for identity, incoming in accepted.items():
         prior = old.get(identity)
         is_stale = prior and stamp(prior.get("last_seen_at")) and (not stamp(incoming.get("last_seen_at"))
@@ -528,7 +565,8 @@ def main(argv=None):
     else:
         result = compare_snapshots(load(args.run_dir / "calendar-before.json"), load(args.run_dir / "calendar-after.json"),
                                    load(args.run_dir / "preview-report.json"), load(args.run_dir / "sync-report.json"), read_dom(args.dom),
-                                   load(args.superseded_db) if args.superseded_db else None, read_dom(args.prior_dom), read_dom(args.before_dom))
+                                   load(args.superseded_db) if args.superseded_db else None, read_dom(args.prior_dom), read_dom(args.before_dom),
+                                   read_public_dom(args.before_dom), read_public_dom(args.dom))
         if args.before_dom:
             result["baseline_dom_evidence"] = [str(path.resolve()) for path in args.before_dom]
         if args.superseded_db:

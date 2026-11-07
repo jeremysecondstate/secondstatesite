@@ -16,3 +16,28 @@
   </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelector(".contact-grid").addEventListener("focusin", ({ target: link }) => {
+    if (!link.matches("a:focus-visible")) return;
+
+    // Let the browser scroll to the link first, then clear the sticky header and focus ring.
+    requestAnimationFrame(() => {
+      if (document.activeElement !== link) return;
+
+      const focusRingInset = 6;
+      const headerBottom = document.querySelector("header.nav").getBoundingClientRect().bottom;
+      const visibleTop = headerBottom + focusRingInset;
+      const visibleBottom = document.documentElement.clientHeight - focusRingInset;
+      const { top, bottom } = link.getBoundingClientRect();
+
+      if (top < visibleTop) {
+        window.scrollBy({ top: top - visibleTop, behavior: "instant" });
+      } else if (bottom > visibleBottom) {
+        window.scrollBy({ top: bottom - visibleBottom, behavior: "instant" });
+      }
+    });
+  });
+</script>
+{% endblock %}

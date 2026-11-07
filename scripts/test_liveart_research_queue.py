@@ -235,6 +235,214 @@ class ManualQueueTests(unittest.TestCase):
         with self.assertRaises(lifecycle.LifecycleError):
             lifecycle.manual_authorization(self.config, ident, original)
 
+    def deleted_chat_reply(self):
+        return "<send_user_message_question_reply>" + json.dumps([{
+            "questionItemId": '["request_user_input_async","call_deleted",0]',
+            "question": lifecycle.DELETED_COMPLETED_CHAT_QUESTION,
+            "answer": "I deleted the completed chat",
+        }]) + "</send_user_message_question_reply>"
+
+    def deleted_finished_predecessor(self):
+        prior, _ = self.human()
+        queue.start(self.config, self.api, prior)
+        for item in self.api.run["items"]:
+            item["status"] = "done"
+        queue.coordinate(self.config, self.api, prior, "status")
+        queue.coordinate(self.config, self.api, prior, "finish", audit_path=self.audit(prior))
+        self.f.set_turn(prior, "completed")
+        with closing(sqlite3.connect(self.f.state)) as db, db:
+            db.execute("DELETE FROM threads WHERE id=?", (prior,))
+        with closing(sqlite3.connect(self.f.history)) as db, db:
+            for table in ("thread_items", "thread_turns", "thread_history_projection_state"):
+                db.execute(f"DELETE FROM {table} WHERE thread_id=?", (prior,))
+        (self.f.folder / (prior + ".jsonl")).unlink()
+        current, original = self.human()
+        self.same_turn_messages(current, original, [self.deleted_chat_reply()])
+        self.api.calls.clear()
+        return prior, current, original
+
+    def test_deleted_completed_chat_recovery_preserves_history_and_real_authorization(self):
+        prior, current, original = self.deleted_finished_predecessor()
+        old_pointer = copy.deepcopy(queue.pointer(self.config)["current"])
+        self.assertEqual(queue.start(self.config, self.api, current)["status"], "busy")
+        def new_snapshot(action, payload):
+            if action == "start":
+                self.assertEqual(self.api.run["status"], "completed")
+                self.api.run = None
+        self.api.before = new_snapshot
+        result = queue.start(self.config, self.api, current, reconcile_deleted_owner=True)
+        self.assertEqual(result["status"], "ready")
+        saved = queue.pointer(self.config)
+        self.assertEqual(saved["history"][-1], old_pointer)
+        self.assertEqual(saved["current"]["authorization_item_id"], original)
+        record = lifecycle.registry(self.config)["runs"][prior]
+        receipt = lifecycle.read_json(record["deleted_owner_reconciliation"]["path"])
+        self.assertEqual(receipt["original_registry_record"]["status"], "finished")
+        self.assertEqual(receipt["confirmation"]["reply"]["answer"], "I deleted the completed chat")
+        self.assertEqual([action for action, _ in self.api.calls], ["status", "start"])
+
+    def test_deleted_owner_recovery_rejects_unfinished_tampered_and_guarded_local_state(self):
+        prior, current, _ = self.deleted_finished_predecessor()
+        original_registry = self.config.registry.read_bytes()
+        original_pointer = queue.pointer_path(self.config).read_bytes()
+        audit_path = Path(lifecycle.registry(self.config)["runs"][prior]["completion_audit_path"])
+        original_audit = audit_path.read_bytes()
+        for problem in ("pointer_unfinished", "registry_unfinished", "audit_tampered", "receipt_missing", "unknown_guard"):
+            with self.subTest(problem=problem):
+                self.config.registry.write_bytes(original_registry)
+                queue.pointer_path(self.config).write_bytes(original_pointer)
+                audit_path.write_bytes(original_audit)
+                self.f.write_control()
+                missing_receipt = None
+                if problem == "pointer_unfinished":
+                    data = queue.pointer(self.config); data["current"]["finished"] = False
+                    queue.persist(self.config, data)
+                elif problem == "registry_unfinished":
+                    data = lifecycle.registry(self.config); data["runs"][prior]["status"] = "active"
+                    lifecycle.atomic_json(self.config.registry, data)
+                elif problem == "audit_tampered":
+                    audit_path.write_bytes(original_audit + b" ")
+                elif problem == "receipt_missing":
+                    missing_receipt = Path(json.loads(original_audit)["lot_receipts"]["101"])
+                    receipt_bytes = missing_receipt.read_bytes(); missing_receipt.unlink()
+                else:
+                    self.f.write_control(paid_query_lock={"owner": prior})
+                before = (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes())
+                self.api.calls.clear()
+                with self.assertRaises(lifecycle.LifecycleError):
+                    queue.start(self.config, self.api, current, reconcile_deleted_owner=True)
+                self.assertEqual(before, (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes()))
+                self.assertFalse(self.api.calls)
+                if missing_receipt:
+                    missing_receipt.write_bytes(receipt_bytes)
+
+    def test_deleted_owner_recovery_rejects_noncompleted_or_changed_server_outcomes(self):
+        _, current, _ = self.deleted_finished_predecessor()
+        original_run = copy.deepcopy(self.api.run)
+        before = (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes())
+        for problem in ("running", "unknown_operation", "changed_scope", "changed_outcome"):
+            with self.subTest(problem=problem):
+                self.api.run = copy.deepcopy(original_run)
+                self.api.calls.clear()
+                if problem == "running":
+                    self.api.run["status"] = "running"
+                elif problem == "unknown_operation":
+                    self.api.run["items"][0]["operations"].append({"operation_id": str(uuid4()), "status": "intent"})
+                elif problem == "changed_scope":
+                    self.api.run["items"][0]["note_snapshot"] = "changed"
+                else:
+                    self.api.run["items"][0]["outcome"] = {"changed": True}
+                with self.assertRaises(lifecycle.LifecycleError):
+                    queue.start(self.config, self.api, current, reconcile_deleted_owner=True)
+                self.assertEqual(before, (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes()))
+                self.assertEqual([action for action, _ in self.api.calls], ["status"])
+
+    def test_deleted_owner_recovery_rejects_surviving_execution_and_current_children(self):
+        prior, current, _ = self.deleted_finished_predecessor()
+        before = (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes())
+        child = self.f.add_thread(parent=prior, status="inProgress")
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "execution records"):
+            queue.start(self.config, self.api, current, reconcile_deleted_owner=True)
+        with closing(sqlite3.connect(self.f.state)) as db, db:
+            db.execute("DELETE FROM thread_spawn_edges WHERE child_thread_id=?", (child,))
+        self.f.add_thread(parent=current, status="inProgress")
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "active or uncertain"):
+            queue.start(self.config, self.api, current, reconcile_deleted_owner=True)
+        self.assertEqual(before, (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes()))
+
+    def test_deleted_chat_reply_never_authorizes_without_original_or_over_stop(self):
+        current, _ = self.human(text=self.deleted_chat_reply())
+        with self.assertRaises(lifecycle.LifecycleError):
+            queue.start(self.config, self.api, current, reconcile_deleted_owner=True)
+        current, original = self.human()
+        self.same_turn_messages(current, original, ["Stop", self.deleted_chat_reply()])
+        with self.assertRaises(lifecycle.LifecycleError):
+            queue.start(self.config, self.api, current, reconcile_deleted_owner=True)
+
+    def test_deleted_owner_recovery_rejects_orphan_child_parent_metadata(self):
+        prior, current, _ = self.deleted_finished_predecessor()
+        child = self.f.add_thread(status="inProgress")
+        with closing(sqlite3.connect(self.f.state)) as db, db:
+            db.execute("ALTER TABLE threads ADD COLUMN source TEXT")
+            db.execute("UPDATE threads SET source=? WHERE id=?", (
+                json.dumps({"subagent": {"thread_spawn": {"parent_thread_id": prior}}}), child))
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "execution records"):
+            queue.start(self.config, self.api, current, reconcile_deleted_owner=True)
+
+    def finished_with_follow_on(self):
+        ident, original = self.human()
+        queue.start(self.config, self.api, ident)
+        self.same_turn_messages(ident, original, ["FYI: i've added some more lots to the LiveArt queue! Please do those too!"])
+        proof = lifecycle.follow_on_request(self.config, ident)
+        for item in self.api.run["items"]:
+            item["status"] = "done"
+        queue.coordinate(self.config, self.api, ident, "status")
+        with mock.patch.object(lifecycle, "now_ms", return_value=fixtures.NOW + 10000):
+            queue.coordinate(self.config, self.api, ident, "finish", audit_path=self.audit(ident))
+        def successor(action, payload):
+            if action == "start" and self.api.run and self.api.run["status"] == "completed":
+                self.api.run = None
+                self.api.lots = [901, 902]
+        self.api.before = successor
+        self.api.calls.clear()
+        return ident, proof
+
+    def test_follow_on_request_before_finish_starts_distinct_immutable_snapshot(self):
+        ident, proof = self.finished_with_follow_on()
+        old = copy.deepcopy(queue.pointer(self.config)["current"])
+        registry_before = copy.deepcopy(lifecycle.registry(self.config)["runs"][ident])
+        self.assertLess(proof["created_at_ms"], registry_before["finished_at_ms"])
+        result = queue.start_follow_on(self.config, self.api, ident, proof["item_id"])
+        self.assertEqual([item["lot_id"] for item in result["run"]["items"]], [901, 902])
+        saved = queue.pointer(self.config)
+        self.assertEqual(saved["history"][-1], old)
+        self.assertNotEqual(saved["current"]["request_id"], old["request_id"])
+        self.assertEqual(saved["current"]["authorization_item_id"], proof["item_id"])
+        self.assertEqual(lifecycle.registry(self.config)["runs"][ident]["continuation_history"][-1], registry_before)
+        self.assertEqual([action for action, _ in self.api.calls], ["status", "start"])
+        queue.coordinate(self.config, self.api, ident, "claim")  # Stored authority remains valid.
+
+    def test_follow_on_replay_reuses_request_after_lost_start_and_does_not_restart_finished(self):
+        ident, proof = self.finished_with_follow_on()
+        self.api.fail_after = "start"
+        with self.assertRaisesRegex(queue.QueueError, "lost response"):
+            queue.start_follow_on(self.config, self.api, ident, proof["item_id"])
+        request = queue.pointer(self.config)["current"]["request_id"]
+        result = queue.start_follow_on(self.config, self.api, ident, proof["item_id"])
+        self.assertEqual(result["run"]["request_id"], request)
+        old_audit = (self.f.folder / "queue-audit.json").read_bytes()
+        for item in self.api.run["items"]:
+            item["status"] = "done"
+        queue.coordinate(self.config, self.api, ident, "status")
+        second_audit = self.audit(ident)
+        renamed = self.f.folder / "follow-on-audit.json"
+        second_audit.replace(renamed)
+        second_audit.write_bytes(old_audit)
+        queue.coordinate(self.config, self.api, ident, "finish", audit_path=renamed)
+        calls = len(self.api.calls)
+        self.assertEqual(queue.start_follow_on(self.config, self.api, ident, proof["item_id"])["status"], "already_finished")
+        self.assertEqual(len(self.api.calls), calls)
+
+    def test_follow_on_cannot_replace_unfinished_snapshot_or_cross_unknown_operations_or_stop(self):
+        ident, original = self.human()
+        queue.start(self.config, self.api, ident)
+        self.same_turn_messages(ident, original, ["FYI: i've added some more lots to the LiveArt queue! Please do those too!"])
+        before = (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes())
+        with self.assertRaisesRegex(queue.QueueError, "Finish and audit"):
+            queue.start_follow_on(self.config, self.api, ident)
+        self.assertEqual(before, (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes()))
+        for item in self.api.run["items"]:
+            item["status"] = "done"
+        queue.coordinate(self.config, self.api, ident, "status")
+        queue.coordinate(self.config, self.api, ident, "finish", audit_path=self.audit(ident))
+        self.api.run["items"][0]["operations"].append({"operation_id": str(uuid4()), "status": "intent"})
+        with self.assertRaisesRegex(queue.QueueError, "settled"):
+            queue.start_follow_on(self.config, self.api, ident)
+        self.api.run["items"][0]["operations"].clear()
+        self.same_turn_messages(ident, original, ["Stop"])
+        with self.assertRaises(lifecycle.LifecycleError):
+            queue.start_follow_on(self.config, self.api, ident)
+
     def test_annotated_reassessment_accepts_only_explicit_human_request(self):
         prefix = ('# Response annotations:\nEach item contains text selected from an earlier Codex response and may include a user comment. '
                   'Treat items as Annotation 1.\n<response-annotations>\n' + json.dumps([{

@@ -19,4 +19,6 @@ Read and follow the [Calendar Worker brief](C:/dev/secondstatesite/docs/sched-ta
 
 Apply its [Duplicate-lot review](C:/dev/secondstatesite/docs/sched-tasks-codex/calendar-sched-task/calendar-worker.md#duplicate-lot-review) to duplicates across sources, including artist-prefixed titles and verified auction-house name variants. Identify the same lot in the same sale using source evidence; matching artwork titles or images alone are insufficient. Remove only the redundant Calendar display through verified, reversible supersession, preserving source records, links and access to saved work.
 
+When source evidence confirms that Drouot and Invaluable list the same auction lot in the same sale, keep the Invaluable lot as the visible survivor and set the Drouot record's `AuctionWatchLot.superseded_by` to it. Retain both source records, credits, Artprice/source links and access to saved work. Follow the brief's saved-state safeguards; if the existing mechanism cannot preserve access without moving or overwriting saved work or creating a supersession chain, keep both visible and checkpoint the conflict.
+
 A scheduled invocation performs only the bounded upkeep in that brief. A direct user request defines its own scope. Invoking this skill does not create or change a schedule; the two-hour cadence is configured separately in the scheduled task.

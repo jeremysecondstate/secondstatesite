@@ -32,6 +32,10 @@ class RegisterForm(UserCreationForm):
         return user
 
 
+class ProfileAvatarInput(forms.ClearableFileInput):
+    template_name = "secondstateapp/widgets/profile_avatar.html"
+
+
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
@@ -39,6 +43,7 @@ class UserProfileForm(forms.ModelForm):
         widgets = {
             "bio": forms.Textarea(attrs={"rows": 5}),
             "favorite_artists": forms.Textarea(attrs={"rows": 4}),
+            "avatar": ProfileAvatarInput(),
         }
 
 

@@ -86,6 +86,24 @@
   padding: 10px;
 }
 
+.profile-avatar-clear {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.profile-card--editor .form-row input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  margin: 0 6px 0 8px;
+  vertical-align: middle;
+}
+
+.profile-card--editor .form-row input[type="checkbox"] + label {
+  display: inline;
+  margin: 0;
+  vertical-align: middle;
+}
+
 .form-row small {
   display: block;
   margin-top: 8px;
@@ -106,6 +124,7 @@
 .profile-page-shell {
   display: grid;
   gap: 22px;
+  overflow-wrap: anywhere;
 }
 
 .profile-layout {

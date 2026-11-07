@@ -137,6 +137,18 @@ class DrouotCaptureTests(TestCase):
         search["pages"][0].update(page_url=entry.url, request_url="https://api.drouot.com/drouot/gingolem/neoGingo/lot/search?" + urlencode({"lang": "en", "q": artist, "cat": "50", "page": "1", "facet": "false"}))
         return validate_drouot_capture(payload, [entry], now=NOW)
 
+    def test_named_after_creator_with_dates_retains_both_names_and_actual_title(self):
+        heading = "Jacques VILLON (1875–1963), after Vincent VAN GOGH (1853–1890)"
+        description = heading + '\n"The Peasant"\nEtching and aquatint, signed on the plate.'
+        result = self._validate_named_source("Jacques Villon", heading, description)
+        self.assertEqual(len(result.lots), 1)
+        lot = result.lots[0]
+        self.assertEqual(lot.artist_watchlist_name, "Jacques Villon")
+        self.assertEqual(lot.artist, "Jacques VILLON, after Vincent VAN GOGH")
+        self.assertEqual(lot.title, 'Jacques VILLON, after Vincent VAN GOGH — "The Peasant"')
+        self.assertEqual(lot.medium, "Etching")
+        self.assertEqual(result.attribution_notes[0]["source_artist_credit"], lot.artist)
+
     def test_short_headings_require_direct_full_offered_work_credit_in_both_source_fields(self):
         cases = [
             ("Alphonse Mucha", "Mucha - Illustrated pages", "This attractive color lithograph is by Alphonse Mucha as part of Ilsee.", "lithograph"),
@@ -150,6 +162,70 @@ class DrouotCaptureTests(TestCase):
                 self.assertEqual(result.lots[0].medium, medium)
                 self.assertEqual(result.lots[0].source_lot_id, "100")
                 self.assertFalse(result.attribution_notes)
+
+    def test_flattened_repeated_catalogue_title_uses_work_title_and_offered_technique(self):
+        for artist, heading, short, repeated, date in (
+            ("Alphonse Mucha", "Mucha, Alphonse", "Salome, from L'Estampe Moderne",
+             "Salome, from L'Estampe Moderne", "1897"),
+            ("Alphonse Mucha", "Mucha, Alphonse", "Bieres de la Meuse",
+             "Bières de la Meuse", "circa 1897"),
+            ("Henri de Toulouse-Lautrec", "Toulouse-Lautrec, Henri de", "Le Poney Philibert (Philibert the Pony)",
+             "Le Poney Philibert (Philibert the Pony)", "1898"),
+        ):
+            with self.subTest(artist=artist, title=short):
+                description = (heading + "\n" + short + " " + artist + " " + repeated + ", " + date
+                               + " Lithograph in colors on wove paper 14 x 10 inches. "
+                               "LITERATURE: A catalogue. © 2026 Auction house. All Rights Reserved.")
+                result = self._validate_named_source(artist, heading, description)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].title, repeated)
+                self.assertEqual(result.lots[0].medium, "Lithograph")
+
+    def test_repeated_publication_title_alone_does_not_establish_offered_medium(self):
+        heading = "Mucha, Alphonse"
+        for offered in ("Poster on paper", "Oil on canvas", "Unknown technique"):
+            description = (heading + "\nSalome, from L'Estampe Moderne Alphonse Mucha "
+                           "Salome, from L'Estampe Moderne, 1897 " + offered)
+            with self.subTest(offered=offered):
+                self.assertEqual(self._validate_named_source("Alphonse Mucha", heading, description).lots, [])
+
+    def test_repeated_catalogue_title_requires_matching_artist_and_same_work(self):
+        heading = "Mucha, Alphonse"
+        for text in (
+            "The Garden Another Artist The Garden, 1897 Lithograph on paper",
+            "The Garden Alphonse Mucha A Different Work, 1897 Lithograph on paper",
+        ):
+            result = self._validate_named_source("Alphonse Mucha", heading, heading + "\n" + text)
+            self.assertEqual(len(result.lots), 1)
+            self.assertEqual(result.lots[0].title, text)
+
+    def test_labelled_catalogue_title_removes_artist_metadata_and_item_marker(self):
+        for artist, heading, title, medium in (
+            ("Takashi Murakami", "MURAKAMI Takashi, RED-TIME, ■artist: MURAKAMI Takashi", "RED-TIME", "offset"),
+            ("Ellsworth Kelly", "Ellsworth KELLY, First Impressions (exhibition poster), （1）",
+             "First Impressions (exhibition poster)", "screen print"),
+        ):
+            with self.subTest(artist=artist):
+                description = (heading + "\n■artist: " + artist + "\n■title: " + title
+                               + "\n■media: " + medium + "\n■size: 50x50cm\n■literature or raisonne no.: ---")
+                result = self._validate_named_source(artist, heading, description)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].title, title)
+                self.assertEqual(result.lots[0].medium, medium)
+
+    def test_labelled_media_overrides_title_word_and_preserves_lot_set_scope(self):
+        heading = "Norman ROCKWELL, The Runaway (estampe) (a set of 3), （１）"
+        description = (heading + "\n■artist: Norman ROCKWELL\n■title: The Runaway (estampe)"
+                       "\n■media: Giclee\n■size: 38.1x35.5cm\n（２）\n■artist: Norman ROCKWELL"
+                       "\n■title: Marriage License (estampe)\n■media: Giclee")
+        result = self._validate_named_source("Norman Rockwell", heading, description)
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].title, "The Runaway (estampe) (a set of 3)")
+        self.assertEqual(result.lots[0].medium, "Giclee")
+        for offered in ("Unknown", "Oil on canvas"):
+            with self.subTest(offered=offered):
+                self.assertEqual(self._validate_named_source("Norman Rockwell", heading,
+                    description.replace("Giclee", offered)).lots, [])
 
     def test_short_names_do_not_accept_references_mismatched_headings_or_other_creators(self):
         heading = "Mucha - Illustrated pages"
@@ -891,6 +967,64 @@ class DrouotCaptureTests(TestCase):
                 self.assertEqual(len(result.lots), 1)
                 self.assertEqual(result.lots[0].artist, ENTRY.artist)
                 self.assertEqual(result.lots[0].title, "Liberty, Equality, Fraternity")
+
+    def test_fairey_alias_suffixes_keep_the_actual_following_title(self):
+        for suffix in ("(Obey)", "(OBEY)", ", aka Obey Giant (USA, 1970)"):
+            heading = "Shepard Fairey" + suffix
+            result = self._validate_named_source(
+                "Shepard Fairey", heading, heading + "\nLotus Angel\nOffset lithograph on paper",
+            )
+            self.assertEqual(len(result.lots), 1)
+            self.assertEqual(result.lots[0].title, "Lotus Angel")
+        # Parenthetical artwork titles remain titles when not a verified alias.
+        result = self._validate_named_source("Shepard Fairey", "Shepard Fairey",
+            "Shepard Fairey\n(Obey the Rules)\nOffset lithograph on paper")
+        self.assertEqual(result.lots[0].title, "(Obey the Rules)")
+
+    def test_spelling_variant_requires_immediate_canonical_primary_credit(self):
+        for artist, variant, canonical in (
+            ("Albrecht Dürer", "Albert Dürer", "Albrecht Dürer (1471–1528) (after)"),
+            ("Alphonse Mucha", "Alfons Mucha", "Alphonse Mucha (1860–1939) (after)"),
+            ("Wassily Kandinsky", "Vassily Kandinsky", "Wassily KANDINSKY (1866–1944)"),
+        ):
+            with self.subTest(artist=artist):
+                result = self._validate_named_source(artist, variant,
+                    variant + "\n" + canonical + "\nComposition\nColor lithograph on paper")
+                self.assertEqual(len(result.lots), 1)
+                self.assertTrue(result.lots[0].title.endswith("Composition"))
+                self.assertEqual(bool(result.attribution_notes), "after" in canonical)
+                for description in (
+                    variant + "\nComposition\nColor lithograph. Biography mentions " + artist,
+                    variant + "\nAnother Artist (1900–1980)\nComposition\nColor lithograph",
+                ):
+                    self.assertEqual(self._validate_named_source(artist, variant, description).lots, [])
+
+    def test_conflicting_repeated_qualified_credit_is_not_primary_authorship(self):
+        result = self._validate_named_source("Rembrandt", "Rembrandt",
+            "Rembrandt\nPieter BRUEGHEL THE ELDER (c. 1525–1569) (after)\n"
+            "The Battle of the Silver Bags and Safes\nEngraving\nTransferred to copper by Sébastien Pignon")
+        self.assertEqual(result.lots, [])
+        self.assertIn("contradicts", result.rejected_lots[0]["reason"])
+        # A portrait's sitter/date title is not an explicitly qualified credit.
+        result = self._validate_named_source("Rembrandt", "Rembrandt",
+            "Rembrandt\nJan Six (1618–1700)\nEtching on paper")
+        self.assertEqual(len(result.lots), 1)
+
+    def test_reproduced_gouache_caption_does_not_override_offered_lithograph(self):
+        result = self._validate_named_source("Salvador Dalí", "Salvador Dalí",
+            "Salvador Dalí\nLady Godiva, 1983\nbased on a 1971 gouache\n\nColor lithograph on Arches vellum")
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].medium.lower(), "lithograph")
+        result = self._validate_named_source("Salvador Dalí", "Salvador Dalí",
+            "Salvador Dalí\nLady Godiva\nGouache on paper\nLiterature: Color lithograph")
+        self.assertEqual(result.lots, [])
+
+    def test_studio_medium_before_work_title_does_not_become_title(self):
+        result = self._validate_named_source("Pierre Soulages", "Pierre Soulages",
+            "Pierre Soulages\nPierre SOULAGES\nOriginal lithograph (Mourlot studio)\n"
+            "Munich Olympic Games\nSigned on the plate")
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].title, "Munich Olympic Games")
 
     def test_qualified_credit_is_bounded_before_inline_work_description_and_suffix_punctuation(self):
         cases = [

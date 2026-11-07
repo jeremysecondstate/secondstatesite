@@ -963,7 +963,7 @@ class AuctionCalendarViewTests(TestCase):
             AuctionWatchLot(
                 source="Invaluable",
                 source_lot_id=f"august-lot-{index}",
-                artist="Joan Miró",
+                artist="Zao Wou-Ki" if index == 1000 else "Joan Miró",
                 title=f"Artwork {index}",
                 auction_house="Bonhams",
                 sale_title="August Auction",
@@ -973,6 +973,13 @@ class AuctionCalendarViewTests(TestCase):
             )
             for index in range(1001)
         ])
+        watch_lot(
+            source_lot_id="august-ended-lot",
+            artist="Banksy", artist_watchlist_name="Banksy", active=False,
+            sale_title="August Auction",
+            sale_url="https://www.invaluable.com/catalog/august-auction",
+            event_at=event_at,
+        )
         watch_lot(
             source_lot_id="august-later-auction",
             sale_title="August Evening Auction",
@@ -987,15 +994,22 @@ class AuctionCalendarViewTests(TestCase):
         ):
             response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
 
-        self.assertEqual(len(response.context["calendar_data"]["2026-08-03"]), 1002)
+        self.assertEqual(len(response.context["calendar_data"]["2026-08-03"]), 1003)
         self.assertEqual(
             response.context["calendar_sales_data"]["2026-08-03"][0]["lot_count"],
-            1001,
+            1002,
         )
         self.assertEqual(
             [sale["sale_title"] for sale in response.context["calendar_sales_data"]["2026-08-03"]],
             ["August Auction", "August Evening Auction"],
         )
+        upcoming = response.context["upcoming_groups"]
+        self.assertEqual(len(upcoming), 1)
+        self.assertEqual(upcoming[0]["sale_title"], "August Auction")
+        self.assertEqual(upcoming[0]["lot_count"], 1001)
+        self.assertIn("Zao", upcoming[0]["artists"])
+        self.assertNotIn("Banksy", upcoming[0]["artists"])
+        self.assertNotIn("_calendar_sale_identity", upcoming[0])
 
     def test_calendar_serializes_and_renders_only_valid_imported_artist_links(self):
         imported_url = (

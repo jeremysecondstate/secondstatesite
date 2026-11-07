@@ -1,3 +1,8 @@
+/* Keep the page gradient continuous as the two windows scroll past. */
+body {
+  background-attachment: fixed;
+}
+
 /* One fixed scene, seen through the two existing rounded windows. */
 .etching-mask {
   position: absolute;

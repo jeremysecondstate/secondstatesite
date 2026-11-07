@@ -1,4 +1,9 @@
 /* The collection has its own palette and layout; other pages keep site.css. */
+body > header.nav {
+  /* Keep the sticky links legible over the light gallery canvas. */
+  background-color: rgba(7, 8, 11, .85);
+}
+
 .collection-shell {
   --collection-paper: #f5f3ee;
   --collection-ink: #242822;

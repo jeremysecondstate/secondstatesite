@@ -228,18 +228,35 @@ def artist_sort_key(value: object) -> str:
 
 
 _ATTRIBUTION_WARNING = re.compile(r"\b(after|attributed\s+to)\b", re.IGNORECASE)
-_FRENCH_ATTRIBUTION = r"(?:d['’‘ʼ]?\s*apr[eè]s|attribu[eé]e?\s+[aà])"
+_FRENCH_AFTER = r"d\s*['’‘ʼ]?\s*apr[eè]s"
+_FRENCH_ATTRIBUTION = rf"(?:{_FRENCH_AFTER}|attribu[eé]e?\s+[aà])"
 _ATTRIBUTION_TITLE_MARKER = re.compile(rf"\b(?:after|attributed\s+to|{_FRENCH_ATTRIBUTION})\b", re.IGNORECASE)
 _FRENCH_CREDIT_PREFIX = re.compile(rf"^(?P<lead>\(?\s*)(?P<marker>{_FRENCH_ATTRIBUTION})(?=\s|\)|:|$)", re.IGNORECASE)
 _FRENCH_CREDIT_SUFFIX = re.compile(rf"(?P<lead>\(\s*|,\s*)(?P<marker>{_FRENCH_ATTRIBUTION})(?P<tail>\s*\)?)$", re.IGNORECASE)
 _CREDIT_BIOGRAPHY = re.compile(r"\s*\([^)]*\b\d{4}\b[^)]*\)\s*")
 _BILINGUAL_AFTER = re.compile(r"\bnach\s*[-–—/]\s*after\b", re.IGNORECASE)
-_PUNCTUATED_CREDIT_SUFFIX = re.compile(
-    r"^(?P<name>.+?)(?:,\s*|\s+)(?P<marker>after|attributed\s+to)\."
-    r"(?:\s+Jacques\s+Villon)?$", re.IGNORECASE,
+_TRAILING_CREDIT_SUFFIX = re.compile(
+    rf"^(?P<name>.+?)(?:,\s*|\s+)(?P<marker>after|attributed\s+to|{_FRENCH_ATTRIBUTION})"
+    r"(?:\.(?:\s+Jacques\s+Villon)?)?$", re.IGNORECASE,
 )
 _QUOTED_TITLE_AFTER_CREDIT = re.compile(
     r'^(?P<name>.+?)\s+after\s+(?:"[^"]+"|“[^”]+”)$', re.IGNORECASE,
+)
+_QUOTED_WORK = r'(?:"[^"]+"|“[^”]+”|«[^»]+»)'
+_STRUCTURED_TITLE_CREDITS = (
+    # A quoted work is separated from the artist credit, optionally by medium.
+    re.compile(rf"^(?:(?:lithographie|oeuvre|œuvre|tableau)\s+)?{_QUOTED_WORK}\s+(?P<credit>.+)$", re.IGNORECASE),
+    # The qualifier itself separates an artist heading from its following work.
+    re.compile(rf"^(?P<credit>.+?\(\s*(?:after|attributed\s+to|{_FRENCH_ATTRIBUTION})\s*\))\s+\S.*$", re.IGNORECASE),
+    # Retain the collective credit in Lux's explicitly colored Haring/Banksy lot.
+    re.compile(rf"^(?P<credit>.+\s+&\s+.+\s+{_FRENCH_AFTER})\s+\(blanc\)$", re.IGNORECASE),
+    # This Artcurial caption has mismatched title quotes, but a complete credit
+    # and a separate publisher suffix. Do not strip arbitrary trailing prose.
+    re.compile(rf'''^carr[ée]\s+["“«][^"“”«»]+['"”»]\s+(?P<credit>{_FRENCH_AFTER}\s+.+?)\s+[ée]dition\s+artcurial\.?$''', re.IGNORECASE),
+)
+_FRENCH_AFTER_WORK_CREDIT = re.compile(
+    rf"^{_FRENCH_AFTER}\s+une\s+lithographie\s+{_QUOTED_WORK}\s+"
+    r"(?:de\s+|d\s*['’‘ʼ]\s*)(?P<name>.+)$", re.IGNORECASE,
 )
 # Explicit auction-credit alias; retain strict full-name matching in titles.
 _CREDIT_NAME_ALIASES = {("harmensz", "rembrandt", "rijn", "van"): ("rembrandt",)}
@@ -250,12 +267,12 @@ def _attribution_credit(value: object) -> tuple[str, str]:
     text = clean_display_text(value, strip_lot_markers=True)
     text = " ".join(_CREDIT_BIOGRAPHY.sub(" ", text).split())
     text = _BILINGUAL_AFTER.sub("After", text)
-    # Forum ends these credit qualifiers with a full stop and can append
-    # printmaker Jacques Villon. Normalize only this explicit credit wording;
-    # the original source stays intact and title credits still require a name match.
-    punctuated = _PUNCTUATED_CREDIT_SUFFIX.fullmatch(text)
-    if punctuated:
-        text = f"{punctuated['name']}, {punctuated['marker']}"
+    # Lux uses bare trailing d'après; Forum can end a qualifier with a full
+    # stop and append printmaker Jacques Villon. Normalize these credit endings
+    # only; source text stays intact and title credits still require a name match.
+    trailing = _TRAILING_CREDIT_SUFFIX.fullmatch(text)
+    if trailing:
+        text = f"{trailing['name']}, {trailing['marker']}"
     # Translate only explicit credit-position markers, never the stored source.
     def translate_marker(match):
         label = "After" if match["marker"].casefold().startswith("d") else "Attributed to"
@@ -279,6 +296,28 @@ def _credit_name_key(value: object) -> tuple[str, ...]:
     # Sorted tokens permit explicit surname-first labels, not fuzzy matching.
     key = tuple(sorted(re.findall(r"\w+", _name_key(artist_display_name(name)))))
     return _CREDIT_NAME_ALIASES.get(key, key)
+
+
+def _credit_matches_artist(name: str, names: set[tuple[str, ...]]) -> bool:
+    if _credit_name_key(name) in names:
+        return True
+    # An explicit collective credit qualifies both complete, known names.
+    # A substring, unknown collaborator, or generation suffix is insufficient.
+    components = re.split(r"\s+&\s+", name)
+    return (len(components) > 1
+            and all(_name_key(artist_display_name(part)) in _DISPLAY_NAMES for part in components)
+            and any(_credit_name_key(part) in names for part in components))
+
+
+def _structured_title_credits(text: str):
+    for pattern in _STRUCTURED_TITLE_CREDITS:
+        match = pattern.fullmatch(text)
+        if match:
+            yield match["credit"]
+    # The offered work is explicitly after a named artist's quoted lithograph.
+    match = _FRENCH_AFTER_WORK_CREDIT.fullmatch(text)
+    if match:
+        yield f"After {match['name']}"
 
 
 def artist_attribution_label(*artists: object, title: object = "") -> str:
@@ -305,14 +344,14 @@ def artist_attribution_label(*artists: object, title: object = "") -> str:
     quoted_credit = _QUOTED_TITLE_AFTER_CREDIT.fullmatch(text)
     if quoted_credit and _credit_name_key(quoted_credit["name"]) in names:
         return "After"
-    candidates = [text, *str(title or "").splitlines()]
-    candidates.extend(re.split(r"\s+[—–-]\s+|[:;]", text))
+    candidates = [text, *str(title or "").splitlines(), *_structured_title_credits(text)]
+    candidates.extend(re.split(r"\s+[—–/-]\s+|[:;]", text))
     candidates.extend(match[1] for match in re.finditer(r"\(([^()]*)\)", text))
     # A catalog can write After Picasso, Pablo, Title or Picasso, Pablo, after.
     for comma in re.finditer(",", text):
         candidates.extend((text[:comma.start()], text[comma.end():]))
     for candidate in dict.fromkeys(candidates):
         label, name = _attribution_credit(candidate)
-        if label and _credit_name_key(name) in names:
+        if label and _credit_matches_artist(name, names):
             return label
     return ""
