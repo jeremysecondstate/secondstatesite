@@ -1,0 +1,2564 @@
+[
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-15 CONTRIBUTION\\To Oliver $10.png",
+    "first_lines": [
+      "12:35 \\ all FS @",
+      "< Sent USDC",
+      "-10 USDC",
+      "-S10.00"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-15 CONTRIBUTION\\To Oliver $490.png",
+    "first_lines": [
+      "12:36 NX ll Fe)",
+      "< Sent USDC",
+      "-490 USDC",
+      "-$490.00"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2024-11-02 CONTRIBUTION\\ALEX TO OLIVER 7500.png",
+    "first_lines": [
+      "24273",
+      "Chase | Zelle(R): ALEX YOO sent you",
+      "$50.00 & it's ready now. Reply STOP to",
+      "cancel these texts."
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\Oliver Confirmation $520.jpg",
+    "first_lines": [
+      "Transactions",
+      "This month",
+      "6) Received USDC",
+      "Today"
+    ],
+    "financial_lines": [
+      "Sold MORPHO"
+    ]
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Jeremy $100.png",
+    "first_lines": [
+      "1:02",
+      "Price",
+      "Network",
+      "Transaction hash"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Jeremy $3900.png",
+    "first_lines": [
+      "1:05 N\\",
+      "Price",
+      "Network",
+      "Transaction hash"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Oliver $20.png",
+    "first_lines": [
+      "1:08 NX awl =e»)",
+      "< Sent USDC",
+      "-20 USDC",
+      "-$20.00"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Oliver $3980.png",
+    "first_lines": [
+      "2:59N wl Se)",
+      "< Sent USDC",
+      "-3,980 USDC",
+      "-$3,980.00"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\ALEX TO JEREMY 25.png",
+    "first_lines": [
+      "2:16 N all S",
+      "< Received USDC",
+      "25 USDC",
+      "Price $1.00"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\ALEX TO JEREMY 4475.png",
+    "first_lines": [
+      "2:17\\N",
+      "Price",
+      "Network",
+      "Transaction hash"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\ALEX TO JEREMY 93.png",
+    "first_lines": [
+      "Deposited funds",
+      "© Using PayPal - s***n@gmail.com aa",
+      "93.66 USDC",
+      "$96.00"
+    ],
+    "financial_lines": [
+      "Payment Method PayPal - s***n@gmail.com",
+      "Subtotal $93.66",
+      "Total $96.00"
+    ]
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\JEREMY (FROM ALEX) TO OLIVER 2.png",
+    "first_lines": [
+      "<S Sent USDC",
+      "-2 USDC",
+      "To +1 914-215-2101",
+      "Price $1.00"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\JEREMY (FROM ALEX) TO OLIVER 25.png",
+    "first_lines": [
+      "2:17\\N",
+      "To",
+      "Price",
+      "Network"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\JEREMY (FROM ALEX) TO OLIVER 4473.png",
+    "first_lines": [
+      "2:18 NX",
+      "To",
+      "Price",
+      "Network"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-10-26 CONTRIBUTION\\SMA-Zelle-Receipt.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Scheduled On its way Completed",
+      "Your payee's received your payment.",
+      "Santa Monica Auctions"
+    ],
+    "financial_lines": [
+      "Your payee's received your payment.",
+      "Amount $5,524.50",
+      "Payment arrives in In moments",
+      "Memo Invoice # SM-2026-298 - Oliver Donson"
+    ]
+  },
+  {
+    "source": "INFRASTRUCTURE\\Flow PC #1902.pdf",
+    "first_lines": [
+      "--- PAGE 1 (ocr_pdf) ---",
+      "FLOW PC",
+      "330 E 2nd St. Ste 203",
+      "Los Angeles, CA 90012"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice Date: May 3, 2024 Customer: Alex Yoo",
+      "Subtotal: $8,800.00",
+      "Total: $9,450.00"
+    ]
+  },
+  {
+    "source": "INFRASTRUCTURE\\Flow PC #1949 WS Alex.pdf",
+    "first_lines": [
+      "--- PAGE 1 (ocr_pdf) ---",
+      "FLOW PC",
+      "330 E 2nd St. Ste 203",
+      "Los Angeles, CA 90012"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice Date: Jul 18, 2024 Customer: Alex Yoo",
+      "Subtotal: $8,180.00",
+      "Total: $7,862.10"
+    ]
+  },
+  {
+    "source": "INFRASTRUCTURE\\Flow PC #1975 WS Alex.pdf",
+    "first_lines": [
+      "--- PAGE 1 (ocr_pdf) ---",
+      "FLOW PC",
+      "330 E 2nd St. #201B",
+      "Los Angeles, CA 90012"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice Date: Aug 15, 2024 Customer: Alex Yoo",
+      "Subtotal: $12,000.00",
+      "Received: Balance: $8,140.00"
+    ]
+  },
+  {
+    "source": "EXPENSES\\MEDIA\\Adobe Photoshop Lightroom.JPEG",
+    "first_lines": [
+      "UUUUUUSU Os /O0 OF OL /F LO 1D LO",
+      "00000040 4B iE 5E 4A 29 AB 5F 49",
+      "00 00",
+      "00 00"
+    ],
+    "financial_lines": [
+      "Payment made"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 1.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "18 Jan 2026",
+      "Billing address",
+      "SecondState"
+    ],
+    "financial_lines": [
+      "Invoice #",
+      "Payment date:",
+      "Payment by",
+      "Total",
+      "PREMIUM monthly subscription",
+      "Option Artprice Images - monthly payments",
+      "Subtotal",
+      "Total amount"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 2.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "17 Feb 2026",
+      "Billing address",
+      "SecondState"
+    ],
+    "financial_lines": [
+      "Invoice #",
+      "Payment date:",
+      "Payment by",
+      "Total",
+      "PREMIUM monthly subscription",
+      "Option Artprice Images - monthly payments",
+      "Subtotal",
+      "Total amount"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 3.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "20 Mar 2026",
+      "Billing address",
+      "SecondState"
+    ],
+    "financial_lines": [
+      "Invoice #",
+      "Payment date:",
+      "Payment by",
+      "Total",
+      "PREMIUM monthly subscription",
+      "Option Artprice Images - monthly payments",
+      "Subtotal",
+      "Total amount"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 4.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "19 Apr 2026",
+      "Billing address",
+      "SecondState"
+    ],
+    "financial_lines": [
+      "Invoice #",
+      "Payment date:",
+      "Payment by",
+      "Total",
+      "PREMIUM monthly subscription",
+      "Option Artprice Images - monthly payments",
+      "Subtotal",
+      "Total amount"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 5.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "19 May 2026",
+      "Billing address",
+      "SecondState"
+    ],
+    "financial_lines": [
+      "Invoice #",
+      "Payment date:",
+      "Payment by",
+      "Total",
+      "PREMIUM monthly subscription",
+      "Option Artprice Images - monthly payments",
+      "Subtotal",
+      "Total amount"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 6.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "18 Jun 2026",
+      "Billing address",
+      "SecondState"
+    ],
+    "financial_lines": [
+      "Invoice #",
+      "Payment date:",
+      "Payment by",
+      "Total",
+      "PREMIUM monthly subscription",
+      "Option Artprice Images - monthly payments",
+      "Subtotal",
+      "Total amount"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Coinbase CC Feb 2026.png",
+    "first_lines": [
+      "5:47 9",
+      "<—",
+      "Transactions",
+      "cA"
+    ],
+    "financial_lines": [
+      "Payment made",
+      "Payment made",
+      "Payment made"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Coinbase CC Mar 2026.png",
+    "first_lines": [
+      "54749 © «| > &",
+      "e",
+      "Transactions",
+      "== Type Vv Date Vv Status v"
+    ],
+    "financial_lines": [
+      "ral Payment made +$74,00",
+      "ral Payment made +$56.00",
+      "ral Payment made +$75.00",
+      "ral Payment made +$85,00"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Coinbase CC Feb 2026.png",
+    "first_lines": [
+      "5:47 9",
+      "<—",
+      "Transactions",
+      "cA"
+    ],
+    "financial_lines": [
+      "Payment made",
+      "Payment made",
+      "Payment made"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Coinbase CC Mar 2026.png",
+    "first_lines": [
+      "54749 © «| > &",
+      "e",
+      "Transactions",
+      "== Type Vv Date Vv Status v"
+    ],
+    "financial_lines": [
+      "ral Payment made +$74,00",
+      "ral Payment made +$56.00",
+      "ral Payment made +$75.00",
+      "ral Payment made +$85,00"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0001-Render-Dec-2025.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000001"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000001",
+      "Description Qty Unit price Amount",
+      "Subtotal $2.09",
+      "Total $2.09",
+      "Amount due $2.09 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0002-Render-Jan-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000002"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000002",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount due $20.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0003-Render-Feb-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000003"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000003",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount due $20.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0004-Render-Mar-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000004"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000004",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount due $20.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0005-Render-Apr-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000005"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000005",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount due $20.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0006-Render-May-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000006"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000006",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount due $20.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0007-Render-July-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000007"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000007",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount due $20.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0008.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000008",
+      "Date of issue August 4, 2026"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000008",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.23",
+      "Total $20.23",
+      "Amount due $20.23 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0009.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000009",
+      "Date of issue September 1, 2026"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000009",
+      "Description Qty Unit price Amount",
+      "Subtotal $21.25",
+      "Total $21.25",
+      "Amount due $21.25 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0011.pdf",
+    "first_lines": [
+      "RVA5KGTP\u00000011 · $21.25 USD due November 2, 2026 Page 1 of 1",
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000011",
+      "Date of issue November 2, 2026"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number RVA5KGTP\u00000011",
+      "Description Qty Unit price Amount",
+      "Subtotal $21.25",
+      "Total $21.25",
+      "Amount due $21.25 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2044-1587.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000011",
+      "Receipt number 2044\u00001587"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000011",
+      "Date paid November 2, 2026",
+      "$21.25 paid on November 2, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $21.25",
+      "Total $21.25",
+      "Amount paid $21.25",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2195-8980.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000009",
+      "Receipt number 2195\u00008980"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000009",
+      "Date paid September 1, 2026",
+      "$21.25 paid on September 1, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $21.25",
+      "Total $21.25",
+      "Amount paid $21.25",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2241-6428.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000001",
+      "Date paid January 4, 2026"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000001",
+      "Date paid January 4, 2026",
+      "$2.09 paid on January 4, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $2.09",
+      "Total $2.09",
+      "Amount paid $2.09",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2286-5453.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000007",
+      "Receipt number 2286\u00005453"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000007",
+      "Date paid July 4, 2026",
+      "$20.00 paid on July 4, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount paid $20.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2506-9657.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000002",
+      "Receipt number 2506\u00009657"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000002",
+      "Date paid February 4, 2026",
+      "$20.00 paid on February 4, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount paid $20.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2599-4903.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000008",
+      "Receipt number 2599\u00004903"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000008",
+      "Date paid August 4, 2026",
+      "$20.23 paid on August 4, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.23",
+      "Total $20.23",
+      "Amount paid $20.23",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2608-8851.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000005",
+      "Receipt number 2608\u00008851"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000005",
+      "Date paid May 5, 2026",
+      "$20.00 paid on May 5, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount paid $20.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2846-8744.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000004",
+      "Receipt number 2846\u00008744"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000004",
+      "Date paid April 5, 2026",
+      "$20.00 paid on April 5, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount paid $20.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2942-6606.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000006",
+      "Receipt number 2942\u00006606"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000006",
+      "Date paid June 5, 2026",
+      "$20.00 paid on June 5, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount paid $20.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2961-3239.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number RVA5KGTP\u00000003",
+      "Receipt number 2961\u00003239"
+    ],
+    "financial_lines": [
+      "Invoice number RVA5KGTP\u00000003",
+      "Date paid March 4, 2026",
+      "$20.00 paid on March 4, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $20.00",
+      "Total $20.00",
+      "Amount paid $20.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\Coinbase CC Feb 2026.png",
+    "first_lines": [
+      "5:47 9",
+      "<—",
+      "Transactions",
+      "cA"
+    ],
+    "financial_lines": [
+      "Payment made",
+      "Payment made",
+      "Payment made"
+    ]
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\Coinbase CC Mar 2026.png",
+    "first_lines": [
+      "54749 © «| > &",
+      "e",
+      "Transactions",
+      "== Type Vv Date Vv Status v"
+    ],
+    "financial_lines": [
+      "ral Payment made +$74,00",
+      "ral Payment made +$56.00",
+      "ral Payment made +$75.00",
+      "ral Payment made +$85,00"
+    ]
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\cc google render charges",
+    "first_lines": [
+      "Transactions",
+      "Q- Search",
+      "= Type Vv Date Vv",
+      "Crescent City Auction"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\cc google render pedro",
+    "first_lines": [
+      "7:46",
+      "<—",
+      "Transactions",
+      "Q"
+    ],
+    "financial_lines": [
+      "Payment",
+      "Payment"
+    ]
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\CHASE-UPS-CLARS.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Printed from Chase for Business",
+      "Transaction details",
+      "BUS COMPLETE CHK (...0076)"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\Circle Shipping - Benton - Alex.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "supjeremyklein <supjeremyklein@gmail.com>",
+      "The UPS Store Receipt",
+      "1 message"
+    ],
+    "financial_lines": [
+      "ITEM NAME QTY PRICE TOTAL",
+      "Subtotal $46.63",
+      "Total tax $0.00",
+      "Total $46.63",
+      "Invoice 0010008520",
+      "Amount USD $46.63"
+    ]
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\FRIEDEBERG-CONCEPT-SHIPPING.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Authorization for Credit Card Use at The UPS Store 1080",
+      "PRINT AND COMPLETE THIS AUTHORIZATION AND RETURN.",
+      "All information will remain confidential"
+    ],
+    "financial_lines": [
+      "Amount to Charge:     $ (USD)",
+      "I authorize ___TheUpsStore#1080   to charge the amount listed above to the credit card"
+    ]
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\IVY RECEIPT.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "supjeremyklein <supjeremyklein@gmail.com>",
+      "Shipping Ready",
+      "3 messages"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\NEIMAN UPS SHIPPING CHASE TRANS.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Printed from Chase for Business",
+      "Overview / Account: BUS COMPLETE CHK (...0076)",
+      "BUS COMPLETE CHK (...0076)"
+    ],
+    "financial_lines": [
+      "Available balance",
+      "Present balance",
+      "Date Description Type Amount Balance",
+      "Date Description Type Amount Balance",
+      "Zelle payment from ALEX",
+      "Zelle payment from ALEX",
+      "Jun 24, 2026 Zelle payment to inna",
+      "Date Description Type Amount Balance",
+      "Date Description Type Amount Balance",
+      "Payment\\ EDI TRN:"
+    ]
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\RACH DAVIS SHIPPING.png",
+    "first_lines": [
+      "Q rachel davis xX @rtver @ 8 @ 3: ( Google @",
+      "<",
+      "HH © uw S&S OG BOD",
+      "20f9 < > Ev"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\SHIP-INV-SHEP-COMMON.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Facture F20260720255608",
+      "En date du : 20/07/2026",
+      "Bon de commande : 12069151"
+    ],
+    "financial_lines": [
+      "Description Qte PU HT TVA Total HT",
+      "Total net HT 239,00 €",
+      "Montant total TTC 239,00 €",
+      "Total à régler 0,00 €"
+    ]
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\UPS SHIPMENT FOR SIMPSON.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Payment receipt",
+      "You paid $149.34",
+      "to The UPS Store #1656 on 1/12/2026"
+    ],
+    "financial_lines": [
+      "Payment receipt",
+      "You paid $149.34",
+      "Total $149.34",
+      "Payment method credit card"
+    ]
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\UPS Store 4134 - 2026-07-01 - Neiman lot 2264.pdf",
+    "first_lines": [],
+    "financial_lines": []
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0002-Biz-Acct-Jan-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000002"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000002",
+      "Description Qty Unit price Amount",
+      "Subtotal $60.00",
+      "Total $60.00",
+      "Amount due $60.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0003-Biz-Acct-Feb-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000003"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000003",
+      "Description Qty Unit price Amount",
+      "Subtotal $60.00",
+      "Total $60.00",
+      "Amount due $60.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0004-Biz-Acct-Mar-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000004"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000004",
+      "Description Qty Unit price Amount",
+      "Subtotal $60.00",
+      "Total $60.00",
+      "Amount due $60.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0007-Biz-Acct-Apr-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000007"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000007",
+      "Description Qty Unit price Amount",
+      "Subtotal $50.00",
+      "Total $50.00",
+      "Amount due $50.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0008-Biz-Acct-May-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000008"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number 8MGN6L2K\u00000008",
+      "Description Qty Unit price Amount",
+      "Subtotal $50.00",
+      "Total $50.00",
+      "Amount due $50.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0001-Pro-Acct-Apr-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number UAHQDL21\u00000001"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number UAHQDL21\u00000001",
+      "Description Qty Unit price Amount",
+      "Subtotal $200.00",
+      "Total $200.00",
+      "Amount due $200.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0002-Pro-Acct-May-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number UAHQDL21\u00000002"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number UAHQDL21\u00000002",
+      "Description Qty Unit price Amount",
+      "Subtotal $200.00",
+      "Total $200.00",
+      "Amount due $200.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0003-Pro-Acct-June-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number UAHQDL21\u00000003"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number UAHQDL21\u00000003",
+      "Description Qty Unit price Amount",
+      "Subtotal $200.00",
+      "Total $200.00",
+      "Amount due $200.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0004-Pro-Acct-July-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number UAHQDL21\u00000004"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number UAHQDL21\u00000004",
+      "Description Qty Unit price Amount",
+      "Subtotal $200.00",
+      "Total $200.00",
+      "Amount due $200.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Receipt-2598-3959-6333-Pro-Acct-July-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number UAHQDL21\u00000004"
+    ],
+    "financial_lines": [
+      "Invoice number UAHQDL21\u00000004",
+      "Date paid July 5, 2026",
+      "$200.00 paid on July 5, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $200.00",
+      "Total $200.00",
+      "Amount paid $200.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\SQUARE\\Second State Mail - Payment Receipt for Square Services - June 2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Jeremy Klein <jeremy@secondstate.art>",
+      "Payment Receipt for Square Services",
+      "1 message"
+    ],
+    "financial_lines": [
+      "Payment Receipt for Square Services",
+      "Payment Receipt for Square",
+      "Service Price Tax Discount Total",
+      "Total Charged $49.00",
+      "your payment method, or cancel your subscription."
+    ]
+  },
+  {
+    "source": "EXPENSES\\SQUARE\\Second State Mail - Payment Receipt for Square Services - May 2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Jeremy Klein <jeremy@secondstate.art>",
+      "Payment Receipt for Square Services",
+      "1 message"
+    ],
+    "financial_lines": [
+      "Payment Receipt for Square Services",
+      "Payment Receipt for Square",
+      "Service Price Tax Discount Total",
+      "Total Charged $49.00",
+      "your payment method, or cancel your subscription."
+    ]
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\Adobe-Transactions-Chase-05-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Printed from Chase for Business",
+      "Transaction details",
+      "BUS COMPLETE CHK (...0076)"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\Adobe-Transactions-Chase-06-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Printed from Chase for Business",
+      "Transaction details",
+      "BUS COMPLETE CHK (...0076)"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\invoice-Adobe-July-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Bill To",
+      "Jeremy Klein",
+      "CA  91010"
+    ],
+    "financial_lines": [
+      "INVOICE",
+      "Invoice Information",
+      "3508507210Invoice Number",
+      "04-JUL-2026Invoice Date",
+      "Credit CardPayment Terms",
+      "PRODUCT NUMBER PRODUCT DESCRIPTION QUANTITY UNIT UNIT PRICE NET AMOUNT TAX RATE TAXES TOTAL",
+      "Invoice Total",
+      "NET AMOUNT (USD)          19.99",
+      "GRAND TOTAL (USD) 19.99"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\invoice-Adobe-June-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Bill To",
+      "Jeremy Klein",
+      "CA  91010"
+    ],
+    "financial_lines": [
+      "INVOICE",
+      "Invoice Information",
+      "3477639247Invoice Number",
+      "04-JUN-2026Invoice Date",
+      "Credit CardPayment Terms",
+      "PRODUCT NUMBER PRODUCT DESCRIPTION QUANTITY UNIT UNIT PRICE NET AMOUNT TAX RATE TAXES TOTAL",
+      "Invoice Total",
+      "NET AMOUNT (USD)          19.99",
+      "GRAND TOTAL (USD) 19.99"
+    ]
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\invoice-Adobe-May-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Bill To",
+      "Jeremy Klein",
+      "CA  91010"
+    ],
+    "financial_lines": [
+      "INVOICE",
+      "Invoice Information",
+      "3447178399Invoice Number",
+      "04-MAY-2026Invoice Date",
+      "Credit CardPayment Terms",
+      "PRODUCT NUMBER PRODUCT DESCRIPTION QUANTITY UNIT UNIT PRICE NET AMOUNT TAX RATE TAXES TOTAL",
+      "Invoice Total",
+      "NET AMOUNT (USD)          19.99",
+      "GRAND TOTAL (USD) 19.99"
+    ]
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Invoice-6AFMD0H0-0028.pdf",
+    "first_lines": [
+      "6AFMD0H0\u00000028 · $125.00 USD due October 24, 2026 Page 1 of 1",
+      "Tax Invoice",
+      "Invoice number 6AFMD0H0\u00000028",
+      "Date of issue October 24, 2026"
+    ],
+    "financial_lines": [
+      "Tax Invoice",
+      "Invoice number 6AFMD0H0\u00000028",
+      "Sold through Link, LLC",
+      "Description Qty Unit price Amount",
+      "Subtotal $125.00",
+      "Total $125.00",
+      "Amount due $125.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Invoice-6AFMD0H0-0029.pdf",
+    "first_lines": [
+      "6AFMD0H0\u00000029 · $50.00 USD due October 24, 2026 Page 1 of 1",
+      "Tax Invoice",
+      "Invoice number 6AFMD0H0\u00000029",
+      "Date of issue October 24, 2026"
+    ],
+    "financial_lines": [
+      "Tax Invoice",
+      "Invoice number 6AFMD0H0\u00000029",
+      "Sold through Link, LLC",
+      "Description Qty Unit price Amount",
+      "Subtotal $50.00",
+      "Total $50.00",
+      "Amount due $50.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Receipt-2030-4401.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number 6AFMD0H0\u00000028",
+      "Receipt number 2030\u00004401"
+    ],
+    "financial_lines": [
+      "Invoice number 6AFMD0H0\u00000028",
+      "Date paid October 24, 2026",
+      "Sold through Link, LLC",
+      "$125.00 paid on October 24, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $125.00",
+      "Total $125.00",
+      "Amount paid $125.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Receipt-2842-2076.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number 6AFMD0H0\u00000029",
+      "Receipt number 2842\u00002076"
+    ],
+    "financial_lines": [
+      "Invoice number 6AFMD0H0\u00000029",
+      "Date paid October 24, 2026",
+      "Sold through Link, LLC",
+      "$50.00 paid on October 24, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $50.00",
+      "Total $50.00",
+      "Amount paid $50.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "EXPENSES\\SUNO\\Invoice-FA0WCXHP-0006.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Invoice",
+      "Invoice number FA0WCXHP\u00000006",
+      "Date of issue June 8, 2026"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Invoice number FA0WCXHP\u00000006",
+      "Description Qty Unit price Amount",
+      "Subtotal $30.00",
+      "Total $30.00",
+      "Amount due $30.00 USD"
+    ]
+  },
+  {
+    "source": "EXPENSES\\SUNO\\Receipt-2840-2505-3066.pdf",
+    "first_lines": [
+      "Page 1 of 1",
+      "Receipt",
+      "Invoice number FA0WCXHP\u00000006",
+      "Receipt number 2840\u00002505\u00003066"
+    ],
+    "financial_lines": [
+      "Invoice number FA0WCXHP\u00000006",
+      "Date paid June 8, 2026",
+      "$30.00 paid on June 8, 2026",
+      "Description Qty Unit price Amount",
+      "Subtotal $30.00",
+      "Total $30.00",
+      "Amount paid $30.00",
+      "Payment history",
+      "Payment method Date Amount paid Receipt number"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\ALEX CC PURCHASE FRIEDEBERG CONCEPT.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Note",
+      "Congratulations on your successful bid. We appreciate your participation!",
+      "Payment is due now. Please contact us if you would like to make"
+    ],
+    "financial_lines": [
+      "Payment is due now. Please contact us if you would like to make",
+      "person there is a 4% discount available for payment by cash, wire or check",
+      "adjusted invoice.",
+      "Payment is required no later than 10 days from the sale. Due to high",
+      "days may be re-entered into a future auction or resold without further",
+      "notice, and payment will be forfeited.",
+      "Total Hammer $600.00",
+      "Buyer's Premium $144.00 (24%)",
+      "Total $744.00",
+      "Balance Due $0.00",
+      "PAID",
+      "Invoice   #INV402290 Apr 11, 2026 02:13PM PDT"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Alex Jeremy Zelle to Oliver 2500",
+    "first_lines": [
+      "12:32 all > @)",
+      "< BUS COMPLETE... (...0076)",
+      "All transactions",
+      "Q Search or filter"
+    ],
+    "financial_lines": [
+      "Zelle payment to OLIVER DONSON",
+      "Zelle payment to OLIVER DONSON",
+      "Zelle payment to OLIVER DONSON",
+      "Zelle payment to grandmajewjew",
+      "Zelle payment to OLIVER DONSON"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\BRADFORDS.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Auction Sale - 139 - 2-DAY PREMIER ART AUCTION! ENDS 10-11-25 & 10-12-25",
+      "1",
+      "27553"
+    ],
+    "financial_lines": [
+      "Invoice #:",
+      "UNPAID",
+      "Sent square invoice for invoice 10/15/25 m.a",
+      "SOLD TO:",
+      "Invoice #:",
+      "UNPAID",
+      "Total Extended Price:",
+      "25% Buyer's Premium:",
+      "Invoice Total:",
+      "Remaining Invoice Balance:",
+      "For out of town buyers, once we have received your payment your purchase will be turned over to Westside Mail Center our exclusive shipping provider. Westside Mail Cen",
+      "Invoice #:"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\CIRCLE PAYMENT STATUS.heic",
+    "first_lines": [
+      "Payee name",
+      "Pay-to address",
+      "delivery method",
+      "Amount"
+    ],
+    "financial_lines": [
+      "Amount"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Circle Proof of Payment - Chase Online.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Friday, December 19, 2025",
+      "Proof of Payment",
+      "Payee details"
+    ],
+    "financial_lines": [
+      "Proof of Payment",
+      "Payment details",
+      "Amount$892.50",
+      "To our billersPlease note the date the customer sent the payment and the date we delivered it. If you",
+      "received the payment after the expected delivery date, factors beyond the customer's",
+      "control (e.g., mail processing if you received the payment by U.S. Mail) may have caused the",
+      "To our customersPlease contact your biller directly for any issues with this payment, using this proof of",
+      "payment for reference. You can also contact us if you have any questions about this",
+      "payment.",
+      "This proof of payment is evidence that the customer has initiated the payment described above."
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Clars Invoice CL00105105.pdf",
+    "first_lines": [
+      "Lot No. Description Price",
+      "Oliver Donson",
+      "340 E 52nd St 7b",
+      "New York NY 10022"
+    ],
+    "financial_lines": [
+      "CL00105105Invoice No.:",
+      "Sale Date: 05/14/2026 2:00 PM",
+      "Sale Date: 05/15/2026 9:30 AM",
+      "Sale Date: 05/16/2026 9:30 AM",
+      "05/14/2026Invoice Date:",
+      "INVOICE",
+      ": 19\"h x 12.5\"w. Note: Proceeds from the sale of this lot will be donated to KQED.",
+      "Note: Proceeds from the sale of this lot will be donated to KQED.",
+      "$7,104.00Invoice Total:",
+      "Total Premium:",
+      "Total Hammer Price:Ship To:",
+      "$7,302.91Balance Due for Card & Online Payments (+2.8%):"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Clars Invoice CL00105689.pdf",
+    "first_lines": [
+      "Lot No. Description Price",
+      "Oliver Donson",
+      "340 E 52nd St 7b",
+      "New York NY 10022"
+    ],
+    "financial_lines": [
+      "CL00105689Invoice No.:",
+      "Sale Date: 06/18/2026 10:00 AM",
+      "Sale Date: 06/18/2026 1:00 PM",
+      "Sale Date: 06/19/2026 9:30 AM",
+      "Sale Date: 06/20/2026 9:30 AM",
+      "06/18/2026Invoice Date:",
+      "INVOICE",
+      "$3,200.00Invoice Total:",
+      "Total Premium:",
+      "Total Hammer Price:Ship To:",
+      "$3,289.60Balance Due for Card & Online Payments (+2.8%):",
+      "Payment Copy"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\DOYLE-Oct-2026-SecondState-TBD-Customer-335120-EMAIL-THREAD.pdf",
+    "first_lines": [
+      "[",
+      "{",
+      "\"page\": 1,",
+      "\"text\": \"Oliver Donson <oliver@secondstate.art>\\nTheodore B. Donson Ltd. -- Customer #335120\\n4 messages\\nMarvel Griepp <mgriepp@icloud.com> Fri, Oct 23, 2026 at 12:06 AM\\nTo: Steven Kuzio <Steven.Kuzio@doyle.com>, Cynthia Klein <Cynthia@doyle.com>\\nCc: Oliver Donson <oliver@secondstate.art>\\nDear Steve, dear Cindy,\\n        Oliver Donson will be picking up our purchases from Tuesday’s sale today, Friday.\\n        Please confirm that you will be releasing these purchases to him on our credit account: \\n                Theodore B. Donson Ltd.\\n                20 Inningwood Road\\n                Ossining NY  10562\\n        Many thanks!\\nBest regards,\\n        Marvel Griepp\\n        Director\\n        Theodore B. Donson Ltd.\\n        914 589 3093\\n> On Nov 17, 2020, at 9:38 PM, Steven Kuzio <Steven.Kuzio@Doyle.com> wrote:\\n>\\n> I have attached our bank instructions.\\n>\\n> Thanks,\\n>\\n> Steven Kuzio\\n> VP, Director of Client Accounts\\n> DOYLE\\n> 175 East 87th Street\\n> New York, NY 10128\\n> Tel: 212-427-4141 ext. 202\\n> Email: steve@doyle.com\\n> Web:  http://www.doyle.com\\n>\\n> -----Original Message-----\\n> From: Marvel Griepp [mailto:mgriepp@icloud.com]\\n> Sent: Tuesday, November 17, 2020 2:46 PM\\n> To: Steven Kuzio; Ted Donson\\n> Subject: Re: Theodore B. Donson Ltd. -- Customer #335120\\n>\\n> Dear Steven:\\n>\\n>         I would be grateful for your banking coordinates as soon as you can send them to me…\\n>\\n> Best regards,\\n>    Marvel Griepp\\n11/4/26, 1:21 AM Second State Mail - Theodore B. Donson Ltd. -- Customer #335120\\nhttps://mail.google.com/mail/u/0/?ik=6233210dd9&view=pt&search=all&permthid=thread-f:1879811957900540993&simpl=msg-f:1879811957900540… 1/3\""
+    ],
+    "financial_lines": [
+      "\"text\": \"Cc: Oliver Donson <oliver@secondstate.art>\\nSubject: Theodore B. Donson Ltd. -- Customer #335120\\n \\n[Quoted text hidden]\\nMarvel Griepp <mgriepp@icloud.com> Tue, Oct 27, 2026 at 11:17 PM\\nTo: Cynthia Klein <Cynthia@doyle.com>\\nCc: Steven Kuzio <Steven.Kuzio@doyle.com>, Oliver Donson <oliver@secondstate.art>\\nDear Steve & Cindy,\\nPlease correct invoice 45259 to read:\\nOliver Donson\\nTheodore B. Donson Ltd.\\n20 Inningwood Road\\nOssining NY  10562\\nI will forward payment next week for this invoice, as well as for 45271.  \\nThank you !\\nBest regards,\\nMarvel Griepp\\nDirector\\nTheodore B. Donson Ltd.\\n914 589 3093\\n[Quoted text hidden]\\nMarvel Griepp <mgriepp@icloud.com> Mon, Nov 2, 2026 at 10:20 PM\\nTo: Cynthia Klein <Cynthia@doyle.com>\\nCc: Steven Kuzio <Steven.Kuzio@doyle.com>, Oliver Donson <oliver@secondstate.art>\\nDear Steven,\\nWe would be grateful to receive your re-issued invoice.  \\nBest regards,\\nMarvel Griepp\\nDirector\\nTheodore B. Donson Ltd.\\n914 589 3093\\n[Quoted text hidden]\\n11/4/26, 1:21 AM Second State Mail - Theodore B. Donson Ltd. -- Customer #335120\\nhttps://mail.google.com/mail/u/0/?ik=6233210dd9&view=pt&search=all&permthid=thread-f:1879811957900540993&simpl=msg-f:1879811957900540… 3/3\""
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\DuMouchelles Invoice.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Customer Copy",
+      "Billing",
+      "43128"
+    ],
+    "financial_lines": [
+      "Invoice: 2026100184",
+      "Total Bid",
+      "Buyer's Premium",
+      "Grand Total",
+      "Balance Due",
+      "Payment and pick-up is expected within",
+      "Payment Options:",
+      "Invoices >$5,000",
+      "Handling and storage fees will be added to the invoice balance and will require full payment to remove items.",
+      "If your invoice does not include Michigan sales tax and your purchases will be picked up in-person at our gallery,",
+      "payments@dumoart.com",
+      "reissue your invoice to include Michigan sales tax."
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\DuMouchelles invoice 2026100184 PAID 2026-10-27.pdf",
+    "first_lines": [
+      "Customer Copy",
+      "Billing",
+      "43128",
+      "Saturday, October 17, 2026"
+    ],
+    "financial_lines": [
+      "Invoice: 2026100184",
+      "Total Bid",
+      "Buyer's Premium",
+      "Grand Total",
+      "Balance Due",
+      "Payment and pick-up is expected within",
+      "Payment Options:",
+      "Invoices >$5,000",
+      "parameters above and our Conditions of Sale. Use the PayPal button if it appears on your invoice.",
+      "PAID AUCTION",
+      "AMOUNT",
+      "Payment Information"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\FERRI PURCHASES.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "FACTURE ACHETEUR N°  55793",
+      "Monsieur DONSON Theodore",
+      "20 Inningwood rd"
+    ],
+    "financial_lines": [
+      "d’épreuves environ). Tirage total à 226 épreuves."
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Ferri Purchases",
+    "first_lines": [
+      "63 — Bet 200",
+      "7 (4 OO",
+      "57° 2 oe ae",
+      "[AB — ve . 300"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "PURCHASE INVOICES\\Ferri Purchases.png",
+    "first_lines": [
+      "93 E> no AO0",
+      "<6 - (4 OO",
+      "aa : re",
+      "pa Delocs eK” \" ie /"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "PURCHASE INVOICES\\Heritage October 2026 12264503.pdf",
+    "first_lines": [
+      "[",
+      "{",
+      "\"page\": 1,",
+      "\"text\": \"REF #:\\n8280-7152\\nA7152\\nInvoice #   12264503 SC\\n2026 October 22 Prints & Multiples Signature® Auction (8280)\\nDate:\\n10/22/2026\\n*Theodore.Donson*\\nz\\n*8280-7152*\\nClient #:\\n1079599-30-10\\n+\\n447796947917\\n (H)\\nBidder #:\\n7152\\nTerms:\\nDue Nov 21, 2026\\nTheodore Donson\\nTheodore B Donson Ltd\\n20\\n Inningwood Rd\\nOssining, NY     \\n10562-2204\\nSales Tax #:\\nResale on File\\n9146024109\\n (W)\\ntbdonson@icloud.com\\nDirect Customer Service\\nToll-Free: 1-866-835-3243\\nLots: 1     Items: 1\\nClient Preferred Shipping Method: FEDEX STD Overnt 1182 3612 2\\nTotal Due\\n$11,250.00\\nHammer Price\\nBuyer Premium\\nTotal\\nSale Subtotal\\n$9,000.00\\n$2,250.00\\n$11,250.00\\nInvoice Total\\n$11,250.00\\nInvoice Summary\\nThank you for your participation\\nRun on Thursday, Oct 22 2026 03:25 PM (???)\\n214-528-3500 / 800-872-6467\\nTelefax 214-409-1425\\nhttps://www.ha.com/FineArt\\ne-mail: \\nBid@HA.com\\nThis invoice is presented by \\nHeritage Auctioneers & Galleries, Inc.\\n2801\\n W. Airport Freeway, Dallas, TX \\n75261-4127\\n(Northwest corner of W. Airport Freeway & Valley View Lane)\\nClient #:\\nTheodore Donson\\nTheodore B Donson Ltd\\n20\\n Inningwood Rd\\nOssining, NY     \\n10562-2204\\n1079599\\n7/1079599/12264503/\\nRemittance Slip:\\nREF #:\\n8280-7152\\nInvoice #:\\n12264503\\nAmount Due:\\n$11,250.00\\nDue Date:\\nNov 21, 2026\\nPlease detach and return with your payment\\nPayment Amount:\\nMake all checks payable to Heritage Auctions and mail to:Attn: Accounts Receivable\\nPO Box \\n619999\\n, Dallas, TX \\n75261-6199\\nPlease include the underlined information with your payment.\\nIf you pay by check, your check may be converted to an electronic funds transfer from your account.\\n\""
+    ],
+    "financial_lines": [
+      "\"text\": \"REF #:\\n8280-7152\\nA7152\\nInvoice #   12264503 SC\\n2026 October 22 Prints & Multiples Signature® Auction (8280)\\nDate:\\n10/22/2026\\n*Theodore.Donson*\\nz\\n*8280-7152*\\nClient #:\\n1079599-30-10\\n+\\n447796947917\\n (H)\\nBidder #:\\n7152\\nTerms:\\nDue Nov 21, 2026\\nTheodore Donson\\nTheodore B Donson Ltd\\n20\\n Inningwood Rd\\nOssining, NY     \\n10562-2204\\nSales Tax #:\\nResale on File\\n9146024109\\n (W)\\ntbdonson@icloud.com\\nDirect Customer Service\\nToll-Free: 1-866-835-3243\\nLots: 1     Items: 1\\nClient Preferred Shipping Method: FEDEX STD Overnt 1182 3612 2\\nTotal Due\\n$11,250.00\\nHammer Price\\nBuyer Premium\\nTotal\\nSale Subtotal\\n$9,000.00\\n$2,250.00\\n$11,250.00\\nInvoice Total\\n$11,250.00\\nInvoice Summary\\nThank you for your participation\\nRun on Thursday, Oct 22 2026 03:25 PM (???)\\n214-528-3500 / 800-872-6467\\nTelefax 214-409-1425\\nhttps://www.ha.com/FineArt\\ne-mail: \\nBid@HA.com\\nThis invoice is presented by \\nHeritage Auctioneers & Galleries, Inc.\\n2801\\n W. Airport Freeway, Dallas, TX \\n75261-4127\\n(Northwest corner of W. Airport Freeway & Valley View Lane)\\nClient #:\\nTheodore Donson\\nTheodore B Donson Ltd\\n20\\n Inningwood Rd\\nOssining, NY     \\n10562-2204\\n1079599\\n7/1079599/12264503/\\nRemittance Slip:\\nREF #:\\n8280-7152\\nInvoice #:\\n12264503\\nAmount Due:\\n$11,250.00\\nDue Date:\\nNov 21, 2026\\nPlease detach and return with your payment\\nPayment Amount:\\nMake all checks payable to Heritage Auctions and mail to:Attn: Accounts Receivable\\nPO Box \\n619999\\n, Dallas, TX \\n75261-6199\\nPlease include the underlined information with your payment.\\nIf you pay by check, your check may be converted to an electronic funds transfer from your account.\\n\"",
+      "\"text\": \"REF #:\\n8280-7152\\nA7152\\nInvoice #:\\n12264503\\n2026 October 22 Prints & Multiples Signature® Auction (8280)\\nClient:\\n1079599-30-10\\nTheodore Donson\\nBidder #:\\n7152\\nHeritage Auctions\\nPage 2   of   2\\nClient Preferred Shipping Method: FEDEX STD Overnt 1182 3612 2\\nFailure to pick-up or arrange shipping within \\n35\\n days of auction shall subject each item to a lien and storage charge of a \\n$100\\n administration fee plus \\n$10\\n per diem \\nfor large items and \\n$5\\n per diem for smaller items. After \\n90\\n days, Heritage may, in one of its auctions, sell the item to satisfy the lien amount plus its \\n10%\\n \\ncommission.\\nPlease complete and sign the enclosed application, to expedite future purchases.\\nPayments by credit card (Visa, Mastercard, Discover) are subject to a \\n2.9%\\n surcharge. This fee only applies to credit card transactions and does not \\nexceed Heritage's cost of processing.\\nYour item(s) will be shipped (or released for third party shipping) after verification of good funds. There will be a \\n5\\n business day wait for checks, unless you have \\nestablished credit with Heritage (no wait for bank wire). Please allow \\n7-14\\n business days for shipping.\\nBalance Due\\n$11,250.00\\n NEW\\n   For faster shipping send a bank wire: \\nWells Fargo Bank, \\n420\\n Montgomery Street, San Francisco, CA  \\n94104-1207\\nABA #: \\n121000248\\n Account Name:Heritage Auctioneers & Galleries, Inc. , Account #: \\n4615041878\\n / SWIFT Code: WFBIUS\\n6\\nS\\nInclude with wire:\\n Originator to Beneficiary Information: Client #\\n1079599\\n, REF #\\n8280-7152\\n, Invoice #\\n12264503\\nPlease e-mail your wire confirmation to Credit@HA.com to ensure prompt application to your invoice.\\nBank information is only presented for wire transfer and ACH payments.\\nMake checks payable to Heritage Auctions and mail to: PO Box \\n619999\\n, Dallas TX \\n75261-6199\\n.\\nTo ensure proper credit, please write your invoice number and account number on your check.\\nI have read and agree to the Auction Terms and Conditions as they appear in the catalog.\\nMerchandise Received:   X______________________________________________________\\nNotice: Title to the lots described above shall not pass to purchaser until the Invoice amount is paid in full.\\nTo ensure proper credit, please write your invoice number and account number on your check.\\nSale Subtotal\\n9,000.00\\nBuyer's Premium\\n2,250.00\\nInvoice Total\\n$11,250.00\\n$11,250.00\\nLot #\\nQty\\nLot Description\\nHammer \\nPrice\\nBuyer \\nPremium\\nTotal\\n**65022\\n1\\n(19 x 14.5) Marc Chagall (1887-1985) Découverte de \\n9,000.00\\n2,250.00\\n11,250.00\\nPROV.\\nProvenance Included\\n0.00\\n0.00\\n0.00\\nSubtotal\\n$9,000.00\\n$2,250.00\\n$11,250.00\\nThank you for your participation\\n214-528-3500 / 800-872-6467\\nTelefax 214-409-1425\\nhttps://www.ha.com/FineArt\\ne-mail: \\nBid@HA.com\\nThis invoice is presented by \\nHeritage Auctioneers & Galleries, Inc.\\n2801\\n W. Airport Freeway, Dallas, TX \\n75261-4127\\n(Northwest corner of W. Airport Freeway & Valley View Lane)\\n** = Heritage Auctions Custom Shipping  \\nRun on Oct 22 2026 03:25 PM (???)\\n\"",
+      "\"text\": \"Heritage Auctions\\n2026 October 22 Prints & Multiples Signature® Auction\\nClient #: \\n1079599\\nInvoice #: \\n12264503\\nREF #: \\n8280-7152\\nHERITAGE AUCTIONS EXTENDED PAYMENT TERMS AGREEMENT\\nThere are \\nno exceptions\\n to these terms. Extended payment options will only be afforded to those strictly complying with these terms. \\nI understand and accept the following extended payment terms for Heritage Auctions \\n2026 October 22 Prints & Multiples \\nSignature® Auction\\n1. There are no extended payment terms for any amount in excess of your preapproved credit line or without this signed document.\\n2. The following payment options are available: 1) 14 days interest free; 2) 30 days and 3) 45 days.\\nExtended payment options require your check(s) upon pickup of your lots from each session.\\nNo lots from any session will be released without checks. You may vary your payment option and exchange your previous check(s) \\nas the auction progresses.\\n3. Extension periods and rates for the above named sale and auction:\\n30-days\\n4. If any check is not paid when due (whether NSF or otherwise), extended payment terms on any unpaid balance are and purchases \\nbear interest from the date of Sale to final payment at the rate of 18% per annum.\\n5. In accordance with the Terms and Conditions of Sale as published, \\\"a credit card transaction may not be used in conjunction with \\nany other financing or extended terms\\\". Credit Cards will not be accepted for the payment of this invoice.\\n6. If you do not have a resale number & take delivery at the Show, you must pay the applicable state sales tax, if any, as part of the \\nfirst check to be deposited.\\n7. \\nREMINDER: ANY CHECKS NOT CLEARED FOR PREVIOUS SALES WILL REDUCE AVAILABLE CREDIT.\\n8. In order to ship lots after the above named sale and auction, you must select a payment option on lots not picked up, and \\nsend us \\nyour check(s) by overnight courier, prior to our shipment of any lots not delivered\\n at the time of the sale.\\n9. Notwithstanding any provisions to the contrary herein, in no event shall the payment options require the payment or permit the \\ncollection of interest in excess of the maximum amount permitted by applicable law. If any such excess of interest is contracted for, \\nyou are not liable for payment in excess of the maximum amount of interest permitted by the applicable law. If any excess is paid, it \\nis subject to refund at your option.\\n10. All disputes in any way relating to, arising under, connected with, or incident to this agreement, shall be submitted to binding \\narbitration under the commercial rules of the American Arbitration Association (heard at Dallas, Texas) or if applicable, the \\nProfessional Numismatists Guild.\\nBIDDER: _____________________________________\\nSignature: _____________________________________\\nCOMPANY/CORP: _______________________________\\nAGENT/TITLE: _______________________________\\nDate\\nPrincipal\\nInterest\\nPayment Due\\nBalance\\n12/05/2026\\n$2,853.79\\n$115.87\\n$2,969.66\\n$8,733.71\\n01/05/2027\\n$2,882.32\\n$87.34\\n$2,969.66\\n$5,851.39\\n02/05/2027\\n$2,911.15\\n$58.51\\n$2,969.66\\n$2,940.24\\n03/05/2027\\n$2,940.24\\n$29.40\\n$2,969.64\\n$0.00\\nTotals:\\n$11,587.50\\n$291.12\\n$11,878.62\\n$17,525.34\\n* Includes Shipping and Handling, Sales Taxes, and Fees\\n\"",
+      "\"text\": \" Heritage Auctions  \\n  \\nRESALE CERTIFICATE  \\n  \\nPurchaser/  \\nBusiness Name:  _____________________________________________  \\n  \\nAddress:  ___________________________________________________  \\n  \\nCity:  ____________________________     State:   _______  Zip: ______  \\n  \\nPhone:  __________________________  \\nI HEREBY CERTIFY, that I hold valid seller's permit NO. _______________________ in the STATE \\nof _______ issued pursuant to the Sales and Use Tax Law of that State; that I am engaged in the \\nbusiness of selling Collect ibles; that the tangible personal property described herein which I shall \\npurchase from HERITAGE will be resold by me in the form of tangible personal property to purchasers \\nnot located in the state in which I take delivery, except for  buyers who (a) provi de a valid resale \\ncertificate in such state in which I take delivery, or (b) pay appropriate sales tax in, or provide a valid \\nresale certificate from, the State of issue of my seller’s permit; PROVIDED, HOWEVER, that in the \\nevent any of such property is used for any purpose other than retention, demonstration, or display while \\nholding it for sale in the regular course of business, it is understood that I am required by the Sales and \\nUse Tax Law to report and pay the tax, measured by the purchase price of such property.  \\nDescription of property to be purchased:  Collectibles  \\n  \\nPrint names of authorized purchaser(s):  \\n___________________________________________________  \\n  \\n  \\nBy: ________________________  Title: ______________ Date: __________  \\n     (Signature of owner or authorized employee or agent of Purchaser)  \\n  \\nA VALID STATE ISSUED SELLER’S PERMIT MUST ACCOMPANY THIS SIGNED FORM IN ORDER TO QUALIFY FOR \\nTAX EXEMPT DEALER STATUS.  \\nFORM & SUPPORTING DOCUMENTS MAY BE FAXED TO: 214-409-2103   \\nOR EMAILED TO RESALE@HA.COM  \\n  \\nHeritage Auctions ● 2801 W. Airport Freeway ● Dallas, Texas 75261-4127  \\n  \\nRESALE CERT - 0520 Rev  \""
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\INV402290-20260411-FRIEDEBERG-CONCEPT.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Invoice",
+      "#INV402290",
+      "Apr 11, 2026 02:13PM PDT"
+    ],
+    "financial_lines": [
+      "Invoice",
+      "Lot# Image Item Name HammerPrice Buyer'sPremium Shipping Tax Subtotal",
+      "Payment is due now. Please contact us if you would like to",
+      "payment by cash, wire or check within 10 calendar days of the",
+      "auction. Please email us to request an adjusted invoice.",
+      "Payment is required no later than 10 days from the sale. Due to",
+      "future auction or resold without further notice, and payment",
+      "Total Hammer $600.00",
+      "Buyer's Premium $144.00",
+      "Total $744.00",
+      "Balance Due $744.00",
+      "Please note, the credit card on your profile will be auto-charged for this invoice if payment is"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Invoice-SantaMonica-2026-10-19.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "INVOICE",
+      "Santa Monica Auctions",
+      "2525 Michigan Avenue"
+    ],
+    "financial_lines": [
+      "INVOICE",
+      "Invoice Number: SM-2026-298",
+      "Invoice Date: October 19, 2026",
+      "Payment Due: October 19, 2026",
+      "Amount Due (USD): $5,524.50",
+      "Product Quantity Price Amount",
+      "Buyer's Premium 27% of Total Hammer",
+      "Total: $5,524.50",
+      "Amount Due (USD): $5,524.50",
+      "Check, Cash, and Wires/Zelle are accepted forms of payment.",
+      "Credit card payments will incur a 3% processing fee. Please inform us if you would like to pay via credit card and we will send",
+      "you a payment link (Clover Merchant Services)."
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\LARSEN-ZUNIGA-NIETO.png",
+    "first_lines": [
+      "LARSEN",
+      "ART AUCTION",
+      "Sold To: Oliver Donson Invoice Number: 442",
+      "20 Inningwood Rd. Invoice Date: 10/17/2026"
+    ],
+    "financial_lines": [
+      "Sold To: Oliver Donson Invoice Number: 442",
+      "20 Inningwood Rd. Invoice Date: 10/17/2026",
+      "Subtotal $1,900.00",
+      "Buyer's Premium $380.00",
+      "Subtotal $2,280.00",
+      "Total Sale $2,280.00",
+      "Payment Terms. Thank you for participating in the Larsen Art Auction and congratulations on your winning bid(s). Payment is due within 5 days",
+      "of the date of the auction. Acceptable forms of payment are check, wire transfer or credit card (up to $25,000 of total purchases). Please make"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\MIRO-INDELIBLE-INVALUABLE.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "(/) Secure Checkout",
+      "Back to Purchases (/my-account/purchases)",
+      "Invoice #3928172"
+    ],
+    "financial_lines": [
+      "Invoice #3928172",
+      "invoice, please contact Customer Care at customercare@invaluable.com.",
+      "Total Due: $0.00 USD",
+      "Payment Option(s)",
+      "pay by clicking the \"Pay Now\" button on your invoice.",
+      "paid",
+      "paid",
+      "Lot Total $403.62 USD",
+      "Invoice Total $403.62 USD",
+      "Payment(s) made ($403.62 USD)",
+      "Total Due $0.00 USD",
+      "Amount Payable Online $0.00 USD"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\NEIMAN - NAMATH - Gmail - Receipt from CRESCENT CITY AUCTION.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "supjeremyklein <supjeremyklein@gmail.com>",
+      "Receipt from CRESCENT CITY AUCTION",
+      "1 message"
+    ],
+    "financial_lines": [
+      "PaymentType: Credit Card (Card Not Present)",
+      "Amount:    $416.00 USD",
+      "GOODS AND/OR SERVICES IN THE AMOUNT OF",
+      "THE TOTAL SHOWN HEREON AND AGREES TO"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Neiman-Broadway-Joe-Lot-Info.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Bid Now",
+      "My Account",
+      "Logout"
+    ],
+    "financial_lines": [
+      "Sold: $416.00",
+      "Payment & Shipping"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Oliver Ferri Purchases & Images.docx",
+    "first_lines": [
+      "Oliver - Auction Purchases",
+      "Ferri & Associes, Drouot | 27 March 2026 | EUR buyer's premium 30% | FX 1.15 USD/EUR",
+      "Lot 38 - Pierre Bonnard",
+      "Lot 63 - Félix Buhot"
+    ],
+    "financial_lines": [
+      "Ferri & Associes, Drouot | 27 March 2026 | EUR buyer's premium 30% | FX 1.15 USD/EUR",
+      "Lots bought | 13 | Total hammer | EUR 15,420.00",
+      "Total incl. premium | EUR 20,046.00 | Total USD | USD 23,052.90",
+      "Premium: EUR 60.00",
+      "Total: EUR 260.00",
+      "Total USD: USD 299.00",
+      "Premium: EUR 210.00",
+      "Total: EUR 910.00",
+      "Total USD: USD 1,046.50",
+      "Premium: EUR 420.00",
+      "Total: EUR 1,820.00",
+      "Total USD: USD 2,093.00"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Oliver Ferri Purchases.docx",
+    "first_lines": [
+      "Oliver – Auction Purchases (March 27, 2026)",
+      "Lot 38 – Pierre Bonnard",
+      "Portrait of Renoir (1916)",
+      "Etching – Edition 150; Arches vellum; Vollard"
+    ],
+    "financial_lines": [
+      "Hammer: €200 | Total: €260 | $299.00",
+      "Hammer: €700 | Total: €910 | $1,046.50",
+      "Hammer: €1400 | Total: €1820 | $2,093.00",
+      "Hammer: €500 | Total: €650 | $747.50",
+      "Hammer: €1200 | Total: €1560 | $1,794.00",
+      "Hammer: €1300 | Total: €1690 | $1,943.50",
+      "Hammer: €280 | Total: €364 | $418.60",
+      "Hammer: €100 | Total: €130 | $149.50",
+      "Hammer: €5500 | Total: €7150 | $8,222.50",
+      "Hammer: €600 | Total: €780 | $897.00",
+      "Hammer: €120 | Total: €156 | $179.40",
+      "Hammer: €3200 | Total: €4160 | $4,784.00"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Richard Zesty Andy Capp.png",
+    "first_lines": [
+      "< Back to Purchases",
+      "Invoice #3711962",
+      "New Year Special Estates Auction * January 11, 2026",
+      "i= Lot Summary"
+    ],
+    "financial_lines": [
+      "Invoice #3711962",
+      "Buyer's Premium $137.50 USD"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Roland_Matisse_Invoice_52365.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "1",
+      "52365",
+      "Auction Sale - 1319 - January 10th, 2026 Estate Sale"
+    ],
+    "financial_lines": [
+      "Invoice #:",
+      "UNPAID",
+      "SOLD TO:",
+      "Total Extended Price:",
+      "27% Buyer's Premium:",
+      "1.00Total Quantity:",
+      "Invoice Total:",
+      "Remaining Invoice Balance:",
+      "have not been conveyed and acknowledged by our gallery, within 5 business days of the sale date, will be moved to The UPS",
+      "Store (all fees will be assessed by and paid to The UPS Store) or our off-site storage facility ($10  per day per lot for large items; $6"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\SHEP-COMMON-FRANCE.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Reference: V01760 - Amount: €50.90",
+      "Vérification terminée",
+      "La transaction a été réalisée avec succès, nous avons bien"
+    ],
+    "financial_lines": [
+      "Reference: V01760 - Amount: €50.90"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\SHEP-COMMON-INV-REC.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Minerve Enchères",
+      "33 avenue de Laon",
+      "02200 SOISSONS"
+    ],
+    "financial_lines": [
+      "Description Qté P.U TVA Total HT Total TTC",
+      "Total adjudication: 50,00€",
+      "Total Non Taxé 50,00 €",
+      "Total HT 0,75 €",
+      "Total TTC 50,90 €",
+      "Solde 0 €"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\SIMPSON INVOICE.png",
+    "first_lines": [
+      "< Back Overdue Invoice Payment f... Vv",
+      "PROPERTY STORAGE",
+      "All purchased property must be collected within 14",
+      "calendar days following the auction."
+    ],
+    "financial_lines": [
+      "< Back Overdue Invoice Payment f... Vv",
+      "will be considered abandoned and any monies paid",
+      "INVOICE",
+      "To: Jeremy Klein Invoice No.:1335-WL219",
+      "Sale Date: 12/06/2025",
+      "Terms: Payment due upon receipt. Total Hammer: $11,100.00",
+      "Buyer's Premium: 2,664.00",
+      "Invoice Total: $13,764.00"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\SIMPSON PAYMENT RECEIPT.png",
+    "first_lines": [
+      "Confirmation",
+      "O For your security, we're reviewing",
+      "your payment",
+      "It usually takes 2 to 7 hours. We'll call you at the number"
+    ],
+    "financial_lines": [
+      "your payment",
+      "any status updates, please check Payment activity.",
+      "You scheduled a payment",
+      "Amount you'll pay to SIMPSON GALLERIES, LLC (...7200)",
+      "Invoice 1335-WL219",
+      "Personalize your payment experience",
+      "($ ) Set up automatic payments >"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\SIMPSON WIRE.jpeg",
+    "first_lines": [
+      "We sent your wire transfer",
+      "CHASE ©",
+      "(—. HN?",
+      "From Account Ending in 0219"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "PURCHASE INVOICES\\SImpson Proof of Payment - Chase Online.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Thursday, December 18, 2025",
+      "Proof of Payment",
+      "Payee details"
+    ],
+    "financial_lines": [
+      "Proof of Payment",
+      "Payment details",
+      "Amount$13764.00",
+      "To our billersPlease note the date the customer sent the payment and the date we delivered it. If you",
+      "received the payment after the expected delivery date, factors beyond the customer's",
+      "control (e.g., mail processing if you received the payment by U.S. Mail) may have caused the",
+      "To our customersPlease contact your biller directly for any issues with this payment, using this proof of",
+      "payment for reference. You can also contact us if you have any questions about this",
+      "payment.",
+      "This proof of payment is evidence that the customer has initiated the payment described above."
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\SWANN INVOICE 09182025.jpg",
+    "first_lines": [
+      "SWANN",
+      "AUCTION GALLERIES",
+      "104 East 25th Street, New York, NY 10010",
+      "Phone: +1 (212) 254-4710"
+    ],
+    "financial_lines": [
+      "INVOICE",
+      "20 Inningwood Rd Invoice #: —2713-WL597",
+      "Sale Date: 09/18/2025",
+      "baa Be saaoae Total Hammer: $3,600.00",
+      "PICKUP Buyer's Premium: 972.00",
+      "Invoice Total: $4,572.00"
+    ]
+  },
+  {
+    "source": "PURCHASE INVOICES\\Shipping Payment Receipt.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Total:  $140.00 (CAD)",
+      "Thank you for your order!",
+      "You may print this receipt page for your records. A receipt has also"
+    ],
+    "financial_lines": [
+      "Total:  $140.00 (CAD)",
+      "Item Description Qty Taxable Unit Price Item Total",
+      "Customer specified amount",
+      "Payment",
+      "12/19/25, 2:40 PM Payment Receipt"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\ART ACCOUNTS.docx",
+    "first_lines": [
+      "Tab 1",
+      "$7500 via pond",
+      "$3330 via kucoin",
+      "Tab 2"
+    ],
+    "financial_lines": [
+      "Total Capital: $________",
+      "Total Expenses: $________",
+      "3. Profit Split (100% Total)",
+      "Each piece (or group of pieces bought together) should only “know” about the money that actually paid for it.",
+      "Paid to Alex (or credited against future payouts)",
+      "Amount In",
+      "Amount Out",
+      "Running Balance",
+      "This SOP defines how money is tracked, earned, and paid at Second State.",
+      "What sold",
+      "Net sale proceeds",
+      "Only entries marked Paid or Reconciled count."
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\BENTONS 1",
+    "first_lines": [
+      "Sold: $250",
+      "Lot 4006",
+      "THOMAS HART",
+      "= BENTON (MISSOURI/..."
+    ],
+    "financial_lines": [
+      "Sold: $250",
+      "“PASS ke Sold: $1,500",
+      "Sold: $1,100",
+      "Sold Lot 4008",
+      "Sold: $14,000",
+      "Sold: $1,100",
+      "Notify Me © + $182 buyer's premium"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\BENTONS 2",
+    "first_lines": [
+      "You Won!",
+      "You Won!",
+      "Lot 4069 | Hh",
+      "THOMAS HART"
+    ],
+    "financial_lines": [
+      "Sold: $1,900",
+      "Sold: $700",
+      "Sold: $1,800",
+      "Sold: $3,750",
+      "Sold: $1,100 stimate: $600 - $800",
+      "Sold: $800 be!",
+      "+ $105 buyer's premium"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\FORUMMIROLOT.html",
+    "first_lines": [
+      "Lot 149 | Joan Mir&oacute; (1893-1983)Exposition XXIIe Salon CLOSE Advanced Search Log In Sign Up Auctions Current Auctions Auction Results How to Buy Valuations Request a valuation How to Sell Private Collections Valuation services Departments Books and Manuscripts Modern & Contemporary Art and Editions 16th - 19th Century Works on Paper Maps and Atlases Photographs and Photobooks Fine Wine and Spirits Author Directory Banksy Private Collections Contact Us Locations About Us Terms and Conditions Anti-money Laundering Compliance Press Office News Make a Payment Auctions Current Auctions Auction Results How to Buy Valuations Request a valuation How to Sell Private Collections Valuation services Departments Books and Manuscripts Modern & Contemporary Art and Editions 16th - 19th Century Works on Paper Maps and Atlases Photographs and Photobooks Fine Wine and Spirits Author Directory Banksy Private Collections Contact Us Locations About Us Terms and Conditions Anti-money Laundering Compliance Press Office News Make a Payment Log In Sign Up Advanced Search +44 (0) 1926 691 141 Return to Auction Catalogue Wednesday 15th July 2026 | 1:00 PM | Lots: 219 Lot 149 Joan Miró (1893-1983)",
+      "Exposition XXIIe Salon de Mai (Mourlot 432)",
+      "Lithograph printed in colours,... Click to expand Share Share this lot Let your friends and family know about this lot Have a similar item? Request a complimentary valuation. Request a Valuation Get alerts to your inbox about similar items Get started Lot 149 Joan Miró (1893-1983) Exposition XXIIe Salon de Mai (Mourlot 432) Estimate: £2,500 - £3,500 Premium Buyer’s premium (inc. VAT) is charged on the hammer price at the following rates: 32.4% up to and including £5,000, plus 31.2% from £5,001 to £500,000, plus 24% above £500,001. Arr An Artist’s Resale Right royalty of up to 4% is payable on the hammer price of this Lot. Hammer Price: £4,500 Currency: GBP EUR USD AUD CAD CNY HKD JPY SFR SGD Description Joan Miró (1893-1983) Exposition XXIIe Salon de Mai (Mourlot 432) Lithograph printed in colours, 1966, signed in pencil, numbered from the avant lettre edition of 100, printed by Mourlot, published by Salon de Mai Éditeur, Paris, on Arches paper, the full sheet printed to the edges, sheet 670 x 517mm (26 3/8 x 20 3/8in) (unframed) Return to Auction Catalogue Wednesday 15th July 2026 | 1:00 PM | Lots: 219 Confirm Bid Current Bid: Next Bid: £ Bid Bid REDUCE TO CURRENT BID Hammer BP (inc. VAT) Import Duty ARR VAT on Hammer Total £0 £0 £0 £0 £0 £0 Please note that submitting this bid is legally binding. View our Terms and Conditions . CANCEL Commision Bidding is closed now. Bid Placed Your bid has been placed. You can review your bid in the 'My Account' section of the website. Return to Catalogue Return to Lot Cancel Bid ESTIMATE YOUR BID: CANCEL BID CLOSE Reduce Your Max Bid Estimate: Current Bid: Reduce to Current Bid CLOSE Maximum Bid reduced Your maximum bid was reduced successfully. Return to Catalogue CLOSE Terms & Conditions Please note that bidding at auction constitutes an irrevocable and binding agreement to purchase. We recommend that you carefully examine any items you intend to bid on as refunds will not be given for Buyer's Remorse . This doesn’t affect your statutory rights. Please note that by submitting a bid you are agreeing to our Terms & Conditions . I accept all of the above Continue Cancel Newsletter Signup Keyword Alerts Email: * Select your interests Subscribe to all auctions You can now save your preferences to receive emails, or create a free lite account which gives you more features. Would you like to receive personalised keyword alerts when new catalogues go live. If so, please indicate these below Add Keywords (e.g. Dickens) Add {{keyword}} Set a password to save your keyword alerts Password: * Passwords are a minimum of 7 characters and must include an upper case letter, a lower case letter, a number and a special character. Re-Enter Password: * I agree to the terms and conditions and privacy policy. * I would like to receive news and alerts from Forum Auctions Save and Continue Thank you for signing up for email notifications. Thank you, your preferences have been saved and a \"lite\" account has been created for you. Should you wish to buy or sell with Forum, please login to create a \"full\" account. Return to homepage Create an account Login Create an account Newsletter Quick Links Calendar Buying Selling Departments Auction Valuations About Us Privacy Policy Terms and Conditions Contact 4 Ingate Place, Battersea, London SW8 3NS info@forumauctions.co.uk +44 (0)20 7871 2640 4 Ingate Place, Battersea, London SW8 3NS Powered by Auction Marketer Forum Auctions Ltd, Registered in England and Wales, Registered Address: Forum Auctions, 4 Ingate Place, London SW8 3NS, Registered Number: 10048705, VAT No: 236 0168 28, Contact number: +44 (0) 20 7871 2640 , Contact email: office@forumauctions.co.uk © Copyright 2026 Forum Auctions Ltd. All Rights Reserved Powered by Auction Marketer"
+    ],
+    "financial_lines": [
+      "Lot 149 | Joan Mir&oacute; (1893-1983)Exposition XXIIe Salon CLOSE Advanced Search Log In Sign Up Auctions Current Auctions Auction Results How to Buy Valuations Request a valuation How to Sell Private Collections Valuation services Departments Books and Manuscripts Modern & Contemporary Art and Editions 16th - 19th Century Works on Paper Maps and Atlases Photographs and Photobooks Fine Wine and Spirits Author Directory Banksy Private Collections Contact Us Locations About Us Terms and Conditions Anti-money Laundering Compliance Press Office News Make a Payment Auctions Current Auctions Auction Results How to Buy Valuations Request a valuation How to Sell Private Collections Valuation services Departments Books and Manuscripts Modern & Contemporary Art and Editions 16th - 19th Century Works on Paper Maps and Atlases Photographs and Photobooks Fine Wine and Spirits Author Directory Banksy Private Collections Contact Us Locations About Us Terms and Conditions Anti-money Laundering Compliance Press Office News Make a Payment Log In Sign Up Advanced Search +44 (0) 1926 691 141 Return to Auction Catalogue Wednesday 15th July 2026 | 1:00 PM | Lots: 219 Lot 149 Joan Miró (1893-1983)",
+      "Lithograph printed in colours,... Click to expand Share Share this lot Let your friends and family know about this lot Have a similar item? Request a complimentary valuation. Request a Valuation Get alerts to your inbox about similar items Get started Lot 149 Joan Miró (1893-1983) Exposition XXIIe Salon de Mai (Mourlot 432) Estimate: £2,500 - £3,500 Premium Buyer’s premium (inc. VAT) is charged on the hammer price at the following rates: 32.4% up to and including £5,000, plus 31.2% from £5,001 to £500,000, plus 24% above £500,001. Arr An Artist’s Resale Right royalty of up to 4% is payable on the hammer price of this Lot. Hammer Price: £4,500 Currency: GBP EUR USD AUD CAD CNY HKD JPY SFR SGD Description Joan Miró (1893-1983) Exposition XXIIe Salon de Mai (Mourlot 432) Lithograph printed in colours, 1966, signed in pencil, numbered from the avant lettre edition of 100, printed by Mourlot, published by Salon de Mai Éditeur, Paris, on Arches paper, the full sheet printed to the edges, sheet 670 x 517mm (26 3/8 x 20 3/8in) (unframed) Return to Auction Catalogue Wednesday 15th July 2026 | 1:00 PM | Lots: 219 Confirm Bid Current Bid: Next Bid: £ Bid Bid REDUCE TO CURRENT BID Hammer BP (inc. VAT) Import Duty ARR VAT on Hammer Total £0 £0 £0 £0 £0 £0 Please note that submitting this bid is legally binding. View our Terms and Conditions . CANCEL Commision Bidding is closed now. Bid Placed Your bid has been placed. You can review your bid in the 'My Account' section of the website. Return to Catalogue Return to Lot Cancel Bid ESTIMATE YOUR BID: CANCEL BID CLOSE Reduce Your Max Bid Estimate: Current Bid: Reduce to Current Bid CLOSE Maximum Bid reduced Your maximum bid was reduced successfully. Return to Catalogue CLOSE Terms & Conditions Please note that bidding at auction constitutes an irrevocable and binding agreement to purchase. We recommend that you carefully examine any items you intend to bid on as refunds will not be given for Buyer's Remorse . This doesn’t affect your statutory rights. Please note that by submitting a bid you are agreeing to our Terms & Conditions . I accept all of the above Continue Cancel Newsletter Signup Keyword Alerts Email: * Select your interests Subscribe to all auctions You can now save your preferences to receive emails, or create a free lite account which gives you more features. Would you like to receive personalised keyword alerts when new catalogues go live. If so, please indicate these below Add Keywords (e.g. Dickens) Add {{keyword}} Set a password to save your keyword alerts Password: * Passwords are a minimum of 7 characters and must include an upper case letter, a lower case letter, a number and a special character. Re-Enter Password: * I agree to the terms and conditions and privacy policy. * I would like to receive news and alerts from Forum Auctions Save and Continue Thank you for signing up for email notifications. Thank you, your preferences have been saved and a \"lite\" account has been created for you. Should you wish to buy or sell with Forum, please login to create a \"full\" account. Return to homepage Create an account Login Create an account Newsletter Quick Links Calendar Buying Selling Departments Auction Valuations About Us Privacy Policy Terms and Conditions Contact 4 Ingate Place, Battersea, London SW8 3NS info@forumauctions.co.uk +44 (0)20 7871 2640 4 Ingate Place, Battersea, London SW8 3NS Powered by Auction Marketer Forum Auctions Ltd, Registered in England and Wales, Registered Address: Forum Auctions, 4 Ingate Place, London SW8 3NS, Registered Number: 10048705, VAT No: 236 0168 28, Contact number: +44 (0) 20 7871 2640 , Contact email: office@forumauctions.co.uk © Copyright 2026 Forum Auctions Ltd. All Rights Reserved Powered by Auction Marketer"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 106 Stella.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "   Jer…",
+      "Home  Fine Art  Prints  Abstract",
+      "Don’t miss out on items like this!"
+    ],
+    "financial_lines": [
+      "Sold: $2,750 USD",
+      "Payment & Shipping ",
+      "statement of fact. CRN bears no responsibility for error or omission. All items are sold as is. All sales are final."
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4006 Benton.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Additional Details",
+      "Payment & Shipping",
+      "Auction Details"
+    ],
+    "financial_lines": [
+      "Payment & Shipping"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4007 Benton.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Additional Details",
+      "Payment & Shipping",
+      "Auction Details"
+    ],
+    "financial_lines": [
+      "Payment & Shipping"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4009 Benton.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Additional Details",
+      "Provenance: Notes:",
+      "The devastating Ohio River floods in the winter of 1937 brought damage stretching from western Pennsylvania to southeastern Missouri. Nearly 400 people died, one million were left homeless"
+    ],
+    "financial_lines": [
+      "Star\" and \"St. Louis Post-Dispatch\" newspapers commissioned Thomas Hart Benton to provide sketches depicting the miserable conditions of the flooded areas in the Missouri Bootheel region.",
+      "Payment & Shipping"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4071 Benton.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Additional Details",
+      "Payment & Shipping",
+      "Auction Details"
+    ],
+    "financial_lines": [
+      "Payment & Shipping"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4072 Benton.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Additional Details",
+      "Provenance: Notes:",
+      "The \"Ol' 97\", a Southern Railway locomotive officially known as the Fast Mail, was en route from Monroe, Virginia, to Spencer, North Carolina, when it derailed at Stillhouse Trestle near"
+    ],
+    "financial_lines": [
+      "Payment & Shipping"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4073 Benton.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Additional Details",
+      "Provenance: Notes:",
+      "This lithograph appeared on the cover of the November 1951 issue of \"The New Republic\" to illustrate Benton's article \"Disaster on the Kaw\" and the need for flood relief. In October that year"
+    ],
+    "financial_lines": [
+      "Payment & Shipping"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4074 Benton.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Additional Details",
+      "Payment & Shipping",
+      "Auction Details"
+    ],
+    "financial_lines": [
+      "Payment & Shipping"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\MAX ERNST.docx",
+    "first_lines": [
+      "CONDITION",
+      "47: La loterie du jardin zoologique",
+      "Detailed breakdown of Max Ernst – La Loterie du Jardin Zoologique (2/12):",
+      "🖼️ Front (framed and unframed)"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "EXTRA NOTES\\Pedro-Friedeberg-Concept-Lot.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Live Auction",
+      "April 11, 2026, The Modern Sale: Art and Design from Deco to Contemporary",
+      "Sat, Apr 11, 2026 07:00AM PDT"
+    ],
+    "financial_lines": [
+      "ITEM DESCRIPTION PAYMENTS SHIPPING INFO"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\Print-Joan Miro-Clars Auction Gallery.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "BACK TO AUCTION",
+      "4198 of 714 Lots    Lot # JUMP",
+      "Sear"
+    ],
+    "financial_lines": [
+      "(with frame): 15\"h x 12.25\"w. Note: Proceeds from the sale of this lot will be donated to KQED.",
+      "SOLD $1,800"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\Print-Rockwell Kent-Clars Auction Gallery.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "BACK TO AUCTION",
+      "4168 of 714 Lots    Lot # JUMP",
+      "Sear"
+    ],
+    "financial_lines": [
+      "SOLD $1,500"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\Prints-Joan Miro-Clars Auction Gallery.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "BACK TO AUCTION",
+      "4197 of 714 Lots    Lot # JUMP",
+      "Sear"
+    ],
+    "financial_lines": [
+      "frame): 19\"h x 12.5\"w. Note: Proceeds from the sale of this lot will be donated to KQED.",
+      "SOLD $2,250"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\RD Lot Info.pdf",
+    "first_lines": [
+      "--- PAGE 1 (ocr_pdf) ---",
+      "-",
+      "=s> Jeremy Klein <jeremy@secondstate.art>",
+      "Fwd: Payment Confirmation"
+    ],
+    "financial_lines": [
+      "Fwd: Payment Confirmation",
+      "Subject: Fwd: Payment Confirmation",
+      "Subject: Payment Confirmation",
+      "Payment Confirmation",
+      "Your payment via American Express-2018 for invoice 345308 was successful.",
+      "Please find your payment confirmation below.",
+      "Invoice",
+      "Lot# Image Item Name Price Premium",
+      "Shipping Tax Subtotal",
+      "Lot# Image Item Name Shipping Tax Subtotal",
+      "Price Premium",
+      "Total Hammer $290.00"
+    ]
+  },
+  {
+    "source": "EXTRA NOTES\\UPS Rach Davis.pdf",
+    "first_lines": [
+      "--- PAGE 1 (ocr_pdf) ---",
+      "-",
+      "=s> Jeremy Klein <jeremy@secondstate.art>",
+      "Pickup + Packing for Artwork from Rachel Davis"
+    ],
+    "financial_lines": [
+      "For shipping, we have our own FedEx account. We can generate a prepaid FedEx label and email it to you — you would just need to",
+      "3. Schedule FedEx Pick up - $15 if total weight of package is less than 10Ib. If over 10lb, it will be $29."
+    ]
+  },
+  {
+    "source": "MISC\\Fairfield Porter Prints 2026.docx",
+    "first_lines": [
+      "PORTER, FAIRFIELD",
+      "Apple Blossom III, 1974",
+      "Lithograph in colors",
+      "Signed and numbered 21/50 III in pencil, very good condition. 26 x 20'' https://www.racheldavisfinearts.com/lots/view/1-6YMX1S/fairfield-porter-lithograph"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "MISC\\Full Inv 2026.docx",
+    "first_lines": [
+      "GRASSET, EUGENE",
+      "Jeanne d’Arc / Sarah Bernhardt, 1894",
+      "GRASSET, EUGENE",
+      "Jeanne d’Arc / Sarah Bernhardt, 1894"
+    ],
+    "financial_lines": [
+      "Screenprint on Limoges or Moustiers porcelain from a design after a watercolor by the artist. - Signed bottom centre, 1986 - 25 cm diameter - Excellent condition - Zao Wou-Ki & Ateliers de Ségriès - Produced for the BSN group on the occasion of its twentieth anniversary in 1986 by the Ateliers de Ségriès in Moustiers, commissioned from Zao Wou-Ki by his friend Antoine Ribou. Zao Wou-Ki was born in Beijing on February 1, 1920. In 1935, he passed the entrance exam for the Hangzhou School of Fine Arts, where he was appointed lecturer after six years of study; he held his first exhibition in 1941 in Chiang Kai-shek. It was in 1948 that he decided to settle in Paris.",
+      "Screenprint from 1982 depicting the iconic British comic-strip character Andy Capp, rendered through Estes’s crisp photorealist sensibility. Published during a period when Estes was extending his vocabulary beyond urban storefronts into popular imagery, the print balances graphic clarity with subtle spatial depth. Literature reference: J. Arthur, Richard Estes: Painting and Prints, Pomegranate Artbooks, 1993, pp. 125–126.",
+      "Lithograph from 1925 depicting a seated female reader holding a bouquet of roses. Catalogued as Duthuit 471. The composition exemplifies Matisse’s early mastery of line and contour, combining interior calm with decorative balance. Executed during a formative decade in which Matisse refined his graphic language alongside painting and sculpture.",
+      "Bernard Naudin — Le Concerto (set of 3) (1924). Composed of an original ink drawing (Indian ink wash with ochre highlights) — signed and dated lower left — together with companion etchings/prints; sold as a set of three. The drawing is an original sheet (40 × 26 cm) with exhibition/print companions; described as a suite in the lot text."
+    ]
+  },
+  {
+    "source": "MISC\\Kollwitz, Käthe – Self-Portrait - Bessenge Sale.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Lot 7043",
+      "Kollwitz, Käthe",
+      "(1867 Königsberg - 1945 Moritzburg)"
+    ],
+    "financial_lines": [
+      "Result (incl. premium)"
+    ]
+  },
+  {
+    "source": "MISC\\Lot - Robert Rauschenberg (1925-2008) Dawn Gallery Poster - Sale Swann June 2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Search Our Catalogues",
+      "Search",
+      "Search Our Catalogues"
+    ],
+    "financial_lines": [
+      "material is sold subject to Swann's standard Terms and Conditions of Sale as published in our catalogues and posted on our website, and include the following",
+      "terms: (1) all property is sold \"as-is\"; and (2) works cannot be returned on the basis of condition.",
+      "Sold: $952.00",
+      "(Sold Price includes Buyer's Premium)",
+      "Payment & Shipping"
+    ]
+  },
+  {
+    "source": "MISC\\Pick-up and Shipping Arrangements.pdf",
+    "first_lines": [
+      "--- PAGE 1 (ocr_pdf) ---",
+      "BURCHARD",
+      "GALLERIES",
+      "International Estate Antiques"
+    ],
+    "financial_lines": [
+      "e Shippers contact Shipping Coordinator at Burchard Galleries, provide proof of paid",
+      "invoice from Burchard’s and buyer’s release consent",
+      "e Shipping costs are separate from the invoice you received from Burchard Galleries"
+    ]
+  },
+  {
+    "source": "MISC\\SHEP-COMMON-LOT.html",
+    "first_lines": [
+      "Auction Lot 102 - Shepard FAIREY, known as OBEY GIANT (1970)",
+      "Reconnect",
+      "Original... | Gazette Drouot Subscribe FR Subscribe Menu Auctions Calendar Auctions Calendar Upcoming Auctions Past Auctions Auction Results Salerooms Top Auctions Top Auctions Collection in the spotlight Auctions Highlight Up for Sale Knocked down Art and Market News Art and Market News Art Market Fairs Market Trends Law and finance Art and Culture Analyses Cultural Heritage Exhibitions Opinion To read, to see People Interviews Portrait 6 Questions for Appointments Obituaries Cultural calendar Cultural calendar Exhibition Guide Calendar of Fairs and Salons Artists and Artworks Artists and Artworks List of Artists Artist Studio Glossary Art Price Index Object Categories Galleries Galleries Gallery listings Works for sale Home / Auctions Calendar / Past Auctions / Back to catalog /",
+      "Lot no. 102 -"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "MISC\\SHEP-COMMON-LOT.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Home / Auctions Calendar / Past Auctions / Back to catalog / Lot no. 102 - Shepard FAIREY, known...",
+      "Information General Terms of Sale",
+      "For subscribers only"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "MISC\\Second State Mail - Invoice for Jeremy.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Jeremy Klein <jeremy@secondstate.art>",
+      "Invoice for Jeremy",
+      "Concept Gallery <info@conceptgallery.com> Sat, Apr 11, 2026 at 2:18 PM"
+    ],
+    "financial_lines": [
+      "Invoice for Jeremy",
+      "Invoice for Jeremy",
+      "The lots you purchased will be ready for pick up or shipment upon receipt of your payment. For your",
+      "convenience you can also review your invoice right here:",
+      "Invoice",
+      "Lot# Image Item Name HammerPrice Buyer'sPremium Shipping Tax Subtotal",
+      "Payment is due now. Please contact us if you would like to make arrangements to pay via check or",
+      "discount available for payment by cash, wire or check within 10 calendar days of the auction. Please",
+      "email us to request an adjusted invoice.",
+      "Payment is required no later than 10 days from the sale. Due to high intake volume at the gallery,",
+      "picked up within 30 days may be re-entered into a future auction or resold without further notice, and",
+      "payment will be forfeited."
+    ]
+  },
+  {
+    "source": "MISC\\directory_structure.docx",
+    "first_lines": [
+      "Directory Structure",
+      "secondstate/",
+      "├── .gitignore",
+      "├── .idea"
+    ],
+    "financial_lines": [
+      "│   │   ├── 0004_soldpiece.py",
+      "│   │   ├── 0005_soldpieceimage.py",
+      "│   │   ├── 0006_soldpiece_link_to_sale_soldpiece_sold_hammer_price.py",
+      "│   │   ├── 0007_remove_soldpiece_auction_house_and_more.py",
+      "│   │   ├── 0008_alter_soldpiece_link_to_sale.py",
+      "│   │       ├── 0004_soldpiece.cpython-313.pyc",
+      "│   │       ├── 0005_soldpieceimage.cpython-313.pyc",
+      "│   │       ├── 0006_soldpiece_link_to_sale_soldpiece_sold_hammer_price.cpython-313.pyc",
+      "│   │       ├── 0007_remove_soldpiece_auction_house_and_more.cpython-313.pyc",
+      "│   │       ├── 0008_alter_soldpiece_link_to_sale.cpython-313.pyc",
+      "│   ├── pieces_sold.html",
+      "│   └── sold_piece_detail.html"
+    ]
+  },
+  {
+    "source": "MISC\\selected_project_files_export.docx",
+    "first_lines": [
+      "Selected Project Files Export",
+      "Project root: C:\\Users\\WS 7950X\\PycharmProjects\\secondstate",
+      "Files exported: 22",
+      "1. manage.py"
+    ],
+    "financial_lines": [
+      "class SoldPiece(models.Model):",
+      "sold_hammer_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)",
+      "class SoldPieceImage(models.Model):",
+      "sold_piece = models.ForeignKey(",
+      "SoldPiece,",
+      "image = models.ImageField(upload_to=\"sold_pieces/\")",
+      "return f\"SoldPieceImage({self.sold_piece_id})\"",
+      "from .models import Artwork, ArtworkImage, SoldPiece",
+      "from .models import SoldPieceImage",
+      "def sold_list(request):",
+      "sold_pieces = SoldPiece.objects.all().order_by(\"-date\")",
+      "for s in sold_pieces:"
+    ]
+  },
+  {
+    "source": "MISC\\zella.pdf",
+    "first_lines": [
+      "--- PAGE 1 (ocr_pdf) ---",
+      "Scan in your banking app to pay:",
+      "SecondState LLC",
+      "secondstate"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "CHASE\\2026-03-31 Chase Checking Statement.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "000002917090076",
+      "CUSTOMER SERVICE INFORMATION",
+      "07206740101000000021"
+    ],
+    "financial_lines": [
+      "INSTANCES AMOUNT",
+      "DATE DESCRIPTION AMOUNT",
+      "DATE DESCRIPTION AMOUNT",
+      "DATE AMOUNT",
+      "Beginning Balance $0.00",
+      "Ending Balance 3 $1.00",
+      "Total Deposits and Additions $1.01",
+      "Total Electronic Withdrawals $0.01",
+      "03/30 Zelle Payment From Clear Pond Consulting LLC Wfct0Zyrjrk6 $1.00",
+      "DAILY ENDING BALANCE",
+      "*start*daily ending balance3",
+      "*end*daily ending balance3"
+    ]
+  },
+  {
+    "source": "CHASE\\2026-04-30 Chase Checking Statement.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "000002917090076",
+      "CUSTOMER SERVICE INFORMATION",
+      "07193260201000000022"
+    ],
+    "financial_lines": [
+      "INSTANCES AMOUNT",
+      "DATE DESCRIPTION AMOUNT",
+      "Beginning Balance $1.00",
+      "Ending Balance 33 $10,178.28",
+      "$2,000 Minimum Daily Ending Balance : Your lowest daily ending balance was $0.16.",
+      "$2,000 Chase Payment Solutions Activity : $0.00 was deposited into this account.",
+      "$2,000 Chase Ink  Business Card Activity : $0.00 was your total Ink activity.",
+      "04/01 Zelle Payment From Rebekah Sherry Bpc022O7Yn1C $25.00",
+      "04/02 Zelle Payment From Rebekah Sherry Bpc022Rbhm16 900.00",
+      "Payment\\                                                         EDI Trn: 1064899226Tc",
+      "DATE DESCRIPTION AMOUNT",
+      "DATE DESCRIPTION AMOUNT"
+    ]
+  },
+  {
+    "source": "CHASE\\2026-05-29 Chase Checking Statement.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "000002917090076",
+      "CUSTOMER SERVICE INFORMATION",
+      "07219530201000000022"
+    ],
+    "financial_lines": [
+      "INSTANCES AMOUNT",
+      "DATE DESCRIPTION AMOUNT",
+      "Beginning Balance $10,178.28",
+      "Ending Balance 12 $10,853.04",
+      "Total Deposits and Additions $1,936.90",
+      "$2,000 Minimum Daily Ending Balance : Your lowest daily ending balance was $10,084.30.",
+      "$2,000 Chase Payment Solutions Activity : $0.00 was deposited into this account.",
+      "$2,000 Chase Ink  Business Card Activity : $0.00 was your total Ink activity.",
+      "DATE DESCRIPTION AMOUNT",
+      "DATE DESCRIPTION AMOUNT",
+      "DATE AMOUNT",
+      "Total ATM & Debit Card Withdrawals $213.14"
+    ]
+  },
+  {
+    "source": "LLC STUFF\\CP_575_G.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Notice CP575G Employer ID Number 42-4006379 Page 1/1",
+      "Department Of the Treasury",
+      "Internal Revenue Service"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "LLC STUFF\\Certificate of Status_1784608645044.pdf",
+    "first_lines": [
+      "--- PAGE 1 (pdf_text) ---",
+      "Secretary of State",
+      "Certificate of Status",
+      "I, SHIRLEY N. WEBER, PH.D., California Secretary of State, hereby certify:"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "LLC STUFF\\EIN-DETAILS-2026.pdf",
+    "first_lines": [
+      "--- PAGE 1 (ocr_pdf) ---",
+      "7/22/26, 12:43 PM IRS Apply for an Employer Identification Number (EIN) online",
+      "An official website of the United States Government",
+      "Here'show youknow v"
+    ],
+    "financial_lines": [
+      "e Make an electronic payment"
+    ]
+  },
+  {
+    "source": "PAYOUTS\\OLIVER-PAYOUT-1-3.png",
+    "first_lines": [
+      "23:50N wt 5G @ »)",
+      "< BUS COMPLETE CHK (...0076)",
+      "Show details \\Z",
+      "y r=] w. CG)"
+    ],
+    "financial_lines": [
+      "ZELLE PAYMENT FROM OLIVER G",
+      "ZELLE PAYMENT FROM OLIVER G"
+    ]
+  },
+  {
+    "source": "PAYOUTS\\OLIVER-PAYOUT-2-3.png",
+    "first_lines": [
+      "21:20",
+      "< BUS COMPLETE CHK (...0076)",
+      "$2,189.54",
+      "Account details"
+    ],
+    "financial_lines": [
+      "Available balance",
+      "Present balance",
+      "ZELLE PAYMENT FROM OLIVER G",
+      "Available balance"
+    ]
+  },
+  {
+    "source": "PAYOUTS\\OLIVER-PAYOUT-3-3.png",
+    "first_lines": [
+      "09:35 N ul ee»",
+      "< BUS COMPLETE... (...0076)",
+      "Q Search or filter",
+      "Pending (8)"
+    ],
+    "financial_lines": [
+      "ZELLE PAYMENT FROM OLIVER G DONSON",
+      "ZELLE PAYMENT TO INTERWAY LLC JPM99DOWE8PG"
+    ]
+  },
+  {
+    "source": "WON PICS\\FRANCIS-SQUARE-SMA.png",
+    "first_lines": [
+      "Sam Francis",
+      "Lot 50: Sam Francis (1923-1994): Untitled (SF. 353), 1992",
+      "Est: $800 USD - $1,200 USD",
+      "Sold: $850 USD"
+    ],
+    "financial_lines": [
+      "Sold: $850 USD"
+    ]
+  },
+  {
+    "source": "WON PICS\\NEIMAN-FRANK-DUMOUCHELLES.png",
+    "first_lines": [
+      "LWMeruchls Bid v Sell v About ¥ Subscribe Contact Q MYACCOUNT | Logout",
+      "torus v",
+      "Leroy Neiman (American, 1921-",
+      "2012) Serigraph on Paper, Ca."
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "WON PICS\\NIETO-GALLO-LARSEN.png",
+    "first_lines": [
+      "Additional Details",
+      "Description:",
+      "John Nieto (American, 1936-2018)",
+      "Gallo, 1996"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "WON PICS\\STELLA-YORK-SMA.png",
+    "first_lines": [
+      "Frank Stella",
+      "Lot 92: Frank Stella (1936-2024): York Factory I (Axsom 63), 1971",
+      "Cla)",
+      "Est: $4,000 USD - $6,000 USD"
+    ],
+    "financial_lines": [
+      "Sold: $3,500 USD",
+      "Screenprint in colors on Special Arjorami paper (total edition includes 25 artist proofs)"
+    ]
+  },
+  {
+    "source": "WON PICS\\ZUNIGA-FISH-LARSEN.png",
+    "first_lines": [
+      "Additional Details",
+      "Descriptio!",
+      "Francisco Zufiga (Mexican, 1912-1998)",
+      "Mujer con Pescados (Woman with Fish) (B. 58), 1980"
+    ],
+    "financial_lines": []
+  },
+  {
+    "source": "WON PICS\\ZUNIGA-JERRY-SMA.png",
+    "first_lines": [
+      "Francisco Zufiiga",
+      "Lot 1296: FRANCISCO ZUNIGA \"DONCELLA\" LITHOGRAPH",
+      "Est: $600 USD - $900 USD",
+      "My Max Bid: $0 USD"
+    ],
+    "financial_lines": [
+      "Sold: $500 USD",
+      "23% buyers premium in effect when bidding on Invaluable. PLEASE BE ADVISED, ON JEWELRY AND COIN LOTS, THAT ALL PAYMENTS WILL BE VERIFIED THROUGH THE."
+    ]
+  },
+  {
+    "source": "_BOOKKEEPING\\evidence\\Venmo-20261026-4716904576296672570.json",
+    "first_lines": [
+      "{",
+      "\"artifact_type\": \"Single-message receipt evidence\",",
+      "\"archived_utc\": \"2026-11-05T14:04:07.535Z\",",
+      "\"source_service\": \"Gmail\","
+    ],
+    "financial_lines": [
+      "\"Subject\": \"Omar Pena paid you $2,000.00\",",
+      "\"body_extraction\": \"Decoded HTML visible text, styling and markup removed; no payment facts changed.\",",
+      "\"body_text\": \"Omar Pena paid you $2000.00 Omar Pena paid you $2000.00 Omar Pena paid you $ 2000 . 00 Print service See transaction Money credited to your Venmo account. Transaction details Date Oct 26, 2026 Transaction ID 4716904576296672570 Sent to @secondstate For any issues, including the recipient not receiving funds, please contact us at Help Center at help.venmo.com or call 1-855-812-4430 . This payment will be reviewed for compliance with our User Agreement and if we determine that there is a violation by either party, it may be reversed or your ability to transfer to your bank account may be restricted. If you don't recognize this payment or want to report it as unauthorized, you can file a dispute in the Venmo app or at any time. To file a dispute, go to the Venmo app or contact Venmo Customer support at (855) 812-4430 . Venmo is a service of PayPal, Inc., a licensed provider of money transfer services. All money transmission is provided by PayPal, Inc. pursuant to PayPal, Inc.'s licenses . (NMLS ID #: 910457) PayPal is located at 2211 North First Street, San Jose, CA 95131 For security reasons, you cannot unsubscribe from payment emails. Venmo RT\"",
+      "\"amount_usd\": 2000,",
+      "\"amount_kind\": \"Gross receipt shown in notice\",",
+      "\"The transaction is distinct from October 19 and October 20 receipts totaling $3,500.\",",
+      "\"Receipt purpose remains unconfirmed; earlier Gift answer for the two $3,500-total receipts does not establish this receipt's classification.\",",
+      "\"No fee or net amount is itemized. Do not infer a fee or record a guessed deduction.\",",
+      "\"This message does not establish the Venmo wallet closing balance.\","
+    ]
+  }
+]

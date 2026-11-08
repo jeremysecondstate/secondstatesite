@@ -1,0 +1,32 @@
+[
+  {
+    "status": "fulfilled",
+    "value": {
+      "name": "run-summary.json",
+      "url": "https://drive.google.com/file/d/1Wzil0zgC1fwaitLZgEuAm37d53PjT1CN/view?usp=drivesdk",
+      "modified_time": "2026-11-06T08:11:56.046Z",
+      "size": 3866906,
+      "sha256": "b5d79c43bd559226c00a3261ea7facd8fc94dbad1ada6b4a6ecc771906773c5a"
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "name": "source-register.json",
+      "url": "https://drive.google.com/file/d/1l_awIj1ELn8lBUGrzpCJtEQWCwyhm9Y3/view?usp=drivesdk",
+      "modified_time": "2026-11-06T08:11:55.229Z",
+      "size": 479846,
+      "sha256": "1ad0758aa365b40c3c86cbc7ebd1b9c5c773a7b0110721de7dc4b2196724ab25"
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "name": "drive-source-manifest.json",
+      "url": "https://drive.google.com/file/d/1TTP7m6ebTD6sS29lBJPgbWQRuDxthmee/view?usp=drivesdk",
+      "modified_time": "2026-11-06T08:11:55.276Z",
+      "size": 367428,
+      "sha256": "8c7397d643d423437f9342918b75a57eedaf97368e4f0caa8c31d1ae27335fb2"
+    }
+  }
+]

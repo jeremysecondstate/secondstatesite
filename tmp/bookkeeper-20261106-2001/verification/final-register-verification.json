@@ -1,0 +1,27 @@
+{
+  "checked_utc": "2026-11-06T20:04:48.375Z",
+  "all_match": true,
+  "results": [
+    {
+      "name": "source-register.json",
+      "cloud_sha256": "61b979bcc19d211a3200a4025d0ed8fe5f7c9fb69de36c325a78cade1562a680",
+      "canonical_sha256": "61b979bcc19d211a3200a4025d0ed8fe5f7c9fb69de36c325a78cade1562a680",
+      "staged_sha256": "61b979bcc19d211a3200a4025d0ed8fe5f7c9fb69de36c325a78cade1562a680",
+      "match": true
+    },
+    {
+      "name": "drive-source-manifest.json",
+      "cloud_sha256": "48f66c6bbbea59f61ed66a6df248d551aa2c39e3c23bf1aa2902c0390ac89251",
+      "canonical_sha256": "48f66c6bbbea59f61ed66a6df248d551aa2c39e3c23bf1aa2902c0390ac89251",
+      "staged_sha256": "48f66c6bbbea59f61ed66a6df248d551aa2c39e3c23bf1aa2902c0390ac89251",
+      "match": true
+    },
+    {
+      "name": "run-summary.json",
+      "cloud_sha256": "54c116d9931d115edde065cf54e7fbc3bbdef7c2373ca8831535b0d70383b8d8",
+      "canonical_sha256": "54c116d9931d115edde065cf54e7fbc3bbdef7c2373ca8831535b0d70383b8d8",
+      "staged_sha256": "54c116d9931d115edde065cf54e7fbc3bbdef7c2373ca8831535b0d70383b8d8",
+      "match": true
+    }
+  ]
+}

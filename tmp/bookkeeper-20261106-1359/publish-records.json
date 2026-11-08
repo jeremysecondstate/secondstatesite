@@ -1,0 +1,21 @@
+{
+  "published_utc": "2026-11-06T14:04:00.4367500Z",
+  "method": "Native .NET FileStream exclusive sharing; Python pywin32 unavailable under system runtime",
+  "run_directory": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review",
+  "written": [
+    {
+      "sha256": "3b97f647ba10df8355174561f6c1761b777df7bd5038bcdb80714935a6bcd9f5",
+      "name": "source-register.json"
+    },
+    {
+      "sha256": "d34c28e43c9c9170d8930e692197a454f1af5d448b9ee0648a136e27648af01c",
+      "name": "drive-source-manifest.json"
+    },
+    {
+      "sha256": "cf5d633776356a3c3e72aaf140f09c993763b7dcca89843926f0c8622283186f",
+      "name": "run-summary.json"
+    }
+  ],
+  "ledger_unchanged": true,
+  "exclusive_concurrent_guards": true
+}

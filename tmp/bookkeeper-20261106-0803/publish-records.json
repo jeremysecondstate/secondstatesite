@@ -1,0 +1,21 @@
+{
+  "written": [
+    {
+      "sha256": "1ad0758aa365b40c3c86cbc7ebd1b9c5c773a7b0110721de7dc4b2196724ab25",
+      "name": "source-register.json"
+    },
+    {
+      "sha256": "8c7397d643d423437f9342918b75a57eedaf97368e4f0caa8c31d1ae27335fb2",
+      "name": "drive-source-manifest.json"
+    },
+    {
+      "sha256": "b5d79c43bd559226c00a3261ea7facd8fc94dbad1ada6b4a6ecc771906773c5a",
+      "name": "run-summary.json"
+    }
+  ],
+  "exclusive_concurrent_guards": true,
+  "published_utc": "2026-11-06T08:11:49.6119989Z",
+  "ledger_unchanged": true,
+  "method": "Native .NET FileStream exclusive sharing; Python pywin32 unavailable under system runtime",
+  "run_directory": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-0803-source-and-ledger-review"
+}

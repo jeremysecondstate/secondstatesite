@@ -1,0 +1,12 @@
+{
+  "prepared_utc": "2026-11-06T20:03:58.661589+00:00",
+  "sources": 236,
+  "manifest": 396,
+  "changed_records": [
+    "source-register.json",
+    "drive-source-manifest.json",
+    "run-summary.json"
+  ],
+  "ledger_sha256": "45410605a93bf61fd948f0c128adadcf108a331d5157bc9515d824fbf27855b9",
+  "canonical_workbook_changed": false
+}

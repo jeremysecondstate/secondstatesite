@@ -1,0 +1,134 @@
+{
+  "checked_utc": "2026-11-06T20:02:17.058772+00:00",
+  "prior_checkpoint_comparison": {
+    "changed_fields": [],
+    "financial_workbook_byte_identical": true,
+    "links_change_note": "Compared directly to last completed 2026-11-06 14:04 UTC run. All referenced Drive identities and local hyperlink targets remain registered/present."
+  },
+  "source_union": {
+    "observations": 276,
+    "posted": 271,
+    "superseded_pending": 5,
+    "mapping_counts": {
+      "statement_aggregate_detail": 48,
+      "existing_cash_match": 211,
+      "new_cash_posting": 12,
+      "superseded_pending_match": 5
+    },
+    "posted_net": "131.80",
+    "individual_posted_cash_refs": 223,
+    "aggregate_reconciliation": {
+      "JE-BANK-2026-03": {
+        "detail_sum": "1.00",
+        "journal_net": "1.0",
+        "difference": "0.00"
+      },
+      "JE-BANK-2026-04": {
+        "detail_sum": "10177.28",
+        "journal_net": "10177.28",
+        "difference": "0.00"
+      },
+      "JE-BANK-2026-05": {
+        "detail_sum": "674.76",
+        "journal_net": "674.76",
+        "difference": "0.00"
+      }
+    },
+    "sign_convention": "Source positive = cash outflow; negative = cash inflow. Each register cash_change is the negated source amount."
+  },
+  "transaction_matches": 231,
+  "remaining_matching_rows": [
+    {
+      "transaction_id": "kYOxbxzYK3F8jbZMVR5wUd0ma9DajBHZznZked",
+      "date": "2026-07-13",
+      "description": "The UPS Store",
+      "cash_change": "-224.95",
+      "cash_je": "JE-BW-20261103-CASH-059",
+      "source": "Bank Transactions",
+      "source_row": "153",
+      "source_url": "https://drive.google.com/file/d/1_MOhIuKfrvU6AHjA4RtKUq9QqqmwNYUe/view?usp=drivesdk",
+      "needed": "Pickup/packing purpose and $224.95 cash match documented. Resolve company share and artwork allocation for combined shipment (company lots 4168/4197/4198 plus excluded 7473); preserve SUPREME's rounded $225 and avoid duplicate cash."
+    },
+    {
+      "transaction_id": "0wXrDrywaVHDqz1aX8DvCvmL0qXqKeC9rZ05A",
+      "date": "2026-10-17",
+      "description": "Zelle from Oliver G Donson",
+      "cash_change": "998",
+      "cash_je": "JE-BW-20261103-CASH-186",
+      "source": "CHASE ACTIVITY",
+      "source_row": "115",
+      "source_url": "https://docs.google.com/spreadsheets/d/1FNTgROp058-4jX7n9mCBOtBhxzAW9K7RB9HNXk3EJdo/edit?usp=drivesdk",
+      "needed": "Sale-profit purpose confirmed. Match earlier seller settlements and TBD-to-Oliver-to-SECONDSTATE remittances to exact receivables/allocations; no new sale or cash."
+    },
+    {
+      "transaction_id": "vqbyVyJqaxCqrBEdVNqPHnVXpPwPYBHpmx57m",
+      "date": "2026-10-17",
+      "description": "Zelle from Oliver G Donson",
+      "cash_change": "2",
+      "cash_je": "JE-BW-20261103-CASH-188",
+      "source": "CHASE ACTIVITY",
+      "source_row": "113",
+      "source_url": "https://docs.google.com/spreadsheets/d/1FNTgROp058-4jX7n9mCBOtBhxzAW9K7RB9HNXk3EJdo/edit?usp=drivesdk",
+      "needed": "Sale-profit purpose confirmed. Match earlier seller settlements and TBD-to-Oliver-to-SECONDSTATE remittances to exact receivables/allocations; no new sale or cash."
+    },
+    {
+      "transaction_id": "kYOxbxzYK3F8jbZMVR8XhJ0bd7d4kRC3D1VYE",
+      "date": "2026-10-22",
+      "description": "Zelle from Oliver G. Donson",
+      "cash_change": "1000",
+      "cash_je": "JE-BW-20261103-CASH-194",
+      "source": "CHASE ACTIVITY",
+      "source_row": "119",
+      "source_url": "https://docs.google.com/spreadsheets/d/1FNTgROp058-4jX7n9mCBOtBhxzAW9K7RB9HNXk3EJdo/edit?usp=drivesdk",
+      "needed": "Sale-profit purpose confirmed. Match earlier seller settlements and TBD-to-Oliver-to-SECONDSTATE remittances to exact receivables/allocations; no new sale or cash."
+    },
+    {
+      "transaction_id": "ZYOJRJBYPMF1qdgzVr1vsRJDmNK4K7UkN5zyV",
+      "date": "2026-10-25",
+      "description": "Zelle Payment from Oliver G Donson",
+      "cash_change": "1000",
+      "cash_je": "JE-BW-20261103-CASH-202",
+      "source": "CHASE ACTIVITY",
+      "source_row": "128",
+      "source_url": "https://docs.google.com/spreadsheets/d/1FNTgROp058-4jX7n9mCBOtBhxzAW9K7RB9HNXk3EJdo/edit?usp=drivesdk",
+      "needed": "Sale-profit purpose confirmed. Match earlier seller settlements and TBD-to-Oliver-to-SECONDSTATE remittances to exact receivables/allocations; no new sale or cash."
+    }
+  ],
+  "queue": {
+    "total": 20,
+    "statuses": {
+      "Answered - matching pending": 6,
+      "Resolved": 5,
+      "Open": 9
+    },
+    "pending_question": {
+      "id": "BW-20",
+      "priority": "High",
+      "record": "Omar Pena October 26 Venmo payment to @secondstate, transaction 4716904576296672570",
+      "amount": "Gross $2,000 recorded in clearing; net/fee/disposition unknown",
+      "evidence": "Recorded JE-BW-20261105-VENMO-002 on November 5 for the previously omitted October 26 gross Venmo receipt of $2,000 from Omar Pena to @secondstate, transaction 4716904576296672570, memo Print service. Dr 1050 Venmo Settlement Clearing / Cr 1900 Bank Review Clearing. Purpose unresolved; no income, fee, Chase cash, acquisition or sale posted. Gross settlement clearing is not a verified net wallet balance. Earlier $17.75 remains separately unmatched. https://mail.google.com/mail/u/?authuser=jeremy%40secondstate.art#all/1a17b1cc36aed5a2",
+      "information_needed": "Was Omar’s separate October 26 Venmo payment of $2,000, labeled “Print service,” another gift to SECONDSTATE or payment for services? Purpose question pending. Subsequently match net settlement, fees, transfers or reversals only from evidence. Do not duplicate the October19/20 gifts, October21 transfer, October22 bank receipt, or this posted gross receipt.",
+      "status": "Open"
+    }
+  },
+  "crosswalk": {
+    "rows": 68,
+    "unique_supreme_ids": 68,
+    "unique_ledger_ids": 67,
+    "missing_ledger_ids": [],
+    "unmapped_ledger_ids": [
+      "SS-ART-0039"
+    ],
+    "established_exception": "68SUPREME IDs map to67ledger IDs because two Miro aliases share SS-ART-0006. Supported ledger-only Benton SS-ART-0039 has no invented SUPREME ID."
+  },
+  "evidence_links": {
+    "direct_or_formula_targets": 797,
+    "unique_targets": 324,
+    "drive_ids_absent_from_registers": [],
+    "missing_local_hyperlink_targets": []
+  },
+  "errors": [],
+  "canonical_unchanged": true,
+  "note": "Any historical source SHA in matching registers remains historical provenance. Current ledger hash and all audited balances/structure equal the prior checkpoint. No financial journal is warranted by unchanged evidence. Separate October 26 Venmo purpose remains unresolved; gross and cash must not be reposted.",
+  "status": "PASS"
+}

@@ -1,0 +1,56 @@
+{
+  "checked_utc": "2026-11-06T08:08:42.248772+00:00",
+  "source_hashes": {
+    "CHASE ACTIVITY.xlsm": "12268c15f8496f6dbea313091d5b821aadcaff75715b7336c00464df68cb3207",
+    "SUPREME.xlsm": "bd56cd7a28ce550f05464bd858df6492b4ae55c4d5d6ac144a8a3fba09d84b73",
+    "Second State Books — General Ledger.xlsm": "45410605a93bf61fd948f0c128adadcf108a331d5157bc9515d824fbf27855b9"
+  },
+  "local_chase": {
+    "rows": 273,
+    "status_counts": {
+      "Posted": 268,
+      "Pending": 5
+    }
+  },
+  "native_chase": {
+    "rows": 138,
+    "status_counts": {
+      "Posted": 138
+    },
+    "cutoff": "2026-11-02",
+    "current_balance": "131.80",
+    "unchanged_vs_prior": true,
+    "amount_normalization": "Prior unformatted numeric amounts versus current formatted numeric strings compared exactly using Decimal."
+  },
+  "local_native_overlap": 135,
+  "native_only_ids": [
+    "3DXRqRjDQECwynrkXVwJSxgav7Do1qHoe1OyM",
+    "K7YvmvJ7LrC36APN8Z3yhDE4yKmjAXtEZ9zw0",
+    "yybX6XgyOZUypndLzDy1uaERj7OZq9hpLQJZk"
+  ],
+  "union": {
+    "rows": 276,
+    "status_counts": {
+      "Posted": 271,
+      "Pending": 5
+    },
+    "raw_rows": 276,
+    "registered_rows": 276
+  },
+  "raw_original_date_differences_preserved": [],
+  "account_normalization": "Numeric 76, 76.0 and text 0076 resolve to the same account; originals remain unchanged.",
+  "crosswalk": {
+    "unique_supreme_ids": 68,
+    "observations": 188,
+    "missing": [],
+    "basis_mismatches": []
+  },
+  "statements": {
+    "reconciled_through": "2026-05-29",
+    "later_period": "2026-05-30 through 2026-11-02",
+    "exact_later_difference": null
+  },
+  "sources_unchanged": true,
+  "errors": [],
+  "status": "PASS"
+}

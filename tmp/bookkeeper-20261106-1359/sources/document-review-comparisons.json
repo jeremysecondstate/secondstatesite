@@ -1,0 +1,980 @@
+[
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-15 CONTRIBUTION\\To Oliver $10.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-15 CONTRIBUTION\\To Oliver $490.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2024-11-02 CONTRIBUTION\\ALEX TO OLIVER 7500.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\Oliver Confirmation $520.jpg",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Jeremy $100.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Jeremy $3900.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Oliver $20.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Oliver $3980.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\ALEX TO JEREMY 25.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\ALEX TO JEREMY 4475.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\ALEX TO JEREMY 93.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\JEREMY (FROM ALEX) TO OLIVER 2.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\JEREMY (FROM ALEX) TO OLIVER 25.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\JEREMY (FROM ALEX) TO OLIVER 4473.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-10-26 CONTRIBUTION\\SMA-Zelle-Receipt.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "INFRASTRUCTURE\\Flow PC #1902.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "INFRASTRUCTURE\\Flow PC #1949 WS Alex.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "INFRASTRUCTURE\\Flow PC #1975 WS Alex.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\MEDIA\\Adobe Photoshop Lightroom.JPEG",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 1.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 2.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 3.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 4.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 5.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 6.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Coinbase CC Feb 2026.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Coinbase CC Mar 2026.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Coinbase CC Feb 2026.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Coinbase CC Mar 2026.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0001-Render-Dec-2025.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0002-Render-Jan-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0003-Render-Feb-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0004-Render-Mar-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0005-Render-Apr-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0006-Render-May-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0007-Render-July-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0008.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0009.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0011.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2044-1587.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2195-8980.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2241-6428.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2286-5453.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2506-9657.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2599-4903.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2608-8851.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2846-8744.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2942-6606.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2961-3239.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\Coinbase CC Feb 2026.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\Coinbase CC Mar 2026.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\cc google render charges",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\cc google render pedro",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\CHASE-UPS-CLARS.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\Circle Shipping - Benton - Alex.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\FRIEDEBERG-CONCEPT-SHIPPING.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\IVY RECEIPT.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\NEIMAN UPS SHIPPING CHASE TRANS.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\RACH DAVIS SHIPPING.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\SHIP-INV-SHEP-COMMON.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\UPS SHIPMENT FOR SIMPSON.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\UPS Store 4134 - 2026-07-01 - Neiman lot 2264.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "prior visual review reused after matching original source hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0002-Biz-Acct-Jan-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0003-Biz-Acct-Feb-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0004-Biz-Acct-Mar-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0007-Biz-Acct-Apr-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0008-Biz-Acct-May-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0001-Pro-Acct-Apr-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0002-Pro-Acct-May-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0003-Pro-Acct-June-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0004-Pro-Acct-July-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Receipt-2598-3959-6333-Pro-Acct-July-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SQUARE\\Second State Mail - Payment Receipt for Square Services - June 2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\SQUARE\\Second State Mail - Payment Receipt for Square Services - May 2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\Adobe-Transactions-Chase-05-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\Adobe-Transactions-Chase-06-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\invoice-Adobe-July-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\invoice-Adobe-June-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\invoice-Adobe-May-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Invoice-6AFMD0H0-0028.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Invoice-6AFMD0H0-0029.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Receipt-2030-4401.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Receipt-2842-2076.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\SUNO\\Invoice-FA0WCXHP-0006.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "EXPENSES\\SUNO\\Receipt-2840-2505-3066.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "PURCHASE INVOICES\\ALEX CC PURCHASE FRIEDEBERG CONCEPT.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Alex Jeremy Zelle to Oliver 2500",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\BRADFORDS.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\CIRCLE PAYMENT STATUS.heic",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Circle Proof of Payment - Chase Online.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Clars Invoice CL00105105.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Clars Invoice CL00105689.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh PDF text extraction"
+  },
+  {
+    "source": "PURCHASE INVOICES\\DOYLE-Oct-2026-SecondState-TBD-Customer-335120-EMAIL-THREAD.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\DuMouchelles Invoice.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\DuMouchelles invoice 2026100184 PAID 2026-10-27.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\FERRI PURCHASES.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Ferri Purchases",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Ferri Purchases.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Heritage October 2026 12264503.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\INV402290-20260411-FRIEDEBERG-CONCEPT.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Invoice-SantaMonica-2026-10-19.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\LARSEN-ZUNIGA-NIETO.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\MIRO-INDELIBLE-INVALUABLE.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\NEIMAN - NAMATH - Gmail - Receipt from CRESCENT CITY AUCTION.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Neiman-Broadway-Joe-Lot-Info.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Oliver Ferri Purchases & Images.docx",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Oliver Ferri Purchases.docx",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Richard Zesty Andy Capp.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Roland_Matisse_Invoice_52365.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\SHEP-COMMON-FRANCE.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\SHEP-COMMON-INV-REC.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\SIMPSON INVOICE.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\SIMPSON PAYMENT RECEIPT.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\SIMPSON WIRE.jpeg",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\SImpson Proof of Payment - Chase Online.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\SWANN INVOICE 09182025.jpg",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Shipping Payment Receipt.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\ART ACCOUNTS.docx",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\BENTONS 1",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\BENTONS 2",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\FORUMMIROLOT.html",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 106 Stella.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4006 Benton.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4007 Benton.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4009 Benton.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4071 Benton.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4072 Benton.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4073 Benton.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4074 Benton.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\MAX ERNST.docx",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\Pedro-Friedeberg-Concept-Lot.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\Print-Joan Miro-Clars Auction Gallery.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\Print-Rockwell Kent-Clars Auction Gallery.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\Prints-Joan Miro-Clars Auction Gallery.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\RD Lot Info.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "EXTRA NOTES\\UPS Rach Davis.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\Fairfield Porter Prints 2026.docx",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\Full Inv 2026.docx",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\Kollwitz, Käthe – Self-Portrait - Bessenge Sale.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\Lot - Robert Rauschenberg (1925-2008) Dawn Gallery Poster - Sale Swann June 2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\Pick-up and Shipping Arrangements.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\SHEP-COMMON-LOT.html",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\SHEP-COMMON-LOT.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\Second State Mail - Invoice for Jeremy.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\directory_structure.docx",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\selected_project_files_export.docx",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "MISC\\zella.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CHASE\\2026-03-31 Chase Checking Statement.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CHASE\\2026-04-30 Chase Checking Statement.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "CHASE\\2026-05-29 Chase Checking Statement.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "LLC STUFF\\CP_575_G.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "LLC STUFF\\Certificate of Status_1784608645044.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "LLC STUFF\\EIN-DETAILS-2026.pdf",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PAYOUTS\\OLIVER-PAYOUT-1-3.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PAYOUTS\\OLIVER-PAYOUT-2-3.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "PAYOUTS\\OLIVER-PAYOUT-3-3.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "WON PICS\\FRANCIS-SQUARE-SMA.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "WON PICS\\NEIMAN-FRANK-DUMOUCHELLES.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "WON PICS\\NIETO-GALLO-LARSEN.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "WON PICS\\STELLA-YORK-SMA.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "WON PICS\\ZUNIGA-FISH-LARSEN.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "WON PICS\\ZUNIGA-JERRY-SMA.png",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "reread registered extraction after matching original hash"
+  },
+  {
+    "source": "_BOOKKEEPING\\evidence\\Venmo-20261026-4716904576296672570.json",
+    "source_unchanged": true,
+    "text_unchanged": true,
+    "method": "fresh archived evidence JSON read"
+  }
+]

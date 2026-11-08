@@ -1,0 +1,10 @@
+{
+  "completed_utc": "2026-11-06T14:04:34.777488+00:00",
+  "status": "PASS",
+  "ledger_unchanged": true,
+  "new_entries": 0,
+  "all_233_source_hashes_unchanged": true,
+  "five_matching_queue_registers_unchanged": true,
+  "fresh_cloud_register_bytes_match": true,
+  "ledger_sha256": "45410605a93bf61fd948f0c128adadcf108a331d5157bc9515d824fbf27855b9"
+}

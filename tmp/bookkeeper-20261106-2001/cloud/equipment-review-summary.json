@@ -1,0 +1,13 @@
+{
+  "checked_utc": "2026-11-06T20:04:20.235Z",
+  "records": 3,
+  "original_invoice_cost_total_usd": "30452.10",
+  "status": "Equipment facts recorded; no equipment or depreciation journal posted",
+  "known_limitations": [
+    "Original invoice dates and costs remain separate from the 2026 first-business-use year.",
+    "No exact day of first business use is supplied or inferred.",
+    "Opening book/tax basis and current-year depreciation have not been calculated in this factual register.",
+    "Printed deposit and balance amounts are historical invoice figures, not newly posted liabilities."
+  ],
+  "unchanged_cloud_metadata": true
+}

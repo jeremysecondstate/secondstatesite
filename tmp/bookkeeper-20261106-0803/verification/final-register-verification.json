@@ -1,0 +1,18 @@
+{
+  "checked_utc": "2026-11-06T08:12:20.793270+00:00",
+  "all_match": true,
+  "checks": [
+    {
+      "name": "run-summary.json",
+      "matches": true
+    },
+    {
+      "name": "source-register.json",
+      "matches": true
+    },
+    {
+      "name": "drive-source-manifest.json",
+      "matches": true
+    }
+  ]
+}

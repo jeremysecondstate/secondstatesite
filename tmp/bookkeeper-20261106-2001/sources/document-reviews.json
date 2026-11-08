@@ -1,0 +1,1352 @@
+[
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-15 CONTRIBUTION\\To Oliver $10.png",
+    "source_sha256": "0e51fac831a5bde7d6bc6e4c025f8c78e503404884a92ed7bcfd7bbfb9180d33",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2025-12-15_CONTRIBUTION_To_Oliver_10.png.txt",
+    "text_sha256": "085bdaccbe771fdfb3efb676703fa880bca7c561f879ffcfd3a4e1b818b60916",
+    "characters": 259
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-15 CONTRIBUTION\\To Oliver $490.png",
+    "source_sha256": "2ba286d060a54d923bfd1e82be2b350de3a91e2156d63a34adf0869fe8be5b45",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2025-12-15_CONTRIBUTION_To_Oliver_490.png.txt",
+    "text_sha256": "4536cbfb80f055a97b41a5bd08f99424f8d8fe30450fef39d6780674dcff5a96",
+    "characters": 260
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2024-11-02 CONTRIBUTION\\ALEX TO OLIVER 7500.png",
+    "source_sha256": "a865f63c92a9ac260e4d1057704df32ba5691e5a024c38501c2167f7825471d1",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2024-11-02_CONTRIBUTION_ALEX_TO_OLIVER_7500.png.txt",
+    "text_sha256": "35f6aa1196cfcd4d6bbf486f56d3e23ec598b2491def5cd785456ee442deb3a7",
+    "characters": 593
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\Oliver Confirmation $520.jpg",
+    "source_sha256": "248ad3f0b93b2954388d207e7637f8bdabadad93e861c49a07e09a6378bf1484",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2026-01-15_CONTRIBUTION_Oliver_Confirmation_520.jpg.txt",
+    "text_sha256": "b5f6049554030c155e3c6cace835487227a8736c9f751800baa3ffa52af34a0e",
+    "characters": 286
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Jeremy $100.png",
+    "source_sha256": "aa217ed71fb3bc5296a03e61ef0d9d1683d38f409dd7068aa2bf4f1065ff39f0",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2026-01-15_CONTRIBUTION_To_Jeremy_100.png.txt",
+    "text_sha256": "406fe7c4685a55aaf73652d27404ded11aced73aca7348b1ca084df456bf2ff5",
+    "characters": 197
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Jeremy $3900.png",
+    "source_sha256": "990d816ba9b275ce3f6a9527b706f62c9a058f3667e2181b21d25b65e407a016",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2026-01-15_CONTRIBUTION_To_Jeremy_3900.png.txt",
+    "text_sha256": "f5ef243a0b5cef874d7da23189ae2fa35e574fe45dec2eb253e509db2a992f82",
+    "characters": 212
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Oliver $20.png",
+    "source_sha256": "82312dab23d1ae1c240bfeb8e255baaa05749b3358bec14369fc6562b3378fe4",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2026-01-15_CONTRIBUTION_To_Oliver_20.png.txt",
+    "text_sha256": "2e93e0bc5444df3699882d3c3c1145813fe6349644b243b36f0a51bc5194df5b",
+    "characters": 258
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-01-15 CONTRIBUTION\\To Oliver $3980.png",
+    "source_sha256": "fa6840dcba2680d2dd19dbe542d8bd3e78281a090e2632eace0db90c6363d6a6",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2026-01-15_CONTRIBUTION_To_Oliver_3980.png.txt",
+    "text_sha256": "d26d64f26fcfe67223eb83ec8637189312e93498416db09fc3b3ec950b2b5fa9",
+    "characters": 259
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\ALEX TO JEREMY 25.png",
+    "source_sha256": "76dbdc29dffc23ab76d29b311bfc54029bfdcb388c0bcda54c2bd1b6c922963f",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2025-12-01_CONTRIBUTION_ALEX_TO_JEREMY_25.png.txt",
+    "text_sha256": "1d910b937655bc0e07910f3a184469e76373eadbb04d0ac29ca6f5230e2ab772",
+    "characters": 184
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\ALEX TO JEREMY 4475.png",
+    "source_sha256": "97b9ac012a3bd68cf1092027bfb4ff86523a469a2042096686c89e1f016c90c2",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2025-12-01_CONTRIBUTION_ALEX_TO_JEREMY_4475.png.txt",
+    "text_sha256": "2bc944fda6428b0bddb1b55724c894abb836bc74e646c505a76294339375ac1b",
+    "characters": 211
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\ALEX TO JEREMY 93.png",
+    "source_sha256": "0e21cc679280ade99fe192e14daa4da53bf21901fbc53ddf742e6cb26c737244",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2025-12-01_CONTRIBUTION_ALEX_TO_JEREMY_93.png.txt",
+    "text_sha256": "9e2002e097ef817397f9ce32cf9362c1cfdbb2d59702aad30a01c9090d4d0273",
+    "characters": 257
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\JEREMY (FROM ALEX) TO OLIVER 2.png",
+    "source_sha256": "ebf7837fd8804cd4556ac719dc4beed4b599b91157c3d11fb572ce282bb4d0c1",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2025-12-01_CONTRIBUTION_JEREMY_FROM_ALEX_TO_OLIVER_2.png.txt",
+    "text_sha256": "ad4b72dd75b821bdec96fae706dbb0a1a4edf102f959350c3b9aeebe4636b30d",
+    "characters": 112
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\JEREMY (FROM ALEX) TO OLIVER 25.png",
+    "source_sha256": "615baa125f3b3aa54b77d9d8ddddb402787223b8518e4c0fc6edc511d0aaef21",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2025-12-01_CONTRIBUTION_JEREMY_FROM_ALEX_TO_OLIVER_25.png.txt",
+    "text_sha256": "46d3b7ada5a9dbf24c93cf25d53239dd672ca3c823a45123fecfbfc1151e974d",
+    "characters": 279
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2025-12-01 CONTRIBUTION\\JEREMY (FROM ALEX) TO OLIVER 4473.png",
+    "source_sha256": "859bb5a7ae1bc7abd8061aaadc34cb6002eb0d09685d62df5822ef810c4c6f78",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2025-12-01_CONTRIBUTION_JEREMY_FROM_ALEX_TO_OLIVER_4473.png.txt",
+    "text_sha256": "86bd7b61bf6ade3d7a9710d6f89bf0f8fe6ad84cd4476e01eefa8ede74e6c1ba",
+    "characters": 293
+  },
+  {
+    "source": "CAPITAL\\DEAL CAPITAL\\ALEX\\2026-10-26 CONTRIBUTION\\SMA-Zelle-Receipt.pdf",
+    "source_sha256": "b52a84830b47672d387242af1b6e61c4c9950cdbcfb000fd52088d8cb6215448",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CAPITAL_DEAL_CAPITAL_ALEX_2026-10-26_CONTRIBUTION_SMA-Zelle-Receipt.pdf.txt",
+    "text_sha256": "7ba4ae8fae758ed617423f599d82176968f5d9520a19dadffdec31f41bfcbac6",
+    "characters": 548
+  },
+  {
+    "source": "INFRASTRUCTURE\\Flow PC #1902.pdf",
+    "source_sha256": "56e5be296d9edeb73dfb75965b15c42beeda390e1e9a47994dff90e94be0a78e",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\INFRASTRUCTURE_Flow_PC_1902.pdf.txt",
+    "text_sha256": "e8532f7c68cf779f6d115790b72ee42b008a77b069edc16c24aae1672f046914",
+    "characters": 1036
+  },
+  {
+    "source": "INFRASTRUCTURE\\Flow PC #1949 WS Alex.pdf",
+    "source_sha256": "bf390bfe22af00b1abe51a6f65e6077f9201db76be0e4f6a28758deb38783f8b",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\INFRASTRUCTURE_Flow_PC_1949_WS_Alex.pdf.txt",
+    "text_sha256": "14e1e6d48300e2f364e0d22d5d039e8acf9e140d99d856104db636479ececcd8",
+    "characters": 1060
+  },
+  {
+    "source": "INFRASTRUCTURE\\Flow PC #1975 WS Alex.pdf",
+    "source_sha256": "c5d360f758cb6828b7e28ae45e191fed01372ba0eece0edfd233dc6db5bd4129",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\INFRASTRUCTURE_Flow_PC_1975_WS_Alex.pdf.txt",
+    "text_sha256": "09c7853ab513c8046c992ae21782c10b852dfda23d672b746b2c40d24747f8e6",
+    "characters": 986
+  },
+  {
+    "source": "EXPENSES\\MEDIA\\Adobe Photoshop Lightroom.JPEG",
+    "source_sha256": "dbb08a5f9f702119b8c638f411b028db82540ee5b0e1a9d07dae2d704203e21c",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_MEDIA_Adobe_Photoshop_Lightroom.JPEG.txt",
+    "text_sha256": "d940918ac42dada8ae617793df5b9c4f537842cd3a7d1a8cb20395a356390eb2",
+    "characters": 1230
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 1.pdf",
+    "source_sha256": "cdbd5eea33d1b7fb20b95529036ab672596710f85aa9cd83f27ee4b9a461b795",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ARTPRICE_Artprice_Monthly_Invoice_1.pdf.txt",
+    "text_sha256": "3e066a7b929d0d40012cd8796bd6f3158c79fd5063b357d1c16d5fed8fb3f630",
+    "characters": 571
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 2.pdf",
+    "source_sha256": "f539d28d0249f27b82ec2b981c6fdeb4e7ff2a8e94b5a28ee90242dcd75de06c",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ARTPRICE_Artprice_Monthly_Invoice_2.pdf.txt",
+    "text_sha256": "45f14b6653ca790bbe69af7a192cda64c7cee8afd734fc1c453abb9107b4ba74",
+    "characters": 573
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 3.pdf",
+    "source_sha256": "4a62c35eb72a52786f899579e9f5e21150df63820d66838373902ac12694a89c",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ARTPRICE_Artprice_Monthly_Invoice_3.pdf.txt",
+    "text_sha256": "3bbc62b348c9130ceab4f39a3724a69f6216276f3465a523d5924d7996248f1e",
+    "characters": 573
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 4.pdf",
+    "source_sha256": "9981c5c0061ea871cde78d278098be5410803a10b98ed94a61e80b6e3048f442",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ARTPRICE_Artprice_Monthly_Invoice_4.pdf.txt",
+    "text_sha256": "72bdc984a358bb976bc2abb3ec0c88093da65fd8ecc98ac0d3f55c18ade08682",
+    "characters": 573
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 5.pdf",
+    "source_sha256": "2efa48261970b3bd0f4578b0152cb525b980d22f43e0f6d20f5fb51e8a867fcf",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ARTPRICE_Artprice_Monthly_Invoice_5.pdf.txt",
+    "text_sha256": "14b464859c97a6e8de9fd059007ee35df3346469ddbdb3f4e53f9d7d8418321e",
+    "characters": 573
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Artprice Monthly Invoice 6.pdf",
+    "source_sha256": "63ab7388cd11ed5b8ae37be0cca87e647f0306e2b6f38f36b54977f6fbb49de4",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ARTPRICE_Artprice_Monthly_Invoice_6.pdf.txt",
+    "text_sha256": "c1591a35fef409f1dd01dbb9102ddace16abe7a756f5c70bdbf6eb9be96c065b",
+    "characters": 573
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Coinbase CC Feb 2026.png",
+    "source_sha256": "434ec0c4442f95e424c8879d29b9ddad9a71937dc7ecee2ee213d4c6cb829509",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ARTPRICE_Coinbase_CC_Feb_2026.png.txt",
+    "text_sha256": "c2499eaa39dd63c5f283582d5cfef14323bd26aec5bb60f93aa21b54efcdeb84",
+    "characters": 605
+  },
+  {
+    "source": "EXPENSES\\ARTPRICE\\Coinbase CC Mar 2026.png",
+    "source_sha256": "123ddadcfa00272f6621d6933e587eabec2a8b7864ace67ae3a9857ea2337147",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ARTPRICE_Coinbase_CC_Mar_2026.png.txt",
+    "text_sha256": "2122993aa1717777a5ba01ae6f07615efffedb7a9be7b64666c5a336d1c0863d",
+    "characters": 502
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Coinbase CC Feb 2026.png",
+    "source_sha256": "434ec0c4442f95e424c8879d29b9ddad9a71937dc7ecee2ee213d4c6cb829509",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_RENDER_Coinbase_CC_Feb_2026.png.txt",
+    "text_sha256": "c2499eaa39dd63c5f283582d5cfef14323bd26aec5bb60f93aa21b54efcdeb84",
+    "characters": 605
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Coinbase CC Mar 2026.png",
+    "source_sha256": "123ddadcfa00272f6621d6933e587eabec2a8b7864ace67ae3a9857ea2337147",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_RENDER_Coinbase_CC_Mar_2026.png.txt",
+    "text_sha256": "2122993aa1717777a5ba01ae6f07615efffedb7a9be7b64666c5a336d1c0863d",
+    "characters": 502
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0001-Render-Dec-2025.pdf",
+    "source_sha256": "8c4942a97754117a618de0d370f5b3bc86de4d615203b08a17733f6bb8d568d8",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_RENDER_Invoice-RVA5KGTP-0001-Render-Dec-2025.pdf.txt",
+    "text_sha256": "076d12cb29f303460829d119c9ee552589ec53f9a2eab1a89db91789d1a58cf3",
+    "characters": 746
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0002-Render-Jan-2026.pdf",
+    "source_sha256": "794f3e00c1c979fb679665ecdda548e79d4d60f65caa589c9f037d5f4dafbfa5",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_RENDER_Invoice-RVA5KGTP-0002-Render-Jan-2026.pdf.txt",
+    "text_sha256": "2b573d289ba4af1b301109ad69bc4fa702cd06f3840a0a96582b1266af99a5e8",
+    "characters": 785
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0003-Render-Feb-2026.pdf",
+    "source_sha256": "b920a5de2e392e3bcc76fc7cb76c12399c7803970ddb95895aaab7200edf748e",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_RENDER_Invoice-RVA5KGTP-0003-Render-Feb-2026.pdf.txt",
+    "text_sha256": "bd2b529b9b64009c30749335d87c7c59f42c9c37df3351f6a6c39ac9e2d02d3e",
+    "characters": 776
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0004-Render-Mar-2026.pdf",
+    "source_sha256": "c9e186050fa1175cb44025f49eb03123d832ac868984b49fcc2e74a3e76d7b61",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_RENDER_Invoice-RVA5KGTP-0004-Render-Mar-2026.pdf.txt",
+    "text_sha256": "c4babff3979ec2217be8d0d8b71607ebcddf7d8a5cfc6bb6b976f24d1eeb638d",
+    "characters": 776
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0005-Render-Apr-2026.pdf",
+    "source_sha256": "ad7cc2173713d7794a621098375307da8be4596daf568c52209de31afca44c49",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_RENDER_Invoice-RVA5KGTP-0005-Render-Apr-2026.pdf.txt",
+    "text_sha256": "d64b3ad7938c088a14256e038e03d9c7588e05eb0fa4ec765867c2d2f8c41caf",
+    "characters": 770
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0006-Render-May-2026.pdf",
+    "source_sha256": "7a915f13ef0a2a46b905c1cbec14b35ab5795c92f052e511b970e84f6e4b60cf",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_RENDER_Invoice-RVA5KGTP-0006-Render-May-2026.pdf.txt",
+    "text_sha256": "1b7cb4901cd5a018eeb112d069d8a51be31b83aefc3fa8b7caffaff3c4f9a592",
+    "characters": 773
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0007-Render-July-2026.pdf",
+    "source_sha256": "da68a0ffb6a87711ae358c1b0e9c25181fab16aaa86d4ef9e1d52e70e074b8cf",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_RENDER_Invoice-RVA5KGTP-0007-Render-July-2026.pdf.txt",
+    "text_sha256": "bc9aad118b4d7a52a2b1c166ccd744e1d441b55c922a2046ef9e76165a4d3161",
+    "characters": 773
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0008.pdf",
+    "source_sha256": "9cc59811f7995aa21de6ffa539fe5a90ec455e5ad33b3a6d66280a8f11d0beed",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Invoice-RVA5KGTP-0008.txt",
+    "pages": 1,
+    "text_sha256": "37c8d4498698eb7d9839f3b03d1522a6f8d282f85254c8856647002a9bf1a4d5",
+    "characters": 732,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0009.pdf",
+    "source_sha256": "6cbfc5c194c2843271d644956ea76185a79ca04736c126214902a18bb583230e",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Invoice-RVA5KGTP-0009.txt",
+    "pages": 1,
+    "text_sha256": "363234fa661c32e714bf1846166c9df48a0a475840921acfb5e52c76db45d78c",
+    "characters": 740,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\Invoice-RVA5KGTP-0011.pdf",
+    "source_sha256": "392baa341e9603626829edd59dca213367c04e61cac101b7120cce26339a21ad",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Invoice-RVA5KGTP-0011.txt",
+    "pages": 1,
+    "text_sha256": "6ee63d478b1d4bb9c4a86ae8faed87faf88e7db78e5df9905d24c084ba703169",
+    "characters": 785,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2044-1587.pdf",
+    "source_sha256": "09d90144d0570c48dc571ad7e976b0c0eca197f1f5949bb5e7c1480310254d08",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Render Receipt-2044-1587.txt",
+    "pages": 1,
+    "text_sha256": "309759acb1f4b2327ef454227bb6580dcd27c25212ac677ad34e914d750a84ab",
+    "characters": 838,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2195-8980.pdf",
+    "source_sha256": "857af58fdb184c784e0b1b481965198d7e9b472a84532c818e4109038f43f507",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Render Receipt-2195-8980.txt",
+    "pages": 1,
+    "text_sha256": "3f75dc20d89414c18d89e7a0b54d888a9489e333089e4c7f46915871d482d523",
+    "characters": 841,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2241-6428.pdf",
+    "source_sha256": "d7bbed6a9f7db774620f2de9aa60b31e69ebf112139655dd956a241ef1ef89f2",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\run-20261104-1357\\source-review\\new-06.txt",
+    "text_sha256": "c4a978d27fd1d871d21cad64d68a9228f64e28be09a0967ca924624ce7281d12",
+    "characters": 808
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2286-5453.pdf",
+    "source_sha256": "2c7805ac7aae651810ffb2c2832a165411e84316431fea2eb13785edafd5d543",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Render Receipt-2286-5453.txt",
+    "pages": 1,
+    "text_sha256": "145c20acb9b7113f0042c2cab200d0673dfc3edc75fbae3bd552fa07949658dd",
+    "characters": 817,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2506-9657.pdf",
+    "source_sha256": "ac4379b68cf2947a1228ca58ba13b68ba535518d15f6c04f08e533b4ab8a11b6",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\run-20261104-1357\\source-review\\new-05.txt",
+    "text_sha256": "a5ce89d82e074067a3f5cd1c608be350bb424046f76afd3dd4a4c6079370080b",
+    "characters": 874
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2599-4903.pdf",
+    "source_sha256": "e14f40843fe4e277f9bc93fa272149f94e024281fbdceff1ec4ca48fd7b699e4",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Render Receipt-2599-4903.txt",
+    "pages": 1,
+    "text_sha256": "993b7eba90ca21d42e3cc639f16a848c30dc2c8640abed572849de6c7b5b14ba",
+    "characters": 833,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2608-8851.pdf",
+    "source_sha256": "599ce0dcfcee5052f0821b7a12a5373b9138d4c1ece4f8adb2ae4ed7ac51957f",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\run-20261104-1357\\source-review\\new-02.txt",
+    "text_sha256": "6a467a352352bd19eca95fcd234cde84095bf71f194305ec33fe2604be06c5b2",
+    "characters": 859
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2846-8744.pdf",
+    "source_sha256": "f56dfb83b8ccf1be4ef39ccdefc3ba4e1c20ee9e3f273e9e90b45caf31774985",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\run-20261104-1357\\source-review\\new-03.txt",
+    "text_sha256": "b8ed2784440c6a3ce62c5f5aea53b78877ec334d7f5cac81c160ed399a54335e",
+    "characters": 865
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2942-6606.pdf",
+    "source_sha256": "d40ad223cb96f66c1b81fefd983dfdb95a30f8ba9dc57818712bc76705886277",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\run-20261104-1357\\source-review\\new-01.txt",
+    "text_sha256": "56fcd1f8b66ae5b976258acb3416c26050c29346a52b00bd1ae88a289690c1f1",
+    "characters": 862
+  },
+  {
+    "source": "EXPENSES\\RENDER\\RECEIPTS\\Render Receipt-2961-3239.pdf",
+    "source_sha256": "7a3b2c2bfc7793f47b7e28b732f615826ef50b151fc72bbf2431fcc873f7002b",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\run-20261104-1357\\source-review\\new-04.txt",
+    "text_sha256": "22973d2a15be3d3279a6f6041417cddbaf4d0b45b9ea52f9897e7d5bdaabd4c0",
+    "characters": 865
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\Coinbase CC Feb 2026.png",
+    "source_sha256": "434ec0c4442f95e424c8879d29b9ddad9a71937dc7ecee2ee213d4c6cb829509",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_GOOGLE_Coinbase_CC_Feb_2026.png.txt",
+    "text_sha256": "c2499eaa39dd63c5f283582d5cfef14323bd26aec5bb60f93aa21b54efcdeb84",
+    "characters": 605
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\Coinbase CC Mar 2026.png",
+    "source_sha256": "123ddadcfa00272f6621d6933e587eabec2a8b7864ace67ae3a9857ea2337147",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_GOOGLE_Coinbase_CC_Mar_2026.png.txt",
+    "text_sha256": "2122993aa1717777a5ba01ae6f07615efffedb7a9be7b64666c5a336d1c0863d",
+    "characters": 502
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\cc google render charges",
+    "source_sha256": "d80f41c8fe9b000ba89fcdc6f5397b93382e3ebbd1d60080190775e099be494c",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_GOOGLE_cc_google_render_charges.txt",
+    "text_sha256": "9f9a322a6dc704b5320e3efc5f9a5da6a8ea989bc45a15e8d0703d2d7105ec09",
+    "characters": 420
+  },
+  {
+    "source": "EXPENSES\\GOOGLE\\cc google render pedro",
+    "source_sha256": "0020c4e0e9e12cf50e0ad31d67f3033f928e4a4937a5c3eb9119de8d7179cb4a",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_GOOGLE_cc_google_render_pedro.txt",
+    "text_sha256": "ef923133d2b6301c7b74a5c160c7f0e00cd588f9564702e9e6d60a53ee5d29b0",
+    "characters": 598
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\CHASE-UPS-CLARS.pdf",
+    "source_sha256": "f1d9931cd8fee6f67b2d00bb6be92897e0b46d36aaccd51a681109b56581f387",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SHIPPING_CHASE-UPS-CLARS.pdf.txt",
+    "text_sha256": "b88ae980cc42c10e997c0211ae5e378acfb8caa361f848ebaca75d4cd13b3c43",
+    "characters": 582
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\Circle Shipping - Benton - Alex.pdf",
+    "source_sha256": "6036cfd78cde94286a72c620bf2d0f4152292c499c3da83ccc3413da6ff07d04",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SHIPPING_Circle_Shipping_-_Benton_-_Alex.pdf.txt",
+    "text_sha256": "a515221fd3c4ac3a5f290c055f432232c36cb140807a4ef472f2804bf3ba0443",
+    "characters": 2267
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\FRIEDEBERG-CONCEPT-SHIPPING.pdf",
+    "source_sha256": "d6a9f293efb25170894653c5d4ce0532b30ef88bd9abbcd081d0b3a6e4e4ad30",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SHIPPING_FRIEDEBERG-CONCEPT-SHIPPING.pdf.txt",
+    "text_sha256": "97f893afe9e086fa5c54d71575cdf24234892bb1452476b670c7cbd4f8e5b925",
+    "characters": 782
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\IVY RECEIPT.pdf",
+    "source_sha256": "150ae0ea817515aa501babb515c72d54aaccf12df6e7a05237fac3d7c5d2c318",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SHIPPING_IVY_RECEIPT.pdf.txt",
+    "text_sha256": "98feced1676a35e3c016c58f51bf681b7015b6fbbe95a68e0edbbda80f3099ec",
+    "characters": 1467
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\NEIMAN UPS SHIPPING CHASE TRANS.pdf",
+    "source_sha256": "9993c70e83532629805144d9fb382d204fde79f076a99eb8abe5d7ba148aedae",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SHIPPING_NEIMAN_UPS_SHIPPING_CHASE_TRANS.pdf.txt",
+    "text_sha256": "488dc4db4b732b4d5cc14fe2882a6a27f6fc97fc6c33f6c3954b70976b472bbb",
+    "characters": 3316
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\RACH DAVIS SHIPPING.png",
+    "source_sha256": "c5017b4484c9941d67fb8f32fe1d48397fcd2c860a460c66516ed8808a96dc39",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SHIPPING_RACH_DAVIS_SHIPPING.png.txt",
+    "text_sha256": "a4a27899d8770148dbeb26cd2b8c101f28e960065bc169e21fe3ca79ae8a9f2f",
+    "characters": 799
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\SHIP-INV-SHEP-COMMON.pdf",
+    "source_sha256": "4eff18b724c476bac4357111fcaade961466284f264a0a420e51907dc274be23",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SHIPPING_SHIP-INV-SHEP-COMMON.pdf.txt",
+    "text_sha256": "661847272a5b654713a4ec74932adb2705b585597e4084c0ea6aabfe4c635642",
+    "characters": 1290
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\UPS SHIPMENT FOR SIMPSON.pdf",
+    "source_sha256": "3c42b652b97f1d2905a1be8eca3e4364717c8a0e5cc3861865ed36a5c1166383",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SHIPPING_UPS_SHIPMENT_FOR_SIMPSON.pdf.txt",
+    "text_sha256": "fd54a77535ca0dffea74d5eb022340a840d63a51ac5482afea57e1af64397e3f",
+    "characters": 333
+  },
+  {
+    "source": "EXPENSES\\SHIPPING\\UPS Store 4134 - 2026-07-01 - Neiman lot 2264.pdf",
+    "source_sha256": "f8ebc328529837317154d6e9823b30b4055e97ea740986b943089d872846710a",
+    "method": "prior visual review reused after matching original source hash",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-UPS Store 4134 - 2026-07-01 - Neiman lot 2264.txt",
+    "pages": 2,
+    "text_sha256": "75a11da44c802486bc6f65640aa48a730f0f684c5c07a42ba3cd1735eb3fb070",
+    "characters": 2,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0002-Biz-Acct-Jan-2026.pdf",
+    "source_sha256": "279ab954c7ae1186e5d1f4bfd434b8599cd9bf0ff6b0b82618389fa3f12f0c4e",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Invoice-8MGN6L2K-0002-Biz-Acct-Jan-2026.pdf.txt",
+    "text_sha256": "2d3cfeeb0a43c89e4de28d5c3a65b5d334d50bcdc6731f929837b4ce619e4900",
+    "characters": 574
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0003-Biz-Acct-Feb-2026.pdf",
+    "source_sha256": "3963f4a7360eefa46daa4d9b30e2060c41a71acb2f522a90eb0a5aa7ef0a35e7",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Invoice-8MGN6L2K-0003-Biz-Acct-Feb-2026.pdf.txt",
+    "text_sha256": "867269ec1a22ee59ff4ebd83bbac12616383ded8c2954754981b4123adaf27e8",
+    "characters": 577
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0004-Biz-Acct-Mar-2026.pdf",
+    "source_sha256": "bea1d0f8293cc30ec3d3cf04201ca655f460ab30554abaa680fe2c8f6bff0db7",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Invoice-8MGN6L2K-0004-Biz-Acct-Mar-2026.pdf.txt",
+    "text_sha256": "48f0c7b8bdf8428ba01a3fd96015b8af38606ee4e742e3a013561b6fd85d78af",
+    "characters": 568
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0007-Biz-Acct-Apr-2026.pdf",
+    "source_sha256": "feccafb960edf3daa90a4f839985c30f8326c1d80154d5ab5b54717feda6c897",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Invoice-8MGN6L2K-0007-Biz-Acct-Apr-2026.pdf.txt",
+    "text_sha256": "8d80a4d7499080b178d4caeee4adc57a8634aa5b8c4b5b3a84fe748a0a63a5b7",
+    "characters": 568
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-8MGN6L2K-0008-Biz-Acct-May-2026.pdf",
+    "source_sha256": "47f8d82cf44482f7dd9cc785463cb61d9caea859d443bc37652166cd6912e0ad",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Invoice-8MGN6L2K-0008-Biz-Acct-May-2026.pdf.txt",
+    "text_sha256": "97dfd9825a4e2e34922c7aaa9873710734f6d1489c74262fa654bfc56174ab12",
+    "characters": 562
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0001-Pro-Acct-Apr-2026.pdf",
+    "source_sha256": "7b1b2fe82f42e149b39636889f3d280d337c404d089fbe8d7bfcca01b99deee4",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Invoice-UAHQDL21-0001-Pro-Acct-Apr-2026.pdf.txt",
+    "text_sha256": "c56751c6d6c02282591109f2fcc8892f162512a70c8c457717f1b8200bd06d5c",
+    "characters": 559
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0002-Pro-Acct-May-2026.pdf",
+    "source_sha256": "a779f982529ab314fff53e43f01145e51e6c70566b27caaec7cf7200ddb4ae86",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Invoice-UAHQDL21-0002-Pro-Acct-May-2026.pdf.txt",
+    "text_sha256": "d0ce5c05525aeb22ff88769c0ee00424af6b9f92cdd0c5b38d4b80baed8b71ec",
+    "characters": 553
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0003-Pro-Acct-June-2026.pdf",
+    "source_sha256": "6d844a3e5ca05f98d640e61d977ac4e2ba47f148e4650cda847d7dc93fb745ea",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Invoice-UAHQDL21-0003-Pro-Acct-June-2026.pdf.txt",
+    "text_sha256": "f7a69b3a3ca8f2e341b94a3692fa46a7e3490a49db44d14370111981ab51fb62",
+    "characters": 556
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Invoice-UAHQDL21-0004-Pro-Acct-July-2026.pdf",
+    "source_sha256": "b4b22974c0d6900833431af974ebf38f0bc35690ef9463e3d29e95844b107751",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Invoice-UAHQDL21-0004-Pro-Acct-July-2026.pdf.txt",
+    "text_sha256": "3875d4b4de9a6f24962e0be5e2a3ef4e0b5ac0f87a64a3ad2e2c7c6bc6814f5f",
+    "characters": 556
+  },
+  {
+    "source": "EXPENSES\\OPENAI\\Receipt-2598-3959-6333-Pro-Acct-July-2026.pdf",
+    "source_sha256": "1f0d5a805c9565ff99d02e3284f46ac69458277fb80567e3c7aede79f174d84c",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_OPENAI_Receipt-2598-3959-6333-Pro-Acct-July-2026.pdf.txt",
+    "text_sha256": "2a2608579b3f7d75cb79f585e850a6f36f85c3e4844a2bf3434a13d05c79873d",
+    "characters": 661
+  },
+  {
+    "source": "EXPENSES\\SQUARE\\Second State Mail - Payment Receipt for Square Services - June 2026.pdf",
+    "source_sha256": "100c0444f953beeb44fc81f98a745b3ca5bc626fb2abd42066c51dcd2ec92be0",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SQUARE_Second_State_Mail_-_Payment_Receipt_for_Square_Services_-_June_2026.pdf.txt",
+    "text_sha256": "01e17a665f44f80cbb38ae00a6ecd4639356926db8ca7fb723934032997e430c",
+    "characters": 776
+  },
+  {
+    "source": "EXPENSES\\SQUARE\\Second State Mail - Payment Receipt for Square Services - May 2026.pdf",
+    "source_sha256": "4eabfbc206b995a3eb7245634a93149e6f5d209c759dc17611e2ea131ef60bf7",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_SQUARE_Second_State_Mail_-_Payment_Receipt_for_Square_Services_-_May_2026.pdf.txt",
+    "text_sha256": "867322dc409ac00f3591a50c11d2a2d1179e669331e6163ceb2f5adcd3c74dc8",
+    "characters": 775
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\Adobe-Transactions-Chase-05-2026.pdf",
+    "source_sha256": "f1b0705d948c416efcbab05a68249c91e91e9386ef88a1a94a1db3be84b3b301",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ADOBE_Adobe-Transactions-Chase-05-2026.pdf.txt",
+    "text_sha256": "f80536ec3a9cb3f6d505ca0769fb0653d12725c8469e6c3439da08c9890a29de",
+    "characters": 600
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\Adobe-Transactions-Chase-06-2026.pdf",
+    "source_sha256": "8b389e94bf3484a83e82e2aaf7b28a11f99f95fcc1b85a86fa7293cc3651b18f",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ADOBE_Adobe-Transactions-Chase-06-2026.pdf.txt",
+    "text_sha256": "e1e383e5edb6d201e8c99dfe154732a0ed953914685180061c70c6bd060e7952",
+    "characters": 600
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\invoice-Adobe-July-2026.pdf",
+    "source_sha256": "945fa8b488090ca441d56f9a0ab705a1e977ab643607272ebd6a81fe5c783a48",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ADOBE_invoice-Adobe-July-2026.pdf.txt",
+    "text_sha256": "eca30302ab9dbb9a1158953711db715d6d13bc91b7370ba0cc156c98cdefac8a",
+    "characters": 807
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\invoice-Adobe-June-2026.pdf",
+    "source_sha256": "7b3d661d01fd348326dbfd26e2e96ba152c6570edd47932b8610831845f94237",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ADOBE_invoice-Adobe-June-2026.pdf.txt",
+    "text_sha256": "8a9f1fdd1f28489bf1b290ca9b227bee9f1af30c8a18631275e37d6c4a8227df",
+    "characters": 807
+  },
+  {
+    "source": "EXPENSES\\ADOBE\\invoice-Adobe-May-2026.pdf",
+    "source_sha256": "2f31a1448bc931f0726a7f706bb46b1c9b8020d825610fecb65eadd4697a09c6",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXPENSES_ADOBE_invoice-Adobe-May-2026.pdf.txt",
+    "text_sha256": "6829954bd0adce6248a0b340404a9e43f8dddd655bc1da3227aa3a44ca4edb90",
+    "characters": 807
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Invoice-6AFMD0H0-0028.pdf",
+    "source_sha256": "7460f6260df2628803c0a6b3bb371e6f02148fb7f52127b07e3d45a9b7182177",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Invoice-6AFMD0H0-0028.txt",
+    "pages": 1,
+    "text_sha256": "730d4d0bf097d71aa45c67df707d490c45de7f62c4d857619c5f032b10669d2d",
+    "characters": 566,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Invoice-6AFMD0H0-0029.pdf",
+    "source_sha256": "df5c30334e216b949a88d73c7543245885e0407a579e74d94ee1ff41e69197ba",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Invoice-6AFMD0H0-0029.txt",
+    "pages": 1,
+    "text_sha256": "768f75698535f901a44bf7516078112c540169388cb84aa770b9c8adbf66a52b",
+    "characters": 549,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Receipt-2030-4401.pdf",
+    "source_sha256": "6b7223afb3eae7ce0cc8c8afa3643da17812aff89e779f9cd39577335f5b42a9",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Receipt-2030-4401.txt",
+    "pages": 1,
+    "text_sha256": "5fa2ad40881a8c17d10c9fd419447fe72c450c3a6a4ae44715ba63c5cf054cdb",
+    "characters": 615,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\LIVEART\\Receipt-2842-2076.pdf",
+    "source_sha256": "06f2a2721463103f532683b5df82af9f80e8b734b29b80427677bb7d46e6d172",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Receipt-2842-2076.txt",
+    "pages": 1,
+    "text_sha256": "1a65be374c33ed4e82ca347e3ee55d46a54ed20f50c79be2cf1b1ccac82d5591",
+    "characters": 598,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\SUNO\\Invoice-FA0WCXHP-0006.pdf",
+    "source_sha256": "5ef69541773619e3e28b28803f27f42946def8ba76c1b799962c7b9cd4a1cb58",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Invoice-FA0WCXHP-0006.txt",
+    "pages": 1,
+    "text_sha256": "5c396ce9f6becf9f9c2aba2e1a6146352e3c1465e410922198a0f7cf3ee15010",
+    "characters": 473,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "EXPENSES\\SUNO\\Receipt-2840-2505-3066.pdf",
+    "source_sha256": "44946eca3c67743138711160a27a75d9bf092bc5c6545253e1bddf6fb1d7c4fd",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Receipt-2840-2505-3066.txt",
+    "pages": 1,
+    "text_sha256": "95f80261ba8b578c68ead073175d988644d05ad19dddae29b9d65dfcf01ca110",
+    "characters": 574,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "PURCHASE INVOICES\\ALEX CC PURCHASE FRIEDEBERG CONCEPT.pdf",
+    "source_sha256": "a00ce2c1a0b7b1530eb1691b6e2f368f240e4415b220d03174fb88169a5453c5",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_ALEX_CC_PURCHASE_FRIEDEBERG_CONCEPT.pdf.txt",
+    "text_sha256": "cdb659dae6771636ea87a23fd3ee95eeb6fa791cb832b2fc2dc49adf445c5c72",
+    "characters": 2328
+  },
+  {
+    "source": "PURCHASE INVOICES\\Alex Jeremy Zelle to Oliver 2500",
+    "source_sha256": "4e6c21f977976d816f659c1ae298433391952541a673b4902e05d4ede7252ea7",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Alex_Jeremy_Zelle_to_Oliver_2500.txt",
+    "text_sha256": "b20d392b7bde50da25ebdefa3e1af1b499d194e71f033822c3f1015ab32ef4ff",
+    "characters": 547
+  },
+  {
+    "source": "PURCHASE INVOICES\\BRADFORDS.pdf",
+    "source_sha256": "cd4231f4d94c0368631153ca6a5e97970896bcec0f8b74d8e01d8e492274ad48",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_BRADFORDS.pdf.txt",
+    "text_sha256": "3123beb795ada2d9f5e81b87774d6dbf7dd8a56efda2e75a9ae2dfa542365c33",
+    "characters": 7060
+  },
+  {
+    "source": "PURCHASE INVOICES\\CIRCLE PAYMENT STATUS.heic",
+    "source_sha256": "e1e99502e837d42ae92e38565d3c0b3ecc93fb1b97e505a0aaafca532ce6a1da",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_CIRCLE_PAYMENT_STATUS.heic.txt",
+    "text_sha256": "7ac38c0983dc61da15524867ffc69b974bb6ac50b12da67b8e5d89f916f5352f",
+    "characters": 408
+  },
+  {
+    "source": "PURCHASE INVOICES\\Circle Proof of Payment - Chase Online.pdf",
+    "source_sha256": "e6374250222c14ade4d7edb9f09d8896535c27e049f1a6e4ecb24ae684b85c16",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Circle_Proof_of_Payment_-_Chase_Online.pdf.txt",
+    "text_sha256": "f6d0710e454b37e1daa5134cd1ea15a6bc73d8a86b7f83b025e5535ab0c477e8",
+    "characters": 1317
+  },
+  {
+    "source": "PURCHASE INVOICES\\Clars Invoice CL00105105.pdf",
+    "source_sha256": "f0cc3f2a0ddcea1b480561c3a7a332d8922cfdf14907db0e46a2bf8d762055cb",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Clars Invoice CL00105105.txt",
+    "pages": 1,
+    "text_sha256": "c8f53793a9cc0c079540f0807ca4a32952a5b8970752c0be69b6b00e8c5f78d3",
+    "characters": 1848,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "PURCHASE INVOICES\\Clars Invoice CL00105689.pdf",
+    "source_sha256": "fae6f62584384078ac2e7e2ca78dbf46df8578555195f7f2745de985f430d9e7",
+    "method": "fresh PDF text extraction",
+    "text_file": "C:\\dev\\secondstatesite\\tmp\\bookkeeper-20261106-2001\\sources\\fresh-pdf-Clars Invoice CL00105689.txt",
+    "pages": 1,
+    "text_sha256": "7cf1b58e8e9d71b531c6e947e450208c1cc1f7feae12a415fc6159cb0227f80d",
+    "characters": 1130,
+    "prior_review_match": true,
+    "prior_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-1359-source-and-ledger-review\\sources\\document-reviews.json"
+  },
+  {
+    "source": "PURCHASE INVOICES\\DOYLE-Oct-2026-SecondState-TBD-Customer-335120-EMAIL-THREAD.pdf",
+    "source_sha256": "ded12531d0c42ade014cc8d8598fcaf659d03a1f778ca69126048dc0297b83a7",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\doyle-review-20261104\\pdf-text.json",
+    "text_sha256": "f021494d9e024c5193c3f7f2d4b63b466c55c089816f501011be955c684c24a6",
+    "characters": 4569
+  },
+  {
+    "source": "PURCHASE INVOICES\\DuMouchelles Invoice.pdf",
+    "source_sha256": "01ed46dd4e0f8f0b50023fe8b1ffb7b4743d7a695a400e723848c2656eb17351",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_DuMouchelles_Invoice.pdf.txt",
+    "text_sha256": "0bfacc62cc17a4057f5bfe42dbe56330182b19a96e4222d1507cb2d0498682eb",
+    "characters": 3752
+  },
+  {
+    "source": "PURCHASE INVOICES\\DuMouchelles invoice 2026100184 PAID 2026-10-27.pdf",
+    "source_sha256": "7faa02c6300044e62f7ee262527d4e7739b52ca45824198accbecd072abbfb41",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\run-20261104-1357\\source-review\\new-07.txt",
+    "text_sha256": "842b008560ecfa07cefe4aa10e6268c65620ba6a1961812aaaeb292390ae4c04",
+    "characters": 3916
+  },
+  {
+    "source": "PURCHASE INVOICES\\FERRI PURCHASES.pdf",
+    "source_sha256": "58b46708fce6c1920ce341d53d810b5f400da5dbcca15797926bd0590bdbdd25",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_FERRI_PURCHASES.pdf.txt",
+    "text_sha256": "7ae7f3c6314af3eb3ec02447e10305ff0f09a30950592cd6ac72fa295fbaa636",
+    "characters": 8001
+  },
+  {
+    "source": "PURCHASE INVOICES\\Ferri Purchases",
+    "source_sha256": "be95e887e8046ed90962e95fbcd0cb6bfc3e24f73cbf638ef710fefb37787087",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Ferri_Purchases.txt",
+    "text_sha256": "6b7910ef12674f45eb8d867ad293bd32b2c905c52171c0edcebea643796a38be",
+    "characters": 232
+  },
+  {
+    "source": "PURCHASE INVOICES\\Ferri Purchases.png",
+    "source_sha256": "fd07a54a1ac0de718924a9f7bec52dc61484882ce72478627c90ece7ac4074e0",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Ferri_Purchases.png.txt",
+    "text_sha256": "10526311aad30acfde4600eaa029b5321528b4436d5c7955b26245da1a65d5ac",
+    "characters": 229
+  },
+  {
+    "source": "PURCHASE INVOICES\\Heritage October 2026 12264503.pdf",
+    "source_sha256": "8cf8d5519ca815bbf66db9dae483b9a7ced9fca6623f763a70bcaee8c9ab258f",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\heritage-review-20261104\\pdf-text.json",
+    "text_sha256": "5e4018066e4e729669118fd8fce96e438ff0324131f63006b0c024135ae227cc",
+    "characters": 10190
+  },
+  {
+    "source": "PURCHASE INVOICES\\INV402290-20260411-FRIEDEBERG-CONCEPT.pdf",
+    "source_sha256": "f8df79c8c37ef9cdfe0f6d7464ae7228a24f4b75f4ca9db4e525e883f946391e",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_INV402290-20260411-FRIEDEBERG-CONCEPT.pdf.txt",
+    "text_sha256": "3b9b961b59dd68c271d56b4de52c4c9b11e43b6fefde874d473e19048b43e536",
+    "characters": 2280
+  },
+  {
+    "source": "PURCHASE INVOICES\\Invoice-SantaMonica-2026-10-19.pdf",
+    "source_sha256": "7e0e31aa2f345c33263eff3c7b7d8b074a71af942e8c3384f12ea9cbe0d06a79",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Invoice-SantaMonica-2026-10-19.pdf.txt",
+    "text_sha256": "98ad77dfdf0427f1fcce1edc13ecf31b62d8dc194c180e439a680166f388cdca",
+    "characters": 1745
+  },
+  {
+    "source": "PURCHASE INVOICES\\LARSEN-ZUNIGA-NIETO.png",
+    "source_sha256": "6c576b9549f19d80c93a6af53e86c6db26fdb1292f2443b75cc36c9ec1cfb54d",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_LARSEN-ZUNIGA-NIETO.png.txt",
+    "text_sha256": "d77fdbaa1eae045d62af7b0989b1b21ab7abc0d60168c50d6ea8aff2584709bf",
+    "characters": 1730
+  },
+  {
+    "source": "PURCHASE INVOICES\\MIRO-INDELIBLE-INVALUABLE.pdf",
+    "source_sha256": "2dc3e8a2ed66570dd7a4f7be320fd603004676469a43dfe90b30f6c578f97637",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_MIRO-INDELIBLE-INVALUABLE.pdf.txt",
+    "text_sha256": "ec36ef3e8ff812172a8efbf3fc8d705a08d351a7010c785b2df112e0b2888bb0",
+    "characters": 3432
+  },
+  {
+    "source": "PURCHASE INVOICES\\NEIMAN - NAMATH - Gmail - Receipt from CRESCENT CITY AUCTION.pdf",
+    "source_sha256": "0a580fa46033af646c192612a9f67668b8a8d2722aba7a97e9f7d6f6c71fcea6",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_NEIMAN_-_NAMATH_-_Gmail_-_Receipt_from_CRESCENT_CITY_AUCTION.pdf.txt",
+    "text_sha256": "a5d8dde72dad9af58583ca6712c178cc9f9799343c7bad4b34a0d2f1d34f9967",
+    "characters": 1044
+  },
+  {
+    "source": "PURCHASE INVOICES\\Neiman-Broadway-Joe-Lot-Info.pdf",
+    "source_sha256": "a4deda38254b8d88328d3dc743626ae14323cb2c6c348e4f2e8145a01d9f78c3",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Neiman-Broadway-Joe-Lot-Info.pdf.txt",
+    "text_sha256": "cecdbd45f4820ec8a42d9ae231a36fc68727289f8ebe6047de0dc816b04f6b58",
+    "characters": 1537
+  },
+  {
+    "source": "PURCHASE INVOICES\\Oliver Ferri Purchases & Images.docx",
+    "source_sha256": "1bffefccf1c944f48540289ec37537c1493aff93ec43ab636145d19d31397576",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Oliver_Ferri_Purchases_Images.docx.txt",
+    "text_sha256": "2deb6417202de8a964f1288bf9bdff0f6464df1830305d313c816d99945ee39b",
+    "characters": 6699
+  },
+  {
+    "source": "PURCHASE INVOICES\\Oliver Ferri Purchases.docx",
+    "source_sha256": "5421c8e2460153e1cf734b39bfbc3fe9289f40061ea7cdd5bdf6e0ae3fa6d565",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Oliver_Ferri_Purchases.docx.txt",
+    "text_sha256": "c22f5a5982ca86b38db744d3b8be2be0a2597ef49ce1872911d28a4ee92a7676",
+    "characters": 2314
+  },
+  {
+    "source": "PURCHASE INVOICES\\Richard Zesty Andy Capp.png",
+    "source_sha256": "7f35ec2a3d2b63ce37726ffa8b098e4a13a233f646e9889521c6ff438a3e91e4",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Richard_Zesty_Andy_Capp.png.txt",
+    "text_sha256": "1b35efa6978e40986cdd610eb0b1540f697ef73c82b18beb1aad137888b688a0",
+    "characters": 225
+  },
+  {
+    "source": "PURCHASE INVOICES\\Roland_Matisse_Invoice_52365.pdf",
+    "source_sha256": "caf54d4db8fe67c9d274e567d74ec2f61624a12dd7b76dbdcf3b5a97e1d91066",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Roland_Matisse_Invoice_52365.pdf.txt",
+    "text_sha256": "823af2b62173855e498ac3b3ab63b0e7325d5d5a5b2c574e40fc1e929176f879",
+    "characters": 1869
+  },
+  {
+    "source": "PURCHASE INVOICES\\SHEP-COMMON-FRANCE.pdf",
+    "source_sha256": "6d1b2d8c25c7e2dddaa0ab5d1d91ec11c4699c190f432635adbf5e02b6f4cba8",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_SHEP-COMMON-FRANCE.pdf.txt",
+    "text_sha256": "20f432bcad162e2c61fefa489cdb4087fc0441a29187f7a80cf23712d6afab67",
+    "characters": 291
+  },
+  {
+    "source": "PURCHASE INVOICES\\SHEP-COMMON-INV-REC.pdf",
+    "source_sha256": "d82df9ff9b99e0cd21b5781b18b8e217406812fbe63d6a6a8b1f2ce2ba41a779",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_SHEP-COMMON-INV-REC.pdf.txt",
+    "text_sha256": "5876a35265655cf67cebb1114ebd25cc792d26b29f4d07a4d462336917bf3eab",
+    "characters": 1814
+  },
+  {
+    "source": "PURCHASE INVOICES\\SIMPSON INVOICE.png",
+    "source_sha256": "211f8b1c5434d9e236e5d4fd2e2cea2c70e14de699442b389b8a899b47699e6a",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_SIMPSON_INVOICE.png.txt",
+    "text_sha256": "9cf9ffda9a53cd1be3b2d9a2839ad04dad602ca6ff126ea57843cecaba48ffc5",
+    "characters": 1281
+  },
+  {
+    "source": "PURCHASE INVOICES\\SIMPSON PAYMENT RECEIPT.png",
+    "source_sha256": "523dd98fb5fc1918f058716ddc08c33e87781837acc3f0bfd693ace93a9e35e7",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_SIMPSON_PAYMENT_RECEIPT.png.txt",
+    "text_sha256": "b0c2d86b2bdcd0eb14716e933aa6e67a448ff0472259602bd2079da4b9bb484c",
+    "characters": 632
+  },
+  {
+    "source": "PURCHASE INVOICES\\SIMPSON WIRE.jpeg",
+    "source_sha256": "7c603a2c7ff342855374d2b4665f8c7c9be04945940a396d95e5230b9502c3a2",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_SIMPSON_WIRE.jpeg.txt",
+    "text_sha256": "20cff1d1f1bae4159bd1bb9867d9b15d905d2f5a01d4129c8c55277bed0e91cc",
+    "characters": 973
+  },
+  {
+    "source": "PURCHASE INVOICES\\SImpson Proof of Payment - Chase Online.pdf",
+    "source_sha256": "922a4de8f5875535c35761face6e26466c3c04c80eabbc2655788b4fa9c1985c",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_SImpson_Proof_of_Payment_-_Chase_Online.pdf.txt",
+    "text_sha256": "0c1ef3f92c3a151905963710b2591e987ea0caea6894129bf25fb873b4bb9a4c",
+    "characters": 1335
+  },
+  {
+    "source": "PURCHASE INVOICES\\SWANN INVOICE 09182025.jpg",
+    "source_sha256": "41c5eaedf47b2d2ea263e5d2026d4487308d68bf44f41b31049c4597172beb40",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_SWANN_INVOICE_09182025.jpg.txt",
+    "text_sha256": "e9848704158f7c78b991b7b1afa09efde050ee7cf730dea9e9b26127e645fd04",
+    "characters": 657
+  },
+  {
+    "source": "PURCHASE INVOICES\\Shipping Payment Receipt.pdf",
+    "source_sha256": "fe127c52b14b4153d6568122598ffa164cbbcabb18b56d6129bdbada5636f067",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PURCHASE_INVOICES_Shipping_Payment_Receipt.pdf.txt",
+    "text_sha256": "8c683112dc3da68a89b40af5677dea8c3f6805b1e11febb3c6ed3994bc82611e",
+    "characters": 977
+  },
+  {
+    "source": "EXTRA NOTES\\ART ACCOUNTS.docx",
+    "source_sha256": "eda99867025f18e0ee162e8c5d69dc271edf57b5cf24abfac1c84bd91d8667df",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_ART_ACCOUNTS.docx.txt",
+    "text_sha256": "57b67ae2cfbbce77d503e67f3061ea126ed892f7edae04e52b4e0ec2b56dc755",
+    "characters": 10505
+  },
+  {
+    "source": "EXTRA NOTES\\BENTONS 1",
+    "source_sha256": "5f52ef9d3ac03f0016a5dc335762166cb5a1a728565129b158b99985a73af795",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_BENTONS_1.txt",
+    "text_sha256": "5332cac633f9b913f1d430a460415de04d7a3c5b7860b4456f20a11ad93153d3",
+    "characters": 531
+  },
+  {
+    "source": "EXTRA NOTES\\BENTONS 2",
+    "source_sha256": "cebff22ce4ba2f7e8a4256f3e17ea364c8ee6a65fe8ccbfb6f0c9b36faafe678",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_BENTONS_2.txt",
+    "text_sha256": "bc03a9f82c58722417e7b1c1260fb7b589bc2b466038e35f13dee0665e5e46af",
+    "characters": 553
+  },
+  {
+    "source": "EXTRA NOTES\\FORUMMIROLOT.html",
+    "source_sha256": "7cf65f4e8f98759dbf35b7bab4e7d8ff41f350ad6c84633c1351f0bf08cffe40",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_FORUMMIROLOT.html.txt",
+    "text_sha256": "4fdbe897aa5a16885d98e44934fb4fb3b37b7b53a128d771d13bf070bfa0c197",
+    "characters": 5007
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 106 Stella.pdf",
+    "source_sha256": "4fdfdbbad01c2cb17e9cbf4ca75b8c5000c0dac69722b94e0fa9921cc7325a2c",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_LOT_106_Stella.pdf.txt",
+    "text_sha256": "0ef056d98a9aa97b36f6ee908c36d2de07d63b6031b27d76a35c627203c03048",
+    "characters": 2352
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4006 Benton.pdf",
+    "source_sha256": "7c15e9f854c68f5699e30ab25265bf4bdce678424bfb410595124a521a58a203",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_LOT_4006_Benton.pdf.txt",
+    "text_sha256": "0a9ea6d8e3c44592d5eef56d60b8f26f60ac55c6ace44c8267349bd222f1029b",
+    "characters": 1920
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4007 Benton.pdf",
+    "source_sha256": "964d953e0f41627240392b69ab903c5d1daeac5901e928be7810f22e9d31ed3d",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_LOT_4007_Benton.pdf.txt",
+    "text_sha256": "94e70467267fef7ebedcc40968d99e57eaebb04bdbe990b0ee06dc0c48d089b7",
+    "characters": 1845
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4009 Benton.pdf",
+    "source_sha256": "2f8021887f0afc0124748910f3cd58d09d8fd2721424340d8e1781f0285787ef",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_LOT_4009_Benton.pdf.txt",
+    "text_sha256": "5cffd7cf7c1dd5c54d6af4246a7141a06a631a3fb4b33eff7e0da7f3a231efa5",
+    "characters": 2861
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4071 Benton.pdf",
+    "source_sha256": "10f3ac03e5c1b00e1670421892dacf0d2e0380969cd9229f8a53906a07c00488",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_LOT_4071_Benton.pdf.txt",
+    "text_sha256": "f73c39b06e97866424506c940ada5f4f982cf5165deaa181f9a454e177d7cb6e",
+    "characters": 1869
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4072 Benton.pdf",
+    "source_sha256": "96a42b1e71017f36dd10c420b16b943f200a065992e346fada5e4f4a47dbf8de",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_LOT_4072_Benton.pdf.txt",
+    "text_sha256": "fa75cf1f1604d584a6a415df19154365ade93a8510f63c32fb1e83df35069334",
+    "characters": 2117
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4073 Benton.pdf",
+    "source_sha256": "972b8d79b56d4f7e1a24ab772cfd6b41087a5e276b44f9ffa3a01b0526f1d34e",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_LOT_4073_Benton.pdf.txt",
+    "text_sha256": "0f9176eb5478ef413df81d9d633133e97e44ca4f1026cdf6bfc752c0234e7a76",
+    "characters": 2408
+  },
+  {
+    "source": "EXTRA NOTES\\LOT 4074 Benton.pdf",
+    "source_sha256": "57d338333d1f73c0bae4becb90f3ed574fb5f0366d7e5ed8c306649c48039cfb",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_LOT_4074_Benton.pdf.txt",
+    "text_sha256": "514f4e0eb5b239caa2e0895525d9524f4bf0915415b7fffb4543ee063ee97835",
+    "characters": 2186
+  },
+  {
+    "source": "EXTRA NOTES\\MAX ERNST.docx",
+    "source_sha256": "3d843108452e6469f1aa938c68e50134ebea9612bb349d221681d94dc60b7377",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_MAX_ERNST.docx.txt",
+    "text_sha256": "991aedc78e6e7b70eabafe1be8e565fa3fb327ca083b634ae0c197498eeac07a",
+    "characters": 3194
+  },
+  {
+    "source": "EXTRA NOTES\\Pedro-Friedeberg-Concept-Lot.pdf",
+    "source_sha256": "8f4ceace0793adaf2dd089fcf6c84c9d17fd151fbde4565d4c7ca090042aadbb",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_Pedro-Friedeberg-Concept-Lot.pdf.txt",
+    "text_sha256": "77661e9b642a85cca8f3bfd56e44943c5afeff3d28f129e42e9a2e3071c62f2f",
+    "characters": 1010
+  },
+  {
+    "source": "EXTRA NOTES\\Print-Joan Miro-Clars Auction Gallery.pdf",
+    "source_sha256": "c516166188d2cfc101555e209172cac8d34abd4ca3eca7a2a5fb9af4395a6493",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_Print-Joan_Miro-Clars_Auction_Gallery.pdf.txt",
+    "text_sha256": "90cdfa6692618e19ce3ae7cf0b668dc44f45c3504d303136fdc2f52ffd2f7ff4",
+    "characters": 1326
+  },
+  {
+    "source": "EXTRA NOTES\\Print-Rockwell Kent-Clars Auction Gallery.pdf",
+    "source_sha256": "2889174160138eac0c5311439d3361cd54daff88279d93d7f14560601097daf1",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_Print-Rockwell_Kent-Clars_Auction_Gallery.pdf.txt",
+    "text_sha256": "ec01c30e9ef93d7c03dec4b70500484af2d5044f69c301d6467935e21cc85da3",
+    "characters": 1203
+  },
+  {
+    "source": "EXTRA NOTES\\Prints-Joan Miro-Clars Auction Gallery.pdf",
+    "source_sha256": "dd90e9b2982037659d41369bc11588a08d76217c997ab82085f325f561f810d1",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_Prints-Joan_Miro-Clars_Auction_Gallery.pdf.txt",
+    "text_sha256": "2cec2e748249a6a6b1ce0b7231a95f06633e8218fcb3e2c98f5284db20bca7d8",
+    "characters": 1426
+  },
+  {
+    "source": "EXTRA NOTES\\RD Lot Info.pdf",
+    "source_sha256": "fe8e1f35ab0d5179cc9b6ab2614fb9bbeaaab311c6bde5a25fa861bd3313c2a8",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_RD_Lot_Info.pdf.txt",
+    "text_sha256": "0594368b6bdc9bfe4c73a48c875b14163cbead35f23cb8d87ee185e4b7f2fb74",
+    "characters": 5673
+  },
+  {
+    "source": "EXTRA NOTES\\UPS Rach Davis.pdf",
+    "source_sha256": "f9150b03d5d39664a770c93eafbc37abc0db6106ccb95c726dcf9ddb30dd2597",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\EXTRA_NOTES_UPS_Rach_Davis.pdf.txt",
+    "text_sha256": "c4773efd2d031f8afadb4cdd4c009a2bf3a9c9d625e65e1c03570d88ce20cf88",
+    "characters": 4296
+  },
+  {
+    "source": "MISC\\Fairfield Porter Prints 2026.docx",
+    "source_sha256": "908a2738268a41c0a0b2903ec82836003c623d1816bf7eee5759624eb0499fbd",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_Fairfield_Porter_Prints_2026.docx.txt",
+    "text_sha256": "3fcfc5b476101f2d9ee2666c007621db224031701b8d8f422339cca930835c55",
+    "characters": 867
+  },
+  {
+    "source": "MISC\\Full Inv 2026.docx",
+    "source_sha256": "f5570e99635660b6e5713ac445af6772249b6c6acbf6f15526de05b030948b12",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_Full_Inv_2026.docx.txt",
+    "text_sha256": "16c77e78a71a81eec42a65ffa2fa6f115de08e5012b8e58110aa406db8b85356",
+    "characters": 31221
+  },
+  {
+    "source": "MISC\\Kollwitz, Käthe – Self-Portrait - Bessenge Sale.pdf",
+    "source_sha256": "197e84c2db444ab9cb9ef42ef77df72a546278e0265ee6b86e9f89ebf1a08da1",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_Kollwitz_Käthe_Self-Portrait_-_Bessenge_Sale.pdf.txt",
+    "text_sha256": "6e4e107b50675d4bff3d0e2688e1d47ba6f8e9e5eb9d9d442c61899abdde685e",
+    "characters": 1619
+  },
+  {
+    "source": "MISC\\Lot - Robert Rauschenberg (1925-2008) Dawn Gallery Poster - Sale Swann June 2026.pdf",
+    "source_sha256": "db948a1b3549879457a7e51e1e9f88c4730db09362b596e80896c8d76b735c44",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_Lot_-_Robert_Rauschenberg_1925-2008_Dawn_Gallery_Poster_-_Sale_Swann_June_2026.pdf.txt",
+    "text_sha256": "bc85bbbca95658ded395bd842b71fb1411d265f1f74937e19374668f041612ec",
+    "characters": 1881
+  },
+  {
+    "source": "MISC\\Pick-up and Shipping Arrangements.pdf",
+    "source_sha256": "7ee8cd79222affcd6e9fcf95680897811f1be308b2f8330cdc9843b085cededb",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_Pick-up_and_Shipping_Arrangements.pdf.txt",
+    "text_sha256": "93dd78057c913d369aabf26e2d9284129be7a13b8608d8c7aa1653f4245ef053",
+    "characters": 1304
+  },
+  {
+    "source": "MISC\\SHEP-COMMON-LOT.html",
+    "source_sha256": "a6996e10372cca86635a7fc58f1aafc3bc4232993862f9070f104d752d76b553",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_SHEP-COMMON-LOT.html.txt",
+    "text_sha256": "ca671f40d2acb3679cf012ee422d2a6aab8325cb9cbba41980e767686e47c8dc",
+    "characters": 5078
+  },
+  {
+    "source": "MISC\\SHEP-COMMON-LOT.pdf",
+    "source_sha256": "0f569b3b994fa3f4db13da64684b39c73ae658394471a4e2baf17e1c63a71348",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_SHEP-COMMON-LOT.pdf.txt",
+    "text_sha256": "bccfce95467156f9fdf105e95536a8a69b8b2ded1564dbc8b804949863da876e",
+    "characters": 853
+  },
+  {
+    "source": "MISC\\Second State Mail - Invoice for Jeremy.pdf",
+    "source_sha256": "c5194d31749b979fe7368e677dc9ea89053d066d269876c3b6421a9831bb9d05",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_Second_State_Mail_-_Invoice_for_Jeremy.pdf.txt",
+    "text_sha256": "305d260ffdcb02026d420a0951c85ef3d62a0cb4179b2ce3625840ec479d9979",
+    "characters": 3003
+  },
+  {
+    "source": "MISC\\directory_structure.docx",
+    "source_sha256": "c074522c7afac5a023700b6e4b595df8397f36e8d7c4763b580c29ca63480867",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_directory_structure.docx.txt",
+    "text_sha256": "ee7db0fe8a5e81dc846cd46fda512789e84471cb4ca738adb6c08119150ff86e",
+    "characters": 797615
+  },
+  {
+    "source": "MISC\\selected_project_files_export.docx",
+    "source_sha256": "439ef21521bb1519325f9fff186988a10e99c55a44923d199e8da2638a085d9f",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_selected_project_files_export.docx.txt",
+    "text_sha256": "e13faa5d7d157d63812b58f018e2cb46ec0980cad6b5412688c9bd37d26ae146",
+    "characters": 82533
+  },
+  {
+    "source": "MISC\\zella.pdf",
+    "source_sha256": "ac60a7c5a38dcb3a581764651660be991cdae416377a3a2ac09f4bb9c4c86542",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\MISC_zella.pdf.txt",
+    "text_sha256": "78230c41c4ece8d287b7890b67e9d2fa22f1b9e369af734d6d0751c19339ae39",
+    "characters": 104
+  },
+  {
+    "source": "CHASE\\2026-03-31 Chase Checking Statement.pdf",
+    "source_sha256": "db784f50b9edbb375cbc6e9f7d85800b34260a7367c139bdb912092850e9ed93",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CHASE_2026-03-31_Chase_Checking_Statement.pdf.txt",
+    "text_sha256": "aaa956d590a0b0d59e8eeab56b920ff718780f3f45dae835ec7c3182078de105",
+    "characters": 3938
+  },
+  {
+    "source": "CHASE\\2026-04-30 Chase Checking Statement.pdf",
+    "source_sha256": "1c01a7eb182096b814c0ed869831aea93b31b626213f6da32f198eab9dc49a97",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CHASE_2026-04-30_Chase_Checking_Statement.pdf.txt",
+    "text_sha256": "1655991c4b5cabb0bde55d74b823ed3e1ba8ad9cc4dd2ed84ef7c9445367b0d1",
+    "characters": 8908
+  },
+  {
+    "source": "CHASE\\2026-05-29 Chase Checking Statement.pdf",
+    "source_sha256": "921aab85e01e4f012f82174847461d6dffc0f39aa4fd63d74211e29cfec0791f",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\CHASE_2026-05-29_Chase_Checking_Statement.pdf.txt",
+    "text_sha256": "d28fa1eca338f642f29a06017e904363578ea72e526e22a4fc09fc86dfcc4d60",
+    "characters": 6759
+  },
+  {
+    "source": "LLC STUFF\\CP_575_G.pdf",
+    "source_sha256": "3c9e859def473f5cbcd4fc4d25a70ba38c69483bde51279f8698db5638cd16a9",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\LLC_STUFF_CP_575_G.pdf.txt",
+    "text_sha256": "437ef650daf41cbd7f8fb4967a03fd9aa1a3b8f19403cde7cb6e742c0d95757c",
+    "characters": 1991
+  },
+  {
+    "source": "LLC STUFF\\Certificate of Status_1784608645044.pdf",
+    "source_sha256": "347d6eb2d0e010b1620a7b1c633a11d387e1e9789a5538c2eca5620080b775df",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\LLC_STUFF_Certificate_of_Status_1784608645044.pdf.txt",
+    "text_sha256": "227982fb0e5f89eedc3ef26e8bf132c3381df1b7d65390c5855f54cac5d6ab2f",
+    "characters": 1238
+  },
+  {
+    "source": "LLC STUFF\\EIN-DETAILS-2026.pdf",
+    "source_sha256": "08a28974178cc9e972b044421cdf9c6d498a64223f2d3e0f243d4202f0cbde83",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\LLC_STUFF_EIN-DETAILS-2026.pdf.txt",
+    "text_sha256": "987461493511ea0c6095248772fb59bac5165229e3d49adc732b439c8adae23a",
+    "characters": 4663
+  },
+  {
+    "source": "PAYOUTS\\OLIVER-PAYOUT-1-3.png",
+    "source_sha256": "5575893e017deb8f172223765bf136b0514731948fe9a5dc2e9de079ffa0f47d",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PAYOUTS_OLIVER-PAYOUT-1-3.png.txt",
+    "text_sha256": "5fb662261ef64f26832406713365465c7a2e7949a7c78f9b2613a90e014c6abe",
+    "characters": 475
+  },
+  {
+    "source": "PAYOUTS\\OLIVER-PAYOUT-2-3.png",
+    "source_sha256": "aa6423e7017ae5316bee2aabc70b703cdaf405959a905a4408e084da28418144",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PAYOUTS_OLIVER-PAYOUT-2-3.png.txt",
+    "text_sha256": "6a2e73293d32a749dbe44d2aa7aa39d14d352c31f25fd47f10083335c803a5d6",
+    "characters": 454
+  },
+  {
+    "source": "PAYOUTS\\OLIVER-PAYOUT-3-3.png",
+    "source_sha256": "0052d52c9d374cc952bc5103ceb3597f64cb4065a83d7db6ecdf534a3a47d42b",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\PAYOUTS_OLIVER-PAYOUT-3-3.png.txt",
+    "text_sha256": "064328ed337e35b68ddceb5796c718ab14d8db679b439007d1a8cf6dcdfa3609",
+    "characters": 581
+  },
+  {
+    "source": "WON PICS\\FRANCIS-SQUARE-SMA.png",
+    "source_sha256": "0a7210cfee2fa0c3839e754978dfbdd87cac5e8524316c4aefc9ffcffed7d326",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\WON_PICS_FRANCIS-SQUARE-SMA.png.txt",
+    "text_sha256": "80a5cc14b72ca51ed277feee2dca6385c8e4da3b934eba95b100207713e253af",
+    "characters": 1560
+  },
+  {
+    "source": "WON PICS\\NEIMAN-FRANK-DUMOUCHELLES.png",
+    "source_sha256": "59de098e07062f23e3cd5111aad9b07c84e4d80ebb7f6bfe071f7cc2c069567a",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\WON_PICS_NEIMAN-FRANK-DUMOUCHELLES.png.txt",
+    "text_sha256": "a5497b3b3e73b344037fedd5d840a2beedaf9c722e0d74d9782c5262fe92ed0e",
+    "characters": 812
+  },
+  {
+    "source": "WON PICS\\NIETO-GALLO-LARSEN.png",
+    "source_sha256": "ed95ecaa7acf2564090d40004d79dec9e6c05c3122fb0739050cb845fe16b149",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\WON_PICS_NIETO-GALLO-LARSEN.png.txt",
+    "text_sha256": "69b2ddd368d2d98bdcd350a9a3005e6c05202421ce5885da2bdeddbf60fe2ebb",
+    "characters": 789
+  },
+  {
+    "source": "WON PICS\\STELLA-YORK-SMA.png",
+    "source_sha256": "56ced7272f06b8219fb34194a4eddeb3c9d2bcfb7c4c2f1287e9cfd28ce7125e",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\WON_PICS_STELLA-YORK-SMA.png.txt",
+    "text_sha256": "e1fdab9b1af349a2c35b41b5f5750d7757b18921fb0b51965427d02389c61653",
+    "characters": 1614
+  },
+  {
+    "source": "WON PICS\\ZUNIGA-FISH-LARSEN.png",
+    "source_sha256": "012f463e3ffcb679544219ca51c62044e2b5b47ed71627ac6409d61ca7b399ab",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\WON_PICS_ZUNIGA-FISH-LARSEN.png.txt",
+    "text_sha256": "a2ede7edbe84de7d0f5a4a3bf48e57d147c8fa5be9e6fb467116a0a7cc3caee4",
+    "characters": 799
+  },
+  {
+    "source": "WON PICS\\ZUNIGA-JERRY-SMA.png",
+    "source_sha256": "5c4df9ab9f029c3730c3b7bbfd3e29e2f5dd8672012dc3805931c13f7eed6c92",
+    "method": "reread registered extraction after matching original hash",
+    "text_file": "C:\\Users\\WS 7950X\\.codex\\automations\\bookie-worker\\work\\2026-11-03\\docs-audit\\texts\\WON_PICS_ZUNIGA-JERRY-SMA.png.txt",
+    "text_sha256": "41689489e31b7bcb6a41e896e08e46df7ac6e5ba63986a9753912ddc328499a9",
+    "characters": 1157
+  },
+  {
+    "source": "_BOOKKEEPING\\evidence\\Venmo-20261026-4716904576296672570.json",
+    "source_sha256": "6685ffbcc5d1a4c9fd598f69a9fa2d681a7a27a94e2f34a47631e7e108db22cc",
+    "method": "fresh archived evidence JSON read",
+    "characters": 3483
+  }
+]

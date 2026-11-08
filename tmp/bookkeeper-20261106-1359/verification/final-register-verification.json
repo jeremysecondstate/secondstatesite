@@ -1,0 +1,27 @@
+{
+  "checked_utc": "2026-11-06T14:04:31.080Z",
+  "all_match": true,
+  "files": [
+    {
+      "name": "run-summary.json",
+      "drive_id": "1Wzil0zgC1fwaitLZgEuAm37d53PjT1CN",
+      "sha256": "cf5d633776356a3c3e72aaf140f09c993763b7dcca89843926f0c8622283186f",
+      "local_sha256": "cf5d633776356a3c3e72aaf140f09c993763b7dcca89843926f0c8622283186f",
+      "matches": true
+    },
+    {
+      "name": "drive-source-manifest.json",
+      "drive_id": "1TTP7m6ebTD6sS29lBJPgbWQRuDxthmee",
+      "sha256": "d34c28e43c9c9170d8930e692197a454f1af5d448b9ee0648a136e27648af01c",
+      "local_sha256": "d34c28e43c9c9170d8930e692197a454f1af5d448b9ee0648a136e27648af01c",
+      "matches": true
+    },
+    {
+      "name": "source-register.json",
+      "drive_id": "1l_awIj1ELn8lBUGrzpCJtEQWCwyhm9Y3",
+      "sha256": "3b97f647ba10df8355174561f6c1761b777df7bd5038bcdb80714935a6bcd9f5",
+      "local_sha256": "3b97f647ba10df8355174561f6c1761b777df7bd5038bcdb80714935a6bcd9f5",
+      "matches": true
+    }
+  ]
+}

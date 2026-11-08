@@ -1,0 +1,215 @@
+{
+  "fresh_supreme_id_row_count": 188,
+  "unique_supreme_ids": 68,
+  "crosswalk_records": 68,
+  "ids_not_crosswalk": [],
+  "substantive_hidden_sheets": [
+    {
+      "name": "Instructions",
+      "state": "hidden",
+      "row_count": 11,
+      "rows": [
+        {
+          "row": 1,
+          "cells": {
+            "A1": {
+              "value": "How to use this Upgraded Ledger (standalone template):"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A3": {
+              "value": "1) Import this .xlsx into your SUPREME Google Sheet as a new tab (File \u2192 Import \u2192 Upload \u2192 Insert new sheet(s))."
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A5": {
+              "value": "2) In 'WF_Deal_Rollup', add ONE row per sold piece."
+            }
+          }
+        },
+        {
+          "row": 6,
+          "cells": {
+            "A6": {
+              "value": "   Fill the BLUE cells by linking to totals from that deal\u2019s 'WF - [Piece Name]' tab."
+            }
+          }
+        },
+        {
+          "row": 7,
+          "cells": {
+            "A7": {
+              "value": "   Use the 'TOTALS TO PARTNERS' block in each WF tab (like the Celia Inquiring example)."
+            }
+          }
+        },
+        {
+          "row": 8,
+          "cells": {
+            "A8": {
+              "value": "   Net Sale Proceeds should link to the WF tab's 'Must Equal Net Sale Proceeds' (or the net proceeds cell used for that check)."
+            }
+          }
+        },
+        {
+          "row": 10,
+          "cells": {
+            "A10": {
+              "value": "3) The 'Partner_Summary' sheet auto-sums across all deals."
+            }
+          }
+        },
+        {
+          "row": 11,
+          "cells": {
+            "A11": {
+              "value": "   Fill the BLUE 'Company Payouts (cash out)' cells by linking to totals actually paid from your SUPREME 'Company Payouts' tab."
+            }
+          }
+        },
+        {
+          "row": 12,
+          "cells": {
+            "A12": {
+              "value": "   Net Owed = Total Earned \u2212 Company Payouts."
+            }
+          }
+        },
+        {
+          "row": 14,
+          "cells": {
+            "A14": {
+              "value": "System rule:"
+            }
+          }
+        },
+        {
+          "row": 15,
+          "cells": {
+            "A15": {
+              "value": "WF tabs define earnings per deal. This ledger aggregates obligations across deals. Company Payouts records cash movement."
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "queue_status_counts": {
+    "Answered - matching pending": 6,
+    "Resolved": 5,
+    "Open": 9
+  },
+  "queue_open": [
+    {
+      "id": "BW-01",
+      "record": "Chase checking 0076, May 30\u2013November 2, 2026",
+      "amount": "Ledger Chase cash / combined posted-source net $131.80; current native pending $0; Bank Review Clearing credit $14,822.08 includes the separate $2,000 Venmo receipt",
+      "information_needed": "Use CHASE ACTIVITY.xlsm for activity matching and classification. Activity location is answered; do not ask for the activity or repeat the June\u2013October statement upload request. Continue source-to-ledger and remaining documentary matching. Keep the May 29 complete-statement cutoff as an internal reconciliation-coverage limit, not an activity blocker.",
+      "status": "Answered - matching pending"
+    },
+    {
+      "id": "BW-03",
+      "record": "Four historical sales in April 2026 batch",
+      "amount": "$26,568 gross; $25,588 expected net; $23,125 cost basis",
+      "information_needed": "Reconcile SUPREME recorded 2025 sale dates against the user-confirmed ownership at LLC formation in 2026 using sale/settlement evidence. Do not ask the user to reconstruct dates already recorded in SUPREME. Confirm ownership/contribution treatment before any historical financial correction. Celia Reclining edition conflict remains open. Only acquisition-date metadata corrected; historical sales, COGS, basis and ownership entries unchanged.",
+      "status": "Open"
+    },
+    {
+      "id": "BW-04",
+      "record": "Auction receivables and settlements",
+      "amount": "$76,887.87 receivable, including Matisse $11,160",
+      "information_needed": "Match individual earlier auction settlements to payments from the auction house to TBD, remittances from TBD to Oliver on SECONDSTATE's behalf, and the resulting SECONDSTATE receipt records. Establish amounts, dates, fees, foreign exchange and any proceeds awaiting remittance. Keep the separate counterparty identities clear. Retain Matisse receivable $11,160 as unpaid. Make any receivable or cash adjustment only from matched records; no sale is recorded a second time as a settlement.",
+      "status": "Answered - matching pending"
+    },
+    {
+      "id": "BW-05",
+      "record": "Supplier payables and purchase-payment matching",
+      "amount": "$26,219.09 credit balance",
+      "information_needed": "Internal payment matching remains: match SECONDSTATE artwork and software payments to invoices and individual bank/card or other payment records, resolving the $25,237 provisional acquisition offsets, OpenAI $880 and Render $102.09 without duplicate cash postings. Establish exact accounts, dates and allocations before clearing or reclassifying supplier balances. Do not ask again whether these purchases/invoices were paid or who paid them; both facts are confirmed as fully paid by SECONDSTATE.",
+      "status": "Answered - matching pending"
+    },
+    {
+      "id": "BW-06",
+      "record": "Bank classifications still unresolved",
+      "amount": "5 distinct later posted movements",
+      "information_needed": "Match the four confirmed sale-profit remittances totaling $3,000 to earlier seller settlements and exact receivables/allocations. Allocate the $224.95 UPS combined pickup/packing charge using company share and per-artwork evidence. Five existing cash entries remain in clearing; their purposes are documented. Do not repeat answered-purpose questions or repost cash. No user question is pending.",
+      "status": "Open"
+    },
+    {
+      "id": "BW-08",
+      "record": "Alex/Oliver payout and Omar funding interpretation",
+      "amount": "$3,000 sale-profit remittance separately matched to four Chase receipts; $3,500 gross Omar gifts, $3,482.25 transferred to Chase, $17.75 unmatched.",
+      "information_needed": "The Omar funding match is recorded. Use Venmo activity to reconcile the $17.75 if supporting detail becomes available. Separately trace the $3,000 sale-profit remittance to existing settlement records without posting a second sale or cash receipt. Neither payment purpose needs to be asked again.",
+      "status": "Answered - matching pending"
+    },
+    {
+      "id": "BW-09",
+      "record": "Ferri invoice 55793 and platform fee",
+      "amount": "EUR 20,323.56; invoice-date reference conversion USD 23,406.64 at 1.1517; platform fee EUR 277.56 / USD 319.67",
+      "information_needed": "Retain original EUR20,323.56 invoice and separate USD23,406.64 conversion. No currency-conversion fee. Proposed inventory/owner-liability adjustment remains unposted. Match actual funding evidence without repeating ownership, paid status, FX method or lot-allocation questions. Ask only a necessary factual question with a direct evidence hyperlink.",
+      "status": "Answered - matching pending"
+    },
+    {
+      "id": "BW-10",
+      "record": "Inventory shipping, premium and delivery gaps",
+      "amount": "May Clars invoice $7,104 vs $6,993 recorded ($111 under review). June Clars $3,200 excluded from SECONDSTATE books. Previously reviewed new acquisitions $30,761.50; further costs unknown.",
+      "information_needed": "Match remaining freight, delivery, itemized Doyle invoices and confirmed payment routes to their records. Investigate the May Clars $111 difference against internal cost and funding evidence. June Clars lot 7473 is answered and excluded. No factual question is pending.",
+      "status": "Open"
+    },
+    {
+      "id": "BW-13",
+      "record": "Owner-funded and pre-LLC evidence",
+      "amount": "Due to Owner $124,488.31",
+      "information_needed": "Business intent and requested working approach are recorded. Match identifiable pre-LLC inventory, ownership and existing funding entries to support contribution treatment, preserving any specific documented repayment obligation. Do not repeat the abstract contribution-versus-reimbursement choice or broad paid/payer questions. Do not zero the entire Due to Owner balance, infer equity shares, create a new market-value basis or promise a tax benefit from the label. Any remaining question should identify a specific conflicting transaction or agreement.",
+      "status": "Answered - matching pending"
+    },
+    {
+      "id": "BW-14",
+      "record": "Additional screenshots, quotes and infrastructure",
+      "amount": "Render four $6.30 charges = $25.20; Google three $25.20 charges = $75.60; Ivy $49.27 shipping capitalized; Flow PC original invoice costs $30,452.10",
+      "information_needed": "Computer existence, ownership, 2026 first business use and tax-history questions are answered. Continue supported asset calculations and the remaining concrete charge/quote matching from existing evidence. Preserve original invoice dates and costs separately from calculated book amounts. Do not repeat settled questions. Remaining internal asset work is the documented 2026 opening carrying amount and any transfer consideration. Retain contribution as the working approach unless specific repayment records establish otherwise. The $30,452.10 original invoice total is preserved without inventing a transfer value or new cash payment. Software purpose is established under existing policy; complete invoice/card funding and settlement matching without reasking a broad purpose question. Ivy shipping payment and acquisition-cost classification are resolved; delivery and complete statement reconciliation remain separately open.",
+      "status": "Open"
+    },
+    {
+      "id": "BW-15",
+      "record": "Recurring software charges without individual invoices",
+      "amount": "Four existing Render software expenses $82.73; LiveArt and Suno $205.00 matched to invoices and paid receipts.",
+      "information_needed": "Continue locating individual invoices for other recurring charges, especially variable OpenAI amounts. Preserve the existing classifications and exact cash matches. The separate BW-14 infrastructure payment matching remains open.",
+      "status": "Open"
+    },
+    {
+      "id": "BW-16",
+      "record": "Legacy source references and internal management coverage",
+      "amount": "No new journal amount",
+      "information_needed": "The acquisition dates for Marc, Flint and Ernst are verified. Recover remaining unavailable historical raw bank references if found; retain internal management assumptions separately.",
+      "status": "Open"
+    },
+    {
+      "id": "BW-17",
+      "record": "Rauschenberg Dwan Gallery Poster: SS-ART-0007 / SALE-JUN-0001",
+      "amount": "SUPREME gross $750.00 / net $697.50; ledger gross $743.75 / net $691.6875; differences $6.25 / $5.8125",
+      "information_needed": "Find the transaction-specific seller statement or other existing agreement in SECONDSTATE records. Do not substitute public premium assumptions or edit SUPREME. If no supporting document is available, leave the recorded amounts and ask only the concrete missing fact with an evidence hyperlink.",
+      "status": "Open"
+    },
+    {
+      "id": "BW-19",
+      "record": "Simpson invoice 1335-WL219: Lewis APR-SOLD-0007 and Murakami SS-ART-0014",
+      "amount": "Invoice $13,764.00 versus recorded purchase components $13,875.00; $111.00 difference before shipping/restoration",
+      "information_needed": "Reconcile the $111 purchase-price discrepancy and the existing $75 shipping allocation against the $149.34 shared pickup/packing receipt, Lewis-specific $35 repacking correspondence and any separate FedEx charges. Preserve the answered SECONDSTATE payer/paid status. Do not invent another cash entry or treat the shared $149.34 cost as two charges.",
+      "status": "Open"
+    },
+    {
+      "id": "BW-20",
+      "record": "Omar Pena October 26 Venmo payment to @secondstate, transaction 4716904576296672570",
+      "amount": "Gross $2,000 recorded in clearing; net/fee/disposition unknown",
+      "information_needed": "Was Omar\u2019s separate October 26 Venmo payment of $2,000, labeled \u201cPrint service,\u201d another gift to SECONDSTATE or payment for services? Purpose question pending. Subsequently match net settlement, fees, transfers or reversals only from evidence. Do not duplicate the October19/20 gifts, October21 transfer, October22 bank receipt, or this posted gross receipt.",
+      "status": "Open"
+    }
+  ]
+}

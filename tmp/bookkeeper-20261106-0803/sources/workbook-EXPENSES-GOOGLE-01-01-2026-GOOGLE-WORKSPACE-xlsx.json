@@ -1,0 +1,169 @@
+{
+  "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\EXPENSES\\GOOGLE\\01-01-2026 GOOGLE WORKSPACE.xlsx",
+  "sha256": "00b55c8b4ae004331171319b23ae881ed177184fa5032a294049ec76cb0c9380",
+  "read_utc": "2026-11-06T08:05:27.098753+00:00",
+  "sheets": [
+    {
+      "name": "5447733140",
+      "state": "visible",
+      "row_count": 10,
+      "rows": [
+        {
+          "row": 1,
+          "cells": {
+            "A1": {
+              "value": "Bill to"
+            },
+            "B1": {
+              "value": "Second State"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A2": {
+              "value": "Invoice number"
+            },
+            "B2": {
+              "value": "5.44773314E9"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A3": {
+              "value": "Invoice date"
+            },
+            "B3": {
+              "value": "46022.0"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A4": {
+              "value": "Billing ID"
+            },
+            "B4": {
+              "value": "7710-2158-2237"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A5": {
+              "value": "Currency"
+            },
+            "B5": {
+              "value": "USD"
+            }
+          }
+        },
+        {
+          "row": 6,
+          "cells": {
+            "A6": {
+              "value": "Invoice amount"
+            },
+            "B6": {
+              "value": "15.71"
+            }
+          }
+        },
+        {
+          "row": 8,
+          "cells": {
+            "A8": {
+              "value": "Domain name"
+            },
+            "B8": {
+              "value": "Subscription"
+            },
+            "C8": {
+              "value": "Description"
+            },
+            "D8": {
+              "value": "Start date"
+            },
+            "E8": {
+              "value": "End date"
+            },
+            "F8": {
+              "value": "Quantity"
+            },
+            "G8": {
+              "value": "Amount"
+            }
+          }
+        },
+        {
+          "row": 9,
+          "cells": {
+            "A9": {
+              "value": "secondstate.art"
+            },
+            "B9": {
+              "value": "Google Workspace Business Starter"
+            },
+            "C9": {
+              "value": "Usage"
+            },
+            "D9": {
+              "value": "46369.0"
+            },
+            "E9": {
+              "value": "46369.0"
+            },
+            "F9": {
+              "value": "4.0"
+            },
+            "G9": {
+              "value": "1.08"
+            }
+          }
+        },
+        {
+          "row": 10,
+          "cells": {
+            "A10": {
+              "value": "secondstate.art"
+            },
+            "B10": {
+              "value": "Google Workspace Business Starter"
+            },
+            "C10": {
+              "value": "Usage"
+            },
+            "D10": {
+              "value": "46370.0"
+            },
+            "E10": {
+              "value": "46387.0"
+            },
+            "F10": {
+              "value": "3.0"
+            },
+            "G10": {
+              "value": "14.63"
+            }
+          }
+        },
+        {
+          "row": 11,
+          "cells": {
+            "C11": {
+              "value": "Tax (0%)"
+            },
+            "G11": {
+              "value": "0.0"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

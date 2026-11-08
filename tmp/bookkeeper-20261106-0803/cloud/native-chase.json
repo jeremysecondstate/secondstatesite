@@ -1,0 +1,1430 @@
+{
+  "metadata": {
+    "spreadsheetId": "1FNTgROp058-4jX7n9mCBOtBhxzAW9K7RB9HNXk3EJdo",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1FNTgROp058-4jX7n9mCBOtBhxzAW9K7RB9HNXk3EJdo/edit?ouid=114354838731752348361",
+    "properties": {
+      "title": "CHASE ACTIVITY",
+      "locale": "en_US",
+      "timeZone": "Etc/GMT"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 0,
+          "title": "Sheet1",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "frozenRowCount": 1
+          }
+        }
+      }
+    ]
+  },
+  "read": {
+    "range": "Sheet1!A1:H300",
+    "majorDimension": "ROWS",
+    "values": [
+      [
+        "Date",
+        "Description",
+        "Amount",
+        "Currency",
+        "Account",
+        "Transaction ID",
+        "Status",
+        "Category"
+      ],
+      [
+        "2026-08-03",
+        "Ivy Auctions",
+        "403.62",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "jzOXoXezyBfJqoZnQ0b3tgx3ZbZArYuv9Q4b6",
+        "Posted",
+        "shopping_other_shopping"
+      ],
+      [
+        "2026-08-04",
+        "Render Cloud Services",
+        "20.23",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "q6b1x1K6X0H68RokrgjnhpdNKDYvQEf5KN0PaY",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-08-04",
+        "Adobe Subscription",
+        "19.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "BaXyVyLa9BUEKvOeXpkZuXpPDNo4y9URK4bQxK",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-08-04",
+        "Smart & Final",
+        "36.64",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "0wXrDrywaVHDqz1aX8o0Ue0r4B4kVwu93xLDz",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-08-05",
+        "ChatGPT Subscription",
+        "200.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "PYpjbjOYB8Fg9XvmN4R5s5471JnE0kc5zwNDMR",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-08-06",
+        "New Life Psychiatry",
+        "105.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "VYpOQOdY67FwLXeKNMdXup0QMBL0gDCYn6YZL",
+        "Posted",
+        "health_wellness_other_medical"
+      ],
+      [
+        "2026-08-06",
+        "Taco Bell",
+        "10.18",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "OYpQOQ9YqJFD45zX98n5C9PBONrPyaHepXeLX",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-08-07",
+        "Cafe Cultura Contemporary",
+        "15.21",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "7BXmKm5BapIXdv578De8Hg7E49vy0pHYA0QwR",
+        "Posted",
+        "dining_drinks_coffee"
+      ],
+      [
+        "2026-08-10",
+        "McDonald's",
+        "5.29",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "vqbyVyJqaxCqrBEdVNkEiqE57DYkvyS0g69xL",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-08-10",
+        "Taco Bell",
+        "27.61",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "A4X3N3w4aqCDXn7OAZp7fyKJMXY591hnjevr3",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-08-11",
+        "Twilio",
+        "-20.15",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "41XJBJ41bRHDKyxVpOo5UYmMRXqmj9HzVKbrrQ",
+        "Posted",
+        "income_other_income"
+      ],
+      [
+        "2026-08-11",
+        "Venmo",
+        "-520.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "0wXrDrywaVHDqz1aX8o1fb3gnVKoONtvJQkZY",
+        "Posted",
+        "transfers_other_transfer_in"
+      ],
+      [
+        "2026-08-12",
+        "McDonald's",
+        "6.63",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "rLbP4PALgjUL8VZkY4Ebt95qa8k5VEfjQ6m775",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-08-12",
+        "Taco Bell",
+        "25.75",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "jzOXoXezyBfJqoZnQ0bytENVqvaN1MikpdNBBB",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-08-13",
+        "Discord Nitro",
+        "9.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "vqbyVyJqaxCqrBEdVNkbSa736vr7VAcPa93DD8",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-08-13",
+        "Revelry Supply",
+        "25.39",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "A4X3N3w4aqCDXn7OAZpKUQM7z9dMjLsxLvqJJQ",
+        "Posted",
+        "shopping_other_shopping"
+      ],
+      [
+        "2026-08-13",
+        "Express Roses",
+        "75.60",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "0wXrDrywaVHDqz1aX8oQUYnPDOJnm9HBYkNXXD",
+        "Posted",
+        "gifts_donations_gifts"
+      ],
+      [
+        "2026-08-14",
+        "Jamba Juice",
+        "10.29",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "rLbP4PALgjUL8VZkY4E3F9A7BRnPNEHrJ5P1D",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-08-17",
+        "Ivy Auctions",
+        "49.27",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "YYejpjPY1OFDmvqwJ49OhQwQJvP5moUzLNOEM",
+        "Posted",
+        "shopping_other_shopping"
+      ],
+      [
+        "2026-08-19",
+        "Duarte Smoke Shop",
+        "2.75",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "K7YvmvJ7LrC36APN8ZvLsPjZp0DAbPfy6nv67",
+        "Posted",
+        "shopping_tobacco_vape"
+      ],
+      [
+        "2026-08-21",
+        "Sprouts Farmers Market",
+        "20.78",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "rLbP4PALgjUL8VZkY4ELuvOVjO5bX9Uba1RPX",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-08-21",
+        "7-Eleven",
+        "4.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "41XJBJ41bRHDKyxVpOoDiabjgbmQLYFqJd9wp",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-08-22",
+        "Sphinx Mart",
+        "26.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "aYOnmn8YwNFkQvx30XjZH5M06j3ra6U9ePB6Z",
+        "Posted",
+        "shopping_tobacco_vape"
+      ],
+      [
+        "2026-08-22",
+        "7-Eleven",
+        "15.98",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "41XJBJ41bRHDKyxVpOobSa1YpbL7epcJQ093A",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-08-23",
+        "Smart & Final",
+        "14.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "rLbP4PALgjUL8VZkY4EQcvD97OXLK7ta8JRXJ",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-08-25",
+        "24 Hour Fitness",
+        "29.98",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "pwbD4D3wAvHwJEan7RdLSA77dwO3EksOne43y",
+        "Posted",
+        "health_wellness_fitness"
+      ],
+      [
+        "2026-08-25",
+        "7-Eleven",
+        "5.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "nYN6461YvkFE6bDjQVq0s8VVMYJBXrI8JQpB5",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-08-25",
+        "Sprouts Farmers Market",
+        "10.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "QYp5J5EY3ZFp3BaVErbZtPBBAkQJpEtkey4Oj",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-08-26",
+        "7-Eleven",
+        "4.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "ZYOJRJBYPMF1qdgzVrLySLnK3Xy3yKCkROrY1",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-08-26",
+        "Sprouts Farmers Market",
+        "13.79",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "83edkdb3aXCVwvz0r1YQH5JNyPjyjNcvy0Abd",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-08-27",
+        "Sprouts Farmers Market",
+        "12.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "nYN6461YvkFE6bDjQVq5CRKkjk58DxFXRYDzmo",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-08-28",
+        "7-Eleven",
+        "4.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "x3bkwko3O8C375O6rLE1T5Y8VbdXVaFKREBba",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-08-29",
+        "Sprouts Farmers Market",
+        "30.78",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "ZYOJRJBYPMF1qdgzVrLPh6dLe8vVaEUVqxLge",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-08-29",
+        "TradingView",
+        "24.90",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "5PXr3rxPRQtxkQyvXKYnIzeA05r7L1I67KAn3",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-08-30",
+        "Smart & Final",
+        "4.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "x3bkwko3O8C375O6rLEJsmPr6oOKqdCJ5vQbn",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-08-30",
+        "Sprouts Farmers Market",
+        "10.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "JgprJrag6jhJyrvRmk6zH5KoOYk8neIXapv4Z",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-08-30",
+        "7-Eleven",
+        "5.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "83edkdb3aXCVwvz0r1YAhbr54nQOVgUJO9VEN",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-08-31",
+        "Sphinx Mart",
+        "26.50",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "aYOnmn8YwNFkQvx30Xj7TYQj0b49ByU9ve5Ag",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-01",
+        "Sprouts Farmers Market",
+        "12.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "wBbKdKZBAJIBrzOwV6NJsBV7KXg0K6tRZL1an",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-09-01",
+        "Raising Cane's Chicken Fingers",
+        "14.90",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "ZYOJRJBYPMF1qdgzVrL6t0d18pQa1pIVxMEw8",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-09-01",
+        "7-Eleven",
+        "4.91",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "6qXryr8qRnCwn0Kk8QY4sdmRM6bNMjIA6a53Q",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-01",
+        "Render",
+        "21.25",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "5PXr3rxPRQtxkQyvXKYAiXe65QOL6QH6K3R84",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-09-02",
+        "Smart & Final",
+        "4.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "YYejpjPY1OFDmvqwJ49bFLv1rzkKJZHqwXZwV",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-09-02",
+        "Sprouts Farmers Market",
+        "13.79",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "JgprJrag6jhJyrvRmk65hLKQYDqnQDUXpe5db",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-09-02",
+        "7-Eleven",
+        "5.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "83edkdb3aXCVwvz0r1YDtwrqn3pVq3HJ9Pzgx",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-03",
+        "Cafe Cultura Contemporary",
+        "29.42",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "MVpZJZoV1atR95E4ezB0FrN3n3dgmAI05gek9",
+        "Posted",
+        "dining_drinks_coffee"
+      ],
+      [
+        "2026-09-04",
+        "Sphinx Mart",
+        "3.50",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "vqbyVyJqaxCqrBEdVN1eCba1V8r4OJFkzgrb4",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-04",
+        "7-Eleven",
+        "10.15",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "VYpOQOdY67FwLXeKNM5Qh6R0A0KP73HnXJwaL",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-04",
+        "Sprouts Farmers Market",
+        "11.98",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "OYpQOQ9YqJFD45zX98AxU1bPZPn6vYfpVPaNX",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-09-04",
+        "Adobe",
+        "19.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "0wXrDrywaVHDqz1aX8mAhZY7m5JEy1IVoJRzq",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-09-05",
+        "7-Eleven",
+        "5.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "kYOxbxzYK3F8jbZMVR6NCNKAaMy0w5U30EyY5",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-05",
+        "OpenAI ChatGPT",
+        "200.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "A4X3N3w4aqCDXn7OAZmJh0QvjxdmwOFbQjPyy",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-09-06",
+        "OnlyFans",
+        "26.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "K7YvmvJ7LrC36APN8ZL9FxPjN97zOaH1ANqbr",
+        "Posted",
+        "entertainment_other_entertainment"
+      ],
+      [
+        "2026-09-07",
+        "7-Eleven",
+        "5.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "yybX6XgyOZUypndLzDBXfAzZprb15Xh39ab84",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-07",
+        "Cafe Cultura Contemporary",
+        "29.42",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "5PXr3rxPRQtxkQyvXK0Du90jrRVy35T61VYak",
+        "Posted",
+        "dining_drinks_coffee"
+      ],
+      [
+        "2026-09-08",
+        "7-Eleven",
+        "5.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "ZYOJRJBYPMF1qdgzVrvEHBeqv3DRX8tVjv5dA",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-08",
+        "Smart & Final",
+        "14.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "83edkdb3aXCVwvz0r149H64LQyZoPnUJBZqn6",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-09-09",
+        "Sprouts Farmers Market",
+        "12.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "odNL4LqdxACMOQBxry6QTykJbVPm8BibO4Dgm",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-09-09",
+        "24 Hour Fitness",
+        "69.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "gYOz8zRYq1F4dNX7Qy8NfnjePErvKqfKA8yNQ",
+        "Posted",
+        "health_wellness_fitness"
+      ],
+      [
+        "2026-09-09",
+        "7-Eleven",
+        "5.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "bYp9895Y6dFz4wNR0rjwceDV3BZOMqHD9JXRR",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-10",
+        "7-Eleven",
+        "4.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "bYp9895Y6dFz4wNR0rjriLZXMOOZJXHo89gmP",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-11",
+        "7-Eleven",
+        "5.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "MVpZJZoV1atR95E4ezB4tnEREK880NsB1rMYJ",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-11",
+        "Cafe Cultura Contemporary",
+        "29.42",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "6qXryr8qRnCwn0Kk8QjnCqpLEpxy8KcAAmmgY",
+        "Posted",
+        "dining_drinks_coffee"
+      ],
+      [
+        "2026-09-13",
+        "7-Eleven",
+        "5.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "wBbKdKZBAJIBrzOwV6nrcaj9mjJkMDcRRgg0M",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-13",
+        "Sphinx Mart",
+        "27.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "mYNw4wLYAKF5A0PNM8vAHJNKZNn4pVC88QQg3",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-13",
+        "Discord Nitro",
+        "9.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "dYOx9x7YD6FEAaRmzBDAUzXe0Xgn4vHooLLX8",
+        "Posted",
+        "entertainment_video_games"
+      ],
+      [
+        "2026-09-14",
+        "7-Eleven",
+        "4.02",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "zKbXLX9KO5fKrBwD413rFoREpRky81hMMRR0n",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-14",
+        "Sprouts Farmers Market",
+        "9.79",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "YYejpjPY1OFDmvqwJ43mUj7v67ZX1MUzzYYkz",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-09-15",
+        "7-Eleven",
+        "4.91",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "eYOxMxVY1LFR3DJpVKx3FymLEmg3DMf44YYmn",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-15",
+        "Sprouts Farmers Market",
+        "10.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "NOpvJvgOPxh85Q3ENjJ5Fxk1pk4zq6fyyQQeR",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-09-16",
+        "ATM Withdrawal",
+        "41.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "zKbXLX9KO5fKrBwD413vSgZjQLboXDFKn8jX7",
+        "Posted",
+        "transfers_withdrawal"
+      ],
+      [
+        "2026-09-16",
+        "Non-Chase ATM Fee",
+        "3.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "YYejpjPY1OFDmvqwJ438sO80zRQjDVF9q5o8A",
+        "Posted",
+        "financial_atm_fees"
+      ],
+      [
+        "2026-09-17",
+        "Adobe",
+        "23.79",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "zKbXLX9KO5fKrBwD413MI4eXYJDvgzCzdgYvr",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-09-19",
+        "Folliero's Italian Food and Pizza",
+        "27.45",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "YYejpjPY1OFDmvqwJ43OtobDNaV9OnCnw0jJb",
+        "Posted",
+        "dining_drinks_restaurants"
+      ],
+      [
+        "2026-09-21",
+        "Bub and Grandma's Pizza",
+        "6.58",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "BaXyVyLa9BUEKvOeXpLniMdRR3Apy7tvx5AzJ",
+        "Posted",
+        "dining_drinks_restaurants"
+      ],
+      [
+        "2026-09-21",
+        "Donut Friend",
+        "32.75",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "3DXRqRjDQECwynrkXVAKSpmoo09v6DIPed9rm",
+        "Posted",
+        "dining_drinks_other_food_drink"
+      ],
+      [
+        "2026-09-25",
+        "24 Hour Fitness",
+        "24.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "wBbKdKZBAJIBrzOwV6npI1aMeeJLb6sverzXp",
+        "Posted",
+        "health_wellness_fitness"
+      ],
+      [
+        "2026-09-25",
+        "Zelle to Alex",
+        "7,375.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "mYNw4wLYAKF5A0PNM8vRsoJpbbn30mcvmNnY7",
+        "Posted",
+        "transfers_other_transfer_out"
+      ],
+      [
+        "2026-09-25",
+        "Zelle to Alex",
+        "125.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "dYOx9x7YD6FEAaRmzBDpSKz4rrgyJAcQ8D6pv",
+        "Posted",
+        "transfers_other_transfer_out"
+      ],
+      [
+        "2026-09-25",
+        "Venmo",
+        "-5,565.74",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "L9NEJEZ9D4Ujdn5X8DEmikRYrrLeVdiBd8O7k",
+        "Posted",
+        "other_other"
+      ],
+      [
+        "2026-09-25",
+        "7-Eleven",
+        "7.19",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "6qXryr8qRnCwn0Kk8Qjqu7q8BBxDPjHNVYzKB",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-27",
+        "Taco Bell",
+        "23.53",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "odNL4LqdxACMOQBxry6NcYRNNj5xoecrnaBZM",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-09-28",
+        "Roses Express",
+        "76.60",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "odNL4LqdxACMOQBxry6Ys14Oebp1bBuokvnao",
+        "Posted",
+        "gifts_donations_gifts"
+      ],
+      [
+        "2026-09-28",
+        "Sphinx Mart & Tobacco",
+        "27.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "bYp9895Y6dFz4wNR0rj9tR9873zR3qtgdMVAx",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-28",
+        "Zelle to Alex",
+        "100.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "ZYOJRJBYPMF1qdgzVrv9hbqJJEjBA4H8qQRJL",
+        "Posted",
+        "transfers_other_transfer_out"
+      ],
+      [
+        "2026-09-28",
+        "Zelle to Alex",
+        "2,450.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "83edkdb3aXCVwvz0r14qSdLzzgE6DYfYO5yQB",
+        "Posted",
+        "transfers_other_transfer_out"
+      ],
+      [
+        "2026-09-28",
+        "7-Eleven",
+        "7.19",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "5PXr3rxPRQtxkQyvXK0mUkjvv1N9PmIN7LB9Q",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-09-28",
+        "Walmart",
+        "8.44",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "5PXr3rxPRQtxkQyvXK0jH3rBmqw3qZh6dZ7L4",
+        "Posted",
+        "shopping_superstores"
+      ],
+      [
+        "2026-09-29",
+        "TradingView",
+        "24.90",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "ZYOJRJBYPMF1qdgzVrvycXvx49MX9KUV9nqQ8",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-09-29",
+        "OpenAI ChatGPT Subscription",
+        "100.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "83edkdb3aXCVwvz0r14QsPQAYKmPKNtJKwO5x",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-09-30",
+        "Monthly Service Fee",
+        "15.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "mYNw4wLYAKF5A0PNM8vrtdLBb4RNRmHv4BkKD",
+        "Posted",
+        "financial_other_bank_fees"
+      ],
+      [
+        "2026-09-30",
+        "Quince",
+        "27.63",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "dYOx9x7YD6FEAaRmzBDYINLornpXpACQ1KJ7P",
+        "Posted",
+        "shopping_clothing_accessories"
+      ],
+      [
+        "2026-09-30",
+        "ESD Official",
+        "60.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "L9NEJEZ9D4Ujdn5X8DEkhZzddoRELzIB797Pd",
+        "Posted",
+        "other_other"
+      ],
+      [
+        "2026-09-30",
+        "TYR",
+        "198.90",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "6qXryr8qRnCwn0Kk8QjoSN5jjVqex5INKMK9y",
+        "Posted",
+        "shopping_clothing_accessories"
+      ],
+      [
+        "2026-10-01",
+        "Render",
+        "21.25",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "wBbKdKZBAJIBrzOwV6ndH0N66qawJNtvXPXMv",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-02",
+        "7-Eleven",
+        "5.04",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "dYOx9x7YD6FEAaRmzBD0iEDAApzLgDTQpMp1o",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-10-03",
+        "Jack's Submariner",
+        "17.96",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "A4X3N3w4aqCDXn7OAZmMSJE9pz6401Fwk5jNg",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-10-05",
+        "ChatGPT",
+        "200.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "eYOxMxVY1LFR3DJpVKx5FeDP7ZeNkBinbm6x6",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-05",
+        "Adobe",
+        "19.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "YYejpjPY1OFDmvqwJ43LUr1x0zrawmtJqkmea",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-06",
+        "McDonald's",
+        "3.32",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "DJpkYkqJryfXAxrR9ZOvuRqa5qOMbvC0n38z7",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-10-08",
+        "New Life Psychology",
+        "105.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "kYOxbxzYK3F8jbZMVR8rs4KvM9aee6FpNJ1bA",
+        "Posted",
+        "health_wellness_other_medical"
+      ],
+      [
+        "2026-10-08",
+        "Raising Cane's",
+        "14.96",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "K7YvmvJ7LrC36APN8Z3bUkPR9bNVV8UL48Jyq",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-10-11",
+        "Sphinx Mart & Tobacco 1",
+        "23.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "OYpQOQ9YqJFD45zX98Dof1e5ergQqgIpMzjL7",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-10-13",
+        "Discord Nitro",
+        "9.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "vqbyVyJqaxCqrBEdVNqNiLXBmLdkEyIp7MNwx",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-14",
+        "OpenAI ChatGPT Subscription",
+        "200.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "x3bkwko3O8C375O6rL36tm5y5gMoDdHOA0ABr",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-14",
+        "Sprouts Farmers Market",
+        "6.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "A4X3N3w4aqCDXn7OAZDZTo3NnoZ5K1hwBNgmd",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-10-15",
+        "Walmart",
+        "14.15",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "aYOnmn8YwNFkQvx30Xk3UY6d6A7bpyh7ykyRr",
+        "Posted",
+        "shopping_superstores"
+      ],
+      [
+        "2026-10-15",
+        "Zelle Payment from Oliver G. Donson",
+        "-1.03",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "JgprJrag6jhJyrvRmkJRU5pvpJ7Y3esmAZAE3",
+        "Posted",
+        "transfers_other_transfer_in"
+      ],
+      [
+        "2026-10-16",
+        "Adobe",
+        "25.03",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "kYOxbxzYK3F8jbZMVR8YsnaQkP1P6eHbRzLD4",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-16",
+        "Taco Bell",
+        "13.04",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "A4X3N3w4aqCDXn7OAZDgCrj3RqVqYNCw6rRBN",
+        "Posted",
+        "dining_drinks_fast_food"
+      ],
+      [
+        "2026-10-17",
+        "Marugame Udon",
+        "62.42",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "yybX6XgyOZUypndLzDyoFapvQq0qJLsROeEov",
+        "Posted",
+        "dining_drinks_restaurants"
+      ],
+      [
+        "2026-10-17",
+        "Zelle from Oliver G Donson",
+        "-2.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "vqbyVyJqaxCqrBEdVNqPHnVXpPwPYBHpmx57m",
+        "Posted",
+        "transfers_other_transfer_in"
+      ],
+      [
+        "2026-10-17",
+        "OpenAI",
+        "378.09",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "K7YvmvJ7LrC36APN8Z3EUDNYQAoA8VHyQaMve",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-17",
+        "Zelle from Oliver G Donson",
+        "-998.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "0wXrDrywaVHDqz1aX8DvCvmL0qXqKeC9rZ05A",
+        "Posted",
+        "transfers_other_transfer_in"
+      ],
+      [
+        "2026-10-18",
+        "Walmart",
+        "5.17",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "3DXRqRjDQECwynrkXVw4txZP61K13zHPK360X",
+        "Posted",
+        "shopping_superstores"
+      ],
+      [
+        "2026-10-19",
+        "OpenAI",
+        "332.18",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "BaXyVyLa9BUEKvOeXpE1h1wvqjvq3LFv93pvo",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-20",
+        "Walmart",
+        "8.44",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "q6b1x1K6X0H68Rokrg6btZ7w4aw4Mzf1JDY1j",
+        "Posted",
+        "shopping_superstores"
+      ],
+      [
+        "2026-10-22",
+        "Zelle from Oliver G. Donson",
+        "-1,000.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "kYOxbxzYK3F8jbZMVR8XhJ0bd7d4kRC3D1VYE",
+        "Posted",
+        "transfers_other_transfer_in"
+      ],
+      [
+        "2026-10-22",
+        "Venmo",
+        "-3,482.25",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "A4X3N3w4aqCDXn7OAZDRt6m9gMg7RnfbB51yQ",
+        "Posted",
+        "other_other"
+      ],
+      [
+        "2026-10-23",
+        "Sprouts Farmers Market",
+        "9.79",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "pwbD4D3wAvHwJEan7Rw8SkeyxZa9xviA4bod1",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-10-24",
+        "Sphinx Mart & Tobacco",
+        "22.50",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "x3bkwko3O8C375O6rL3qi18VaZMQMLIKNPA1O",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-10-24",
+        "LiveArt API",
+        "125.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "aYOnmn8YwNFkQvx30Xkqs5DZEL787Rs1LNyqZ",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-24",
+        "Zelle Payment to Interway LLC",
+        "97.55",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "JgprJrag6jhJyrvRmkJxsbyrdB7V7ZI7rNAz0",
+        "Posted",
+        "transfers_other_transfer_out"
+      ],
+      [
+        "2026-10-24",
+        "7-Eleven",
+        "12.78",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "83edkdb3aXCVwvz0r1V4iozZ87NYN1TvNqm7v",
+        "Posted",
+        "shopping_convenience_stores"
+      ],
+      [
+        "2026-10-25",
+        "24 Hour Fitness",
+        "24.99",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "rLbP4PALgjUL8VZkY4LnSvMk0nB5BJCwxkKOJ",
+        "Posted",
+        "health_wellness_fitness"
+      ],
+      [
+        "2026-10-25",
+        "Vallarta Supermarkets",
+        "35.71",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "jzOXoXezyBfJqoZnQ0JpsLjaQyDNDgIjyaQqd",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-10-25",
+        "Zelle Payment from Oliver G Donson",
+        "-1,000.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "ZYOJRJBYPMF1qdgzVr1vsRJDmNK4K7UkN5zyV",
+        "Posted",
+        "transfers_other_transfer_in"
+      ],
+      [
+        "2026-10-25",
+        "LiveArt Pro",
+        "50.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "41XJBJ41bRHDKyxVpODvSaOq3v4m4Afnyg1jA",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-25",
+        "Walmart",
+        "8.44",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "0wXrDrywaVHDqz1aX8DmSEpJvR6n6eCv0Rx1m",
+        "Posted",
+        "shopping_superstores"
+      ],
+      [
+        "2026-10-26",
+        "Santa Monica Auctions",
+        "5,524.50",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "vqbyVyJqaxCqrBEdVNq1T4MrnKm7mBU05rYLw",
+        "Posted",
+        "shopping_other_shopping"
+      ],
+      [
+        "2026-10-28",
+        "Sphinx Mart",
+        "23.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "K7YvmvJ7LrC36APN8Z3jSkV10MNjp1hEeJ61Y",
+        "Posted",
+        "shopping_tobacco_vape"
+      ],
+      [
+        "2026-10-29",
+        "TradingView",
+        "24.90",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "yybX6XgyOZUypndLzDyvTNLkmgpZokIpKYvgA",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-29",
+        "Walmart",
+        "16.16",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "3DXRqRjDQECwynrkXVwOcdzVYrZomVHordRAV",
+        "Posted",
+        "shopping_superstores"
+      ],
+      [
+        "2026-10-30",
+        "OpenAI ChatGPT Subscription",
+        "500.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "eYOxMxVY1LFR3DJpVKRwHnMmV7avKLI47Jvnb",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [
+        "2026-10-30",
+        "Monthly Service Fee",
+        "15.00",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "NOpvJvgOPxh85Q3ENj84Uo6kAEQyY1CydJBoy",
+        "Posted",
+        "financial_other_bank_fees"
+      ],
+      [
+        "2026-11-01",
+        "Walmart",
+        "8.44",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "K7YvmvJ7LrC36APN8Z3yhDE4yKmjAXtEZ9zw0",
+        "Posted",
+        "shopping_superstores"
+      ],
+      [
+        "2026-11-02",
+        "Vallarta Supermarkets",
+        "19.98",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "3DXRqRjDQECwynrkXVwJSxgav7Do1qHoe1OyM",
+        "Posted",
+        "groceries_groceries"
+      ],
+      [
+        "2026-11-02",
+        "Render",
+        "21.25",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076",
+        "yybX6XgyOZUypndLzDy1uaERj7OZq9hpLQJZk",
+        "Posted",
+        "services_digital_other_services"
+      ],
+      [],
+      [
+        "",
+        "Current balance",
+        "131.80",
+        "USD",
+        "Chase BUS COMPLETE CHK ••0076"
+      ]
+    ]
+  }
+}

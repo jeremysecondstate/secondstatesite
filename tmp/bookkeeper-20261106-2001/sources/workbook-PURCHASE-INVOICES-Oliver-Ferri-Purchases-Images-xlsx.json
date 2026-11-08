@@ -1,0 +1,764 @@
+{
+  "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\PURCHASE INVOICES\\Oliver Ferri Purchases & Images.xlsx",
+  "sha256": "357487ad8bfbab91aa8c9e391788f2ecf46c60430d6f18534fc652f2fc9815bc",
+  "read_utc": "2026-11-06T20:01:49.818811+00:00",
+  "sheets": [
+    {
+      "name": "Summary",
+      "state": "visible",
+      "row_count": 9,
+      "rows": [
+        {
+          "row": 1,
+          "cells": {
+            "A1": {
+              "value": "Oliver - Auction Purchases"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A3": {
+              "value": "Sale date"
+            },
+            "B3": {
+              "value": "2026-03-27"
+            },
+            "D3": {
+              "value": "Top hammer lots"
+            },
+            "E3": {
+              "value": "Hammer (€)"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A4": {
+              "value": "FX (EUR -> USD)"
+            },
+            "B4": {
+              "value": "1.15"
+            },
+            "D4": {
+              "value": "176 - Olympia (large plate)"
+            },
+            "E4": {
+              "value": "5500"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A5": {
+              "value": "Buyer's premium"
+            },
+            "B5": {
+              "value": "0.3"
+            },
+            "D5": {
+              "value": "194 - The Monkey"
+            },
+            "E5": {
+              "value": "3200"
+            }
+          }
+        },
+        {
+          "row": 6,
+          "cells": {
+            "A6": {
+              "value": "Lots bought"
+            },
+            "B6": {
+              "value": "13"
+            },
+            "D6": {
+              "value": "86 - La Promenade, or The Cypresses"
+            },
+            "E6": {
+              "value": "1400"
+            }
+          }
+        },
+        {
+          "row": 7,
+          "cells": {
+            "A7": {
+              "value": "Total hammer (€)"
+            },
+            "B7": {
+              "value": null,
+              "formula": "SUM(Purchases!J2:J14)"
+            },
+            "D7": {
+              "value": "128 - Dios se lo pague a usted (God gives it back to you)"
+            },
+            "E7": {
+              "value": "1300"
+            }
+          }
+        },
+        {
+          "row": 8,
+          "cells": {
+            "A8": {
+              "value": "Total incl. premium (€)"
+            },
+            "B8": {
+              "value": null,
+              "formula": "SUM(Purchases!L2:L14)"
+            },
+            "D8": {
+              "value": "89 - Arabs of Oran"
+            },
+            "E8": {
+              "value": "1200"
+            }
+          }
+        },
+        {
+          "row": 9,
+          "cells": {
+            "A9": {
+              "value": "Total USD ($)"
+            },
+            "B9": {
+              "value": null,
+              "formula": "SUM(Purchases!M2:M14)"
+            }
+          }
+        },
+        {
+          "row": 10,
+          "cells": {
+            "A10": {
+              "value": "Top hammer lot"
+            },
+            "B10": {
+              "value": null,
+              "formula": "INDEX(Purchases!D2:D14,MATCH(MAX(Purchases!J2:J14),Purchases!J2:J14,0))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Purchases",
+      "state": "visible",
+      "row_count": 14,
+      "rows": [
+        {
+          "row": 1,
+          "cells": {
+            "A1": {
+              "value": "Lot"
+            },
+            "B1": {
+              "value": "Photo"
+            },
+            "C1": {
+              "value": "Artist"
+            },
+            "D1": {
+              "value": "Title"
+            },
+            "E1": {
+              "value": "Date"
+            },
+            "F1": {
+              "value": "Medium"
+            },
+            "G1": {
+              "value": "Catalog details"
+            },
+            "H1": {
+              "value": "Size (cm)"
+            },
+            "I1": {
+              "value": "Estimate (€)"
+            },
+            "J1": {
+              "value": "Hammer (€)"
+            },
+            "K1": {
+              "value": "Premium (€)"
+            },
+            "L1": {
+              "value": "Total (€)"
+            },
+            "M1": {
+              "value": "Total ($)"
+            },
+            "N1": {
+              "value": "Source"
+            }
+          }
+        },
+        {
+          "row": 2,
+          "cells": {
+            "A2": {
+              "value": "38"
+            },
+            "C2": {
+              "value": "Pierre Bonnard"
+            },
+            "D2": {
+              "value": "Portrait of Renoir"
+            },
+            "E2": {
+              "value": "1916"
+            },
+            "F2": {
+              "value": "Original etching"
+            },
+            "G2": {
+              "value": "Very fine proof on Arches vellum printed by Fort for Vollard. Edition of 150 copies. Bouvet 84. Joint: 2 plates illustrating Dingo by Octave Mirbeau; set of 3 plates."
+            },
+            "H2": {
+              "value": "25.8 x 19.8"
+            },
+            "I2": {
+              "value": "€150 - 200"
+            },
+            "J2": {
+              "value": "200"
+            },
+            "K2": {
+              "value": "60"
+            },
+            "L2": {
+              "value": "260"
+            },
+            "M2": {
+              "value": "299"
+            },
+            "N2": {
+              "value": "todays Auction lots 1-100.pdf"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "A3": {
+              "value": "63"
+            },
+            "C3": {
+              "value": "Félix Buhot"
+            },
+            "D3": {
+              "value": "The Crossing"
+            },
+            "E3": {
+              "value": "1879"
+            },
+            "F3": {
+              "value": "Etching, drypoint and roulette"
+            },
+            "G3": {
+              "value": "Superb proof on old laid paper, from the definitive state, printed in bistre, stamped, signed and annotated in pencil by the artist: 'Essai tiré à 35 épreuves'."
+            },
+            "H3": {
+              "value": "-"
+            },
+            "I3": {
+              "value": "€800 - 1,000"
+            },
+            "J3": {
+              "value": "700"
+            },
+            "K3": {
+              "value": "210"
+            },
+            "L3": {
+              "value": "910"
+            },
+            "M3": {
+              "value": "1046.5"
+            },
+            "N3": {
+              "value": "todays Auction lots 1-100.pdf"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A4": {
+              "value": "86"
+            },
+            "C4": {
+              "value": "Henri-Edmond Cross"
+            },
+            "D4": {
+              "value": "La Promenade, or The Cypresses"
+            },
+            "E4": {
+              "value": "1897"
+            },
+            "F4": {
+              "value": "Original color lithograph"
+            },
+            "G4": {
+              "value": "Very fine proof on chine applied to heavyweight vellum, signed and numbered in pencil. All margins. Edition of 100 proofs for the Album d'estampes originales de la Galerie Vollard. Johnson 27. Tiny breaks and yellowing in large margins."
+            },
+            "H4": {
+              "value": "28.5 x 41.0"
+            },
+            "I4": {
+              "value": "€1,000 - 1,200"
+            },
+            "J4": {
+              "value": "1400"
+            },
+            "K4": {
+              "value": "420"
+            },
+            "L4": {
+              "value": "1820"
+            },
+            "M4": {
+              "value": "2093"
+            },
+            "N4": {
+              "value": "todays Auction lots 1-100.pdf"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A5": {
+              "value": "87"
+            },
+            "C5": {
+              "value": "Henri-Edmond Cross"
+            },
+            "D5": {
+              "value": "At the Champs-Elysées"
+            },
+            "E5": {
+              "value": "1898"
+            },
+            "F5": {
+              "value": "Original color lithograph"
+            },
+            "G5": {
+              "value": "Very fine proof on chine applied to japon, stamped and numbered in pencil. Full margins. Very rare proof from the deluxe edition of 75 copies for Pan. A. Clot, Paris. Cate and Hitchings 25."
+            },
+            "H5": {
+              "value": "20.0 x 26.0"
+            },
+            "I5": {
+              "value": "€500 - 600"
+            },
+            "J5": {
+              "value": "500"
+            },
+            "K5": {
+              "value": "150"
+            },
+            "L5": {
+              "value": "650"
+            },
+            "M5": {
+              "value": "747.5"
+            },
+            "N5": {
+              "value": "todays Auction lots 1-100.pdf"
+            }
+          }
+        },
+        {
+          "row": 6,
+          "cells": {
+            "A6": {
+              "value": "89"
+            },
+            "C6": {
+              "value": "Eugène Delacroix"
+            },
+            "D6": {
+              "value": "Arabs of Oran"
+            },
+            "E6": {
+              "value": "1833"
+            },
+            "F6": {
+              "value": "Etching and roulette"
+            },
+            "G6": {
+              "value": "Superb and rare proof, on Hollande laid paper watermarked with the Aquafortists, of the 1st state (of 6), with the title in point, before the letter and the bevels, all margins, numbered with the compositor 22. A rare item. Edition of 50 copies. Delteil 20."
+            },
+            "H6": {
+              "value": "17.4 x 21.4"
+            },
+            "I6": {
+              "value": "€1,200 - 1,500"
+            },
+            "J6": {
+              "value": "1200"
+            },
+            "K6": {
+              "value": "360"
+            },
+            "L6": {
+              "value": "1560"
+            },
+            "M6": {
+              "value": "1794"
+            },
+            "N6": {
+              "value": "todays Auction lots 1-100.pdf"
+            }
+          }
+        },
+        {
+          "row": 7,
+          "cells": {
+            "A7": {
+              "value": "128"
+            },
+            "C7": {
+              "value": "Francisco de Goya"
+            },
+            "D7": {
+              "value": "Dios se lo pague a usted (God gives it back to you)"
+            },
+            "F7": {
+              "value": "Original etching"
+            },
+            "G7": {
+              "value": "Superb proof before the letter, on Hollande, with large margins, from the 1st edition (1867). Only two early proofs are known. Edition of 50 copies in this state. Delteil 24."
+            },
+            "H7": {
+              "value": "14.0 x 18.5"
+            },
+            "I7": {
+              "value": "€600 - 800"
+            },
+            "J7": {
+              "value": "1300"
+            },
+            "K7": {
+              "value": "390"
+            },
+            "L7": {
+              "value": "1690"
+            },
+            "M7": {
+              "value": "1943.5"
+            },
+            "N7": {
+              "value": "todays Auction lots 101-200 .pdf"
+            }
+          }
+        },
+        {
+          "row": 8,
+          "cells": {
+            "A8": {
+              "value": "131"
+            },
+            "C8": {
+              "value": "Francisco de Goya"
+            },
+            "D8": {
+              "value": "Mejor es holgar (Isn't it better to do nothing?). Caprices 73"
+            },
+            "F8": {
+              "value": "Original etching"
+            },
+            "G8": {
+              "value": "Very fine proof on cream vellum printed in bistre, before the copper bevels of the second edition (1850). Delteil 110."
+            },
+            "H8": {
+              "value": "21.3 x 14.9"
+            },
+            "I8": {
+              "value": "€200 - 300"
+            },
+            "J8": {
+              "value": "280"
+            },
+            "K8": {
+              "value": "84"
+            },
+            "L8": {
+              "value": "364"
+            },
+            "M8": {
+              "value": "418.6"
+            },
+            "N8": {
+              "value": "todays Auction lots 101-200 .pdf"
+            }
+          }
+        },
+        {
+          "row": 9,
+          "cells": {
+            "A9": {
+              "value": "168"
+            },
+            "C9": {
+              "value": "Alexandre Lunois"
+            },
+            "D9": {
+              "value": "A bullfight in the countryside"
+            },
+            "F9": {
+              "value": "Original color lithograph"
+            },
+            "G9": {
+              "value": "Plate 8 of the La Corrida series. Very fine proof on chine, signed, with remarks. G. Pellet éditeur. Edition of 100 copies, including 25 with remarks. Joint: Entrée de la quadrille. Small angular tear."
+            },
+            "H9": {
+              "value": "45.0 x 60.0"
+            },
+            "I9": {
+              "value": "-"
+            },
+            "J9": {
+              "value": "100"
+            },
+            "K9": {
+              "value": "30"
+            },
+            "L9": {
+              "value": "130"
+            },
+            "M9": {
+              "value": "149.5"
+            },
+            "N9": {
+              "value": "todays Auction lots 101-200 .pdf"
+            }
+          }
+        },
+        {
+          "row": 10,
+          "cells": {
+            "A10": {
+              "value": "176"
+            },
+            "C10": {
+              "value": "Edouard Manet"
+            },
+            "D10": {
+              "value": "Olympia (large plate)"
+            },
+            "F10": {
+              "value": "Original etching on watermarked Van der Ley laid paper"
+            },
+            "G10": {
+              "value": "A very rare proof - the catalog says two proofs listed - of a very early state, not described by Guérin, with a first signature, the lower square line barely indicated, before numerous works in the background. The proof belonged to Ph. Burty."
+            },
+            "H10": {
+              "value": "-"
+            },
+            "I10": {
+              "value": "€2,000 - 3,000"
+            },
+            "J10": {
+              "value": "5500"
+            },
+            "K10": {
+              "value": "1650"
+            },
+            "L10": {
+              "value": "7150"
+            },
+            "M10": {
+              "value": "8222.5"
+            },
+            "N10": {
+              "value": "todays Auction lots 101-200 .pdf"
+            }
+          }
+        },
+        {
+          "row": 11,
+          "cells": {
+            "A11": {
+              "value": "180"
+            },
+            "C11": {
+              "value": "Jean-François Millet"
+            },
+            "D11": {
+              "value": "La Précaution maternelle"
+            },
+            "E11": {
+              "value": "1862"
+            },
+            "F11": {
+              "value": "Original glass plate"
+            },
+            "G11": {
+              "value": "Very fine trial proof, stamped and annotated by the editor on verso. Rare Sagot edition of 150 copies. Delteil 27."
+            },
+            "H11": {
+              "value": "28.6 x 22.4"
+            },
+            "I11": {
+              "value": "€800 - 1,000"
+            },
+            "J11": {
+              "value": "600"
+            },
+            "K11": {
+              "value": "180"
+            },
+            "L11": {
+              "value": "780"
+            },
+            "M11": {
+              "value": "897"
+            },
+            "N11": {
+              "value": "todays Auction lots 101-200 .pdf"
+            }
+          }
+        },
+        {
+          "row": 12,
+          "cells": {
+            "A12": {
+              "value": "191"
+            },
+            "C12": {
+              "value": "Bernard Naudin"
+            },
+            "D12": {
+              "value": "Le Concerto (set of 3)"
+            },
+            "E12": {
+              "value": "1924"
+            },
+            "F12": {
+              "value": "Original drawing with companion prints"
+            },
+            "G12": {
+              "value": "Original drawing, Indian ink wash with ochre highlights, signed and dated lower left. Joint: Le Guitariste à la roulotte. 1932. Original etching, signed; and Ferrer, state proof before signature and engraved title. Set of 3 pieces."
+            },
+            "H12": {
+              "value": "40.0 x 26.0"
+            },
+            "I12": {
+              "value": "€150 - 200"
+            },
+            "J12": {
+              "value": "120"
+            },
+            "K12": {
+              "value": "36"
+            },
+            "L12": {
+              "value": "156"
+            },
+            "M12": {
+              "value": "179.4"
+            },
+            "N12": {
+              "value": "todays Auction lots 101-200 .pdf"
+            }
+          }
+        },
+        {
+          "row": 13,
+          "cells": {
+            "A13": {
+              "value": "194"
+            },
+            "C13": {
+              "value": "Pablo Picasso"
+            },
+            "D13": {
+              "value": "The Monkey"
+            },
+            "E13": {
+              "value": "1936"
+            },
+            "F13": {
+              "value": "Original etching, aquatint and drypoint"
+            },
+            "G13": {
+              "value": "Plate 12 for Picasso / Eaux-fortes originales / pour des textes de / Buffon, Paris, Fabiani, 1942. Very fine and rare proof on Montval vellum signed in red pencil by the artist (approximately thirty proofs). Total edition of 226 proofs. Bloch 339; Baer 586; Cramer 37."
+            },
+            "H13": {
+              "value": "41.8 x 31.8"
+            },
+            "I13": {
+              "value": "€1,500 - 2,000"
+            },
+            "J13": {
+              "value": "3200"
+            },
+            "K13": {
+              "value": "960"
+            },
+            "L13": {
+              "value": "4160"
+            },
+            "M13": {
+              "value": "4784"
+            },
+            "N13": {
+              "value": "todays Auction lots 101-200 .pdf"
+            }
+          }
+        },
+        {
+          "row": 14,
+          "cells": {
+            "A14": {
+              "value": "243"
+            },
+            "C14": {
+              "value": "Félix Vallotton"
+            },
+            "D14": {
+              "value": "Les Raseurs"
+            },
+            "E14": {
+              "value": "1893"
+            },
+            "F14": {
+              "value": "Original lithograph"
+            },
+            "G14": {
+              "value": "Very fine proof on cream vellum, numbered and signed in blue pencil. Edition of 100 proofs for L'Escarmouche. Goerg-Vallotton 42."
+            },
+            "H14": {
+              "value": "36.0 x 26.0"
+            },
+            "I14": {
+              "value": "-"
+            },
+            "J14": {
+              "value": "320"
+            },
+            "K14": {
+              "value": "96"
+            },
+            "L14": {
+              "value": "416"
+            },
+            "M14": {
+              "value": "478.4"
+            },
+            "N14": {
+              "value": "User-supplied lot text (not in uploaded sale PDFs)"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

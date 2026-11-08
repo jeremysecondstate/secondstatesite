@@ -1,0 +1,50 @@
+{
+  "checked_utc": "2026-11-06T08:05:50.278028+00:00",
+  "engine": "Microsoft Excel 16.0",
+  "source_sha256": "45410605a93bf61fd948f0c128adadcf108a331d5157bc9515d824fbf27855b9",
+  "macros_disabled": true,
+  "links_updated": false,
+  "save_called": false,
+  "formula_differences": [],
+  "formula_errors": [],
+  "read_only": true,
+  "file_format": 52.0,
+  "full_rebuild_completed": true,
+  "reports": {
+    "Dashboard": {
+      "B6": 131.79999999999563,
+      "B7": 110705.6109770115,
+      "B8": 76887.86750000001,
+      "B9": 124488.31,
+      "B10": 81211.35,
+      "B11": 52390.0,
+      "B13": 24442.2125,
+      "B14": 8762.877500000004,
+      "B18": 0.0
+    },
+    "Trial Balance": {
+      "E26": 0.0
+    },
+    "Financial Statements": {
+      "D16": 4383.74,
+      "B17": 8762.877500000004,
+      "B20": 131.79999999999563,
+      "B21": 76887.86750000001,
+      "B22": 110705.6109770115,
+      "B24": 2017.75,
+      "B25": 189743.0284770115,
+      "B27": 26219.09,
+      "B28": 124488.31,
+      "B30": 14822.079999999944,
+      "B37": 0.0
+    }
+  },
+  "reopened_read_only": true,
+  "reopened_check": {
+    "trial_balance": 0.0,
+    "balance_sheet": 0.0
+  },
+  "source_unchanged": true,
+  "copy_unchanged": true,
+  "status": "PASS"
+}

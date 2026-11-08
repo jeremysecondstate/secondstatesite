@@ -1,0 +1,75 @@
+{
+  "verified_utc": "2026-11-06T14:02:01.908130+00:00",
+  "directories_including_root": 161,
+  "source_subfolders": 160,
+  "source_files_including_virtual": 235,
+  "binary_hash_checks": {
+    "unchanged": 233
+  },
+  "new_files": [],
+  "removed_files": [],
+  "virtual_pointer_errors_redirect_to_drive": [
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\PURCHASE INVOICES\\prompt-to-make-analytics-forecasting-moreprecise.gdoc",
+      "error": "[Errno 22] Invalid argument"
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\MISC\\old_SUPREME.gsheet",
+      "error": "[Errno 22] Invalid argument"
+    }
+  ],
+  "registered_extractions_reread": 146,
+  "fresh_pdf_extractions": 15,
+  "prior_visual_reviews_reused": 1,
+  "total_document_reviews": 163,
+  "extraction_errors": [],
+  "workbooks_reread": 9,
+  "sheet_count": 55,
+  "hidden_sheets": [
+    [
+      "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\MISC\\old_SUPREME EXCEL.xlsx",
+      "Instructions",
+      11
+    ]
+  ],
+  "workbook_annotation_parts_read": 1,
+  "supreme_sheets": 13,
+  "supreme_artwork_observations": 188,
+  "unique_supreme_ids": 68,
+  "crosswalk_records": 68,
+  "ids_not_crosswalk": [],
+  "scope": "Read-only mapped-drive source check; virtual native files and remote inventory belong to parent review. Canonical ledger and registers untouched.",
+  "completed_utc": "2026-11-06T14:02:51.077129+00:00",
+  "previous_review_reference": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\_BOOKKEEPING\\runs\\2026-11-06-0803-source-and-ledger-review\\sources",
+  "source_versions_unchanged": 233,
+  "all_nine_workbooks_content_unchanged": true,
+  "all_163_document_extractions_match_previous_source_and_text": true,
+  "fresh_image_visual_reviews": 0,
+  "visual_review_method": "No new or changed financial image and no newly unclear financial field. Prior source-hash-matched visual conclusions retained, including IHOP archive and scanned UPS invoice.",
+  "ancillary_nontransaction_assets": 60,
+  "registered_evidence_archives": 2,
+  "queue_status_counts": {
+    "Answered - matching pending": 6,
+    "Resolved": 5,
+    "Open": 9
+  },
+  "remaining_unmatched_bank_movements": 5,
+  "pending_question_id": "BW-20",
+  "financial_delta": "No new or changed source activity, acquisition or sale; no newly supported accounting entry or monetary correction. SUPREME source figures unchanged.",
+  "preserved_unresolved_items": [
+    "Omar October 26 gross USD2000 payment memo Print service is already posted to clearing; earlier gifts do not classify it. BW-20 remains unanswered.",
+    "Four Oliver sale-profit remittances total USD3000; purposes are settled, exact earlier settlement/receivable allocations unresolved.",
+    "UPS USD224.95 combined pickup/packing includes company lots4168/4197/4198 and excluded7473; company share/allocation not established.",
+    "May Clars invoice USD7104 versus recorded acquisition USD6993 is a separate USD111 discrepancy from Simpson invoice USD13764 versus recorded USD13875.",
+    "Ferri original EUR20323.56 and separate USD23406.64 conversion preserved; held proposal is not a posted event.",
+    "Complete statement coverage ends May29; later activity cutoff November2 retains an unknown complete-statement reconciliation difference.",
+    "Ownership/funding, equipment opening-basis and prior sales dates require transaction-specific evidence; no new facts in current unchanged sources."
+  ],
+  "policy": "Current source hash equality and exact workbook/extraction content equality support reuse of prior transaction reviews. No financial rate, private term, cash posting, allocation or tax treatment was inferred.",
+  "final_source_hash_recheck": {
+    "checked_utc": "2026-11-06T14:02:51.077129+00:00",
+    "files": 233,
+    "all_unchanged": true
+  },
+  "canonical_files_changed": []
+}

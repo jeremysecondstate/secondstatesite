@@ -1,0 +1,378 @@
+{
+  "spreadsheetId": "1nwF75Hmunp4bXLKbDFhbRbknwrHHLWlECoS0RYBFtuM",
+  "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1nwF75Hmunp4bXLKbDFhbRbknwrHHLWlECoS0RYBFtuM/edit?ouid=114354838731752348361",
+  "properties": {
+    "title": "old_SUPREME",
+    "locale": "en_US",
+    "timeZone": "America/Los_Angeles"
+  },
+  "sheets": [
+    {
+      "properties": {
+        "sheetId": 2121678177,
+        "title": "Contributions",
+        "index": 0,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 1013,
+          "columnCount": 25,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 425696641,
+        "title": "Inventory for April 2026",
+        "index": 1,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 60,
+          "columnCount": 31,
+          "frozenRowCount": 4,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 416542517,
+        "title": "April Sales Inv. Percentage Share",
+        "index": 2,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1005,
+          "columnCount": 26
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 314159268,
+        "title": "Partner Summary APRIL",
+        "index": 3,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "frozenRowCount": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 314159266,
+        "title": "WF Deal Rollup APRIL",
+        "index": 4,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "frozenRowCount": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 573316784,
+        "title": "Inventory for June 2026",
+        "index": 5,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 76,
+          "columnCount": 31,
+          "frozenRowCount": 4,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 2095941531,
+        "title": "June Sales Inv. Percentage Share",
+        "index": 6,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1005,
+          "columnCount": 26
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 678677002,
+        "title": "Inventory for July 2026",
+        "index": 7,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 74,
+          "columnCount": 31,
+          "frozenRowCount": 4,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 2022515801,
+        "title": "July 2026 Sales Inv. Percentage Share",
+        "index": 8,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1005,
+          "columnCount": 26
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 105677059,
+        "title": "Inventory for Fall 2026",
+        "index": 9,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 73,
+          "columnCount": 31,
+          "frozenRowCount": 4,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 1862123338,
+        "title": "Fall 2026 Sales Inv. Percentage Share",
+        "index": 10,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 1005,
+          "columnCount": 26
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 1588507437,
+        "title": "WF - Celia Inquiring",
+        "index": 11,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1001,
+          "columnCount": 26,
+          "frozenRowCount": 8,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 156038805,
+        "title": "WF - Circus Night",
+        "index": 12,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1001,
+          "columnCount": 26,
+          "frozenRowCount": 8,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 1275946955,
+        "title": "Waterfall Deal",
+        "index": 13,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1001,
+          "columnCount": 26,
+          "frozenRowCount": 8,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 2127390994,
+        "title": "WF - Celia Reclining",
+        "index": 14,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1001,
+          "columnCount": 26,
+          "frozenRowCount": 8,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 1665569318,
+        "title": "WF - Celia Looks",
+        "index": 15,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1001,
+          "columnCount": 26,
+          "frozenRowCount": 8,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 2024926761,
+        "title": "WF - Grans Rupestres VII",
+        "index": 16,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1001,
+          "columnCount": 26,
+          "frozenRowCount": 8,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 387523543,
+        "title": "WF Deal Rollup",
+        "index": 17,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "frozenRowCount": 2,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 1804472461,
+        "title": "Instructions",
+        "index": 18,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 314159267,
+        "title": "Waterfall Deal v2",
+        "index": 19,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1001,
+          "columnCount": 26
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 314159269,
+        "title": "Company Payouts v2",
+        "index": 20,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 887003860,
+        "title": "Company Payouts",
+        "index": 21,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "frozenRowCount": 4,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 908437416,
+        "title": "Partner Summary",
+        "index": 22,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "frozenRowCount": 3,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 314159270,
+        "title": "WF - Circus Night v2",
+        "index": 23,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 314159271,
+        "title": "Sold Inventory Archive",
+        "index": 24,
+        "sheetType": "GRID",
+        "hidden": true,
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26
+        }
+      }
+    }
+  ]
+}

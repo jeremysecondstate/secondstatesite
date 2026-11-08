@@ -1,0 +1,232 @@
+{
+  "checked_utc": "2026-11-06T14:03:58.429575+00:00",
+  "status": "PASS",
+  "record_sha256": {
+    "source-register.json": "3b97f647ba10df8355174561f6c1761b777df7bd5038bcdb80714935a6bcd9f5",
+    "drive-source-manifest.json": "d34c28e43c9c9170d8930e692197a454f1af5d448b9ee0648a136e27648af01c",
+    "run-summary.json": "cf5d633776356a3c3e72aaf140f09c993763b7dcca89843926f0c8622283186f"
+  },
+  "errors": [],
+  "checks": [
+    {
+      "check": "Eight canonical baseline records included",
+      "passed": true
+    },
+    {
+      "check": "Baseline unchanged: chase-source-matches.csv",
+      "passed": true
+    },
+    {
+      "check": "Baseline unchanged: drive-source-manifest.json",
+      "passed": true
+    },
+    {
+      "check": "Baseline unchanged: review-queue.csv",
+      "passed": true
+    },
+    {
+      "check": "Baseline unchanged: source-register.json",
+      "passed": true
+    },
+    {
+      "check": "Baseline unchanged: transaction-review.csv",
+      "passed": true
+    },
+    {
+      "check": "Baseline unchanged: artwork-crosswalk.csv",
+      "passed": true
+    },
+    {
+      "check": "Baseline unchanged: transaction-matches.csv",
+      "passed": true
+    },
+    {
+      "check": "Baseline unchanged: run-summary.json",
+      "passed": true
+    },
+    {
+      "check": "Only the three authorized review records are staged",
+      "passed": true
+    },
+    {
+      "check": "Metadata-only changes: source-register.json",
+      "passed": true
+    },
+    {
+      "check": "Metadata-only changes: drive-source-manifest.json",
+      "passed": true
+    },
+    {
+      "check": "Metadata-only changes: run-summary.json",
+      "passed": true
+    },
+    {
+      "check": "Every source review timestamp matches this run",
+      "passed": true
+    },
+    {
+      "check": "Present local verification timestamps match this run",
+      "passed": true
+    },
+    {
+      "check": "Every manifest verification timestamp matches this run",
+      "passed": true
+    },
+    {
+      "check": "Every source points to the current run evidence",
+      "passed": true
+    },
+    {
+      "check": "Backup directory belongs to the current run",
+      "passed": true
+    },
+    {
+      "check": "Scheduled audit directory and timestamp match this run",
+      "passed": true
+    },
+    {
+      "check": "236 source identities retained",
+      "passed": true
+    },
+    {
+      "check": "396 manifest identities retained",
+      "passed": true
+    },
+    {
+      "check": "Current cloud/native/match/source audits pass",
+      "passed": true
+    },
+    {
+      "check": "Local source versions all unchanged",
+      "passed": true
+    },
+    {
+      "check": "Cloud 235 source files plus direct native Chase covered",
+      "passed": true
+    },
+    {
+      "check": "Equipment facts additionally reviewed without transaction discovery",
+      "passed": true
+    },
+    {
+      "check": "Current summary source coverage agrees",
+      "passed": true
+    },
+    {
+      "check": "Current summary journal counts agree",
+      "passed": true
+    },
+    {
+      "check": "Current accounting audit has no introduced errors",
+      "passed": true
+    },
+    {
+      "check": "Latest native validation is the exact fresh report",
+      "passed": true
+    },
+    {
+      "check": "Current bank observation counts agree",
+      "passed": true
+    },
+    {
+      "check": "Queue counts and remaining matching counts agree",
+      "passed": true
+    },
+    {
+      "check": "Existing sole pending question preserved and not reasked",
+      "passed": true
+    },
+    {
+      "check": "Cash summary agrees with native recalculation",
+      "passed": true
+    },
+    {
+      "check": "Current clearing balances agree",
+      "passed": true
+    },
+    {
+      "check": "Summary accurately records no workbook or financial mutation",
+      "passed": true
+    },
+    {
+      "check": "Current date and run directory set",
+      "passed": true
+    },
+    {
+      "check": "Previous run reference advances correctly",
+      "passed": true
+    },
+    {
+      "check": "Staged review timestamp is current",
+      "passed": true
+    },
+    {
+      "check": "Canonical ledger unchanged and agrees with all audits",
+      "passed": true
+    },
+    {
+      "check": "Final baseline recheck: chase-source-matches.csv",
+      "passed": true
+    },
+    {
+      "check": "Final baseline recheck: drive-source-manifest.json",
+      "passed": true
+    },
+    {
+      "check": "Final baseline recheck: review-queue.csv",
+      "passed": true
+    },
+    {
+      "check": "Final baseline recheck: source-register.json",
+      "passed": true
+    },
+    {
+      "check": "Final baseline recheck: transaction-review.csv",
+      "passed": true
+    },
+    {
+      "check": "Final baseline recheck: artwork-crosswalk.csv",
+      "passed": true
+    },
+    {
+      "check": "Final baseline recheck: transaction-matches.csv",
+      "passed": true
+    },
+    {
+      "check": "Final baseline recheck: run-summary.json",
+      "passed": true
+    }
+  ],
+  "changed_leaf_counts": {
+    "source-register.json": {
+      "last_cloud_verified_utc": 236,
+      "last_full_review_utc": 236,
+      "last_local_verified_utc": 236,
+      "last_verified_utc": 236,
+      "latest_run_verification": 236,
+      "cloud_sync_verification/checked_utc": 1
+    },
+    "drive-source-manifest.json": {
+      "last_cloud_verified_utc": 396,
+      "availability_observation/checked_utc": 1
+    },
+    "run-summary.json": {
+      "/completed_utc": 1,
+      "/latest_native_validation/checked_utc": 1,
+      "/latest_scheduled_audit/completed_utc": 1,
+      "/latest_scheduled_audit/run_directory": 1,
+      "/ledger_cloud_sync_verification/checked_utc": 1,
+      "/native_pointer_availability/checked_utc": 1,
+      "/previous_full_review_run": 1,
+      "/record_backup_directory": 1,
+      "/run_directory": 1
+    }
+  },
+  "financial_or_queue_or_source_identity_changes": false,
+  "canonical_writes_performed": false,
+  "notes": [
+    "Historical raw provenance and settled decisions are unchanged.",
+    "Only review timestamps, review descriptions, and current/prior run paths changed.",
+    "Dated backups and publication remain parent-controlled final steps; no canonical record was written by this audit."
+  ]
+}

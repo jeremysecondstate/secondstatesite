@@ -1,0 +1,60 @@
+{
+  "checked_utc": "2026-11-06T14:02:00.645852+00:00",
+  "prior_checkpoint_comparison": {
+    "changed_fields": [],
+    "financial_workbook_byte_identical": true,
+    "links_change_note": "Compared directly to last completed 2026-11-06 08:12 UTC run. All referenced Drive identities and local hyperlink targets remain registered/present."
+  },
+  "source_union": {
+    "observations": 276,
+    "posted": 271,
+    "superseded_pending": 5,
+    "mapping_counts": {
+      "statement_aggregate_detail": 48,
+      "existing_cash_match": 211,
+      "new_cash_posting": 12,
+      "superseded_pending_match": 5
+    },
+    "posted_net": "131.80",
+    "individual_posted_cash_refs": 223,
+    "aggregate_reconciliation": {
+      "JE-BANK-2026-03": {
+        "detail_sum": "1.00",
+        "journal_net": "1.0",
+        "difference": "0.00"
+      },
+      "JE-BANK-2026-04": {
+        "detail_sum": "10177.28",
+        "journal_net": "10177.28",
+        "difference": "0.00"
+      },
+      "JE-BANK-2026-05": {
+        "detail_sum": "674.76",
+        "journal_net": "674.76",
+        "difference": "0.00"
+      }
+    },
+    "sign_convention": "Source positive = cash outflow; negative = cash inflow. Each register cash_change is the negated source amount."
+  },
+  "transaction_matches": 231,
+  "crosswalk": {
+    "rows": 68,
+    "unique_supreme_ids": 68,
+    "unique_ledger_ids": 67,
+    "missing_ledger_ids": [],
+    "unmapped_ledger_ids": [
+      "SS-ART-0039"
+    ],
+    "established_exception": "68SUPREME IDs map to67ledger IDs because two Miro aliases share SS-ART-0006. Supported ledger-only Benton SS-ART-0039 has no invented SUPREME ID."
+  },
+  "evidence_links": {
+    "direct_or_formula_targets": 797,
+    "unique_targets": 324,
+    "drive_ids_absent_from_registers": [],
+    "missing_local_hyperlink_targets": []
+  },
+  "errors": [],
+  "canonical_unchanged": true,
+  "note": "Any historical source SHA in matching registers remains historical provenance. Current ledger hash and all audited balances/structure equal the prior checkpoint. No financial journal is warranted by unchanged evidence. Separate October 26 Venmo purpose remains unresolved; gross and cash must not be reposted.",
+  "status": "PASS"
+}

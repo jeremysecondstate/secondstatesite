@@ -1,0 +1,354 @@
+{
+  "directories": 161,
+  "files": 233,
+  "statuses": {
+    "unchanged": 233,
+    "changed": 0,
+    "new": 0
+  },
+  "errors": [
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\PURCHASE INVOICES\\prompt-to-make-analytics-forecasting-moreprecise.gdoc",
+      "error": "[Errno 22] Invalid argument"
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\MISC\\old_SUPREME.gsheet",
+      "error": "[Errno 22] Invalid argument"
+    }
+  ],
+  "changed_new": [],
+  "register_count": 236
+}
+{
+  "workbooks": [
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\CHASE ACTIVITY.xlsm",
+      "dump": "workbook-CHASE-ACTIVITY-xlsm.json",
+      "sheets": [
+        {
+          "name": "Sheet1",
+          "state": "visible",
+          "row_count": 276
+        }
+      ]
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\SUPREME.xlsm",
+      "dump": "workbook-SUPREME-xlsm.json",
+      "sheets": [
+        {
+          "name": "Contributions",
+          "state": "visible",
+          "row_count": 47
+        },
+        {
+          "name": "Fall Inventory",
+          "state": "visible",
+          "row_count": 210
+        },
+        {
+          "name": "Fall Sales",
+          "state": "visible",
+          "row_count": 109
+        },
+        {
+          "name": "Next Sales",
+          "state": "visible",
+          "row_count": 109
+        },
+        {
+          "name": "Capital Log",
+          "state": "visible",
+          "row_count": 211
+        },
+        {
+          "name": "Payouts",
+          "state": "visible",
+          "row_count": 20
+        },
+        {
+          "name": "April Inventory",
+          "state": "visible",
+          "row_count": 210
+        },
+        {
+          "name": "April Sales",
+          "state": "visible",
+          "row_count": 109
+        },
+        {
+          "name": "June Inventory",
+          "state": "visible",
+          "row_count": 211
+        },
+        {
+          "name": "June Sales",
+          "state": "visible",
+          "row_count": 109
+        },
+        {
+          "name": "July Inventory",
+          "state": "visible",
+          "row_count": 210
+        },
+        {
+          "name": "July Sales",
+          "state": "visible",
+          "row_count": 109
+        },
+        {
+          "name": "Dimensions",
+          "state": "visible",
+          "row_count": 20
+        }
+      ]
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\Second State Books \u2014 General Ledger.xlsm",
+      "dump": "workbook-Second-State-Books-General-Ledger-xlsm.json",
+      "sheets": [
+        {
+          "name": "Dashboard",
+          "state": "visible",
+          "row_count": 16
+        },
+        {
+          "name": "Chart of Accounts",
+          "state": "visible",
+          "row_count": 24
+        },
+        {
+          "name": "Journal Entries",
+          "state": "visible",
+          "row_count": 1030
+        },
+        {
+          "name": "Inventory Cost Basis",
+          "state": "visible",
+          "row_count": 69
+        },
+        {
+          "name": "Sales & COGS",
+          "state": "visible",
+          "row_count": 16
+        },
+        {
+          "name": "Document Links",
+          "state": "visible",
+          "row_count": 208
+        },
+        {
+          "name": "Read Me",
+          "state": "visible",
+          "row_count": 9
+        },
+        {
+          "name": "Due to Owner",
+          "state": "visible",
+          "row_count": 25
+        },
+        {
+          "name": "Owner Equity",
+          "state": "visible",
+          "row_count": 7
+        },
+        {
+          "name": "Receipts Index",
+          "state": "visible",
+          "row_count": 103
+        },
+        {
+          "name": "Monthly Reconciliation",
+          "state": "visible",
+          "row_count": 10
+        },
+        {
+          "name": "Trial Balance",
+          "state": "visible",
+          "row_count": 26
+        },
+        {
+          "name": "Financial Statements",
+          "state": "visible",
+          "row_count": 37
+        },
+        {
+          "name": "Journal Templates",
+          "state": "visible",
+          "row_count": 12
+        },
+        {
+          "name": "Bank Transactions",
+          "state": "visible",
+          "row_count": 320
+        },
+        {
+          "name": "Owner Time & Research",
+          "state": "visible",
+          "row_count": 56
+        },
+        {
+          "name": "Mgmt Cost Basis",
+          "state": "visible",
+          "row_count": 56
+        },
+        {
+          "name": "Pre-LLC Contributions",
+          "state": "visible",
+          "row_count": 7
+        },
+        {
+          "name": "SUPREME Spending Review",
+          "state": "visible",
+          "row_count": 39
+        },
+        {
+          "name": "Chase Activity Raw",
+          "state": "visible",
+          "row_count": 283
+        }
+      ]
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\EXPENSES\\GOOGLE\\01-01-2026 GOOGLE WORKSPACE.xlsx",
+      "dump": "workbook-EXPENSES-GOOGLE-01-01-2026-GOOGLE-WORKSPACE-xlsx.json",
+      "sheets": [
+        {
+          "name": "5447733140",
+          "state": "visible",
+          "row_count": 10
+        }
+      ]
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\PURCHASE INVOICES\\Oliver Ferri Purchases & Images.xlsx",
+      "dump": "workbook-PURCHASE-INVOICES-Oliver-Ferri-Purchases-Images-xlsx.json",
+      "sheets": [
+        {
+          "name": "Summary",
+          "state": "visible",
+          "row_count": 9
+        },
+        {
+          "name": "Purchases",
+          "state": "visible",
+          "row_count": 14
+        }
+      ]
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\EXTRA NOTES\\INVENTORY TOTAL.xlsx",
+      "dump": "workbook-EXTRA-NOTES-INVENTORY-TOTAL-xlsx.json",
+      "sheets": [
+        {
+          "name": "Sheet1",
+          "state": "visible",
+          "row_count": 70
+        }
+      ]
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\MISC\\New Inventory April 3rd 2026 - Second State Gallery.xlsx",
+      "dump": "workbook-MISC-New-Inventory-April-3rd-2026-Second-State-Gallery-xlsx.json",
+      "sheets": [
+        {
+          "name": "Full Inv",
+          "state": "visible",
+          "row_count": 79
+        },
+        {
+          "name": "Sheet1",
+          "state": "visible",
+          "row_count": 0
+        },
+        {
+          "name": "2nd St. Holdings",
+          "state": "visible",
+          "row_count": 36
+        }
+      ]
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\MISC\\Oliver Current Print Inventory - Cataloging Program.xlsx",
+      "dump": "workbook-MISC-Oliver-Current-Print-Inventory-Cataloging-Program-xlsx.json",
+      "sheets": [
+        {
+          "name": "Sheet1",
+          "state": "visible",
+          "row_count": 72
+        }
+      ]
+    },
+    {
+      "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\MISC\\old_SUPREME EXCEL.xlsx",
+      "dump": "workbook-MISC-old-SUPREME-EXCEL-xlsx.json",
+      "sheets": [
+        {
+          "name": "Second State Inv.",
+          "state": "visible",
+          "row_count": 37
+        },
+        {
+          "name": "Sales",
+          "state": "visible",
+          "row_count": 11
+        },
+        {
+          "name": "Contributions",
+          "state": "visible",
+          "row_count": 9
+        },
+        {
+          "name": "Waterfall Deal",
+          "state": "visible",
+          "row_count": 67
+        },
+        {
+          "name": "WF - Celia Inquiring",
+          "state": "visible",
+          "row_count": 67
+        },
+        {
+          "name": "WF - Celia Reclining",
+          "state": "visible",
+          "row_count": 67
+        },
+        {
+          "name": "WF - Celia Looks",
+          "state": "visible",
+          "row_count": 67
+        },
+        {
+          "name": "WF - Grans Rupestres VII",
+          "state": "visible",
+          "row_count": 67
+        },
+        {
+          "name": "WF Deal Rollup",
+          "state": "visible",
+          "row_count": 62
+        },
+        {
+          "name": "Partner Summary",
+          "state": "visible",
+          "row_count": 6
+        },
+        {
+          "name": "Instructions",
+          "state": "hidden",
+          "row_count": 11
+        },
+        {
+          "name": "Company Payouts",
+          "state": "visible",
+          "row_count": 15
+        },
+        {
+          "name": "Capital Ledger",
+          "state": "visible",
+          "row_count": 3
+        }
+      ]
+    }
+  ]
+}

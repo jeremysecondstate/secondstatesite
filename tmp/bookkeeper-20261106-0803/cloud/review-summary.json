@@ -1,0 +1,17 @@
+{
+  "checked_utc": "2026-11-06T08:08:27.853626+00:00",
+  "status": "PASS",
+  "source_identities_listed": 395,
+  "source_files_listed": 235,
+  "source_directories_including_root": 161,
+  "additional_equipment_register_reviewed": true,
+  "new_source_files": [],
+  "changed_source_files": [],
+  "native_old_supreme_all_25_tabs_exactly_unchanged": true,
+  "native_old_supreme_hidden_tabs": 22,
+  "planning_document_text_exactly_unchanged": true,
+  "native_chase_directly_read": true,
+  "native_chase_listing_absence_persists": true,
+  "ledger_cloud_sha256": "45410605a93bf61fd948f0c128adadcf108a331d5157bc9515d824fbf27855b9",
+  "queue_cloud_matches": true
+}

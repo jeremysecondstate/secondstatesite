@@ -1,0 +1,10 @@
+{
+  "source-register.json": "4906733235c72db64e8491d24a61da56aabe336276b973cb817f7de241a42896",
+  "drive-source-manifest.json": "c4241fa8ee46b8577055c446862e1498724d51c7b6eb2f63eee30eabf890c71f",
+  "run-summary.json": "defb305ab6f0b1baacbf1a8cf4d91c0cd0b50147945e68b3b5a8ea7a44129046",
+  "review-queue.csv": "f656df2cf134814afc2888adbc0ec4df32a0c83061d98d0843ac117d02df006e",
+  "artwork-crosswalk.csv": "ab4571fa9e4673bcacb72bef493a8e931aba05fe9a8ef8bc9adc8694c9a90101",
+  "transaction-matches.csv": "852230ca0ab2400bcf8040df8b410225e518492e332fd34d7fd82762b17a0513",
+  "chase-source-matches.csv": "832b24d493f0de1058fa076808cbf571e6960f5a676a3596c22b721d95f1ad86",
+  "transaction-review.csv": "6ab991b8b3013800ef88f43f1efa29080d5eb41b736950f117761e9492af018b"
+}

@@ -1,0 +1,4238 @@
+{
+  "path": "J:\\Shared drives\\SECONDSTATE\\THE BOOKS\\EXTRA NOTES\\INVENTORY TOTAL.xlsx",
+  "sha256": "d602311777e206d51dc8d7bbf155bf0c1d19897cf487b903bb14444d6b6224de",
+  "read_utc": "2026-11-06T14:01:03.730309+00:00",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "state": "visible",
+      "row_count": 70,
+      "rows": [
+        {
+          "row": 1,
+          "cells": {
+            "A1": {
+              "value": "Oliver Donson - Current Print Inventory - September 27th, 2025"
+            }
+          }
+        },
+        {
+          "row": 3,
+          "cells": {
+            "H3": {
+              "value": "Print Size (in)"
+            },
+            "Q3": {
+              "value": "Sale Estimate"
+            }
+          }
+        },
+        {
+          "row": 4,
+          "cells": {
+            "A4": {
+              "value": "#"
+            },
+            "B4": {
+              "value": "Images"
+            },
+            "C4": {
+              "value": "Catalog Number"
+            },
+            "D4": {
+              "value": "Artist"
+            },
+            "E4": {
+              "value": "Title"
+            },
+            "F4": {
+              "value": "Year"
+            },
+            "G4": {
+              "value": "Medium"
+            },
+            "H4": {
+              "value": "Height"
+            },
+            "I4": {
+              "value": "Width"
+            },
+            "J4": {
+              "value": "Hammer Price ($)"
+            },
+            "K4": {
+              "value": "($, €, £, etc.)"
+            },
+            "L4": {
+              "value": "w/ Premium ($)"
+            },
+            "M4": {
+              "value": "Paid by Oliver?"
+            },
+            "N4": {
+              "value": "Purchase Date"
+            },
+            "O4": {
+              "value": "Purchased from"
+            },
+            "P4": {
+              "value": "Description/Notes"
+            },
+            "Q4": {
+              "value": "Low"
+            },
+            "R4": {
+              "value": "High"
+            },
+            "S4": {
+              "value": "Possible Sale @"
+            },
+            "T4": {
+              "value": "Status"
+            },
+            "U4": {
+              "value": "Location"
+            },
+            "V4": {
+              "value": "Paid by Oliver?"
+            },
+            "W4": {
+              "value": "Owed to TBD"
+            },
+            "X4": {
+              "value": "$ Paid by Oliver"
+            },
+            "Y4": {
+              "value": "DETAILS/LISTING INFO"
+            }
+          }
+        },
+        {
+          "row": 5,
+          "cells": {
+            "A5": {
+              "value": "1.0"
+            },
+            "C5": {
+              "value": "Wember 372"
+            },
+            "D5": {
+              "value": "Grasset, Eugene"
+            },
+            "E5": {
+              "value": "Jeanne-D'arc / Sarah Bernhardt"
+            },
+            "F5": {
+              "value": "1894.0"
+            },
+            "G5": {
+              "value": "Lithograph"
+            },
+            "H5": {
+              "value": "S 45 1/2"
+            },
+            "I5": {
+              "value": "29.0"
+            },
+            "J5": {
+              "value": "0.0"
+            },
+            "L5": {
+              "value": "0.0"
+            },
+            "M5": {
+              "value": "GIFT"
+            },
+            "N5": {
+              "value": "43466.0"
+            },
+            "O5": {
+              "value": "?"
+            },
+            "P5": {
+              "value": "Framed"
+            },
+            "Q5": {
+              "value": "1500.0"
+            },
+            "R5": {
+              "value": "3000.0"
+            },
+            "T5": {
+              "value": "Inventory"
+            },
+            "U5": {
+              "value": "Skillmania"
+            },
+            "V5": {
+              "value": "GIFT"
+            },
+            "W5": {
+              "value": "0",
+              "formula": "IF(V5=\"NO\",L5,0)"
+            },
+            "X5": {
+              "value": "0",
+              "formula": "IF(V5=\"YES\",L5,0)"
+            },
+            "Y5": {
+              "value": "Eugène Grasset was a leading figure in the French Art Nouveau poster movement, admired for his dazzling, multi-colored lithographs that combined striking palettes with a sharp, dramatic presence. This 1894 work features Sarah Bernhardt, the most celebrated actress of her era, whose magnetic stage presence and daring choices — from playing tragic heroines like Phèdre and Marguerite Gautier to taking on Hamlet in French — made her a legend. Beyond the stage, she toured internationally, ran her own Paris theater, and even continued performing after the amputation of her leg, cementing her reputation as an unstoppable force of art and willpower.\n\nAlthough Bernhardt never actually played Joan of Arc, the decision to depict her as the saintly heroine was a deliberate act of myth-making. By aligning her with Joan — a national symbol of courage and purity — Grasset’s lithograph reinforced her image as larger than life. Bernhardt moved in the highest artistic circles, admired by Victor Hugo, painted by Gustave Doré, and befriended by writers and painters who saw her as a muse. The combination of her legendary persona and Grasset’s innovative artistry makes this piece not only visually captivating, but also a fascinating snapshot of fin-de-siècle France — a true standout in any collection of Art Nouveau poster art."
+            }
+          }
+        },
+        {
+          "row": 6,
+          "cells": {
+            "A6": {
+              "value": "2.0"
+            },
+            "C6": {
+              "value": "Koschatzky 47"
+            },
+            "D6": {
+              "value": "Hundertwasser, Friedensreich"
+            },
+            "E6": {
+              "value": "Exodus into Space (plate 4)"
+            },
+            "F6": {
+              "value": "1971-1972"
+            },
+            "G6": {
+              "value": "Screenprint in colors with metal imprints"
+            },
+            "H6": {
+              "value": "S 19 1/2"
+            },
+            "I6": {
+              "value": "26.5"
+            },
+            "J6": {
+              "value": "0.0"
+            },
+            "L6": {
+              "value": "0.0"
+            },
+            "M6": {
+              "value": "GIFT"
+            },
+            "N6": {
+              "value": "43466.0"
+            },
+            "O6": {
+              "value": "?"
+            },
+            "P6": {
+              "value": "Framed singned in ink edition of 300"
+            },
+            "Q6": {
+              "value": "3000.0"
+            },
+            "R6": {
+              "value": "5000.0"
+            },
+            "T6": {
+              "value": "Inventory"
+            },
+            "U6": {
+              "value": "Skillmania"
+            },
+            "V6": {
+              "value": "GIFT"
+            },
+            "W6": {
+              "value": "0",
+              "formula": null
+            },
+            "X6": {
+              "value": "0",
+              "formula": null
+            },
+            "Y6": {
+              "value": "\"Exodus into Space (plate 4)\" (1971–72) is a screenprint by the Austrian artist Friedensreich Hundertwasser, a visionary painter, architect, and environmental activist. The work reflects Hundertwasser’s fascination with humanity’s place in the cosmos, created during the height of the Space Race, when artists worldwide were responding to humankind’s exploration beyond Earth. True to his style, it combines vibrant colors, organic forms, and metallic embossing—elements that emphasize his rejection of straight lines and industrial rigidity. Produced in a limited edition of 300, this piece highlights Hundertwasser’s commitment to merging art with philosophy, ecology, and utopian ideas of a harmonious future. \n\nHundertwasser prints regularly draw attention due to their multitude of colors and imaginitve design elements. A self declared naturist Hundertwasser (Austrian) believed art and design should follow the truth of the natural world and shouldn't feature human ideals in the forms of right angles or straight lines. In essence his art is a call to meld with the natural world and in turn evokes a certain psychadelic feel. A pioneer of these types of visionary styles he is vastly over looked outside of Europe where he designed countless buildings and public works and is a household name. His prints are among the most extravigent to exist in the fine art market, many featuring more than 20 layers of printing and  they consistently elicit the curiosity of any art enthusiast. The Regntag (Rainy Day) is perhaps his most famous suite of works, 10 in total, bearing the namesake of his sea vessel. There is a short art film produced by the artist that bears the name as well."
+            }
+          }
+        },
+        {
+          "row": 7,
+          "cells": {
+            "A7": {
+              "value": "3.0"
+            },
+            "D7": {
+              "value": "Indiana, Robert"
+            },
+            "E7": {
+              "value": "New York State Theatre / Lincoln Center"
+            },
+            "F7": {
+              "value": "1964.0"
+            },
+            "G7": {
+              "value": "Color lithographic poster on wove paper"
+            },
+            "H7": {
+              "value": "46.0"
+            },
+            "I7": {
+              "value": "30.0"
+            },
+            "J7": {
+              "value": "150",
+              "formula": "L7*0.8"
+            },
+            "L7": {
+              "value": "187.5"
+            },
+            "M7": {
+              "value": "YES"
+            },
+            "N7": {
+              "value": "43768.0"
+            },
+            "O7": {
+              "value": "Freemans Auctions (Philidelphia)"
+            },
+            "P7": {
+              "value": "From the edition of approximately 500 (there was also a limited edition of 144), published by Lincoln Center for the Performing Arts, New York to dedicate the opening of the New York State Theater, April 23, 1964."
+            },
+            "Q7": {
+              "value": "200.0"
+            },
+            "R7": {
+              "value": "500.0"
+            },
+            "S7": {
+              "value": "Doyle/Heritage"
+            },
+            "T7": {
+              "value": "Inventory"
+            },
+            "U7": {
+              "value": "Coat Closet NYC or Moms Office"
+            },
+            "V7": {
+              "value": "YES",
+              "formula": "M7"
+            },
+            "W7": {
+              "value": "0",
+              "formula": null
+            },
+            "X7": {
+              "value": "187.5",
+              "formula": null
+            },
+            "Y7": {
+              "value": "Robert Indiana’s “New York State Theatre / Lincoln Center” poster (1964) was created to celebrate the dedication of the New York State Theater at Lincoln Center on April 23, 1964, designed by architect Philip Johnson. Indiana, best known for his bold typographic “LOVE” works, brought his Pop Art sensibility to cultural institutions at a moment when New York was cementing its role as a global center for both modern art and performance. This poster was published in an edition of about 500, alongside a smaller limited edition of 144, making it relatively accessible compared to his fine art prints. It stands as a vivid example of how Indiana merged graphic design with high art, elevating posters to collectible objects that bridged art, theater, and public life in 1960s New York."
+            }
+          }
+        },
+        {
+          "row": 8,
+          "cells": {
+            "A8": {
+              "value": "4.0"
+            },
+            "D8": {
+              "value": "Christo & Jeanne Claude"
+            },
+            "E8": {
+              "value": "Wrapped Monument to Vittorio Emanuele (Poster)"
+            },
+            "F8": {
+              "value": "1975.0"
+            },
+            "G8": {
+              "value": "Offset lithographic poster with printed text on wove "
+            },
+            "H8": {
+              "value": "28.0"
+            },
+            "I8": {
+              "value": "22.0"
+            },
+            "J8": {
+              "value": "150",
+              "formula": null
+            },
+            "L8": {
+              "value": "187.5"
+            },
+            "M8": {
+              "value": "YES"
+            },
+            "N8": {
+              "value": "43769.0"
+            },
+            "O8": {
+              "value": "Freemans Auctions (Philidelphia)"
+            },
+            "P8": {
+              "value": "Pencil signed, for the exhibition \"Christo\" at Galeria Ciento, Barcelona, October - November, 1975. Offset lithographic poster with printed text on wove paper."
+            },
+            "Q8": {
+              "value": "200.0"
+            },
+            "R8": {
+              "value": "600.0"
+            },
+            "S8": {
+              "value": "Doyle/Heritage"
+            },
+            "T8": {
+              "value": "Consigned"
+            },
+            "U8": {
+              "value": "With Heritage"
+            },
+            "V8": {
+              "value": "YES",
+              "formula": null
+            },
+            "W8": {
+              "value": "0",
+              "formula": null
+            },
+            "X8": {
+              "value": "187.5",
+              "formula": null
+            },
+            "Y8": {
+              "value": "Christo and Jeanne-Claude’s Wrapped Monument to Vittorio Emanuele belongs to their broader practice of “wrapping” monuments, buildings, and landscapes to provoke new ways of seeing familiar forms. Created in 1975 as an exhibition poster for Galeria Ciento in Barcelona, it reflects their early European projects before their monumental wrappings in Paris and Berlin. The act of covering a statue of Vittorio Emanuele II—Italy’s first king—invited reflection on national memory, power, and the shifting meaning of public monuments. Today, such works are considered precursors to later large-scale interventions, like the wrapping of the Pont Neuf in Paris (1985) and the Reichstag in Berlin (1995)."
+            }
+          }
+        },
+        {
+          "row": 9,
+          "cells": {
+            "A9": {
+              "value": "5.0"
+            },
+            "D9": {
+              "value": "Blake, Peter"
+            },
+            "E9": {
+              "value": "Demonstrations in a Department Store I"
+            },
+            "F9": {
+              "value": "1998.0"
+            },
+            "G9": {
+              "value": "Screenprint in colors on Somerset paper"
+            },
+            "H9": {
+              "value": "27.25"
+            },
+            "I9": {
+              "value": "33.125"
+            },
+            "J9": {
+              "value": "275.0"
+            },
+            "L9": {
+              "value": "360.0"
+            },
+            "M9": {
+              "value": "YES"
+            },
+            "N9": {
+              "value": "43866.0"
+            },
+            "O9": {
+              "value": "Heritage Auctions"
+            },
+            "P9": {
+              "value": "Ed. 16/70 - Signed and numbered in pencil along lower edge - Published by Gresham Studio, Cambridge, UK"
+            },
+            "Q9": {
+              "value": "600.0"
+            },
+            "R9": {
+              "value": "1200.0"
+            },
+            "S9": {
+              "value": "Forum"
+            },
+            "T9": {
+              "value": "inventory"
+            },
+            "U9": {
+              "value": "Skillmania"
+            },
+            "V9": {
+              "value": "YES",
+              "formula": null
+            },
+            "W9": {
+              "value": "0",
+              "formula": null
+            },
+            "X9": {
+              "value": "360",
+              "formula": null
+            },
+            "Y9": {
+              "value": "Peter Blake, often called the “Godfather of Pop Art,” is best known for co-creating the iconic album cover for The Beatles’ Sgt. Pepper’s Lonely Hearts Club Band in 1967. By the late 1990s, when Demonstrations in a Department Store I was created, Blake was revisiting themes of consumerism and mass culture that had defined his earlier Pop Art career. This screenprint reflects his interest in everyday objects and commercial spaces, echoing his fascination with how consumer goods shape modern identity. Published by Gresham Studio in Cambridge, UK, the edition highlights Blake’s enduring role in bridging fine art and popular culture into the 21st century."
+            }
+          }
+        },
+        {
+          "row": 10,
+          "cells": {
+            "A10": {
+              "value": "6.0"
+            },
+            "C10": {
+              "value": "D'Oench 134"
+            },
+            "D10": {
+              "value": "Dine, Jim"
+            },
+            "E10": {
+              "value": "Jerusalem Plant #4"
+            },
+            "F10": {
+              "value": "1982.0"
+            },
+            "G10": {
+              "value": "Lithograph with hand painting"
+            },
+            "H10": {
+              "value": "35.75"
+            },
+            "I10": {
+              "value": "25.75"
+            },
+            "J10": {
+              "value": "2200.0"
+            },
+            "L10": {
+              "value": "2750",
+              "formula": "2200*1.25"
+            },
+            "M10": {
+              "value": "No"
+            },
+            "N10": {
+              "value": "44007.0"
+            },
+            "O10": {
+              "value": "Swann Auction Galleries"
+            },
+            "P10": {
+              "value": "Ed. PP 3 / 3  - J. Green English paper. Printed and published by ULAE, West Islip, with the blind stamp lower left\nCondition: A very good impression of this large lithograph with strong colors "
+            },
+            "Q10": {
+              "value": "2700.0"
+            },
+            "R10": {
+              "value": "4200.0"
+            },
+            "S10": {
+              "value": "Bonhams/Forum"
+            },
+            "T10": {
+              "value": "Inventory"
+            },
+            "U10": {
+              "value": "NYC - Moms Office"
+            },
+            "V10": {
+              "value": "No",
+              "formula": null
+            },
+            "W10": {
+              "value": "2750",
+              "formula": null
+            },
+            "X10": {
+              "value": "0",
+              "formula": null
+            },
+            "Y10": {
+              "value": "Jim Dine’s Jerusalem Plant #4 (1982) is part of his broader exploration of plants and botanical imagery, a theme that often carried symbolic weight in his work. Dine was a central figure in the Pop Art movement, but unlike many of his contemporaries, he infused personal and emotional meaning into his imagery, frequently revisiting motifs such as hearts, tools, and plants. This print was created at Universal Limited Art Editions (ULAE), a prestigious American print workshop that collaborated with leading modern artists like Jasper Johns and Robert Rauschenberg. The use of hand-painting on top of lithography reflects Dine’s interest in blending unique painterly gestures with reproducible printmaking, giving each impression a distinct quality."
+            }
+          }
+        },
+        {
+          "row": 11,
+          "cells": {
+            "A11": {
+              "value": "7.0"
+            },
+            "C11": {
+              "value": "Koschatzky 56"
+            },
+            "D11": {
+              "value": "Hundertwasser, Friedensreich"
+            },
+            "E11": {
+              "value": "Hommage a Schroder-Sonnenstein"
+            },
+            "F11": {
+              "value": "1972.0"
+            },
+            "G11": {
+              "value": "Screenprint in colors with metal imprints"
+            },
+            "H11": {
+              "value": "35.0"
+            },
+            "I11": {
+              "value": "23.625"
+            },
+            "J11": {
+              "value": "800.0"
+            },
+            "L11": {
+              "value": "1000.0"
+            },
+            "M11": {
+              "value": "YES"
+            },
+            "N11": {
+              "value": "44007.0"
+            },
+            "O11": {
+              "value": "Swann Auction Galleries"
+            },
+            "P11": {
+              "value": "Stamp signature - Screenprint in colors, with metal imprints, an electrostatic application of felt fibrils/heavy cream wove paper. Printed by Dietz Offizin, Lengmoos. Published by Ars Viva, Zurich "
+            },
+            "Q11": {
+              "value": "600.0"
+            },
+            "R11": {
+              "value": "1800.0"
+            },
+            "S11": {
+              "value": "Hold for sale"
+            },
+            "T11": {
+              "value": "Inventory"
+            },
+            "U11": {
+              "value": "Skillmania"
+            },
+            "V11": {
+              "value": "YES",
+              "formula": null
+            },
+            "W11": {
+              "value": "0",
+              "formula": null
+            },
+            "X11": {
+              "value": "1000",
+              "formula": null
+            },
+            "Y11": {
+              "value": "Friedensreich Hundertwasser was an Austrian artist and architect known for his vibrant, organic forms and rejection of straight lines, which he called “the devil’s tools.” This 1972 screenprint, Hommage à Schröder-Sonnenstern, pays tribute to the eccentric German outsider artist Friedrich Schröder-Sonnenstern, celebrated for his fantastical and surreal imagery. Produced by the respected Dietz Offizin workshop and published by Ars Viva in Zurich, the work exemplifies Hundertwasser’s experiments with unconventional materials, incorporating metal imprints and electrostatic felt fibrils. His prints from this period reflect his philosophy of merging art, nature, and individuality, breaking away from rigid modernist traditions."
+            }
+          }
+        },
+        {
+          "row": 12,
+          "cells": {
+            "A12": {
+              "value": "8.0"
+            },
+            "C12": {
+              "value": "Brown 434"
+            },
+            "D12": {
+              "value": "Brown, Bolton"
+            },
+            "E12": {
+              "value": "Three Bathers"
+            },
+            "F12": {
+              "value": "1922/1923"
+            },
+            "G12": {
+              "value": "Lithograph"
+            },
+            "H12": {
+              "value": "11.625"
+            },
+            "I12": {
+              "value": "16.5"
+            },
+            "J12": {
+              "value": "180.0"
+            },
+            "L12": {
+              "value": "212.4",
+              "formula": "J12*1.18"
+            },
+            "M12": {
+              "value": "YES"
+            },
+            "N12": {
+              "value": "44019.0"
+            },
+            "O12": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P12": {
+              "value": "Very good condition"
+            },
+            "Q12": {
+              "value": "200.0"
+            },
+            "R12": {
+              "value": "500.0"
+            },
+            "S12": {
+              "value": "Heritage/Doyle"
+            },
+            "T12": {
+              "value": "Inventory"
+            },
+            "U12": {
+              "value": "Oliver Drawer NYC"
+            },
+            "V12": {
+              "value": "YES",
+              "formula": null
+            },
+            "W12": {
+              "value": "0",
+              "formula": null
+            },
+            "X12": {
+              "value": "212.4",
+              "formula": null
+            },
+            "Y12": {
+              "value": "Three Bathers (1922–1923) is a lithograph by George Wesley Bellows, an American artist associated with the Ashcan School, known for capturing raw and energetic scenes of early 20th-century life. Bellows frequently explored the human figure, and his bathers series reflected his fascination with the body in motion, often set in natural landscapes. Lithography was a medium he particularly enjoyed, as it allowed for expressive lines and tonal contrasts that suited his vigorous style. This work came near the end of his career—Bellows died unexpectedly in 1925 at only 42, making pieces from this period especially significant in his oeuvre."
+            }
+          }
+        },
+        {
+          "row": 13,
+          "cells": {
+            "A13": {
+              "value": "9.0"
+            },
+            "C13": {
+              "value": "Smith I-62"
+            },
+            "D13": {
+              "value": "Ganso, Emil"
+            },
+            "E13": {
+              "value": "Hilda"
+            },
+            "F13": {
+              "value": "1930.0"
+            },
+            "G13": {
+              "value": "Etching and Drypoint"
+            },
+            "H13": {
+              "value": "6.25"
+            },
+            "I13": {
+              "value": "7.0"
+            },
+            "J13": {
+              "value": "250.0"
+            },
+            "L13": {
+              "value": "295",
+              "formula": null
+            },
+            "M13": {
+              "value": "YES"
+            },
+            "N13": {
+              "value": "44019.0"
+            },
+            "O13": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P13": {
+              "value": "signed and numbered 34/35 in pencil, very good condition"
+            },
+            "Q13": {
+              "value": "400.0"
+            },
+            "R13": {
+              "value": "1000.0"
+            },
+            "S13": {
+              "value": "Heritage"
+            },
+            "T13": {
+              "value": "Inventory"
+            },
+            "U13": {
+              "value": "Oliver Drawer NYC"
+            },
+            "V13": {
+              "value": "YES",
+              "formula": null
+            },
+            "W13": {
+              "value": "0",
+              "formula": null
+            },
+            "X13": {
+              "value": "295",
+              "formula": null
+            },
+            "Y13": {
+              "value": "Emil Ganso (1895–1941) was a German-born American artist known for his masterful etchings, drypoints, and woodcuts, often focusing on intimate nudes and still lifes. He immigrated to the U.S. in 1912, working as a baker before fully dedicating himself to art. By the 1930s, Ganso had gained national recognition, with his work included in exhibitions at institutions like the Whitney Museum and the Art Institute of Chicago. His prints, such as Hilda (1930), demonstrate his skill in combining delicacy of line with bold tonal contrasts, hallmarks of the American printmaking renaissance during that era."
+            }
+          }
+        },
+        {
+          "row": 14,
+          "cells": {
+            "A14": {
+              "value": "10.0"
+            },
+            "C14": {
+              "value": "Smith I-163"
+            },
+            "D14": {
+              "value": "Ganso, Emil"
+            },
+            "E14": {
+              "value": "Sunbath"
+            },
+            "F14": {
+              "value": "1936.0"
+            },
+            "G14": {
+              "value": "Etching and Aquatint"
+            },
+            "H14": {
+              "value": "8.875"
+            },
+            "I14": {
+              "value": "14.875"
+            },
+            "J14": {
+              "value": "100.0"
+            },
+            "L14": {
+              "value": "118",
+              "formula": null
+            },
+            "M14": {
+              "value": "YES"
+            },
+            "N14": {
+              "value": "44019.0"
+            },
+            "O14": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P14": {
+              "value": "published by AAG in an edition of around 200, with original presentation folder, very good condition"
+            },
+            "Q14": {
+              "value": "400.0"
+            },
+            "R14": {
+              "value": "1000.0"
+            },
+            "S14": {
+              "value": "Heritage"
+            },
+            "T14": {
+              "value": "Inventory"
+            },
+            "U14": {
+              "value": "Skillmania"
+            },
+            "V14": {
+              "value": "YES",
+              "formula": null
+            },
+            "W14": {
+              "value": "0",
+              "formula": null
+            },
+            "X14": {
+              "value": "118",
+              "formula": null
+            },
+            "Y14": {
+              "value": "Emil Ganso (1895–1941) was a German-born American artist known for his mastery of printmaking, particularly etchings, aquatints, and woodcuts. His work often captured scenes of everyday life with a modernist sensibility, and he became associated with the American Artists’ Group (AAG), which helped make fine art more accessible to the public during the 1930s and 1940s. The etching Sunbath (1936) reflects the era’s interest in leisure and the human figure, while also showcasing the rich tonal effects achievable with aquatint. Ganso’s works were widely collected in his lifetime, and he contributed to the democratization of art through affordable editions like this one."
+            }
+          }
+        },
+        {
+          "row": 15,
+          "cells": {
+            "A15": {
+              "value": "11.0"
+            },
+            "D15": {
+              "value": "Hornby, Lester"
+            },
+            "E15": {
+              "value": "Cheri"
+            },
+            "F15": {
+              "value": "1906.0"
+            },
+            "G15": {
+              "value": "Etching in Colors with Drypoint"
+            },
+            "H15": {
+              "value": "6.75"
+            },
+            "I15": {
+              "value": "10.0"
+            },
+            "J15": {
+              "value": "170.0"
+            },
+            "L15": {
+              "value": "200.6",
+              "formula": null
+            },
+            "M15": {
+              "value": "YES"
+            },
+            "N15": {
+              "value": "44019.0"
+            },
+            "O15": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P15": {
+              "value": "signed, titled and numbered 1/30 in pencil, artist's estate stamp lower left margin."
+            },
+            "Q15": {
+              "value": "250.0"
+            },
+            "R15": {
+              "value": "500.0"
+            },
+            "S15": {
+              "value": "Heritage"
+            },
+            "T15": {
+              "value": "Inventory"
+            },
+            "U15": {
+              "value": "Oliver Drawer NYC"
+            },
+            "V15": {
+              "value": "YES",
+              "formula": null
+            },
+            "W15": {
+              "value": "0",
+              "formula": null
+            },
+            "X15": {
+              "value": "200.6",
+              "formula": null
+            },
+            "Y15": {
+              "value": "Lester Hornby (1882–1956) was an American artist and printmaker known for his mastery of etching and drypoint, often incorporating color into his works at a time when black-and-white etching was the norm. His subject Cheri (1906) reflects Hornby’s time in Paris, where he studied and worked among the city’s vibrant artistic community in Montparnasse. The limited edition of just 30 impressions, each signed and estate stamped, shows how early 20th-century printmakers sought to elevate etchings into collectible fine art rather than mass reproductions. Hornby’s works are now regarded as important examples of the transatlantic exchange of artistic ideas between France and America in the early modernist era."
+            }
+          }
+        },
+        {
+          "row": 16,
+          "cells": {
+            "A16": {
+              "value": "12.0"
+            },
+            "C16": {
+              "value": "Hardie 275"
+            },
+            "D16": {
+              "value": "McBey, James"
+            },
+            "E16": {
+              "value": "Manhattan"
+            },
+            "F16": {
+              "value": "1939.0"
+            },
+            "G16": {
+              "value": "Etching"
+            },
+            "H16": {
+              "value": "7.375"
+            },
+            "I16": {
+              "value": "15.125"
+            },
+            "J16": {
+              "value": "325.0"
+            },
+            "L16": {
+              "value": "383.5",
+              "formula": null
+            },
+            "M16": {
+              "value": "YES"
+            },
+            "N16": {
+              "value": "44019.0"
+            },
+            "O16": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P16": {
+              "value": "signed in ink, print fixed down to mat - From the 1st published state of 73 proofs, before the clouds were burnished out. "
+            },
+            "Q16": {
+              "value": "750.0"
+            },
+            "R16": {
+              "value": "1500.0"
+            },
+            "S16": {
+              "value": "Heritage"
+            },
+            "T16": {
+              "value": "inventory"
+            },
+            "U16": {
+              "value": "Skillmania"
+            },
+            "V16": {
+              "value": "YES",
+              "formula": null
+            },
+            "W16": {
+              "value": "0",
+              "formula": null
+            },
+            "X16": {
+              "value": "383.5",
+              "formula": null
+            },
+            "Y16": {
+              "value": "James McBey (1883–1959) was a Scottish artist celebrated for his etchings and drypoints, often compared to Whistler. His 1939 etching Manhattan captures the iconic New York skyline on the eve of World War II, at a time when skyscrapers symbolized modernity and American progress. McBey created a very limited number of proofs—this piece belongs to the rare first published state of only 73 impressions, produced before the artist altered the sky by burnishing out the clouds. Collectors value works like this not only for their technical mastery but also as snapshots of a rapidly changing era in both art and world history."
+            }
+          }
+        },
+        {
+          "row": 17,
+          "cells": {
+            "A17": {
+              "value": "13.0"
+            },
+            "D17": {
+              "value": "Murphy, John J. A. "
+            },
+            "E17": {
+              "value": "Figures Bathing"
+            },
+            "F17": {
+              "value": "~1920s/30s"
+            },
+            "G17": {
+              "value": "Painted woodblock"
+            },
+            "H17": {
+              "value": " 6 5/8 x 11 x 1"
+            },
+            "J17": {
+              "value": "425.0"
+            },
+            "L17": {
+              "value": "501.5",
+              "formula": null
+            },
+            "M17": {
+              "value": "YES"
+            },
+            "N17": {
+              "value": "44019.0"
+            },
+            "O17": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P17": {
+              "value": "(American 1888-1967) note: portrait of Cecil Buller in lower left corner, some paint loss to surface, minor splitting to wood. Lot 173 Beuatiful piece, needs retoring"
+            },
+            "Q17": {
+              "value": "600.0"
+            },
+            "R17": {
+              "value": "1200.0"
+            },
+            "S17": {
+              "value": "Heritage - Doyle - Freemans"
+            },
+            "T17": {
+              "value": "Inventory"
+            },
+            "U17": {
+              "value": "TV Room - Manhattan"
+            },
+            "V17": {
+              "value": "YES",
+              "formula": null
+            },
+            "W17": {
+              "value": "0",
+              "formula": null
+            },
+            "X17": {
+              "value": "501.5",
+              "formula": null
+            },
+            "Y17": {
+              "value": "Murphy was a printmaker and painter, wood-engraver and book-maker; studied at the Boston Museum of Fine Arts & Art Students League; worked as a portrait painter; moved to London to be painter Frank Brangwyn's assistant; served in the camouflage section of the Army Corps of Engineers in France & illustrated posters during WWI; returned to New York 1921 fotr solo exhibition of woodcuts at Keppel's Gallery; exhibited at the Leicester Gallery, London and Walker Galleries, New York; designed book illustrations and typography; fellow of the Metropolitan Museum.  "
+            }
+          }
+        },
+        {
+          "row": 18,
+          "cells": {
+            "A18": {
+              "value": "14.0"
+            },
+            "D18": {
+              "value": "Murphy, John J. A. "
+            },
+            "E18": {
+              "value": "Faces and Figures"
+            },
+            "F18": {
+              "value": "~1920s/30s"
+            },
+            "G18": {
+              "value": "Painted woodblock"
+            },
+            "H18": {
+              "value": "9 x 8 x 1"
+            },
+            "J18": {
+              "value": "500.0"
+            },
+            "L18": {
+              "value": "590",
+              "formula": null
+            },
+            "M18": {
+              "value": "YES"
+            },
+            "N18": {
+              "value": "44019.0"
+            },
+            "O18": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P18": {
+              "value": "Note: self-portrait of artist holding a carving tool in lower left corner, some minor splitting to block.   Lot 172 R.D .   "
+            },
+            "Q18": {
+              "value": "600.0"
+            },
+            "R18": {
+              "value": "1200.0"
+            },
+            "S18": {
+              "value": "Heritage - Doyle - Freemans"
+            },
+            "T18": {
+              "value": "Inventory"
+            },
+            "U18": {
+              "value": "TV Room - Manhattan"
+            },
+            "V18": {
+              "value": "YES",
+              "formula": null
+            },
+            "W18": {
+              "value": "0",
+              "formula": null
+            },
+            "X18": {
+              "value": "590",
+              "formula": null
+            },
+            "Y18": {
+              "value": "John J. A. Murphy was an American artist and printmaker known for his woodblock prints during the early 20th century, often blending modernist design with traditional printmaking techniques. His work, such as Faces and Figures from the 1920s–30s, reflects the influence of the Arts and Crafts movement, which emphasized handcrafted quality and fine detail. Woodblock self-portraits like this one also highlight the growing interest in self-representation among modern artists, who were exploring their identity through their craft. At the time, Murphy’s prints were exhibited alongside other American modernists and helped bring renewed attention to the woodcut medium in the United States."
+            }
+          }
+        },
+        {
+          "row": 19,
+          "cells": {
+            "A19": {
+              "value": "15.0"
+            },
+            "D19": {
+              "value": "Schanker, Louis"
+            },
+            "E19": {
+              "value": "Café"
+            },
+            "F19": {
+              "value": "1938.0"
+            },
+            "G19": {
+              "value": "Lithograph in Colors"
+            },
+            "J19": {
+              "value": "450.0"
+            },
+            "L19": {
+              "value": "531",
+              "formula": null
+            },
+            "M19": {
+              "value": "YES"
+            },
+            "N19": {
+              "value": "44019.0"
+            },
+            "O19": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P19": {
+              "value": "signed and numbered 19/80 in pencil."
+            },
+            "Q19": {
+              "value": "500.0"
+            },
+            "R19": {
+              "value": "1000.0"
+            },
+            "S19": {
+              "value": "Doyle/Freemans"
+            },
+            "T19": {
+              "value": "Inventory"
+            },
+            "U19": {
+              "value": "Oliver Drawer NYC"
+            },
+            "V19": {
+              "value": "YES",
+              "formula": null
+            },
+            "W19": {
+              "value": "0",
+              "formula": null
+            },
+            "X19": {
+              "value": "531",
+              "formula": null
+            },
+            "Y19": {
+              "value": "Louis Schanker was a prominent American abstract artist and a founding member of the New York art group known as The Ten, who in the 1930s challenged conservative art institutions by promoting modernist approaches. His lithographs, including Café (1938), were produced during the Works Progress Administration (WPA) era, when artists were commissioned to create affordable art for the public. Schanker’s work combined elements of Cubism and abstraction, often using bold colors and geometric forms to convey rhythm and movement. Limited editions like this signed and numbered print reflect both the democratization of art during the Depression and the artist’s role in shaping early American modernism."
+            }
+          }
+        },
+        {
+          "row": 20,
+          "cells": {
+            "A20": {
+              "value": "16.0"
+            },
+            "D20": {
+              "value": "Strasser, William"
+            },
+            "E20": {
+              "value": "On the River"
+            },
+            "F20": {
+              "value": "?"
+            },
+            "G20": {
+              "value": "Monoprint in colors"
+            },
+            "H20": {
+              "value": "10.875"
+            },
+            "I20": {
+              "value": "16.875"
+            },
+            "J20": {
+              "value": "60.0"
+            },
+            "L20": {
+              "value": "70.8",
+              "formula": null
+            },
+            "M20": {
+              "value": "YES"
+            },
+            "N20": {
+              "value": "44019.0"
+            },
+            "O20": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P20": {
+              "value": "Signed in margin"
+            },
+            "Q20": {
+              "value": "100.0"
+            },
+            "R20": {
+              "value": "500.0"
+            },
+            "S20": {
+              "value": "Heritage/Doyle"
+            },
+            "T20": {
+              "value": "Inventory"
+            },
+            "U20": {
+              "value": "Oliver Drawer NYC"
+            },
+            "V20": {
+              "value": "YES",
+              "formula": null
+            },
+            "W20": {
+              "value": "0",
+              "formula": null
+            },
+            "X20": {
+              "value": "70.8",
+              "formula": null
+            },
+            "Y20": {
+              "value": "William Strasser was a mid-20th century American artist known for his printmaking, particularly monoprints and lithographs. A monoprint like On the River is a unique print made by painting or inking directly onto a plate, so each impression is one-of-a-kind—quite different from standard edition prints. During the postwar period, many artists in the U.S. embraced experimental printmaking as a way to blend painterly expression with reproducible art, and Strasser’s works often reflect this modernist exploration. Collectors value pieces like this both for their scarcity and for the way they embody the creative experimentation of American printmakers in the 1950s–60s."
+            }
+          }
+        },
+        {
+          "row": 21,
+          "cells": {
+            "A21": {
+              "value": "17.0"
+            },
+            "D21": {
+              "value": "Verve Magazine"
+            },
+            "E21": {
+              "value": "Selection of 20 Works from Verve!"
+            },
+            "G21": {
+              "value": "Group of fine lithograph reproductions"
+            },
+            "H21": {
+              "value": "< 14 x 10"
+            },
+            "J21": {
+              "value": "1300.0"
+            },
+            "L21": {
+              "value": "1534",
+              "formula": null
+            },
+            "M21": {
+              "value": "YES"
+            },
+            "N21": {
+              "value": "44019.0"
+            },
+            "O21": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P21": {
+              "value": "Lot 81 R.D Fine art - 20th c. European school- Untitled- lithographs in color. as published in 'Verve', 'Derriere Le Miroir' etc.. artist's include F. Leger, B. Buffet, H. Matisse, W. Lam, Zao Wou-ki, M. Chagall, G. Braque, P. Alechinsky, R.Matta, J. Friedlaender, J. Villon, H. Hartung, V. Vasarely etc..., generally good condition, some have minor tears around edges. 14 x 10'' (largest)"
+            },
+            "Q21": {
+              "value": "1200.0"
+            },
+            "R21": {
+              "value": "2000.0"
+            },
+            "S21": {
+              "value": "Heritage - Doyle - Freemans"
+            },
+            "T21": {
+              "value": "Inventory"
+            },
+            "U21": {
+              "value": "Oliver Drawer NYC"
+            },
+            "V21": {
+              "value": "YES",
+              "formula": null
+            },
+            "W21": {
+              "value": "0",
+              "formula": null
+            },
+            "X21": {
+              "value": "1534",
+              "formula": null
+            },
+            "Y21": {
+              "value": "Verve was a groundbreaking French art magazine founded in 1937 by publisher Tériade, who worked closely with many of the greatest modern artists of the 20th century. The publication was celebrated for its luxurious lithographic plates, often created directly by artists such as Henri Matisse, Marc Chagall, and Georges Braque, making each issue itself a work of art. Along with Derrière Le Miroir, another important artist-focused periodical, Verve provided an accessible yet high-quality platform for avant-garde art at a time when Europe was undergoing immense cultural and political upheaval. Collections of prints from these magazines remain highly sought after because they encapsulate the vibrancy of modernism and preserve original works by some of the most influential artists of the century."
+            }
+          }
+        },
+        {
+          "row": 22,
+          "cells": {
+            "A22": {
+              "value": "18.0"
+            },
+            "D22": {
+              "value": "Raysse, Martial"
+            },
+            "E22": {
+              "value": "Enlèvement D'Europe"
+            },
+            "F22": {
+              "value": "1989.0"
+            },
+            "G22": {
+              "value": "Lithograph in colors"
+            },
+            "H22": {
+              "value": "24.375"
+            },
+            "I22": {
+              "value": "18.25"
+            },
+            "J22": {
+              "value": "230.464",
+              "formula": "K22*1.108"
+            },
+            "K22": {
+              "value": "208.0"
+            },
+            "L22": {
+              "value": "230.464",
+              "formula": "J22"
+            },
+            "M22": {
+              "value": "YES"
+            },
+            "N22": {
+              "value": "44131.0"
+            },
+            "O22": {
+              "value": "Tajan"
+            },
+            "P22": {
+              "value": "Numbered 19/140 - Some traces of folds and stains on the margin\nLithograph in colors on Arches wove paper; monogrammed in pencil; Framed"
+            },
+            "Q22": {
+              "value": "300.0"
+            },
+            "R22": {
+              "value": "1000.0"
+            },
+            "S22": {
+              "value": "Bonhams/Forum"
+            },
+            "T22": {
+              "value": "Inventory"
+            },
+            "U22": {
+              "value": "Oliver Drawer NYC"
+            },
+            "V22": {
+              "value": "YES",
+              "formula": null
+            },
+            "W22": {
+              "value": "0",
+              "formula": null
+            },
+            "X22": {
+              "value": "230.464",
+              "formula": null
+            },
+            "Y22": {
+              "value": "Martial Raysse (b. 1936) is a French artist closely associated with the Nouveau Réalisme movement, often considered the European counterpart to American Pop Art. His works frequently draw on themes of consumerism, mythology, and classical imagery reinterpreted through vibrant modern aesthetics. Enlèvement d’Europe (The Abduction of Europa) revisits the ancient myth of Europa and Zeus, a subject that has inspired artists since antiquity, but Raysse reimagines it through the lens of 20th-century visual culture. By the late 1980s, when this print was created, Raysse was already internationally recognized for blending mythological subjects with bold colors and playful irony, making this lithograph a striking example of his mature style."
+            }
+          }
+        },
+        {
+          "row": 23,
+          "cells": {
+            "A23": {
+              "value": "19.0"
+            },
+            "D23": {
+              "value": "Audeban, John James (After)"
+            },
+            "E23": {
+              "value": "Lepus Americanus (Northern Hare)"
+            },
+            "J23": {
+              "value": "500.0"
+            },
+            "L23": {
+              "value": "600.0"
+            },
+            "M23": {
+              "value": "YES"
+            },
+            "N23": {
+              "value": "44371.0"
+            },
+            "O23": {
+              "value": "Leland Little"
+            },
+            "P23": {
+              "value": "Hand-colored lithograph, 1847, No. 3, Plate XII from The Viviparous Quadrupeds of North America, published by J. T. Bowen, Philadelphia, PA, matted and framed.\nFrame dimensions 31 1/4 x 36 1/2 in."
+            },
+            "Q23": {
+              "value": "750.0"
+            },
+            "R23": {
+              "value": "1500.0"
+            },
+            "S23": {
+              "value": "Swann/Doyle"
+            },
+            "T23": {
+              "value": "Consigned"
+            },
+            "U23": {
+              "value": "With Heritage"
+            },
+            "V23": {
+              "value": "YES",
+              "formula": null
+            },
+            "W23": {
+              "value": "0",
+              "formula": null
+            },
+            "X23": {
+              "value": "600",
+              "formula": null
+            },
+            "Y23": {
+              "value": "John James Audubon (1785–1851) is one of the most celebrated naturalists and wildlife illustrators of the 19th century, best known for his monumental Birds of America. After completing that project, he turned his attention to mammals, collaborating with his sons to create The Viviparous Quadrupeds of North America (1845–1854). The Lepus Americanus (Northern Hare) plate was produced by J.T. Bowen in Philadelphia, using hand-colored lithography to capture both scientific accuracy and aesthetic beauty. These prints were among the earliest comprehensive attempts to document North American mammals, making them prized by collectors not only for their artistry but also for their importance in the history of natural science."
+            }
+          }
+        },
+        {
+          "row": 24,
+          "cells": {
+            "A24": {
+              "value": "20.0"
+            },
+            "D24": {
+              "value": "Lichtenstein, Roy (After)"
+            },
+            "E24": {
+              "value": "The American Federation of Art 80th Anniversary 1909-1989"
+            },
+            "G24": {
+              "value": "Offset lithographic poster "
+            },
+            "K24": {
+              "value": "117.0"
+            },
+            "L24": {
+              "value": "138.06",
+              "formula": "1.18*K24"
+            },
+            "M24": {
+              "value": "YES"
+            },
+            "N24": {
+              "value": "44384.0"
+            },
+            "O24": {
+              "value": "Tajan"
+            },
+            "Q24": {
+              "value": "200.0"
+            },
+            "R24": {
+              "value": "400.0"
+            },
+            "S24": {
+              "value": "Heritage"
+            },
+            "T24": {
+              "value": "Inventory"
+            },
+            "U24": {
+              "value": "Oliver Drawer NYC"
+            },
+            "V24": {
+              "value": "YES",
+              "formula": null
+            },
+            "W24": {
+              "value": "0",
+              "formula": null
+            },
+            "X24": {
+              "value": "138.06",
+              "formula": null
+            },
+            "Y24": {
+              "value": "Roy Lichtenstein, one of the leading figures of the Pop Art movement, was known for his comic-inspired works that challenged the divide between high and low art. This poster was created in 1989 to celebrate the 80th anniversary of the American Federation of Arts, an organization founded in 1909 to make art more accessible to the public. Lichtenstein often revisited and reinterpreted earlier works, which is why this piece is marked “After,” signifying it was based on an existing design rather than an entirely original composition. Posters like this not only highlight his bold style but also reflect the broader cultural effort to democratize art appreciation during the late 20th century."
+            }
+          }
+        },
+        {
+          "row": 25,
+          "cells": {
+            "A25": {
+              "value": "21.0"
+            },
+            "D25": {
+              "value": "Rouault, Georges (After)"
+            },
+            "E25": {
+              "value": "La Sibylle de Cumes"
+            },
+            "F25": {
+              "value": "1928.0"
+            },
+            "G25": {
+              "value": "Color Lithograph"
+            },
+            "H25": {
+              "value": "24.0"
+            },
+            "I25": {
+              "value": "18.0"
+            },
+            "K25": {
+              "value": "130.0"
+            },
+            "L25": {
+              "value": "153.4",
+              "formula": null
+            },
+            "M25": {
+              "value": "YES"
+            },
+            "N25": {
+              "value": "44384.0"
+            },
+            "O25": {
+              "value": "Tajan"
+            },
+            "Q25": {
+              "value": "600.0"
+            },
+            "R25": {
+              "value": "1800.0"
+            },
+            "S25": {
+              "value": "Swann (Unsold)     Forum (Unsold)"
+            },
+            "T25": {
+              "value": "Unsold"
+            },
+            "U25": {
+              "value": "Forum"
+            },
+            "V25": {
+              "value": "YES",
+              "formula": null
+            },
+            "W25": {
+              "value": "0",
+              "formula": null
+            },
+            "X25": {
+              "value": "153.4",
+              "formula": null
+            },
+            "Y25": {
+              "value": "La Sibylle de Cumes (1928) after Georges Rouault reflects the artist’s deep engagement with spiritual and mystical themes, which were central to his practice. Rouault, originally trained as a stained-glass artist, carried the influence of bold outlines and luminous colors into his paintings and prints, giving them a distinctive, almost medieval quality. The subject—the Cumaean Sibyl—was a prophetic figure from classical antiquity, later woven into Christian iconography through her association with foretelling the coming of Christ. Works like this highlight Rouault’s ability to bridge ancient myth, religious symbolism, and modern expressionist style, making his art resonate with both historical depth and emotional immediacy."
+            }
+          }
+        },
+        {
+          "row": 26,
+          "cells": {
+            "A26": {
+              "value": "22.0"
+            },
+            "D26": {
+              "value": "Wou Ki, Zao "
+            },
+            "E26": {
+              "value": "The Orchid"
+            },
+            "F26": {
+              "value": "1986.0"
+            },
+            "G26": {
+              "value": "Earthenware Plate"
+            },
+            "H26": {
+              "value": "D 9 7/8"
+            },
+            "K26": {
+              "value": "260.0"
+            },
+            "L26": {
+              "value": "306.8",
+              "formula": null
+            },
+            "M26": {
+              "value": "YES"
+            },
+            "N26": {
+              "value": "44384.0"
+            },
+            "O26": {
+              "value": "Tajan"
+            },
+            "Q26": {
+              "value": "600.0"
+            },
+            "R26": {
+              "value": "1200.0"
+            },
+            "S26": {
+              "value": "Swann"
+            },
+            "T26": {
+              "value": "inventory"
+            },
+            "U26": {
+              "value": "TV Room - Manhattan"
+            },
+            "V26": {
+              "value": "YES",
+              "formula": null
+            },
+            "W26": {
+              "value": "0",
+              "formula": null
+            },
+            "X26": {
+              "value": "306.8",
+              "formula": null
+            },
+            "Y26": {
+              "value": "Zao Wou-Ki was a Chinese-French painter celebrated for blending traditional Chinese ink painting techniques with European abstract expressionism. By the 1980s, when The Orchid plate was created, he was internationally recognized and had begun exploring ceramics as an extension of his artistic language. The orchid motif carries deep symbolism in Chinese culture, often associated with elegance, refinement, and scholarly virtue. This earthenware plate reflects both his cross-cultural identity and his ability to translate lyrical abstraction into decorative arts beyond canvas."
+            }
+          }
+        },
+        {
+          "row": 27,
+          "cells": {
+            "A27": {
+              "value": "23.0"
+            },
+            "D27": {
+              "value": "Kokoshka, Oscar"
+            },
+            "E27": {
+              "value": "Apulia"
+            },
+            "F27": {
+              "value": "1964.0"
+            },
+            "G27": {
+              "value": "20 lithographs on Japon paper"
+            },
+            "H27": {
+              "value": "26.25"
+            },
+            "I27": {
+              "value": "20.0"
+            },
+            "J27": {
+              "value": "2600.0"
+            },
+            "L27": {
+              "value": "3250",
+              "formula": "1.25*J27"
+            },
+            "M27": {
+              "value": "No"
+            },
+            "N27": {
+              "value": "44488.0"
+            },
+            "O27": {
+              "value": "Heritage Auctions"
+            },
+            "P27": {
+              "value": "Ed. 13/50 - Each signed and numbered in pencil along lower edge.  26-1/4 x 20 inches (66.7 x 50.8 cm) (sheet, each) Published by Marlborough Fine Art Limited, London\nShipping cost ($30)\nCondition Report*:\nPortfolio comes in original case. This is a complete set including the colophon. There is a soft crease to the right edge of several sheets varying in size from one inch to six inches that are most visible in raking light. Very mild spots of foxing to a few sheets. "
+            },
+            "Q27": {
+              "value": "4500.0"
+            },
+            "R27": {
+              "value": "7500.0"
+            },
+            "S27": {
+              "value": "Bassenge/K&F/Koller"
+            },
+            "T27": {
+              "value": "Re-Offered in  spring"
+            },
+            "U27": {
+              "value": "K+F"
+            },
+            "V27": {
+              "value": "No",
+              "formula": null
+            },
+            "W27": {
+              "value": "3250",
+              "formula": null
+            },
+            "X27": {
+              "value": "0",
+              "formula": null
+            },
+            "Y27": {
+              "value": "Oskar Kokoschka’s Apulia (1964) is a portfolio of twenty lithographs inspired by his travels through the Apulia region of southern Italy, an area rich with ancient ruins, Romanesque churches, and Mediterranean landscapes. Kokoschka, a leading figure of Austrian Expressionism, often captured the vitality and psychological intensity of places and people, and here he translated the region’s history and atmosphere into expressive, gestural prints. Published by Marlborough Fine Art in London, the edition was limited to just 50 sets, each signed and numbered by the artist, underscoring its rarity. This body of work also reflects Kokoschka’s postwar career, during which he devoted significant attention to printmaking as a means of combining his painterly style with broader dissemination of his art."
+            }
+          }
+        },
+        {
+          "row": 28,
+          "cells": {
+            "A28": {
+              "value": "24.0"
+            },
+            "D28": {
+              "value": "Vlaminck, Maurice"
+            },
+            "E28": {
+              "value": "Village Sous La Neige"
+            },
+            "F28": {
+              "value": "1955.0"
+            },
+            "G28": {
+              "value": "Lithograph or Heliogravure"
+            },
+            "H28": {
+              "value": "15.625"
+            },
+            "I28": {
+              "value": "19.625"
+            },
+            "J28": {
+              "value": "325.0"
+            },
+            "L28": {
+              "value": "409.5",
+              "formula": "1.26*J28"
+            },
+            "M28": {
+              "value": "YES"
+            },
+            "N28": {
+              "value": "44489.0"
+            },
+            "O28": {
+              "value": "DOYLE"
+            },
+            "P28": {
+              "value": "Color heliogravure, 1955, on wove paper, signed and numbered 28/100 in pencil, published by Editions C. Guillard, Paris, with good margins, framed. Also called \"Saint-Maurice-lès-Charence.\""
+            },
+            "Q28": {
+              "value": "600.0"
+            },
+            "R28": {
+              "value": "1200.0"
+            },
+            "S28": {
+              "value": "Bassenge"
+            },
+            "T28": {
+              "value": "Inventory"
+            },
+            "U28": {
+              "value": "Ossining with Dad"
+            },
+            "V28": {
+              "value": "YES",
+              "formula": null
+            },
+            "W28": {
+              "value": "0",
+              "formula": "IF( OR(V28=\"NO\",V28=\"Not Yet\"),L28,0)"
+            },
+            "X28": {
+              "value": "409.5",
+              "formula": null
+            },
+            "Y28": {
+              "value": "Maurice de Vlaminck was a French painter closely associated with Fauvism, a movement known for its vivid colors and expressive brushwork. By the 1950s, when Village sous la neige (Saint-Maurice-lès-Charence) was produced, he had moved toward a more restrained palette, often depicting rural French landscapes with a somber, atmospheric mood. The heliogravure technique allowed for richly textured reproductions that captured the painterly qualities of his original works. This piece reflects Vlaminck’s later career, when he turned to quieter, wintry village scenes that conveyed both nostalgia and a deep connection to the French countryside."
+            }
+          }
+        },
+        {
+          "row": 29,
+          "cells": {
+            "A29": {
+              "value": "25.0"
+            },
+            "D29": {
+              "value": "Audeban, John James (After)"
+            },
+            "E29": {
+              "value": "Tufted Duck"
+            },
+            "G29": {
+              "value": "Aquatint with hand coloring"
+            },
+            "H29": {
+              "value": "13.875"
+            },
+            "I29": {
+              "value": "17.5"
+            },
+            "J29": {
+              "value": "225.0"
+            },
+            "L29": {
+              "value": "270",
+              "formula": "270"
+            },
+            "M29": {
+              "value": "YES"
+            },
+            "N29": {
+              "value": "44546.0"
+            },
+            "O29": {
+              "value": "William Bunch"
+            },
+            "P29": {
+              "value": "John J Audubon , 13-7/8\" x 17-1/2\" plate, 17-1/2\" x 21\" sheet, trimmed and tattered edges, overall toning, foxing https://www.princeton.edu/~graphicarts/2010/06/audubons_tufted_duck.html"
+            },
+            "Q29": {
+              "value": "800.0"
+            },
+            "R29": {
+              "value": "1600.0"
+            },
+            "S29": {
+              "value": "Swann/Doyle"
+            },
+            "T29": {
+              "value": "Inventory"
+            },
+            "U29": {
+              "value": "Keller Linke"
+            },
+            "V29": {
+              "value": "YES",
+              "formula": null
+            },
+            "W29": {
+              "value": "0",
+              "formula": "IF(V29=\"NO\",L29,0)"
+            },
+            "X29": {
+              "value": "270",
+              "formula": null
+            },
+            "Y29": {
+              "value": "The Tufted Duck print you’re looking at is based on the work of John James Audubon, the famed naturalist and painter best known for his monumental series The Birds of America (1827–1838). Audubon’s plates were originally produced as hand-colored aquatints, a labor-intensive process involving skilled engravers and colorists, making each print both a scientific record and a work of art. While the Tufted Duck itself is a Eurasian species and relatively rare in North America, Audubon sought to include it to give his series a comprehensive scope. Today, surviving original plates and even high-quality later impressions remain highly valued by collectors, blending ornithological history with fine art."
+            }
+          }
+        },
+        {
+          "row": 30,
+          "cells": {
+            "A30": {
+              "value": "26.0"
+            },
+            "D30": {
+              "value": "Chagall, Marc"
+            },
+            "E30": {
+              "value": "Etching (man) "
+            },
+            "G30": {
+              "value": "Etching"
+            },
+            "J30": {
+              "value": "0.0"
+            },
+            "L30": {
+              "value": "0.0"
+            },
+            "M30": {
+              "value": "YES"
+            },
+            "N30": {
+              "value": "44562.0"
+            },
+            "P30": {
+              "value": "Signed I believe in pencil - in BW https://www.moma.org/collection/works/216454?association=portfolios&page=1&parent_id=61873&sov_referrer=association"
+            },
+            "Q30": {
+              "value": "500.0"
+            },
+            "R30": {
+              "value": "1200.0"
+            },
+            "T30": {
+              "value": "Inventory"
+            },
+            "U30": {
+              "value": "Oliver Drawer NYC"
+            },
+            "V30": {
+              "value": "YES",
+              "formula": null
+            },
+            "W30": {
+              "value": "0",
+              "formula": null
+            },
+            "X30": {
+              "value": "0",
+              "formula": null
+            },
+            "Y30": {
+              "value": "Marc Chagall was a Russian-French modernist whose work often blended elements of Cubism, Fauvism, and Surrealism, creating dreamlike compositions infused with folklore and personal symbolism. He experimented widely with printmaking techniques, and his etchings in particular are prized for their expressive linework and lyrical, often mystical imagery. Chagall began working seriously with etching in the 1920s, producing illustrations for literary classics such as La Fontaine’s Fables and the Bible. Even a smaller, unsigned or uncertainly signed etching reflects his distinctive hand and remains sought after for its connection to one of the most imaginative artists of the 20th century."
+            }
+          }
+        },
+        {
+          "row": 31,
+          "cells": {
+            "A31": {
+              "value": "27.0"
+            },
+            "D31": {
+              "value": "Foujita, Léonard Tsuguharu (after)"
+            },
+            "E31": {
+              "value": "Chanton Assis (from book of cats)"
+            },
+            "F31": {
+              "value": "1929.0"
+            },
+            "G31": {
+              "value": "Collotype in black & white on Japan"
+            },
+            "H31": {
+              "value": "9.875"
+            },
+            "I31": {
+              "value": "7.375"
+            },
+            "K31": {
+              "value": "1560.0"
+            },
+            "L31": {
+              "value": "1716",
+              "formula": "K31*1.1"
+            },
+            "M31": {
+              "value": "No"
+            },
+            "N31": {
+              "value": "44672.0"
+            },
+            "O31": {
+              "value": "Agutte"
+            },
+            "P31": {
+              "value": "Signé et daté '1929' dans la planche en bas à gauche - Printed signature and date '1929' lower left. PROVENANCE: Collection particulière, France (par descendance). BIBLIOGRAPHIE: Sylvie et Dominique Buisson, Léonard-Tsuguharu Foujita II, Paris : ACR Édition, 2001, décrit sous le n°30.127 et reproduit p. 561 - Honoraires acheteurs"
+            },
+            "Q31": {
+              "value": "2500.0"
+            },
+            "R31": {
+              "value": "4500.0"
+            },
+            "T31": {
+              "value": "Inventory"
+            },
+            "U31": {
+              "value": "Ossining with Dad"
+            },
+            "V31": {
+              "value": "No",
+              "formula": null
+            },
+            "W31": {
+              "value": "1716",
+              "formula": null
+            },
+            "X31": {
+              "value": "0",
+              "formula": null
+            },
+            "Y31": {
+              "value": "Léonard Tsuguharu Foujita was a Japanese–French painter and printmaker who became a celebrated figure in Paris during the 1920s, blending Japanese ink techniques with Western modernist styles. His Book of Cats (1929), from which Chanton Assis originates, is considered one of the most beautiful and desirable illustrated books of the 20th century, featuring 20 collotypes of cats rendered with exquisite delicacy. Foujita’s cats were deeply personal—he often lived surrounded by them—and he captured their elegance and mischievous spirit with an unmatched sensitivity. The edition quickly sold out on publication, and today, individual plates are highly collectible, valued both for their rarity and their role in cementing Foujita’s reputation as the great “painter of cats.”"
+            }
+          }
+        },
+        {
+          "row": 32,
+          "cells": {
+            "A32": {
+              "value": "28.0"
+            },
+            "D32": {
+              "value": "Goya, Fransisco de"
+            },
+            "E32": {
+              "value": "Oh what a Taylor can do"
+            },
+            "G32": {
+              "value": "Etching"
+            },
+            "J32": {
+              "value": "450.0"
+            },
+            "L32": {
+              "value": "563.0"
+            },
+            "M32": {
+              "value": "No"
+            },
+            "N32": {
+              "value": "44757.0"
+            },
+            "O32": {
+              "value": "Butterscotch"
+            },
+            "Q32": {
+              "value": "1250.0"
+            },
+            "R32": {
+              "value": "2500.0"
+            },
+            "T32": {
+              "value": "Inventory"
+            },
+            "U32": {
+              "value": "Ossining with Dad"
+            },
+            "V32": {
+              "value": "No",
+              "formula": null
+            },
+            "W32": {
+              "value": "563",
+              "formula": null
+            },
+            "X32": {
+              "value": "0",
+              "formula": null
+            },
+            "Y32": {
+              "value": "Francisco de Goya’s etching Oh What a Tailor Can Do (Qué tal sastre!) comes from his famous satirical series Los Caprichos (1799), a set of 80 prints critiquing social folly, superstition, and corruption in late 18th-century Spain. This particular plate mocks vanity and the absurdities of fashion, portraying human weakness with biting humor. Goya used aquatint and etching to achieve striking contrasts of light and shadow, a technical mastery that gave his social commentary a haunting intensity. Though the series was withdrawn shortly after publication due to fear of Inquisition backlash, it went on to become one of the most influential works in Western printmaking."
+            }
+          }
+        },
+        {
+          "row": 33,
+          "cells": {
+            "A33": {
+              "value": "29.0"
+            },
+            "C33": {
+              "value": "Ludman 28"
+            },
+            "D33": {
+              "value": "Porter, Fairfield"
+            },
+            "E33": {
+              "value": "Apple Blossom III"
+            },
+            "F33": {
+              "value": "1974.0"
+            },
+            "G33": {
+              "value": "Lithograph in colors"
+            },
+            "H33": {
+              "value": "26.0"
+            },
+            "I33": {
+              "value": "20.0"
+            },
+            "J33": {
+              "value": "700.0"
+            },
+            "L33": {
+              "value": "840",
+              "formula": "1.2*J33"
+            },
+            "M33": {
+              "value": "YES"
+            },
+            "N33": {
+              "value": "44961.0"
+            },
+            "O33": {
+              "value": "Rachel Davis Fine Art"
+            },
+            "P33": {
+              "value": "Signed and numbered 21/50 III in pencil, very good condition. 26 x 20''  https://www.racheldavisfinearts.com/lots/view/1-6YMX1S/fairfield-porter-lithograph"
+            },
+            "Q33": {
+              "value": "1250.0"
+            },
+            "R33": {
+              "value": "2500.0"
+            },
+            "U33": {
+              "value": "Rachel Davis"
+            },
+            "V33": {
+              "value": "YES",
+              "formula": null
+            },
+            "W33": {
+              "value": "0",
+              "formula": null
+            },
+            "X33": {
+              "value": "840",
+              "formula": null
+            },
+            "Y33": {
+              "value": "Fairfield Porter was an American painter and printmaker best known for his lyrical, representational style at a time when Abstract Expressionism dominated the art world. He often depicted domestic interiors, portraits of friends, and serene landscapes, balancing a modernist sensibility with an appreciation for everyday beauty. Apple Blossom III (1974) reflects his love of nature and his subtle use of color to create harmony and intimacy within a scene. Produced as a limited-edition lithograph late in his career, works like this highlight Porter’s enduring commitment to figuration and his influence on a generation of realist painters who followed."
+            }
+          }
+        },
+        {
+          "row": 34,
+          "cells": {
+            "A34": {
+              "value": "30.0"
+            },
+            "D34": {
+              "value": "Porter, Fairfield"
+            },
+            "E34": {
+              "value": "Isle au Haut"
+            },
+            "F34": {
+              "value": "1975.0"
+            },
+            "G34": {
+              "value": "Lithograph in colors"
+            },
+            "H34": {
+              "value": "32.75"
+            },
+            "I34": {
+              "value": "28.75"
+            },
+            "J34": {
+              "value": "340",
+              "formula": "L34/1.25"
+            },
+            "L34": {
+              "value": "425.0"
+            },
+            "M34": {
+              "value": "YES"
+            },
+            "N34": {
+              "value": "45000.0"
+            },
+            "O34": {
+              "value": "Heritage Auctions"
+            },
+            "P34": {
+              "value": "Ed. 43/100 - Signed and numbered in pencil along lower edge - Published by Brooke Alexander, Inc., New York - Printed by American Atelier, New York. Mild buckling along the upper edge; moderate overall light and time staining. Not examined out of frame.  https://fineart.ha.com/itm/prints-and-multiples/fairfield-porter-1907-1975-isle-au-haut-1975lithograph-in-colors-on-arches-paper28-3-8-x-23-5-8-inches-721/a/18198-40091.s"
+            },
+            "Q34": {
+              "value": "800.0"
+            },
+            "R34": {
+              "value": "1600.0"
+            },
+            "V34": {
+              "value": "YES",
+              "formula": null
+            },
+            "W34": {
+              "value": "0",
+              "formula": null
+            },
+            "X34": {
+              "value": "425",
+              "formula": null
+            },
+            "Y34": {
+              "value": "Fairfield Porter’s Isle au Haut (1975) captures the quiet, contemplative landscapes of coastal Maine, where he spent many summers painting. Porter had a deep connection to Maine’s islands, and Isle au Haut—a remote and rugged spot—reflects his sensitivity to light, color, and natural atmosphere. This lithograph was published by Brooke Alexander, Inc., a key figure in promoting contemporary printmaking in New York during the 1970s, and printed by the renowned American Atelier. As one of Porter’s later prints, it demonstrates his ability to translate his painterly vision into lithography, preserving the freshness and intimacy that define his best work."
+            }
+          }
+        },
+        {
+          "row": 35,
+          "cells": {
+            "A35": {
+              "value": "31.0"
+            },
+            "C35": {
+              "value": "Karsch 37/II "
+            },
+            "D35": {
+              "value": "Dix, Otto"
+            },
+            "E35": {
+              "value": "Internationaler Reitakt"
+            },
+            "F35": {
+              "value": "1922.0"
+            },
+            "G35": {
+              "value": "Drypoint"
+            },
+            "H35": {
+              "value": "15.75"
+            },
+            "I35": {
+              "value": "11.625"
+            },
+            "J35": {
+              "value": "3683.232",
+              "formula": null
+            },
+            "K35": {
+              "value": "3780.0"
+            },
+            "L35": {
+              "value": "4604.04",
+              "formula": "1.218*K35"
+            },
+            "M35": {
+              "value": "No"
+            },
+            "N35": {
+              "value": "45001.0"
+            },
+            "O35": {
+              "value": "Christies London"
+            },
+            "P35": {
+              "value": "On wove paper, signed in pencil, dated, titled, and numbered 47/50, second, final state (Karsch recorded a unique example of the first state), a fine impression printing with much burr and a light plate tone, from the edition presumably published by the artist"
+            },
+            "Q35": {
+              "value": "5000.0"
+            },
+            "R35": {
+              "value": "8000.0"
+            },
+            "V35": {
+              "value": "No",
+              "formula": null
+            },
+            "W35": {
+              "value": "4604.04",
+              "formula": null
+            },
+            "X35": {
+              "value": "0",
+              "formula": null
+            },
+            "Y35": {
+              "value": "Otto Dix’s Internationaler Reitakt (1922) is a powerful drypoint from the years immediately following World War I, when the artist was producing some of his most biting and socially critical works. Dix, a veteran himself, became a leading figure of the Neue Sachlichkeit (New Objectivity) movement, using unflinching realism to expose the brutality, decadence, and absurdity of postwar German society. His prints from this period often combine sharp satire with raw psychological intensity, and the drypoint technique—with its rich burr and dark plate tone—amplifies that visceral effect. Limited to just 50 impressions, this work exemplifies Dix’s fearless engagement with the cultural upheaval of Weimar Germany."
+            }
+          }
+        },
+        {
+          "row": 36,
+          "cells": {
+            "A36": {
+              "value": "32.0"
+            },
+            "C36": {
+              "value": "Karsch 39 II "
+            },
+            "D36": {
+              "value": "Dix, Otto"
+            },
+            "E36": {
+              "value": "Technisches Personal"
+            },
+            "F36": {
+              "value": "1922.0"
+            },
+            "G36": {
+              "value": "Drypoint"
+            },
+            "H36": {
+              "value": "11.75"
+            },
+            "I36": {
+              "value": "7.75"
+            },
+            "J36": {
+              "value": "3683.232",
+              "formula": null
+            },
+            "K36": {
+              "value": "3780.0"
+            },
+            "L36": {
+              "value": "4604.04",
+              "formula": null
+            },
+            "M36": {
+              "value": "No"
+            },
+            "N36": {
+              "value": "45001.0"
+            },
+            "O36": {
+              "value": "Christies London"
+            },
+            "P36": {
+              "value": "On wove paper, signed in pencil, dated, titled, and numbered 1/50, second, final state (Karsch assumed the existence of a first state, but could not trace an example of it), a fine impression, printing with much burrr and a light plate tone, from the edition presumably published by the artist"
+            },
+            "Q36": {
+              "value": "5000.0"
+            },
+            "R36": {
+              "value": "8000.0"
+            },
+            "V36": {
+              "value": "No",
+              "formula": null
+            },
+            "W36": {
+              "value": "4604.04",
+              "formula": null
+            },
+            "X36": {
+              "value": "0",
+              "formula": null
+            },
+            "Y36": {
+              "value": "Otto Dix’s Technisches Personal (1922) comes from the same fertile postwar period as Internationaler Reitakt, when he turned to printmaking to deliver some of his most searing critiques of modern life. The title, meaning “technical staff,” reflects Dix’s fascination with the mechanization and depersonalization of society in the aftermath of World War I. Using the drypoint medium, he achieved intense textures and dramatic contrasts, with the burr of the line giving the image a raw, almost abrasive energy. As with many of his works from the early 1920s, the print exemplifies Dix’s role as a chronicler of Weimar Germany’s unsettling blend of technological progress, social change, and lingering trauma."
+            }
+          }
+        },
+        {
+          "row": 37,
+          "cells": {
+            "A37": {
+              "value": "33.0"
+            },
+            "C37": {
+              "value": "Schiefler & Mosel 165 "
+            },
+            "D37": {
+              "value": "Nolde, Emil"
+            },
+            "E37": {
+              "value": "Frau N. (Frau Ada Nolde)"
+            },
+            "F37": {
+              "value": "1911.0"
+            },
+            "G37": {
+              "value": "Etching and Drypoint"
+            },
+            "H37": {
+              "value": "9.0"
+            },
+            "I37": {
+              "value": "7.125"
+            },
+            "J37": {
+              "value": "2332.7136",
+              "formula": null
+            },
+            "K37": {
+              "value": "2394.0"
+            },
+            "L37": {
+              "value": "2915.892",
+              "formula": null
+            },
+            "M37": {
+              "value": "No"
+            },
+            "N37": {
+              "value": "45001.0"
+            },
+            "O37": {
+              "value": "Christies London"
+            },
+            "P37": {
+              "value": "On laid paper, signed in pencil, a good impression of the the third, final state, printed with a light plate tone, one of approximately twenty impressions of this state"
+            },
+            "Q37": {
+              "value": "4000.0"
+            },
+            "R37": {
+              "value": "6000.0"
+            },
+            "V37": {
+              "value": "No",
+              "formula": null
+            },
+            "W37": {
+              "value": "2915.892",
+              "formula": null
+            },
+            "X37": {
+              "value": "0",
+              "formula": null
+            },
+            "Y37": {
+              "value": "Emil Nolde’s Frau N. (Frau Ada Nolde) (1911) is an intimate etching and drypoint portrait of his wife, Ada, who was a frequent subject and an important muse throughout his career. Nolde, a leading figure of German Expressionism and a member of Die Brücke, brought an emotional intensity to his printmaking, using rough, expressive lines and dramatic contrasts to convey psychological depth. The combination of etching and drypoint gave his portraits a raw immediacy, with the plate tone adding to their atmospheric quality. With only about 20 impressions known, this rare print reflects both Nolde’s devotion to Ada and his innovative role in elevating printmaking as a modern expressive art form."
+            }
+          }
+        },
+        {
+          "row": 38,
+          "cells": {
+            "A38": {
+              "value": "34.0"
+            },
+            "C38": {
+              "value": "Anselmino 36"
+            },
+            "D38": {
+              "value": "Ray, Man"
+            },
+            "E38": {
+              "value": "L'Aventure"
+            },
+            "F38": {
+              "value": "1972.0"
+            },
+            "G38": {
+              "value": "Etching and Aquatint in colors"
+            },
+            "H38": {
+              "value": "S: 19 3/4"
+            },
+            "I38": {
+              "value": "26 S"
+            },
+            "J38": {
+              "value": "812.5",
+              "formula": "1.25*K38"
+            },
+            "K38": {
+              "value": "650.0"
+            },
+            "L38": {
+              "value": "1040",
+              "formula": "J38*1.28"
+            },
+            "M38": {
+              "value": "No"
+            },
+            "N38": {
+              "value": "45079.0"
+            },
+            "O38": {
+              "value": "Bonhams Knightsbridge"
+            },
+            "P38": {
+              "value": "On Arches wove paper, signed and numbered 45/90 in pencil, printed by Jaques David, Paris, published by Richard Binder Editeur, Brussels, with full margins."
+            },
+            "Q38": {
+              "value": "1500.0"
+            },
+            "R38": {
+              "value": "2500.0"
+            },
+            "V38": {
+              "value": "No",
+              "formula": null
+            },
+            "W38": {
+              "value": "1040",
+              "formula": null
+            },
+            "X38": {
+              "value": "0",
+              "formula": null
+            },
+            "Y38": {
+              "value": "Man Ray’s L’Aventure (1972) reflects the artist’s lifelong engagement with experimentation, symbolism, and the playful crossing of boundaries between art and life. Best known as a central figure in Dada and Surrealism, Man Ray brought his inventive spirit to printmaking later in his career, using etching and aquatint to explore bold color and form. Produced in Paris and published in Brussels, the print exemplifies his international presence and enduring influence on avant-garde art well into the 20th century. With its limited edition of just 90 impressions, L’Aventure captures the wit, imagination, and unconventional approach that made Man Ray one of the most original figures of modernism."
+            }
+          }
+        },
+        {
+          "row": 39,
+          "cells": {
+            "A39": {
+              "value": "35.0"
+            },
+            "C39": {
+              "value": "Coppel LT 30"
+            },
+            "D39": {
+              "value": "Tschudi, Lill"
+            },
+            "E39": {
+              "value": "Nudes"
+            },
+            "F39": {
+              "value": "1933.0"
+            },
+            "G39": {
+              "value": "Linocut"
+            },
+            "H39": {
+              "value": "10.25"
+            },
+            "I39": {
+              "value": "11.0"
+            },
+            "J39": {
+              "value": "3584",
+              "formula": "1.28*K39"
+            },
+            "K39": {
+              "value": "2800.0"
+            },
+            "L39": {
+              "value": "4515.84",
+              "formula": "1.26*J39"
+            },
+            "M39": {
+              "value": "No"
+            },
+            "N39": {
+              "value": "45265.0"
+            },
+            "O39": {
+              "value": "Bonhams New Bond Street"
+            },
+            "P39": {
+              "value": "Signed, titled and numbered 3/50 in pencil. Printed in cobalt blue, yellow ochre, pale reddish brown, darker reddish brown and dark blue, on tissue thin oriental laid paper, further signed, titled 'Aktgruppe' and dated '1933' in pencil in the lower margin.  Block 260 x 280mm (10 1/4 x 11in) - Sheet 285 x 350mm (11 1/4 x 13 3/4in)"
+            },
+            "Q39": {
+              "value": "5000.0"
+            },
+            "R39": {
+              "value": "9000.0"
+            },
+            "V39": {
+              "value": "No",
+              "formula": null
+            },
+            "W39": {
+              "value": "4515.84",
+              "formula": null
+            },
+            "X39": {
+              "value": "0",
+              "formula": null
+            },
+            "Y39": {
+              "value": "Lill Tschudi’s Nudes (1933) is a striking example of her mastery of the linocut, a medium she helped elevate within modern printmaking. A Swiss artist associated with the Grosvenor School of Modern Art in London, Tschudi was part of the pioneering group that used linocut to create bold, dynamic compositions in vivid colors. While she is often celebrated for her depictions of urban life and movement, Nudes shows her ability to apply the same rhythmic energy and stylized forms to the human figure. Printed in a sophisticated palette on delicate oriental paper, this rare edition of just 50 impressions demonstrates both her technical finesse and her central role in the modernist printmaking revival of the 1930s."
+            }
+          }
+        },
+        {
+          "row": 40,
+          "cells": {
+            "A40": {
+              "value": "36.0"
+            },
+            "C40": {
+              "value": "Mourlot 284; cf. Cramer books 43"
+            },
+            "D40": {
+              "value": "Chagall, Marc"
+            },
+            "E40": {
+              "value": "Le profile et l’enfant rouge"
+            },
+            "F40": {
+              "value": "1960.0"
+            },
+            "G40": {
+              "value": "Lithograph in colors"
+            },
+            "H40": {
+              "value": "13.0"
+            },
+            "I40": {
+              "value": "10.0"
+            },
+            "J40": {
+              "value": "2896.551724",
+              "formula": "K40/145"
+            },
+            "K40": {
+              "value": "420000.0"
+            },
+            "L40": {
+              "value": "3331.034483",
+              "formula": "J40*1.15"
+            },
+            "M40": {
+              "value": "YES"
+            },
+            "N40": {
+              "value": "45541.0"
+            },
+            "O40": {
+              "value": "Mainichi "
+            },
+            "P40": {
+              "value": "From Chagall Lithographe, Tome I. On Arches, signed in pencil, numbered 11/40 (Mourlot only calls for a de luxe edition of 100), published by André Sauret, with margins, some pale discoloration, otherwise generally in good condition   L. 330 x 277mm., S. 475 x 325mm. "
+            },
+            "Q40": {
+              "value": "4000.0"
+            },
+            "R40": {
+              "value": "6000.0"
+            },
+            "V40": {
+              "value": "YES",
+              "formula": null
+            },
+            "W40": {
+              "value": "0",
+              "formula": null
+            },
+            "X40": {
+              "value": "3331.034483",
+              "formula": null
+            },
+            "Y40": {
+              "value": "Marc Chagall’s Le profil et l’enfant rouge (1960) is a luminous lithograph created during one of the most prolific periods of his career, when he collaborated extensively with the master printer Fernand Mourlot in Paris. This work was included in Chagall Lithographe, Tome I, a landmark volume that helped establish his reputation as one of the greatest modern printmakers. Chagall’s lithographs are celebrated for their dreamlike quality, rich colors, and fusion of personal memory, folklore, and biblical symbolism—often evoking a sense of poetic wonder. With its small edition size and connection to the deluxe publication, this piece exemplifies the technical brilliance and imaginative spirit that made Chagall’s graphic works so influential in 20th-century art."
+            }
+          }
+        },
+        {
+          "row": 41,
+          "cells": {
+            "A41": {
+              "value": "37.0"
+            },
+            "D41": {
+              "value": "Murakami, Takeshi"
+            },
+            "E41": {
+              "value": "Hypha"
+            },
+            "F41": {
+              "value": "2007.0"
+            },
+            "G41": {
+              "value": "Offset lithograph"
+            },
+            "H41": {
+              "value": "25.75"
+            },
+            "I41": {
+              "value": "51.0"
+            },
+            "J41": {
+              "value": "965.5172414",
+              "formula": null
+            },
+            "K41": {
+              "value": "140000.0"
+            },
+            "L41": {
+              "value": "1110.344828",
+              "formula": null
+            },
+            "M41": {
+              "value": "YES"
+            },
+            "N41": {
+              "value": "45541.0"
+            },
+            "O41": {
+              "value": "Mainichi "
+            },
+            "P41": {
+              "value": "Hand signed  lower right - \"Hypha will cover the world, little by little. 'We should be able to get our hands on that door to the alien world soon. Wait 'til we get there!'\" - Shipping cost +$500 with the chagall 'Le profile et l'enfant rouge' "
+            },
+            "Q41": {
+              "value": "1500.0"
+            },
+            "R41": {
+              "value": "3000.0"
+            },
+            "V41": {
+              "value": "YES",
+              "formula": null
+            },
+            "W41": {
+              "value": "0",
+              "formula": null
+            },
+            "X41": {
+              "value": "1110.344828",
+              "formula": null
+            },
+            "Y41": {
+              "value": "Takeshi Murakami’s Hypha (2007) reflects his signature blending of contemporary pop culture with traditional Japanese artistic sensibilities, a style often described as “Superflat.” The title references the branching filaments of fungi, which grow and spread invisibly—an idea Murakami has linked to how art and ideas permeate global culture. By the mid-2000s, Murakami was already an international art star, collaborating with major brands like Louis Vuitton and shaping the intersection of fine art and commercial design. Works like Hypha embody both playful surface appeal and deeper commentary on organic growth, globalization, and the interconnectedness of cultural production."
+            }
+          }
+        },
+        {
+          "row": 42,
+          "cells": {
+            "A42": {
+              "value": "38.0"
+            },
+            "D42": {
+              "value": "Murakami, Takeshi"
+            },
+            "E42": {
+              "value": "A picture of the blessed lion who stares at death"
+            },
+            "F42": {
+              "value": "2009.0"
+            },
+            "G42": {
+              "value": "Offset Lithograph"
+            },
+            "H42": {
+              "value": "28.0"
+            },
+            "I42": {
+              "value": "55.0"
+            },
+            "J42": {
+              "value": "1066.666667",
+              "formula": "K42/150"
+            },
+            "K42": {
+              "value": "160000.0"
+            },
+            "L42": {
+              "value": "1242.666667",
+              "formula": "J42*1.165"
+            },
+            "M42": {
+              "value": "YES"
+            },
+            "N42": {
+              "value": "45569.0"
+            },
+            "O42": {
+              "value": "Mainichi "
+            },
+            "P42": {
+              "value": "Signed, numbered and dated 'Takashi Murakami lower right; printed with artist's copyright and titled\nPublished by Kaikai Kiki Co., Ltd., Tokyo in 2009. Takashi Murakami, A picture of the blessed lion who stares at death, offset print, Ed. 100 (per that entry), 27 3/8 × 54 7/8 in, Mainichi Auction Inc., Paintings, prints and sculpture, Tokyo, 4 Oct 2024, lot 540, illustrated p.149."
+            },
+            "Q42": {
+              "value": "2000.0"
+            },
+            "R42": {
+              "value": "4000.0"
+            },
+            "V42": {
+              "value": "YES",
+              "formula": null
+            },
+            "W42": {
+              "value": "0",
+              "formula": null
+            },
+            "X42": {
+              "value": "1242.666667",
+              "formula": null
+            },
+            "Y42": {
+              "value": "Takashi Murakami’s A Picture of the Blessed Lion Who Stares at Death (2009) is a striking example of his fusion of Buddhist iconography with contemporary pop aesthetics. The lion, a traditional guardian figure in East Asian art and temples, is reimagined through Murakami’s vivid colors and stylized forms, embodying both strength and spiritual transcendence. Created under his Kaikai Kiki studio in Tokyo, the work reflects his practice of producing limited-edition prints that make his art accessible while maintaining high artistic value. This piece also illustrates Murakami’s ongoing dialogue between life, death, and enlightenment, central themes in his body of work that bridge tradition and modernity."
+            }
+          }
+        },
+        {
+          "row": 43,
+          "cells": {
+            "A43": {
+              "value": "39.0"
+            },
+            "D43": {
+              "value": "Murakami, Takeshi"
+            },
+            "E43": {
+              "value": "And then, when that's done…"
+            },
+            "F43": {
+              "value": "2009.0"
+            },
+            "G43": {
+              "value": "Offset Lithograph"
+            },
+            "H43": {
+              "value": "19 3/4"
+            },
+            "I43": {
+              "value": "19 3/4"
+            },
+            "J43": {
+              "value": "925.0"
+            },
+            "L43": {
+              "value": "1077.625",
+              "formula": null
+            },
+            "M43": {
+              "value": "YES"
+            },
+            "N43": {
+              "value": "45623.0"
+            },
+            "O43": {
+              "value": "Tajan"
+            },
+            "P43": {
+              "value": "Offset lithograph. Signed and numbered \"179/300. Framed\n50 x 50 CM - 19 3/4 x 19 3/4 IN. Published by Kaikai Kiki Co., Ltd., Tokyo. Ref.: Kaikai Kiki (2008) Takashi Murakami Prints: “My First Art” Series; Tajan, Paris, 17 Nov 2010, lot 157, ill. p.112."
+            },
+            "Q43": {
+              "value": "1500.0"
+            },
+            "R43": {
+              "value": "2500.0"
+            },
+            "V43": {
+              "value": "YES",
+              "formula": null
+            },
+            "W43": {
+              "value": "0",
+              "formula": null
+            },
+            "X43": {
+              "value": "1077.625",
+              "formula": null
+            },
+            "Y43": {
+              "value": "Takashi Murakami’s And then, when that’s done… (2009) continues his exploration of the iconic “DOB” character, often interpreted as an alter ego and commentary on the commercialization of contemporary culture. Rendered here as an offset lithograph, the work exemplifies Murakami’s “Superflat” aesthetic, merging the slick surfaces of pop art with the layered references of traditional Japanese painting. The character’s wide-eyed, almost manic expression embodies both playful charm and unsettling intensity, reflecting Murakami’s interest in the dualities of innocence and anxiety within modern society. Published by Kaikai Kiki Co., Ltd. in Tokyo and produced in a limited edition of 300, the print underscores Murakami’s commitment to making his art accessible to a broad audience while retaining the exclusivity of fine art production. Exhibited and sold internationally, this piece demonstrates the enduring appeal of Murakami’s visual language, which seamlessly bridges high art, mass media, and global consumer culture."
+            }
+          }
+        },
+        {
+          "row": 44,
+          "cells": {
+            "A44": {
+              "value": "40.0"
+            },
+            "C44": {
+              "value": "Klipstein 240; Knesebeck 250"
+            },
+            "D44": {
+              "value": "Kollwitz, Käthe"
+            },
+            "E44": {
+              "value": "Zwei schwatzende Frauen mit zwei Kindern"
+            },
+            "F44": {
+              "value": "1930.0"
+            },
+            "G44": {
+              "value": "Lithograph"
+            },
+            "H44": {
+              "value": "15 5/8"
+            },
+            "I44": {
+              "value": "10 1/4"
+            },
+            "J44": {
+              "value": "1400.0"
+            },
+            "L44": {
+              "value": "1778.0"
+            },
+            "M44": {
+              "value": "YES"
+            },
+            "N44": {
+              "value": "45918.0"
+            },
+            "O44": {
+              "value": "Swann Auction Galleries"
+            },
+            "P44": {
+              "value": "Edition of 150; signed in pencil; Klipstein 240; Knesebeck 250; Lot 113"
+            },
+            "Q44": {
+              "value": "2000.0"
+            },
+            "R44": {
+              "value": "4000.0"
+            },
+            "Y44": {
+              "value": "Käthe Kollwitz was a German artist celebrated for her powerful portrayals of human suffering and resilience. This print (Klipstein 240; Knesebeck 250) is one of her iconic graphic works, noted for its stark emotional intensity and masterful draftsmanship. Kollwitz’s etchings and lithographs remain central to 20th-century German Expressionism."
+            }
+          }
+        },
+        {
+          "row": 45,
+          "cells": {
+            "A45": {
+              "value": "41.0"
+            },
+            "C45": {
+              "value": "Mourlot 500"
+            },
+            "D45": {
+              "value": "Miró, Joan"
+            },
+            "E45": {
+              "value": "Exhibition XXII Salon de Mai"
+            },
+            "F45": {
+              "value": "1966.0"
+            },
+            "G45": {
+              "value": "Color lithograph"
+            },
+            "H45": {
+              "value": "26 1/2"
+            },
+            "I45": {
+              "value": "20 3/8"
+            },
+            "J45": {
+              "value": "2200.0"
+            },
+            "L45": {
+              "value": "2794.0"
+            },
+            "M45": {
+              "value": "YES"
+            },
+            "N45": {
+              "value": "45918.0"
+            },
+            "O45": {
+              "value": "Swann Auction Galleries"
+            },
+            "P45": {
+              "value": "Signed and numbered 44/100; printed by Mourlot, Paris; published by Salon de Mai, Paris; Mourlot 500; Lot 203"
+            },
+            "Q45": {
+              "value": "3000.0"
+            },
+            "R45": {
+              "value": "5000.0"
+            },
+            "Y45": {
+              "value": "Joan Miró’s Mourlot 500 belongs to his prolific body of color lithographs produced in collaboration with the master printer Fernand Mourlot. This print exemplifies Miró’s signature biomorphic shapes, playful abstraction, and vibrant use of primary colors. Works from the Mourlot series are highly regarded for capturing Miró’s whimsical yet deeply modernist vision."
+            }
+          }
+        },
+        {
+          "row": 46,
+          "cells": {
+            "A46": {
+              "value": "42.0"
+            },
+            "C46": {
+              "value": "Foster 34"
+            },
+            "D46": {
+              "value": "Rauschenberg, Robert"
+            },
+            "E46": {
+              "value": "Dawn Galley Print"
+            },
+            "F46": {
+              "value": "1965.0"
+            },
+            "G46": {
+              "value": "Offset print"
+            },
+            "H46": {
+              "value": "22.75"
+            },
+            "I46": {
+              "value": "24.75"
+            },
+            "J46": {
+              "value": "375.0"
+            },
+            "L46": {
+              "value": "480.0"
+            },
+            "M46": {
+              "value": "YES"
+            },
+            "N46": {
+              "value": "45918.0"
+            },
+            "O46": {
+              "value": "Clars Auction Gallery"
+            },
+            "P46": {
+              "value": "Pencil-signed and dated lower right; Listing ID 1-B6FKRT / 5198"
+            },
+            "Q46": {
+              "value": "750.0"
+            },
+            "R46": {
+              "value": "1500.0"
+            },
+            "Y46": {
+              "value": "Robert Rauschenberg’s Foster 34 is part of his innovative printmaking practice, where he combined photographic imagery with experimental processes. A leading figure of post-war American art, Rauschenberg bridged Abstract Expressionism and Pop Art. This edition highlights his interest in layering, collage aesthetics, and the interplay between high art and mass culture."
+            }
+          }
+        },
+        {
+          "row": 47,
+          "cells": {
+            "A47": {
+              "value": "43.0"
+            },
+            "C47": {
+              "value": "Fürst HGW 57"
+            },
+            "D47": {
+              "value": "Hundertwasser, Friedensreich"
+            },
+            "E47": {
+              "value": "Green Power"
+            },
+            "F47": {
+              "value": "1972.0"
+            },
+            "G47": {
+              "value": "Screenprint with metal embossing"
+            },
+            "H47": {
+              "value": "30.0"
+            },
+            "I47": {
+              "value": "22.0"
+            },
+            "J47": {
+              "value": "2250.0"
+            },
+            "L47": {
+              "value": "2880.0"
+            },
+            "M47": {
+              "value": "YES"
+            },
+            "N47": {
+              "value": "45926.0"
+            },
+            "O47": {
+              "value": "Freeman’s | Hindman"
+            },
+            "P47": {
+              "value": "Signed and numbered 145/249; published by Gruener Janura AG, Glarus & Ugo Meneghini, Venice; printed by Studio Quattro, Venice; Lot 37"
+            },
+            "Q47": {
+              "value": "3000.0"
+            },
+            "R47": {
+              "value": "5000.0"
+            },
+            "Y47": {
+              "value": "Hundertwasser’s Fürst HGW 57 is an example of his vividly colored, organic print editions, filled with spirals, biomorphic forms, and architectural fantasy. Hundertwasser rejected straight lines in favor of nature’s irregularity, and his graphic works embody his ecological and humanist philosophy. This piece reflects his joyful, idiosyncratic visual language."
+            }
+          }
+        },
+        {
+          "row": 48,
+          "cells": {
+            "A48": {
+              "value": "44.0"
+            },
+            "C48": {
+              "value": "Lankheit 829"
+            },
+            "D48": {
+              "value": "Marc, Franz"
+            },
+            "E48": {
+              "value": "Schlafende Hirtin"
+            },
+            "F48": {
+              "value": "1912.0"
+            },
+            "G48": {
+              "value": "Woodcut"
+            },
+            "H48": {
+              "value": "7 3/4"
+            },
+            "I48": {
+              "value": "9 3/8"
+            },
+            "J48": {
+              "value": "4000.0"
+            },
+            "L48": {
+              "value": "5080.0"
+            },
+            "M48": {
+              "value": "YES"
+            },
+            "N48": {
+              "value": "45930.0"
+            },
+            "O48": {
+              "value": "John Moran"
+            },
+            "P48": {
+              "value": "Woodcut printed from the original 1912 block on thin Japan paper; sheet c.7¾ × 9⅜ in. The print bears Marc’s stylised “M” plus widow’s signature and an estate stamp. Slight uninked horizontal line from a crack in the block; otherwise good. Estimate $7,000–$9,000; current bid $3,500."
+            },
+            "Q48": {
+              "value": "6000.0"
+            },
+            "R48": {
+              "value": "12000.0"
+            },
+            "Y48": {
+              "value": "Franz Marc’s Schlafende Hirtin (1912) is a rare woodcut from the artist’s groundbreaking Der Blaue Reiter period. With its simplified forms and lyrical symbolism, the print reflects Marc’s search for spiritual harmony between humanity and nature. This impression, authenticated by Maria Marc’s signature and the estate stamp, is characteristic of the very limited editions that survive. A cornerstone of German Expressionist printmaking, it offers collectors a scarce opportunity to acquire a work that embodies both Marc’s artistic vision and the enduring legacy of early modernism."
+            }
+          }
+        },
+        {
+          "row": 49,
+          "cells": {
+            "A49": {
+              "value": "45.0"
+            },
+            "C49": {
+              "value": "Wright 20"
+            },
+            "D49": {
+              "value": "Flint, Sir William Russell"
+            },
+            "E49": {
+              "value": "Slippery Steps"
+            },
+            "F49": {
+              "value": "1929.0"
+            },
+            "G49": {
+              "value": "Etching"
+            },
+            "H49": {
+              "value": "9 1/2"
+            },
+            "I49": {
+              "value": "6 3/4"
+            },
+            "J49": {
+              "value": "280.0"
+            },
+            "L49": {
+              "value": "350.0"
+            },
+            "M49": {
+              "value": "YES"
+            },
+            "N49": {
+              "value": "45941.0"
+            },
+            "O49": {
+              "value": "Bradford's"
+            },
+            "P49": {
+              "value": "Etching on paper, pencil‑signed lower right; numbered “XLVIII” (48/??), edition likely <75. Plate ≈ 9.5 × 6.75 in. Great condition with slight wear. Classic British subject."
+            },
+            "Q49": {
+              "value": "750.0"
+            },
+            "R49": {
+              "value": "1500.0"
+            },
+            "Y49": {
+              "value": "Sir William Russell Flint’s Slippery Steps exemplifies the artist’s mastery of the etched line and his enduring fascination with atmosphere, elegance, and movement. Executed with exquisite control, the composition captures a fleeting, light-struck moment typical of Flint’s celebrated portrayals of women in intimate European settings. Printed on fine Whatman paper and delicately hand-signed by the artist, this impression conveys the silken tonal transitions and crisp draughtsmanship that define Flint’s best graphic work. Issued in a small numbered edition, Slippery Steps represents Flint’s ability to merge technical precision with poetic grace. For collectors of early-twentieth-century British etching, it stands as both a testament to the artist’s refinement and a touchstone of the “etching revival” that placed Flint among the leading printmakers of his generation."
+            }
+          }
+        },
+        {
+          "row": 50,
+          "cells": {
+            "A50": {
+              "value": "46.0"
+            },
+            "C50": {
+              "value": "Gallery Ref. BD1043"
+            },
+            "D50": {
+              "value": "Bustion, Nathaniel"
+            },
+            "E50": {
+              "value": "African Girl"
+            },
+            "F50": {
+              "value": "1997.0"
+            },
+            "G50": {
+              "value": "Screenprint"
+            },
+            "H50": {
+              "value": "18 3/4"
+            },
+            "I50": {
+              "value": "13 1/4"
+            },
+            "J50": {
+              "value": "130.0"
+            },
+            "L50": {
+              "value": "162.5"
+            },
+            "M50": {
+              "value": "YES"
+            },
+            "N50": {
+              "value": "45941.0"
+            },
+            "O50": {
+              "value": "Bradford's"
+            },
+            "P50": {
+              "value": "Screenprint on paper, pencil‑signed and numbered AP 4/15 (edition 15). Image 18.75 × 13.25 in; APs often sought after. Good; minor wear to frame. Extremely low current bid ($5) for a scarce African‑American edition."
+            },
+            "Q50": {
+              "value": "250.0"
+            },
+            "R50": {
+              "value": "500.0"
+            },
+            "Y50": {
+              "value": "Screenprint on paper, pencil-signed lower right, artist’s proof 4/15. Created in 1997, Nathaniel Bustion’s African Girl embodies the artist’s vibrant engagement with identity, rhythm, and cultural memory. Using the layered luminosity of the screenprint medium, Bustion distills his subject into bold planes of color and sculptural contour, evoking both modernist abstraction and the visual cadences of African art. The poised figure—at once iconic and intimate—reflects Bustion’s lifelong exploration of Black womanhood and the strength and dignity of everyday experience. Printed in a rare artist’s proof edition of only fifteen impressions, this work demonstrates the meticulous craft and expressive power that define Bustion’s late-twentieth-century practice. With its dynamic balance of form and hue, African Girl stands as a compelling testament to the artist’s vision—bridging modern printmaking technique and the affirming spirit of the African diaspora in contemporary American art."
+            }
+          }
+        },
+        {
+          "row": 51,
+          "cells": {
+            "A51": {
+              "value": "47.0"
+            },
+            "C51": {
+              "value": "Spies/Leppien 53/C"
+            },
+            "D51": {
+              "value": "Ernst, Max"
+            },
+            "E51": {
+              "value": "Zu Kurt Schwitters: La Loterie du Jardin Zoologique"
+            },
+            "F51": {
+              "value": "1951.0"
+            },
+            "G51": {
+              "value": "Etching, hand-colored"
+            },
+            "H51": {
+              "value": "4 3/4"
+            },
+            "I51": {
+              "value": "3 1/2"
+            },
+            "J51": {
+              "value": "1600.0"
+            },
+            "L51": {
+              "value": "2000.0"
+            },
+            "M51": {
+              "value": "YES"
+            },
+            "N51": {
+              "value": "45942.0"
+            },
+            "O51": {
+              "value": "Bradford's"
+            },
+            "P51": {
+              "value": "Artist: Max Ernst (1891–1976). Medium: Etching with hand-coloring on paper. Signature: Pencil-signed lower right (“Max Ernst”). Edition: 2/12. Printer: Georges Visat. Publisher: Librairie Les Pas Perdus, Paris. Date: Circa 1951. Image size: 4.75 × 3.5 in (12 × 9 cm) Framed size: 14 × 11.75 in. Condition: Excellent, with light age wear. See Full Report Here."
+            },
+            "Q51": {
+              "value": "5000.0"
+            },
+            "R51": {
+              "value": "12000.0"
+            },
+            "Y51": {
+              "value": "Max Ernst’s Zu: Kurt Schwitters, La Loterie du Jardin Zoologique (1951) is a rare etching with hand-coloring from a deluxe edition of only twelve impressions, printed by Georges Visat in Paris and published by Librairie Les Pas Perdus. The work pays homage to Ernst’s fellow Dadaist Kurt Schwitters, merging playful surrealist chance imagery with precise intaglio technique. Each impression was individually hand-colored, resulting in subtle variations and making every sheet unique. This impression, numbered 2/12, bears full provenance from its first recorded sale at Butterfield & Butterfield in 1998 to its subsequent offering at Bradford’s Auction Gallery in 2025."
+            }
+          }
+        },
+        {
+          "row": 52,
+          "cells": {
+            "A52": {
+              "value": "48.0"
+            },
+            "C52": {
+              "value": "Klipstein 122 / Richter ed. of 30"
+            },
+            "D52": {
+              "value": "Kollwitz, Käthe"
+            },
+            "E52": {
+              "value": "Selbstbildnis"
+            },
+            "F52": {
+              "value": "1912.0"
+            },
+            "G52": {
+              "value": "Etching & aquatint in sepia on wove paper"
+            },
+            "H52": {
+              "value": "5 1/2"
+            },
+            "I52": {
+              "value": "3.9"
+            },
+            "J52": {
+              "value": "715.0"
+            },
+            "K52": {
+              "value": "1000.0"
+            },
+            "L52": {
+              "value": "894.0"
+            },
+            "M52": {
+              "value": "YES"
+            },
+            "N52": {
+              "value": "45960.0"
+            },
+            "O52": {
+              "value": "Waddington's"
+            },
+            "P52": {
+              "value": "Artist: Käthe Kollwitz (1867–1945). Medium: Etching and aquatint in sepia on wove paper. Signature: Pencil-signed lower right (“Käthe Kollwitz”); plate-signed lower right within image. Edition: From the edition of 30, published circa 1920 by Emil Richter, Dresden. Catalogue Raisonné: Klipstein 122 (VII state). Image size: 5.5 × 3.9 in (14 × 9.9 cm); sheet 12.8 × 9.6 in (32.5 × 24.5 cm). Provenance: Private Collection, Westmount QC → Waddington’s, Toronto (11 Apr 2019, Lot 175) → Private Collection, Toronto ON → Waddington’s Editions Sale (30 Oct 2025, Lot 14). Condition: Very good overall; minor surface accretions in upper-left and lower-right margins only. Notes: A finely printed, lifetime Richter-edition impression showing warm plate tone and full margins. See Full Report Here."
+            },
+            "Q52": {
+              "value": "1250.0"
+            },
+            "R52": {
+              "value": "2500.0"
+            },
+            "Y52": {
+              "value": "Käthe Kollwitz’s Selbstbildnis (1912) is one of the artist’s most intimate and widely recognized etched self-portraits, executed at the height of her mature period. Printed in sepia aquatint and etching, this striking image belongs to the scarce Emil Richter edition of thirty impressions issued circa 1920. Each was hand-signed by Kollwitz, reflecting her personal oversight of the printing. The work demonstrates her masterful balance of strength and vulnerability through densely hatched lines and luminous chiaroscuro. This impression bears full, untrimmed margins and rich plate tone characteristic of early pulls. Its provenance traces from a private collection in Westmount, Quebec, to Waddington’s (Toronto) in 2019 and again in 2025, confirming a continuous and well-documented ownership history."
+            }
+          }
+        },
+        {
+          "row": 53,
+          "cells": {
+            "A53": {
+              "value": "49.0"
+            },
+            "C53": {
+              "value": "Abe Catalogue #094 / Lifetime jizuri"
+            },
+            "D53": {
+              "value": "Yoshida, Hiroshi"
+            },
+            "E53": {
+              "value": "Study of a Nude (Shūsaku)"
+            },
+            "F53": {
+              "value": "1927.0"
+            },
+            "G53": {
+              "value": "Woodblock in colors with ink on wove paper"
+            },
+            "H53": {
+              "value": "14.6"
+            },
+            "I53": {
+              "value": "9.8"
+            },
+            "J53": {
+              "value": "787.0"
+            },
+            "K53": {
+              "value": "1100.0"
+            },
+            "L53": {
+              "value": "984.0"
+            },
+            "M53": {
+              "value": "YES"
+            },
+            "N53": {
+              "value": "45960.0"
+            },
+            "O53": {
+              "value": "Waddington's"
+            },
+            "P53": {
+              "value": "On wove paper. Pencil-signed and titled in the lower margin; red jizuri (self-printed) seal in left margin. Edition: Lifetime edition printed under the artist’s supervision; Abe Catalogue #094. Image size: 14.6 × 9.8 in (37.1 × 24.8 cm). Provenance: Private Collection, Toronto ON → Waddington’s Editions Sale (30 Oct 2025, Lot 53). Condition: Good overall condition with minor scattered creases at edges and a small accretion in the lower-right corner; not examined out of frame. Notes: Richly inked impression with brilliant gold-mica background and delicate color transitions in the flesh tones—an outstanding example of Yoshida’s technical refinement."
+            },
+            "Q53": {
+              "value": "800.0"
+            },
+            "R53": {
+              "value": "1200.0"
+            },
+            "Y53": {
+              "value": "Hiroshi Yoshida’s Study of a Nude (Shūsaku) (1927) is among the artist’s rare Western-style figure studies, revealing his fusion of Japanese woodblock technique with European realism. Printed in subtle gradations of rose, ochre, and gold, the work exemplifies Yoshida’s technical brilliance and sensitivity to human form. Each lifetime impression bears the artist’s pencil signature, title, and the red jizuri (self-printed) seal—attesting that the print was pulled under Yoshida’s direct supervision at his Tokyo workshop. The present sheet, noted for its luminous mica background and well-preserved color balance, descends from a Toronto private collection and was acquired at Waddington’s Editions Sale (October 2025). Comparable impressions have achieved strong results at Mainichi Auction (Tokyo) and Bonhams (London), underscoring its desirability among collectors of early modern Japanese printmaking."
+            }
+          }
+        },
+        {
+          "row": 54,
+          "cells": {
+            "A54": {
+              "value": "50.0"
+            },
+            "C54": {
+              "value": "Creekmore Fath, The Lithographs of Thomas Hart Benton, University of Texas Press, 1979, 42."
+            },
+            "D54": {
+              "value": "Benton, Thomas Hart "
+            },
+            "E54": {
+              "value": "Aaron"
+            },
+            "F54": {
+              "value": "1940.0"
+            },
+            "G54": {
+              "value": "Lithograph "
+            },
+            "H54": {
+              "value": "12 3/4"
+            },
+            "I54": {
+              "value": "9 1/2"
+            },
+            "J54": {
+              "value": "750.0"
+            },
+            "L54": {
+              "value": "893.0"
+            },
+            "M54": {
+              "value": "YES"
+            },
+            "N54": {
+              "value": "45997.0"
+            },
+            "O54": {
+              "value": "Circle Auction"
+            },
+            "P54": {
+              "value": "Pencil-signed and inscribed to the bottom margin. Circulated by Associated American Artists. Matted to 18\" x 14\", not framed."
+            },
+            "Q54": {
+              "value": "1500.0"
+            },
+            "R54": {
+              "value": "4000.0"
+            },
+            "Y54": {
+              "value": "Of Aaron, Benton wrote: \"Aaron with his staff. This old negro man was picked up by one of my students on East 18th St. in Kansas City and was persuaded to come to my class at the Kansas City Art Institute to pose. I painted a 3/4 length portrait of him with both hands showing around the staff. The portrait was purchase by The Philadelphia Academy in the early ’40s. This lithographic head was done from the painting.\" Literature: Creekmore Fath, The Lithographs of Thomas Hart Benton, University of Texas Press, 1979, 42. Condition: The sheet is not laid down. Full margins. Light tan crescent-shaped stain to the bottom margin."
+            }
+          }
+        },
+        {
+          "row": 55,
+          "cells": {
+            "A55": {
+              "value": "51.0"
+            },
+            "C55": {
+              "value": "Bourcard and Goodfriend 128 v/IX"
+            },
+            "D55": {
+              "value": "Buhot, Felix"
+            },
+            "E55": {
+              "value": "L'Hiver A Paris"
+            },
+            "F55": {
+              "value": "1879.0"
+            },
+            "G55": {
+              "value": "etching, drypoint, aquatint, sulphur tint, softground and roulette"
+            },
+            "H55": {
+              "value": "9 5/16"
+            },
+            "I55": {
+              "value": "13 5/8"
+            },
+            "J55": {
+              "value": "140.0"
+            },
+            "L55": {
+              "value": "188.0"
+            },
+            "M55": {
+              "value": "YES"
+            },
+            "N55": {
+              "value": "45997.0"
+            },
+            "O55": {
+              "value": "Rachel Davis"
+            },
+            "P55": {
+              "value": "L'Hiver A Paris; etching, drypoint, aquatint, sulphur tint, softground and roulette, 1879.  9 5/16 x 13 5/8\". Literature: Bourcard and Goodfriend 128 v/IX. Condition: Slightly light struck."
+            },
+            "Q55": {
+              "value": "500.0"
+            },
+            "R55": {
+              "value": "1000.0"
+            },
+            "Y55": {
+              "value": "A richly worked print combining etching, drypoint, aquatint, sulphur tint, softground, and roulette to capture a bustling Parisian winter street scene with atmospheric detail. From Buhot’s admired “noisy prints,” the sheet shows slight light-strike but retains strong impression and texture."
+            }
+          }
+        },
+        {
+          "row": 56,
+          "cells": {
+            "A56": {
+              "value": "52.0"
+            },
+            "C56": {
+              "value": "McCarron 103"
+            },
+            "D56": {
+              "value": "Lewis, Martin"
+            },
+            "E56": {
+              "value": "Circus Night"
+            },
+            "F56": {
+              "value": "1933.0"
+            },
+            "G56": {
+              "value": "drypoint on laid paper"
+            },
+            "H56": {
+              "value": "12 1/8"
+            },
+            "I56": {
+              "value": "15 1/2"
+            },
+            "J56": {
+              "value": "10000.0"
+            },
+            "L56": {
+              "value": "13176.0"
+            },
+            "M56": {
+              "value": "YES"
+            },
+            "N56": {
+              "value": "45997.0"
+            },
+            "O56": {
+              "value": "Simpson"
+            },
+            "P56": {
+              "value": "Condition: with a shadow of toning around the image extending 1/2 inch into the margins. Otherwise no visible damage. Framed under acrylic. Provenance: Property of a National Insurance Company. Drypoint on laid paper, signed lower right, \"Martin Lewis,\" from the edition of 43, McCarron 103."
+            },
+            "Q56": {
+              "value": "15000.0"
+            },
+            "R56": {
+              "value": "25000.0"
+            },
+            "Y56": {
+              "value": "A nocturnal urban drypoint showing crowds gathered under bright circus lights, with Lewis’s signature mastery of chiaroscuro and atmospheric glow. Signed lower right and from the edition of 43, on laid paper, with only faint toning at the margins visible under acrylic."
+            }
+          }
+        },
+        {
+          "row": 57,
+          "cells": {
+            "A57": {
+              "value": "53.0"
+            },
+            "D57": {
+              "value": "Murakami, Takeshi"
+            },
+            "E57": {
+              "value": "And Then x 6 Marine Blue The Superflat Method"
+            },
+            "F57": {
+              "value": "2013.0"
+            },
+            "G57": {
+              "value": "offset lithograph on paper"
+            },
+            "H57": {
+              "value": "19 5/8"
+            },
+            "I57": {
+              "value": "19 5/8"
+            },
+            "J57": {
+              "value": "1100.0"
+            },
+            "L57": {
+              "value": "1449.0"
+            },
+            "M57": {
+              "value": "YES"
+            },
+            "N57": {
+              "value": "45997.0"
+            },
+            "O57": {
+              "value": "Simpson"
+            },
+            "P57": {
+              "value": "TAKASHI MURAKAMI (Japanese b. 1962) \"And Then (A Deep Ocean of Ultramarine),\" 2013, offset lithograph on paper, signed and numbered lower right, \"TM 138/300,\" co-published by the artist and Kaikai Kiki Co. Ltd., Tokyo, Japan and New York, New York.Provenance: Collection of Gabriela Oliveira, Garden City, Idaho. Dimensions: 19 5/8 x 19 5/8 in. (49.8 x 49.8 cm.) Condition: There are no visible signs of damage."
+            },
+            "Q57": {
+              "value": "1500.0"
+            },
+            "R57": {
+              "value": "2500.0"
+            },
+            "Y57": {
+              "value": "This offset lithograph belongs to Takashi Murakami’s celebrated “And Then” series, characterized by immersive and hypnotic chromatic intensity. Dominated by a deep ultramarine ground, the composition is animated by subtle variations in color—particularly in the eyes and facial elements—giving each impression a distinctive visual rhythm despite its serial format. Murakami’s offset prints are produced through highly controlled, multi-stage processes that achieve exceptional sharpness, saturation, and surface complexity. For collectors, the work is especially appealing as a refined example of Murakami’s print practice, combining technical sophistication, visual richness, and the quiet uniqueness that distinguishes individual impressions within this iconic series."
+            }
+          }
+        },
+        {
+          "row": 58,
+          "cells": {
+            "A58": {
+              "value": "54.0"
+            },
+            "C58": {
+              "value": "Smithsonian-AAA.neimlero"
+            },
+            "D58": {
+              "value": "Neiman, LeRoy"
+            },
+            "E58": {
+              "value": "High Sea Sailings"
+            },
+            "F58": {
+              "value": "1995.0"
+            },
+            "G58": {
+              "value": "serigraph in color"
+            },
+            "H58": {
+              "value": "25 3/4"
+            },
+            "I58": {
+              "value": "18 1/4"
+            },
+            "J58": {
+              "value": "150.0"
+            },
+            "L58": {
+              "value": "200.0"
+            },
+            "M58": {
+              "value": "YES"
+            },
+            "N58": {
+              "value": "45997.0"
+            },
+            "O58": {
+              "value": "Rachel Davis"
+            },
+            "P58": {
+              "value": "Serigraph in color on paper, signed by the artist in pen (faded) lower right. Image depicts a dynamic nautical scene with bold movement and vivid blues. Sheet measures approximately 25 3/4 × 18 1/4 in. Signed in pen lower right — signature is somewhat faded but still legible."
+            },
+            "Q58": {
+              "value": "500.0"
+            },
+            "R58": {
+              "value": "1000.0"
+            },
+            "Y58": {
+              "value": "LeRoy Neiman (American, 1921–2012) is known for his energetic, expressionistic style and vibrant portrayals of sports, entertainment, and leisure culture. “High Sea Sailings” showcases Neiman’s layered color approach and active mark-making, capturing both motion and atmosphere. This vibrant serigraph exemplifies LeRoy Neiman’s dynamic approach to movement, color, and spectacle, hallmarks of his celebrated late-career work. Known internationally for his depictions of major sporting and leisure events, Neiman captures the exhilaration of open-water sailing through energetic mark-making and saturated hues. Created in 1995, the print reflects the artist’s mature mastery of the serigraph medium, which allowed him to translate the spontaneity of his painting into richly layered color. For collectors, High Sea Sailings is especially appealing as a strong, recognizable example of Neiman’s iconic style, combining visual immediacy with the enduring popularity of his nautical and sports imagery in the secondary market."
+            }
+          }
+        },
+        {
+          "row": 59,
+          "cells": {
+            "A59": {
+              "value": "55.0"
+            },
+            "C59": {
+              "value": "Delteil 3"
+            },
+            "D59": {
+              "value": "Millet, Jean-François"
+            },
+            "E59": {
+              "value": "Man leaning on his spade"
+            },
+            "F59": {
+              "value": "c. 1860"
+            },
+            "G59": {
+              "value": "Etching"
+            },
+            "H59": {
+              "value": "2 5/8"
+            },
+            "I59": {
+              "value": "3 5/16"
+            },
+            "J59": {
+              "value": "440.8",
+              "formula": "1.16*K59"
+            },
+            "K59": {
+              "value": "380.0"
+            },
+            "L59": {
+              "value": "573.04",
+              "formula": "1.3*J59"
+            },
+            "M59": {
+              "value": "YES"
+            },
+            "N59": {
+              "value": "46001.0"
+            },
+            "O59": {
+              "value": "Ader"
+            },
+            "P59": {
+              "value": "Delteil 3; fine proof printed in brown on thin ivory vellum; small normal margins"
+            },
+            "Q59": {
+              "value": "750.0"
+            },
+            "R59": {
+              "value": "2000.0"
+            },
+            "Y59": {
+              "value": "This etching exemplifies Jean-François Millet’s radical elevation of rural labor to a subject of moral and artistic gravity, a vision that profoundly influenced later realists and modernists, including Van Gogh. The solitary figure—caught between effort and repose—embodies Millet’s belief in the quiet heroism of peasant life, rendered through an economy of line that gives the image unusual emotional force. Created during the height of the Barbizon movement, the work reflects Millet’s direct engagement with agricultural life around Barbizon rather than academic idealization. For collectors, Millet’s etchings are especially appealing for their rarity relative to his paintings and for offering a direct, intimate expression of the ideas that shaped nineteenth-century social realism."
+            }
+          }
+        },
+        {
+          "row": 60,
+          "cells": {
+            "A60": {
+              "value": "56.0"
+            },
+            "C60": {
+              "value": "Guérin 291"
+            },
+            "D60": {
+              "value": "Maillol, Aristide"
+            },
+            "E60": {
+              "value": "Nude woman seated, drapery"
+            },
+            "F60": {
+              "value": "c. early 20th c."
+            },
+            "G60": {
+              "value": "Lithograph"
+            },
+            "H60": {
+              "value": "9 1/16"
+            },
+            "I60": {
+              "value": "7 1/8"
+            },
+            "J60": {
+              "value": "208.8",
+              "formula": null
+            },
+            "K60": {
+              "value": "180.0"
+            },
+            "L60": {
+              "value": "271.44",
+              "formula": null
+            },
+            "M60": {
+              "value": "YES"
+            },
+            "N60": {
+              "value": "46001.0"
+            },
+            "O60": {
+              "value": "Ader"
+            },
+            "P60": {
+              "value": "Guérin 291; very fine proof on Montval laid paper; signed with monogram in pencil; full margins; dry stamp H. Petiet"
+            },
+            "Q60": {
+              "value": "500.0"
+            },
+            "R60": {
+              "value": "1500.0"
+            },
+            "Y60": {
+              "value": "This lithograph reflects Aristide Maillol’s classical approach to the female form, emphasizing harmony, weight, and sculptural calm. The seated nude, partially enveloped in drapery, is rendered with simplified contours and balanced proportions that echo Maillol’s work as a sculptor. Rejecting expressive excess, the composition conveys a timeless serenity rooted in classical tradition. The print exemplifies Maillol’s pursuit of idealized form and quiet monumentality in modern art. Presenting Sculptural serenity over anecdote or symbolism. Closely aligned with his work in stone and bronze, the composition demonstrates Maillol’s conviction that modern art could renew classical ideals through simplification and restraint. Unlike many printmakers, Maillol treated graphic works as extensions of his sculptural practice, giving his prints a distinctive sense of volume and permanence. Collectors value Maillol’s lithographs for their clarity of form and for providing access to the artist’s core aesthetic at a scale and intimacy unavailable in his monumental sculpture."
+            }
+          }
+        },
+        {
+          "row": 61,
+          "cells": {
+            "A61": {
+              "value": "57.0"
+            },
+            "C61": {
+              "value": "Ginestet & Pouillon 670"
+            },
+            "D61": {
+              "value": "Picasso, Pablo (after)"
+            },
+            "E61": {
+              "value": "Maternity"
+            },
+            "F61": {
+              "value": "1930.0"
+            },
+            "G61": {
+              "value": "Etching and aquatint (color)"
+            },
+            "H61": {
+              "value": "16 9/16"
+            },
+            "I61": {
+              "value": "25 9/16"
+            },
+            "J61": {
+              "value": "5800",
+              "formula": null
+            },
+            "K61": {
+              "value": "5000.0"
+            },
+            "L61": {
+              "value": "7540",
+              "formula": null
+            },
+            "M61": {
+              "value": "YES"
+            },
+            "N61": {
+              "value": "46001.0"
+            },
+            "O61": {
+              "value": "Ader"
+            },
+            "P61": {
+              "value": "Ginestet & Pouillon 670; very fine proof on vellum; numbered and signed in pencil by Picasso; mounted on cardboard; edition of 200; Bernheim-Jeune"
+            },
+            "Q61": {
+              "value": "8000.0"
+            },
+            "R61": {
+              "value": "12000.0"
+            },
+            "Y61": {
+              "value": "Maternity reflects Picasso’s sustained engagement with themes of motherhood and tenderness during a pivotal period shaped by his relationship with Marie-Thérèse Walter. Executed in etching and aquatint with delicate color, the work demonstrates Picasso’s belief that printmaking could rival painting in emotional subtlety and formal invention. Images of maternity recur throughout his career, but works from this period are especially admired for their lyrical calm and classical balance. For collectors, the print offers a compelling combination of intimacy, technical sophistication, and a central theme within Picasso’s broader oeuvre. Maternity belongs to Picasso’s profound exploration of motherhood and familial intimacy during the late 1920s and early 1930s, a period shaped by his relationship with Marie-Thérèse Walter. Executed in etching and aquatint with subtle color, the work demonstrates Picasso’s mastery of printmaking as an expressive medium equal to painting. Images of maternity recur throughout Picasso’s career, but works from this period are particularly prized for their tenderness and classical calm. The composition bridges modern abstraction and ancient archetype, reinforcing Picasso’s ability to renew timeless themes through radical economy of form."
+            }
+          }
+        },
+        {
+          "row": 62,
+          "cells": {
+            "A62": {
+              "value": "58.0"
+            },
+            "C62": {
+              "value": "Bloch 77; Baer 118 b 2; Johnson 91"
+            },
+            "D62": {
+              "value": "Picasso, Pablo"
+            },
+            "E62": {
+              "value": "Man and Woman"
+            },
+            "F62": {
+              "value": "1927.0"
+            },
+            "G62": {
+              "value": "Etching"
+            },
+            "H62": {
+              "value": "11.0"
+            },
+            "I62": {
+              "value": "21 11/16"
+            },
+            "J62": {
+              "value": "3712",
+              "formula": null
+            },
+            "K62": {
+              "value": "3200.0"
+            },
+            "L62": {
+              "value": "4825.6",
+              "formula": null
+            },
+            "M62": {
+              "value": "YES"
+            },
+            "N62": {
+              "value": "46001.0"
+            },
+            "O62": {
+              "value": "Ader"
+            },
+            "P62": {
+              "value": "Bloch 77; Baer II 8; very fine proof on strong white vellum; numbered and signed in brush and sepia ink; edition of 250; provenance: Ambroise Vollard → Henri Marie Petiet"
+            },
+            "Q62": {
+              "value": "6000.0"
+            },
+            "R62": {
+              "value": "12000.0"
+            },
+            "Y62": {
+              "value": "This etching forms part of Picasso’s celebrated Vollard Suite, widely regarded as one of the most important published print series of the twentieth century. Created during a period of intense personal and artistic experimentation, the composition explores intimacy and psychological tension through confident, economical line. The Vollard Suite marked Picasso’s full command of etching as a primary creative language, rather than a secondary medium. Collectors prize works from the suite for their art-historical importance, strong market demand, and for offering direct insight into Picasso’s evolving themes of desire, power, and human connection."
+            }
+          }
+        },
+        {
+          "row": 64,
+          "cells": {
+            "P64": {
+              "value": "Of Aaron, Benton wrote: \"Aaron with his staff. This old negro man was picked up by one of my students on East 18th St. in Kansas City and was persuaded to come to my class at the Kansas City Art Institute to pose. I painted a 3/4 length portrait of him with both hands showing around the staff. The portrait was purchase by The Philadelphia Academy in the early ’40s. This lithographic head was done from the painting.\""
+            }
+          }
+        },
+        {
+          "row": 65,
+          "cells": {
+            "C65": {
+              "value": "Catalog Number"
+            },
+            "D65": {
+              "value": "Artist"
+            },
+            "E65": {
+              "value": "Title"
+            },
+            "F65": {
+              "value": "Year"
+            },
+            "G65": {
+              "value": "Medium"
+            },
+            "H65": {
+              "value": "H"
+            },
+            "I65": {
+              "value": "W"
+            },
+            "J65": {
+              "value": "Hammer Price ($)"
+            },
+            "K65": {
+              "value": "($, €, £, etc.)"
+            },
+            "L65": {
+              "value": "w/ Premium ($)"
+            },
+            "M65": {
+              "value": "Paid by Oliver?"
+            },
+            "N65": {
+              "value": "Purchase Date"
+            },
+            "O65": {
+              "value": "Purchased from"
+            },
+            "P65": {
+              "value": "Description/Notes"
+            },
+            "Q65": {
+              "value": "Low"
+            },
+            "R65": {
+              "value": "High"
+            },
+            "S65": {
+              "value": "Possible Sale @"
+            },
+            "T65": {
+              "value": "Status"
+            },
+            "U65": {
+              "value": "Location"
+            },
+            "V65": {
+              "value": "Paid by Oliver?"
+            },
+            "W65": {
+              "value": "Owed to TBD"
+            },
+            "X65": {
+              "value": "Purchased by O"
+            },
+            "Y65": {
+              "value": "DETAILS/LISTING INFO"
+            }
+          }
+        },
+        {
+          "row": 66,
+          "cells": {
+            "A66": {
+              "value": "#"
+            },
+            "D66": {
+              "value": "Not included: 7 American Prints Lot 83 Rachel Davis, 4 Alex Blum Etchings, 2 Emil Fuchs etchings, 2 American Etchings (in the locks), Donald MacLaughlin watercolor"
+            },
+            "I66": {
+              "value": "TOTALS :"
+            },
+            "J66": {
+              "value": "68693.47723",
+              "formula": "SUM(J5:J63)"
+            },
+            "L66": {
+              "value": "88784.08698",
+              "formula": "SUM(L5:L63)"
+            },
+            "Q66": {
+              "value": "115000",
+              "formula": "SUM(Q5:Q63)"
+            },
+            "R66": {
+              "value": "210400",
+              "formula": null
+            },
+            "W66": {
+              "value": "25958.812",
+              "formula": "SUM(W5:W63)"
+            },
+            "X66": {
+              "value": "16306.69498",
+              "formula": null
+            }
+          }
+        },
+        {
+          "row": 67,
+          "cells": {
+            "Q67": {
+              "value": "avg = "
+            },
+            "R67": {
+              "value": "162700",
+              "formula": "(Q66+R66)/2"
+            },
+            "S67": {
+              "value": "$"
+            },
+            "T67": {
+              "value": "%"
+            }
+          }
+        },
+        {
+          "row": 68,
+          "cells": {
+            "M68": {
+              "value": "TOTAL LOAN from TBD for purchases = "
+            },
+            "N68": {
+              "value": "25958.812",
+              "formula": "SUM(W5:W63)"
+            },
+            "Q68": {
+              "value": "estimated profit is:"
+            },
+            "S68": {
+              "value": "73915.91302",
+              "formula": "R67-L66"
+            },
+            "T68": {
+              "value": "0.8325355989",
+              "formula": "S68/L66"
+            }
+          }
+        },
+        {
+          "row": 69,
+          "cells": {
+            "D69": {
+              "value": "Of the Hundertwasser Regentag sets we have 1 full set of 10 - # 1674/3000"
+            },
+            "Q69": {
+              "value": "Low"
+            },
+            "S69": {
+              "value": "26215.91302",
+              "formula": "Q66-L66"
+            },
+            "T69": {
+              "value": "0.2952771596",
+              "formula": "S69/L66"
+            }
+          }
+        },
+        {
+          "row": 70,
+          "cells": {
+            "D70": {
+              "value": "where #4 is ink signed and of the edition of 300 "
+            },
+            "M70": {
+              "value": "TOTAL Invested OGD = "
+            },
+            "N70": {
+              "value": "16306.69498",
+              "formula": "X66"
+            },
+            "Q70": {
+              "value": "HIgh"
+            },
+            "S70": {
+              "value": "121615.913",
+              "formula": "R66-L66"
+            },
+            "T70": {
+              "value": "1.369794038",
+              "formula": "S70/L66"
+            }
+          }
+        },
+        {
+          "row": 71,
+          "cells": {
+            "D71": {
+              "value": "and one set of 5 out of 10 (#1, #3, #6, #8, #10)"
+            }
+          }
+        },
+        {
+          "row": 72,
+          "cells": {
+            "Q72": {
+              "value": "w/o gifts profit:"
+            },
+            "S72": {
+              "value": "68415.91302",
+              "formula": "S68-5500"
+            },
+            "T72": {
+              "value": "0.7705875608",
+              "formula": "S72/L66"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
