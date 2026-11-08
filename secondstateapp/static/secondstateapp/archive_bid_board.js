@@ -10,7 +10,7 @@
   const decimalParts = value => value == null || value === "" ? null : /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(value));
   const grouped = digits => new Intl.NumberFormat("en-US").format(BigInt(digits));
   const money = value => {const match = decimalParts(value); return match ? `${match[1]}$${grouped(match[2])}.${(match[3] || "").padEnd(2, "0")}` : "Unavailable";};
-  const pct = value => {const match = decimalParts(value); if (!match) return "Unavailable"; const fraction = (match[3] || "").replace(/0+$/, ""); return `${match[1]}${grouped(match[2])}${fraction ? `.${fraction}` : ""}%`;};
+  const pct = value => {const match = value == null || value === "" ? null : /^(-?)(\d+)(?:\.(\d{1,3}))?$/.exec(String(value)); if (!match) return "Unavailable"; const fraction = (match[3] || "").replace(/0+$/, ""); return `${match[1]}${grouped(match[2])}${fraction ? `.${fraction}` : ""}%`;};
   const el = (tag, text, cls) => {const node = document.createElement(tag); if (text != null) node.textContent = text; if (cls) node.className = cls; return node;};
   function mount(root, options) {
     root.classList.add("archive-board");
@@ -33,7 +33,7 @@
       field.name = name;
       field.id = `archive-board-${options.lot.id}-${name}`;
       if (config.choices) config.choices.forEach(([value, title]) => {const o = el("option", title); o.value = value; field.append(o);});
-      else {field.type = "number"; field.inputMode = "decimal"; field.step = "0.01"; field.min = "0"; field.max = config.max || "1000000000000"; field.required = !config.optional;}
+      else {field.type = "number"; field.inputMode = "decimal"; field.step = config.step || "0.01"; field.min = "0"; field.max = config.max || "1000000000000"; field.required = !config.optional;}
       wrap.append(field); parent.append(wrap); fields[name] = field; return field;
     }
     input(controls, "starting_hammer", "Current / opening hammer (USD)", {optional: true});
@@ -50,7 +50,7 @@
     input(costs, "starting_basis", "Starting amount represents", {choices: [["current", "Current hammer — next bid required"], ["opening", "Opening hammer — available to bid"]]});
     input(costs, "fixed_increment", "Fixed bid increment (USD)");
     input(costs, "buyer_premium_pct", "Buyer premium (%)", {max: "100"});
-    input(costs, "purchase_tax_pct", "Purchase tax (%)", {max: "100"});
+    input(costs, "purchase_tax_pct", "Purchase tax (%)", {max: "100", step: "0.001"});
     input(costs, "purchase_tax_basis", "Purchase tax applies to", {choices: [["hammer_premium", "Hammer + buyer premium"], ["hammer", "Hammer only"], ["acquisition", "Hammer + premium + acquisition costs"]]});
     input(costs, "acquisition_costs", "Other acquisition costs (USD)");
     input(costs, "selling_commission_pct", "Selling commission (%)", {max: "100"});

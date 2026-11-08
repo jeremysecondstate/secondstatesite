@@ -90,6 +90,22 @@ async function mount(data) {
   return page;
 }
 
+test("three-decimal tax is valid input and displays exactly in live and saved Boards", async () => {
+  const data = board();
+  data.assumptions.purchase_tax_pct = "8.875";
+  const live = await mount(data);
+  const tax = descendants(live.root).find(node => node.name === "purchase_tax_pct");
+  assert.equal(tax.step, "0.001");
+  assert.equal(tax.value, "8.875");
+  assert.equal(descendants(live.root).find(node => node.name === "acquisition_costs").step, "0.01");
+  assert.equal(descendants(live.root).find(node => node.name === "minimum_return_pct").step, "0.01");
+  assert.match(live.root.textContent, /8\.875% tax on hammer \+ premium/);
+  const {context} = environment({ok: true, board: {analysis: data, assumptions: data.assumptions, summary: {qualifying_bid: "300.00", qualifies: true, detail}}});
+  await context.window.SavedBidBoard.open({id: 1, title: "Example", saved_bid_board_url: "/saved/"});
+  assert.match(context.document.body.textContent, /8\.875%/);
+  assert.doesNotMatch(context.document.body.textContent, /8\.88%/);
+});
+
 test("finite coverage labels the supported ceiling and stops next-bid arithmetic", async () => {
   const {root} = await mount(board());
   assert.match(root.textContent, /Known bid tiers end at \$300\.00/);

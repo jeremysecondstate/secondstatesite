@@ -48,13 +48,14 @@ def money(value):
     return f"{value.quantize(CENT, rounding=ROUND_HALF_UP):.2f}"
 
 
-def decimal_value(value, name, *, maximum=MAX_MONEY, minimum=Decimal(0)):
+def decimal_value(value, name, *, maximum=MAX_MONEY, minimum=Decimal(0), decimal_places=2):
     try:
         number = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
         raise BidBoardError(f"{name} must be a number.") from None
-    if isinstance(value, bool) or not number.is_finite() or not minimum <= number <= maximum or number.as_tuple().exponent < -2:
-        raise BidBoardError(f"{name} must be between {minimum} and {maximum}, with at most two decimals.")
+    if isinstance(value, bool) or not number.is_finite() or not minimum <= number <= maximum or number.as_tuple().exponent < -decimal_places:
+        precision = "three" if decimal_places == 3 else "two"
+        raise BidBoardError(f"{name} must be between {minimum} and {maximum}, with at most {precision} decimals.")
     return number
 
 
@@ -66,8 +67,11 @@ def normalize_assumptions(supplied=None):
     if unknown:
         raise BidBoardError(f"Unsupported bid assumption: {', '.join(sorted(unknown))}.")
     result = {**DEFAULTS, **supplied}
-    for field in ("buyer_premium_pct", "purchase_tax_pct", "selling_commission_pct"):
+    for field in ("buyer_premium_pct", "selling_commission_pct"):
         result[field] = money(decimal_value(result[field], field.replace("_", " "), maximum=Decimal(100)))
+    tax_rate = decimal_value(result["purchase_tax_pct"], "purchase tax pct", maximum=Decimal(100), decimal_places=3)
+    # Preserve statutory rates such as 8.875%; round only the cash tax to cents.
+    result["purchase_tax_pct"] = f"{tax_rate:.3f}" if tax_rate.as_tuple().exponent < -2 else money(tax_rate)
     if Decimal(result["selling_commission_pct"]) >= 100:
         raise BidBoardError("Selling commission must be less than 100%.")
     for field in ("acquisition_costs", "selling_costs", "minimum_profit"):

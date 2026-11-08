@@ -49,6 +49,17 @@ class SavedBidBoardEmailTests(TestCase):
         self.assertNotIn("Saved Bid Board", email.text_body)
         self.assertNotIn("Saved Bid Board", email.html_body)
 
+    def test_saved_three_decimal_tax_rate_is_exact_in_email(self):
+        self.saved_board(purchase_tax_pct="8.875", purchase_tax_basis="hammer_premium")
+        email = compose_auction_email([self.lot])
+        saved = email.lot_snapshots[self.lot.pk]["bid_board"]
+        self.assertEqual(saved["assumptions"]["purchase_tax_pct"], "8.875")
+        costs = {item["label"]: item["value"] for item in saved["email"]["costs"]}
+        self.assertEqual(costs["Purchase tax"], "8.875%")
+        for body in (email.text_body, email.html_body):
+            self.assertIn("8.875%", body)
+            self.assertNotIn("8.88%", body)
+
     @patch("secondstateapp.bid_board.build_board", side_effect=AssertionError("Saved email must not recalculate"))
     def test_email_uses_saved_values_and_retains_an_independent_audit_snapshot(self, recalculate):
         record = self.saved_board()

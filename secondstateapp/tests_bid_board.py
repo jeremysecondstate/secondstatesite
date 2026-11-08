@@ -38,6 +38,18 @@ class BidBoardCalculationTests(SimpleTestCase):
             taxes.append(cash_flow(Decimal(1000), Decimal(2000), assumptions)["purchase_tax"])
         self.assertEqual(taxes, [Decimal(100), Decimal(125), Decimal(145)])
 
+    def test_three_decimal_tax_rate_is_exact_and_only_cash_tax_rounds_to_cents(self):
+        assumptions = self.assumptions(buyer_premium_pct="25", purchase_tax_pct="8.875", purchase_tax_basis="hammer_premium")
+        self.assertEqual(assumptions["purchase_tax_pct"], "8.875")
+        detail = detail_for(Decimal(1000), Decimal(2000), assumptions, BidLadder(assumptions))
+        self.assertEqual(detail["purchase_tax_basis_amount"], "1250.00")
+        self.assertEqual(detail["purchase_tax"], "110.94")
+        self.assertEqual(detail["all_in_acquisition"], "1360.94")
+        for values in ({"purchase_tax_pct": "8.8751"}, {"purchase_tax_pct": "100.001"}, {"purchase_tax_pct": "-0.001"},
+                       {"buyer_premium_pct": "25.001"}, {"selling_commission_pct": "1.001"}, {"minimum_return_pct": "20.001"}, {"acquisition_costs": "1.001"}):
+            with self.subTest(values=values), self.assertRaises(BidBoardError):
+                self.assumptions(**values)
+
     def test_opening_includes_start_but_current_begins_with_next_bid(self):
         opening = BidLadder(self.assumptions(starting_hammer="975", fixed_increment="100"))
         current = BidLadder(self.assumptions(starting_hammer="975", starting_basis="current", fixed_increment="100"))
@@ -320,6 +332,17 @@ class BidBoardAPITests(TestCase):
         self.assertEqual(loaded["assumptions"]["minimum_profit"], "650.00")
         self.assertEqual(loaded["selected_case"], "optimistic")
         self.assertEqual(loaded["selected_ids"], ["501"])
+
+    def test_three_decimal_tax_rate_survives_save_and_reload(self):
+        response = self.post(action="save", selected_bid="1100", assumptions={"purchase_tax_pct": "8.875", "purchase_tax_basis": "hammer_premium", "resale_overrides": {"working": "3000"}})
+        self.assertEqual(response.status_code, 200, response.content)
+        stored = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+        self.assertEqual(stored.assumptions["purchase_tax_pct"], "8.875")
+        self.assertEqual(stored.analysis["assumptions"]["purchase_tax_pct"], "8.875")
+        loaded = self.client.get(self.url).json()["analysis"]
+        self.assertEqual(loaded["assumptions"]["purchase_tax_pct"], "8.875")
+        self.assertEqual(loaded["assumptions"]["purchase_tax_basis"], "hammer_premium")
+        self.assertEqual(loaded["detail"]["purchase_tax"], "122.03")
 
     def test_interpolated_cell_selection_survives_save_and_reload(self):
         for selected_case, expected_resale in (

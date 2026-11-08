@@ -247,7 +247,7 @@ def _snapshot_lot(lot: AuctionWatchLot, zone: ZoneInfo) -> dict:
     return snapshot
 
 
-def _board_amount(value, *, percent=False) -> str:
+def _board_amount(value, *, percent=False, percent_places=2) -> str:
     if value in (None, ""):
         return "Unavailable"
     try:
@@ -256,7 +256,10 @@ def _board_amount(value, *, percent=False) -> str:
         return "Unavailable"
     if not amount.is_finite():
         return "Unavailable"
-    return f"{amount:,.2f}%" if percent else f"{'-' if amount < 0 else ''}${abs(amount):,.2f}"
+    if percent:
+        places = percent_places if amount.as_tuple().exponent < -2 else 2
+        return f"{amount:,.{places}f}%"
+    return f"{'-' if amount < 0 else ''}${abs(amount):,.2f}"
 
 
 def _snapshot_email_bid_board(record, sale_date, zone) -> dict:
@@ -315,7 +318,7 @@ def _snapshot_email_bid_board(record, sale_date, zone) -> dict:
             })
         rows.append({"bid": _board_amount(row.get("bid")), "acquisition": _board_amount(row.get("all_in_acquisition")), "cells": cells})
     costs = [
-        {"label": label, "value": _board_amount(assumptions.get(key), percent=percent)}
+        {"label": label, "value": _board_amount(assumptions.get(key), percent=percent, percent_places=3 if key == "purchase_tax_pct" else 2)}
         for label, key, percent in (
             ("Minimum profit", "minimum_profit", False),
             ("Minimum return on cost", "minimum_return_pct", True),

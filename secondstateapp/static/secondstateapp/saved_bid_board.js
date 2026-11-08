@@ -7,7 +7,7 @@
   const parts = value => value == null || value === "" ? null : /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(value));
   const grouped = digits => new Intl.NumberFormat("en-US").format(BigInt(digits));
   const money = value => {const match = parts(value); return match ? `${match[1]}$${grouped(match[2])}.${(match[3] || "").padEnd(2, "0")}` : "Unavailable";};
-  const pct = value => {const match = parts(value); return match ? `${match[1]}${grouped(match[2])}${match[3]?.replace(/0+$/, "") ? `.${match[3].replace(/0+$/, "")}` : ""}%` : "Unavailable";};
+  const pct = value => {const match = value == null || value === "" ? null : /^(-?)(\d+)(?:\.(\d{1,3}))?$/.exec(String(value)); return match ? `${match[1]}${grouped(match[2])}${match[3]?.replace(/0+$/, "") ? `.${match[3].replace(/0+$/, "")}` : ""}%` : "Unavailable";};
   const el = (tag, text, className) => {const node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node;};
   const qualification = summary => summary.qualifies === true ? "Meets both minimums" : summary.qualifies === false ? "Below saved minimums" : "Qualification unavailable";
   const pending = new Map();
