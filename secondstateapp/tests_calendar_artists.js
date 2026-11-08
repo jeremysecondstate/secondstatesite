@@ -8,6 +8,37 @@ const CalendarArtists = require("./static/secondstateapp/calendar_artists.js");
 
 const names = (artists) => artists.map((artist) => artist.name);
 
+test("artist bookmarks resolve exact current labels or one retained source credit", () => {
+  const lots = [
+    {artist: "Ensor, James", artist_source: "James Ensor"},
+    {artist: "Ensor, James", artist_source: "JAMES ENSOR"},
+    {artist: "After Ensor, James", artist_source: "After James Ensor"},
+    {artist: "Fini, Leonor", artist_source: "Leonor Fini"},
+    {artist: "García Ortega, José", artist_source: "José García Ortega"},
+  ];
+  const before = JSON.stringify(lots);
+  assert.equal(CalendarArtists.resolveArtistKey(lots, "ensor, james"), "ensor, james");
+  assert.equal(CalendarArtists.resolveArtistKey(lots, " JAMES\tENSOR "), "ensor, james");
+  assert.equal(CalendarArtists.resolveArtistKey(lots, "after james ensor"), "after ensor, james");
+  assert.equal(CalendarArtists.resolveArtistKey(lots, "leonor fini"), "fini, leonor");
+  assert.equal(CalendarArtists.resolveArtistKey(lots, "Jose\u0301 Garci\u0301a Ortega"), "garcía ortega, josé");
+  assert.equal(CalendarArtists.resolveArtistKey(lots, "james"), null);
+  assert.equal(CalendarArtists.resolveArtistKey(lots, "leonor fini jr."), null);
+  assert.equal(CalendarArtists.resolveArtistKey(lots, ""), null);
+  assert.equal(JSON.stringify(lots), before);
+});
+
+test("ambiguous source credits cannot select an arbitrary displayed artist", () => {
+  const lots = [
+    {artist: "First artist", artist_source: "Shared source"},
+    {artist: "Second artist", artist_source: "Shared source"},
+    {artist: "Shared source", artist_source: "Different source"},
+  ];
+  assert.equal(CalendarArtists.resolveArtistKey(lots.slice(0, 2), "shared source"), null);
+  assert.equal(CalendarArtists.resolveArtistKey(lots, "shared source"), "shared source", "an exact current label takes precedence");
+  assert.equal(CalendarArtists.resolveArtistKey([], "shared source"), null);
+});
+
 test("an empty day has no artists and every sort returns a separate empty array", () => {
   const artists = CalendarArtists.summarize([]);
   assert.deepEqual(artists, []);

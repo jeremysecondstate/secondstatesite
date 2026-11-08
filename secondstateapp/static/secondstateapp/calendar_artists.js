@@ -8,6 +8,17 @@
 
   const artistName = (lot) => String(lot.artist || "").normalize("NFC").trim().replace(/\s+/g, " ") || "Artist unknown";
   const artistKey = (lot) => artistName(lot).toLocaleLowerCase("en");
+  const sourceKey = (value) => String(value || "").normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en");
+
+  const resolveArtistKey = (lots, requested) => {
+    const key = sourceKey(requested);
+    if (!key) return null;
+    if (lots.some((lot) => artistKey(lot) === key)) return key;
+    // Existing bookmarks can contain the prior natural-order display label.
+    // Resolve only an exact retained source credit with one displayed target.
+    const matches = new Set(lots.filter((lot) => sourceKey(lot.artist_source) === key).map(artistKey));
+    return matches.size === 1 ? matches.values().next().value : null;
+  };
 
   const knownInstant = (value) => {
     if (typeof value !== "string") return null;
@@ -133,5 +144,5 @@
     return formatArrival({earliestTime: details.startTime, arrivalTime: details.time}, timeZone);
   };
 
-  return {artistKey, summarize, sorted, formatArrival, estimateLotArrival, formatLotArrival, lotArrivalDetails};
+  return {artistKey, resolveArtistKey, summarize, sorted, formatArrival, estimateLotArrival, formatLotArrival, lotArrivalDetails};
 });

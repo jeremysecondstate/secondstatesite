@@ -471,7 +471,7 @@
 <script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=archive-fx-evidence-20261028"></script>
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=archive-fx-evidence-20261028"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
-<script src="{% static 'secondstateapp/calendar_artists.js' %}?v=lot-timetable-20261105"></script>
+<script src="{% static 'secondstateapp/calendar_artists.js' %}?v=artist-labels-20261108"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-modes-20261028"></script>
 <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261027"></script>
@@ -3841,7 +3841,10 @@
       if (galleryOrganization.house === galleryFilter.slice(6)) galleryOrganization.house = "";
       galleryFilter = "all";
     }
-    if (galleryFilter.startsWith("artist:") && !lots.some((lot) => window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7))) galleryFilter = "all";
+    if (galleryFilter.startsWith("artist:")) {
+      const artistKey = window.CalendarArtists.resolveArtistKey(lots, galleryFilter.slice(7));
+      galleryFilter = artistKey ? `artist:${artistKey}` : "all";
+    }
     renderGalleryFilters();
     renderGalleryArtists();
     renderGalleryCards();

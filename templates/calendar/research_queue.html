@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static calendar_filters %}
 
 {% block title %}LiveArt Research Queue · SecondState{% endblock %}
 {% block extra_css %}
@@ -57,14 +57,14 @@
           <article class="research-queue-item" aria-labelledby="queue-item-{{ item.lot.pk }}">
             <div class="research-queue-artwork">
               {% if item.image_url %}
-                <img src="{{ item.image_url }}" alt="{{ item.lot.title|default:'Untitled lot' }}{% if item.lot.artist_watchlist_name or item.lot.artist %} by {% firstof item.lot.artist_watchlist_name item.lot.artist %}{% endif %}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-queue-image>
+                <img src="{{ item.image_url }}" alt="{{ item.lot.title|default:'Untitled lot' }}{% if item.lot.artist_watchlist_name or item.lot.artist %} by {% firstof item.lot.artist_watchlist_name|artist_display_name item.lot.artist|artist_display_name %}{% endif %}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-queue-image>
                 <span data-queue-image-fallback hidden>Image unavailable</span>
               {% else %}
                 <span>Image unavailable</span>
               {% endif %}
             </div>
             <div class="research-queue-copy">
-              <p class="research-queue-artist">{% firstof item.lot.artist_watchlist_name item.lot.artist "Unknown artist" %}</p>
+              <p class="research-queue-artist">{% firstof item.lot.artist_watchlist_name|artist_display_name item.lot.artist|artist_display_name "Unknown artist" %}</p>
               <h3 id="queue-item-{{ item.lot.pk }}" tabindex="-1">{{ item.lot.title|default:"Untitled lot" }}</h3>
               <dl class="research-queue-facts">
                 <div><dt>Auction house</dt><dd>{{ item.lot.auction_house|default:item.lot.source }}</dd></div>

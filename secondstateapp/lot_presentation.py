@@ -122,7 +122,7 @@ _ARTISTS = (
     ("Zao, Wou-Ki", "Zao Wou-Ki"), ("Zúñiga, Francisco",),
     # Additional explicit labels in the existing research registry/bookmarks.
     ("Adnan, Etel",), ("Ai, Weiwei", "Ai Weiwei"), ("Arp, Jean (Hans)", "Jean Arp", "Hans Arp"),
-    ("Bacon, Francis",), ("Baldessari, John",), ("Basquiat, Jean-Michel",), ("Beckmann, Max",),
+    ("Bacon, Francis",), ("Baldessari, John",), ("Basquiat, Jean-Michel", "Jean Michel Basquiat"), ("Beckmann, Max",),
     ("Bernhardt, Katherine",), ("Blake, William",), ("Bourgeois, Louise",), ("Bravo, Claudio",),
     ("Carrington, Leonora",), ("Chu, Teh-Chun", "Chu Teh-Chun"), ("Condo, George",),
     ("de Kooning, Elaine Marie", "Elaine de Kooning", "de Kooning, Elaine"),
@@ -164,6 +164,54 @@ _ARTISTS = (
     ("Pettway, Essie Bendolph",), ("Rijn, Rembrandt van", "Rembrandt van Rijn"),
     # His representing gallery uses Shibuya: bsandcgallery.com/artists/sho-shibuya.
     ("Shibuya, Sho",),
+    # Complete November 2026 Calendar credit audit. These are explicit full
+    # names, not a rule that treats an unknown name's final token as its surname.
+    # Keep supplied middle names, compound family names and established aliases.
+    ("Agam, Yaacov",), ("Ahrendt, William",), ("Aitchison, Craigie",),
+    ("Albright, Ivan Le Lorraine",), ("Avery, Milton",), ("Ayres, Gillian",),
+    ("Baechler, Donald",), ("Baskin, Leonard",), ("Beuys, Joseph",),
+    ("Bernheim de Villers, Gaston",),
+    # Preserve this source spelling; a display-order change is not an identity correction.
+    ("Balderssari, John",),
+    ("Biggers, Sanford",), ("Bonnard, Pierre", "Pierre (1867) Bonnard"),
+    ("Borofsky, Jonathan",), ("Bowling, Frank",),
+    ("Brown, Christopher",), ("Brown, Harley",), ("Brown, Roger",), ("Burden, Chris",),
+    ("Cassatt, Mary",), ("Cassatt, Mary Stevenson",), ("Cézanne, Paul",),
+    ("Chadwick, Helen",), ("Chughtai, Abdur Rahman",), ("Cocteau, Jean",),
+    ("Craig-Martin, Michael",), ("De Forest, Roy Dean",), ("Degas, Edgar",),
+    ("Dix, Otto",), ("Dorazio, Piero",), ("Driskell, David Clyde",),
+    ("Dubuffet, Jean",), ("Duchamp, Marcel",), ("Dylan, Bob",),
+    ("Emin, Tracey",), ("Ensor, James",), ("Fahlström, Öyvind",),
+    ("Feininger, Lyonel",), ("Fini, Leonor",), ("Fitzpatrick, Tony",),
+    ("Fontana, Lucio",), ("Foujita, Léonard Tsuguharu",), ("Fry, Anthony",),
+    ("García Ortega, José",), ("Giacometti, Alberto",), ("Gilliam, Sam",),
+    ("Golub, Leon Albert",), ("Grignion, Charles",), ("Gromaire, Marcel",),
+    ("Hall, Norma Bassett",), ("Hamaguchi, Yozo",), ("Hamilton, Ann",),
+    ("Hancock, Trenton Doyle",), ("Heilmann, Mary",), ("Heizer, Michael",),
+    ("Held, Al",), ("Helleu, Paul César",), ("Howell-Sickles, Donna",),
+    ("Hoyland, John",), ("Hughes, Shara",), ("Kandinsky, Wassily",),
+    ("Kent, Mary Corita",), ("Kentridge, William",), ("Klimt, Gustav",),
+    ("Knight, Gwendolyn",), ("Kohlmeyer, Ida Rittenberg",), ("Laurencin, Marie",),
+    ("Le Parc, Julio",), ("Lowry, Laurence Stephen",), ("Lynch, Rhett",),
+    ("Maillol, Aristide",), ("Manet, Édouard",), ("Mapplethorpe, Robert",),
+    ("Marini, Marino",), ("Martin, Fletcher",), ("Mell, Ed",), ("Milton, Peter",),
+    ("Monet, Claude",), ("Morgan, Barbara",), ("Murphy, Brenda",),
+    ("Oiestad, H Steven",), ("Olitski, Jules",), ("Paladino, Mimmo",),
+    ("Paschke, Ed",), ("Pasmore, Victor",), ("Perkinson, Tom",), ("Perry, Grayson",),
+    ("Pirnie, Larry",), ("Pollock, Jackson",), ("Porter, Fairfield",),
+    ("Ramberg, Christina",), ("Rego, Paula",), ("Reinhardt, Ad",),
+    ("Rijn, Rembrandt Harmensz. van",), ("Robert, Hubert",), ("Roberts, Dolona",),
+    ("Salle, David",), ("Schenck, Bill",), ("Scholder, Fritz",), ("Scholz, Georg",),
+    ("Scully, Sean",), ("Severini, Gino",), ("Shapiro, Joel",), ("Shires, William",),
+    ("Shonibare, Yinka",), ('Shufelt, Robert "Shoofly"',), ("Sorlier, Charles",),
+    ("Sultan, Donald K.",), ("Surls, James",), ("Thornley, Georges William",),
+    ("Trova, Ernest Tino",), ("Turk, Gavin",), ("van Ostade, Adriaen Jansz",),
+    ("Vigil, Dan",), ("Villon, Jacques",), ("Walker, Caroline",), ("Wewerka, Stefan",),
+    ("Whitney, Stanley",), ("Wieghorst, Olaf",), ("Wilson, John Woodrow",),
+    ("Wylie, Rose",), ("Yoshida, Hiroshi",), ("Young, Russell",), ("Zerbini, Luiz",),
+    # Established stage names and mononyms are not given-name/surname pairs.
+    ("A. R. Penck", "A.R. Penck", "Penck, A.R.", "Penck, A. R."),
+    ("Invader",), ("Man Ray",), ("Panamarenko",), ("Yvaral (Jean-Pierre Vasarely)",),
 )
 
 
@@ -184,9 +232,15 @@ for _display, *_aliases in _ARTISTS:
         _DISPLAY_NAMES[_name_key(_variant)] = _display
 
 _ATTRIBUTION = r"(?:attributed to|circle of|school of|studio of|workshop of|manner of|style of|followers? of|after)"
-_ATTRIBUTION_PREFIX = re.compile(rf"^(?P<prefix>{_ATTRIBUTION})\s+(?P<name>.+)$", re.IGNORECASE)
-_ATTRIBUTION_SUFFIX = re.compile(rf"^(?P<name>.+?)(?P<suffix>\s*\({_ATTRIBUTION}\)|,\s*{_ATTRIBUTION})$", re.IGNORECASE)
+_ATTRIBUTION_PREFIX = re.compile(rf"^(?P<prefix>{_ATTRIBUTION}|\({_ATTRIBUTION}\))\s+(?P<name>.+)$", re.IGNORECASE)
+_ATTRIBUTION_SUFFIX = re.compile(
+    rf"^(?P<name>.+?)(?P<suffix>\s*\({_ATTRIBUTION}\)|(?:,\s*|\s+){_ATTRIBUTION}\.?)$", re.IGNORECASE,
+)
 _GENERATION = re.compile(r"^(?P<name>.+?)(?P<suffix>,?\s+(?:Jr\.?|Sr\.?|II|III|IV))$", re.IGNORECASE)
+_DISPLAY_BIOGRAPHY = re.compile(r"^(?P<name>.+?)(?P<suffix>\s+\([^()]*\b\d{4}\b[^()]*\))$")
+_DISPLAY_MAKER_CREDIT = re.compile(
+    r"^(?P<name>.+?)(?P<separator>,\s*by\s+|\s+after\.\s+)(?P<maker>.+)$", re.IGNORECASE,
+)
 
 
 def _attribution_parts(value: str) -> tuple[str, str, str]:
@@ -203,17 +257,32 @@ def _attribution_parts(value: str) -> tuple[str, str, str]:
     return prefix, value, suffix
 
 
+def _known_artist_display(name: str) -> str | None:
+    display = _DISPLAY_NAMES.get(_name_key(name))
+    if display is None:
+        ending = _GENERATION.fullmatch(name) or _DISPLAY_BIOGRAPHY.fullmatch(name)
+        if ending:
+            known = _DISPLAY_NAMES.get(_name_key(ending["name"]))
+            if known:
+                display = known + ending["suffix"]
+    return display
+
+
 def artist_display_name(value: object) -> str:
     """Use curated surname-first spelling while retaining attribution wording."""
     label = clean_display_text(value)
     prefix, name, suffix = _attribution_parts(label)
-    display = _DISPLAY_NAMES.get(_name_key(name))
+    display = _known_artist_display(name)
     if display is None:
-        generation = _GENERATION.fullmatch(name)
-        if generation:
-            known = _DISPLAY_NAMES.get(_name_key(generation["name"]))
-            if known:
-                display = known + generation["suffix"]
+        # These source credits identify an original artist and a printmaker.
+        # Reformat only two complete curated names, keeping their roles/order;
+        # an unknown collaborator or arbitrary title must remain untouched.
+        credit = _DISPLAY_MAKER_CREDIT.fullmatch(name)
+        if credit:
+            original = _known_artist_display(credit["name"])
+            maker = _known_artist_display(credit["maker"])
+            if original and maker:
+                display = original + credit["separator"] + maker
     return prefix + (display or name) + suffix
 
 
@@ -237,7 +306,7 @@ _CREDIT_BIOGRAPHY = re.compile(r"\s*\([^)]*\b\d{4}\b[^)]*\)\s*")
 _BILINGUAL_AFTER = re.compile(r"\bnach\s*[-–—/]\s*after\b", re.IGNORECASE)
 _TRAILING_CREDIT_SUFFIX = re.compile(
     rf"^(?P<name>.+?)(?:,\s*|\s+)(?P<marker>after|attributed\s+to|{_FRENCH_ATTRIBUTION})"
-    r"(?:\.(?:\s+Jacques\s+Villon)?)?$", re.IGNORECASE,
+    r"(?:\.(?:\s+(?:Jacques\s+Villon|Villon,\s*Jacques))?)?$", re.IGNORECASE,
 )
 _QUOTED_TITLE_AFTER_CREDIT = re.compile(
     r'^(?P<name>.+?)\s+after\s+(?:"[^"]+"|“[^”]+”)$', re.IGNORECASE,

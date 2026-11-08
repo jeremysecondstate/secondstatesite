@@ -2,7 +2,7 @@
 
 from unittest import TestCase
 
-from .lot_presentation import artist_display_name, artist_sort_key, clean_display_text
+from .lot_presentation import artist_attribution_label, artist_display_name, artist_sort_key, clean_display_text
 
 
 class LotTextPresentationTests(TestCase):
@@ -62,6 +62,78 @@ class LotTextPresentationTests(TestCase):
 
 
 class ArtistPresentationTests(TestCase):
+    def test_november_calendar_names_use_complete_curated_surnames(self):
+        examples = {
+            "James Ensor": "Ensor, James", "Joseph Beuys": "Beuys, Joseph",
+            "Leonor Fini": "Fini, Leonor", "Gillian Ayres": "Ayres, Gillian",
+            "Abdur Rahman Chughtai": "Chughtai, Abdur Rahman",
+            "Adriaen Jansz van Ostade": "van Ostade, Adriaen Jansz",
+            "Julio Le Parc": "Le Parc, Julio", "José García Ortega": "García Ortega, José",
+            "Gaston Bernheim de Villers": "Bernheim de Villers, Gaston",
+            "Michael Craig-Martin": "Craig-Martin, Michael", "Roy Dean De Forest": "De Forest, Roy Dean",
+            "Léonard Tsuguharu Foujita": "Foujita, Léonard Tsuguharu",
+            "Ida Rittenberg Kohlmeyer": "Kohlmeyer, Ida Rittenberg",
+            "Ivan Le Lorraine Albright": "Albright, Ivan Le Lorraine",
+            "Mary Corita Kent": "Kent, Mary Corita", "Norma Bassett Hall": "Hall, Norma Bassett",
+            "Rembrandt Harmensz. van Rijn": "Rijn, Rembrandt Harmensz. van",
+            'Robert "Shoofly" Shufelt': 'Shufelt, Robert "Shoofly"',
+            "H Steven Oiestad": "Oiestad, H Steven", "Öyvind Fahlström": "Fahlström, Öyvind",
+            "Pierre (1867) Bonnard": "Bonnard, Pierre", "Jean Michel Basquiat": "Basquiat, Jean-Michel",
+            "John Balderssari": "Balderssari, John",
+        }
+        for raw, expected in examples.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(artist_display_name(raw), expected)
+                self.assertEqual(artist_display_name(expected), expected)
+                self.assertEqual(artist_sort_key(raw), artist_sort_key(expected))
+        self.assertEqual(sorted(["James Ensor", "Gillian Ayres", "Joseph Beuys"], key=artist_sort_key),
+                         ["Gillian Ayres", "Joseph Beuys", "James Ensor"])
+
+    def test_source_qualifiers_biography_and_printmaker_roles_survive_display_order(self):
+        examples = {
+            "Joseph Beuys (German, 1921-1986)": "Beuys, Joseph (German, 1921-1986)",
+            "(after) Joan MIRO": "(after) Miró, Joan", "(after) MATISSE, Henri": "(after) Matisse, Henri",
+            "Joan Miró after.": "Miró, Joan after.",
+            "Hubert Robert, Attributed to.": "Robert, Hubert, Attributed to.",
+            "After Claude Monet, by Georges William Thornley": "After Monet, Claude, by Thornley, Georges William",
+            "After Marc Chagall, by Charles Sorlier": "After Chagall, Marc, by Sorlier, Charles",
+            "After Pablo Picasso, by Jacques Villon": "After Picasso, Pablo, by Villon, Jacques",
+            "Gaston Bernheim de Villers after. Jacques Villon": "Bernheim de Villers, Gaston after. Villon, Jacques",
+            "Marcel Duchamp after. Jacques Villon": "Duchamp, Marcel after. Villon, Jacques",
+            "Marcel Gromaire after. Jacques Villon": "Gromaire, Marcel after. Villon, Jacques",
+            "Marie Laurencin after. Jacques Villon": "Laurencin, Marie after. Villon, Jacques",
+            "Pierre-Auguste Renoir after. Jacques Villon": "Renoir, Pierre-Auguste after. Villon, Jacques",
+        }
+        for raw, expected in examples.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(artist_display_name(raw), expected)
+                self.assertEqual(artist_display_name(expected), expected)
+                self.assertEqual(artist_attribution_label(raw), artist_attribution_label(expected))
+        self.assertEqual(artist_sort_key("Hubert Robert, Attributed to."), artist_sort_key("Hubert Robert"))
+        self.assertEqual(artist_sort_key("(after) Joan MIRO"), artist_sort_key("Joan Miró"))
+
+    def test_new_display_aliases_keep_full_credit_attribution_matching_strict(self):
+        for artist, title in (
+            ("Joseph Beuys", "Joseph Beuys (1921-1986) d'après"),
+            ("James Ensor", "James Ensor (1860-1949) d’après"),
+            ("Jean Michel Basquiat", "Jean-Michel Basquiat (1960–1988) d'après"),
+            ("José García Ortega", "García Ortega, José, after"),
+        ):
+            with self.subTest(artist=artist):
+                self.assertEqual(artist_attribution_label(artist, title=title), "After")
+                self.assertEqual(artist_attribution_label(artist_display_name(artist), title=title), "After")
+        for title in ("James Ensor Jr. d'après", "Unknown Ensor d'après", "Joseph Beuys d'après",
+                      "After the Party", "James Ensor and Unknown Artist d'après"):
+            self.assertEqual(artist_attribution_label("James Ensor", title=title), "")
+
+    def test_unknown_credits_and_stage_names_are_not_split_or_assigned_to_known_artists(self):
+        for value in ("After James Ensor, by Unknown Maker", "Unknown Artist after. Jacques Villon",
+                      "Unknown Artist (German, 1921-1986)", "James Ensor Jr.",
+                      "A. R. Penck", "Man Ray", "Invader", "Panamarenko", "Yvaral (Jean-Pierre Vasarely)"):
+            expected = "Ensor, James Jr." if value == "James Ensor Jr." else value
+            self.assertEqual(artist_display_name(value), expected)
+        self.assertNotEqual(artist_display_name("John Balderssari"), artist_display_name("John Baldessari"))
+
     def test_curated_names_preserve_accents_and_compound_surnames(self):
         examples = {
             "Willem De Kooning": "de Kooning, Willem", "Niki de Saint Phalle": "de Saint-Phalle, Niki",

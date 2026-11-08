@@ -18,6 +18,11 @@ class CalendarPresentationTests(TestCase):
 
     def test_screenshot_examples_render_cleanly_without_rewriting_source_or_links(self):
         cases = (
+            ("James Ensor", "View of Ostend", "Ensor, James"),
+            ("Joseph Beuys", "Original source title", "Beuys, Joseph"),
+            ("Joseph Beuys (German, 1921-1986)", "A complete source biography", "Beuys, Joseph (German, 1921-1986)"),
+            ("Leonor Fini", "La gardienne", "Fini, Leonor"),
+            ("Hubert Robert, Attributed to.", "Landscape", "Robert, Hubert, Attributed to."),
             ("Victor Vasarely", "§ Victor Vasarely (1906–1997), Sir-Ris Negatif, 1974", "Vasarely, Victor"),
             ("David Hockney", "§ David Hockney OM, CH, RA (1937–2026)", "Hockney, David"),
             ("Christo", "Â§ Christo & Jeanne Claude (Bulgarian/American, 1935–2020) Wrapped Reichstag; Berlin and The wall", "Christo"),
@@ -60,6 +65,26 @@ class CalendarPresentationTests(TestCase):
         self.assertEqual(groups[0]["auction_house"], "Dawson’s")
         self.assertEqual(groups[0]["sale_title"], "Prints & Multiples")
         self.assertEqual(groups[0]["lot_count"], 2)
+
+    def test_new_surname_labels_keep_attribution_source_and_purchase_state(self):
+        lot = watch_lot(
+            artist="Joseph Beuys (1921-1986) d'après", artist_watchlist_name="Joseph Beuys",
+            title="Untitled", won_by_us=True,
+            artprice_url="https://www.artprice.com/artist/2485/joseph-beuys/lots/pasts",
+        )
+        lot.refresh_from_db()
+        before = AuctionWatchLot.objects.filter(pk=lot.pk).values().get()
+        with patch("secondstateapp.calendar_views.artist_research_urls", return_value=(lot.artprice_url, "")) as lookup:
+            displayed = _lot_json(lot, CALENDAR_ZONE)
+        lookup.assert_called_once_with("Joseph Beuys")
+        self.assertEqual(displayed["artist"], "Beuys, Joseph")
+        self.assertEqual(displayed["artist_source"], "Joseph Beuys")
+        self.assertEqual(displayed["artist_sort_key"], "beuys, joseph")
+        self.assertEqual(displayed["attribution_label"], "After")
+        self.assertTrue(displayed["won_by_us"])
+        self.assertEqual(displayed["artprice_url"], lot.artprice_url)
+        self.assertEqual(displayed["lot_url"], lot.lot_url)
+        self.assertEqual(AuctionWatchLot.objects.filter(pk=lot.pk).values().get(), before)
 
     @patch.dict(os.environ, {"CATALOG_API_KEY": "presentation-test-key"}, clear=False)
     def test_later_capture_still_displays_cleanly_and_preserves_research_identity(self):

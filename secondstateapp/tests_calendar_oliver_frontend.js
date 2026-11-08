@@ -869,6 +869,43 @@ function houseNavigationPage(lots, view) {
 }
 
 for (const view of ["catalog", "oliver"]) {
+  test(`${view} old artist bookmarks canonicalize on initial load and browser history without losing other filters`, () => {
+    const lots = [
+      lot(1, "Phillips", true, {artist: "Ensor, James", artist_source: "James Ensor", attribution_label: "After", email_tray_selected: true}),
+      lot(2, "Bonhams", true, {artist: "Ensor, James", artist_source: "James Ensor"}),
+      lot(3, "Phillips", true, {artist: "Fini, Leonor", artist_source: "Leonor Fini"}),
+      lot(4, "Other", false, {artist: "Ensor, James", artist_source: "James Ensor"}),
+    ];
+    const before = JSON.stringify(lots);
+    const navigation = houseNavigationPage(lots, view);
+    const {context} = navigation;
+    const oldUrl = `https://secondstate.art/calendar/?${new URLSearchParams({
+      month: "2026-10", day: dayA, view, artist: "james ensor", house: "Phillips", hide_attributed: "1",
+    })}`;
+    navigation.initialize("all", {artist: "james ensor", house: "Phillips", hide_attributed: "1"});
+    assert.equal(context.galleryFilter, "artist:ensor, james");
+    assert.equal(context.run("galleryOrganization.house"), "Phillips");
+    assert.equal(context.galleryResults.textContent, "0 watched lots", "hidden/other-house lots still resolve the saved artist");
+    assert.equal(new URL(context.window.location.href).searchParams.get("artist"), "ensor, james");
+    context.galleryAttributionToggle.click();
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
+    context.run("openResearchWorkspace()");
+    navigation.restore(oldUrl);
+    assert.equal(context.galleryFilter, "artist:ensor, james");
+    assert.equal(context.galleryHideAttributed, true);
+    assert.equal(new URL(context.window.location.href).searchParams.get("artist"), "ensor, james");
+    assert.equal(new URL(context.window.location.href).searchParams.get("house"), "Phillips");
+    assert.equal(navigation.pushes(), 1, "canonicalizing history does not create a second history entry");
+    const finiUrl = new URL(oldUrl);
+    finiUrl.searchParams.set("artist", "leonor fini");
+    navigation.restore(finiUrl.href);
+    assert.equal(context.galleryFilter, "artist:fini, leonor");
+    assert.deepEqual(context.galleryGrid.children.map(card => card.id), [3]);
+    assert.equal(JSON.stringify(lots), before, "browsing preserves every source field and saved selection");
+  });
+}
+
+for (const view of ["catalog", "oliver"]) {
   test(`${view} house URL restores initial and history state with attribution hiding and clears on All houses`, () => {
     const lots = [
       lot(1, "Other", false, {email_tray_selected: true}),
