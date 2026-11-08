@@ -48,6 +48,7 @@ from .auction_email import (
 )
 from .bid_board_snapshot import saved_board_summary
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate
+from .calendar_sales import verified_sale
 from .calendar_images import (
     is_saved_calendar_image_url,
     prepare_saved_calendar_image,
@@ -123,6 +124,9 @@ def _artist_label(lot: AuctionWatchLot) -> str:
 def _sale_identity(lot: AuctionWatchLot) -> str:
     if lot.sale_url:
         return f"sale:{lot.sale_url}"
+    sale = verified_sale(lot)
+    if sale:
+        return sale["identity"]
     return "|".join(
         (
             lot.source,
@@ -203,6 +207,11 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
     groups = []
     for sale_lots in grouped.values():
         first = sale_lots[0]
+        sale = verified_sale(first)
+        display_time = first
+        if sale:
+            display_time = copy(first)
+            display_time.event_at = sale["starts_at"]
         auction_house = next((lot.auction_house for lot in sale_lots if lot.auction_house), first.source or "Auction")
         sale_title = next((lot.sale_title for lot in sale_lots if lot.sale_title), "")
         artists = sorted({artist_display_name(_artist_label(lot)) for lot in sale_lots}, key=artist_sort_key)
@@ -213,11 +222,11 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
                 "lot_count": len(sale_lots),
                 "artists": "; ".join(artists[:3]),
                 "additional_artists": max(0, len(artists) - 3),
-                "time_label": _time_label(first, zone),
+                "time_label": _time_label(display_time, zone),
                 "url": first.sale_url or first.lot_url,
                 "sale_url": first.sale_url,
                 "ended": all(not lot.active for lot in sale_lots),
-                "sort_at": first.event_at,
+                "sort_at": display_time.event_at,
             }
         )
     return sorted(groups, key=lambda item: (item["sort_at"], item["auction_house"]))
