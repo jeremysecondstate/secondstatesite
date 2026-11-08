@@ -30,7 +30,7 @@
     return Number.isFinite(time) ? time : null;
   };
 
-  // Published block times take precedence. Otherwise an explicitly supplied
+  // Published block times and sale-specific pace take precedence. Otherwise an explicitly supplied
   // numbering baseline offsets the one-minute estimate; never infer one from
   // the watched subset, number length, or another sale.
   const lotArrivalDetails = (lot) => {
@@ -49,6 +49,21 @@
         || schedule.source_url !== "https://www.dobiaschofsky.com/g246.html") return null;
       return {number, time: at, startTime: start, kind: schedule.kind, sourceUrl: schedule.source_url,
         firstLot: schedule.first_lot, lastLot: schedule.last_lot, minutes: null};
+    }
+    if (lot.arrival_estimate != null) {
+      const estimate = lot.arrival_estimate;
+      const start = knownInstant(estimate.session_start_at);
+      if (start === null || !Number.isSafeInteger(estimate.first_lot) || estimate.first_lot <= 0
+        || !Number.isSafeInteger(estimate.last_lot) || estimate.last_lot < estimate.first_lot
+        || number < estimate.first_lot || number > estimate.last_lot
+        || !Number.isFinite(estimate.lots_per_hour) || estimate.lots_per_hour <= 0
+        || estimate.source_url !== "https://fineart.ha.com/c/auction-home.zx?saleNo=8256") return null;
+      const minutes = (number - estimate.first_lot) * 60 / estimate.lots_per_hour;
+      const at = start + minutes * 60000;
+      return Number.isFinite(new Date(at).getTime())
+        ? {number, time: at, startTime: start, kind: "published_pace", sourceUrl: estimate.source_url,
+          firstLot: estimate.first_lot, lastLot: estimate.last_lot, lotsPerHour: estimate.lots_per_hour, minutes}
+        : null;
     }
     const baseline = lot.numbering_baseline ?? 0;
     if (!Number.isSafeInteger(baseline) || baseline < 0 || baseline > number) return null;
@@ -103,6 +118,7 @@
         group.arrivalKind = details.kind;
         group.arrivalSourceUrl = details.sourceUrl;
         group.arrivalMinutes = details.minutes;
+        group.arrivalLotsPerHour = details.lotsPerHour;
         group.arrivalFirstLot = details.firstLot;
         group.arrivalLastLot = details.lastLot;
       }

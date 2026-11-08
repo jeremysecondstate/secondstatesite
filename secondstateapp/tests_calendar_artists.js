@@ -414,6 +414,45 @@ const houseTimetable = (at = "2026-11-06T13:30:00Z", first = 3446, last = 3467) 
   first_lot: first, last_lot: last, source_url: "https://www.dobiaschofsky.com/g246.html",
 });
 
+const heritagePace = () => ({session_start_at: "2026-11-11T17:00:00Z", first_lot: 79001, last_lot: 79230,
+  lots_per_hour: 54, source_url: "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"});
+
+test("Heritage estimates start with the first lot at live start, not the proxy cutoff", () => {
+  const base = Object.freeze({artist: "Mucha, Alphonse", event_at: "2026-11-11T16:50:00Z", time: "8:50 AM",
+    arrival_estimate: Object.freeze(heritagePace()), email_tray_selected: true, won_by_us: true});
+  for (const [lot_number, expected] of [["79001", "9:00 AM"], ["79055", "10:00 AM"],
+    ["79087", "10:35 AM"], ["79088A", "10:36 AM"], ["79095", "10:44 AM"], ["79230", "1:14 PM"]]) {
+    const lot = Object.freeze({...base, lot_number});
+    const before = JSON.stringify(lot);
+    assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), expected);
+    const [artist] = CalendarArtists.summarize([lot]);
+    assert.equal(artist.arrivalTime, CalendarArtists.estimateLotArrival(lot));
+    assert.equal(artist.arrivalStartTime, Date.parse("2026-11-11T17:00:00Z"));
+    assert.equal(artist.arrivalKind, "published_pace");
+    assert.equal(artist.arrivalLotsPerHour, 54);
+    assert.equal(artist.timeLabel, "8:50 AM");
+    assert.equal(JSON.stringify(lot), before);
+  }
+  const [artist] = CalendarArtists.summarize([{...base, lot_number: "79095"}, {...base, lot_number: "79088"}]);
+  assert.equal(artist.arrivalLotNumber, 79088);
+  assert.equal(CalendarArtists.formatArrival(artist, "America/New_York"), "1:36 PM");
+});
+
+test("invalid published pace metadata does not invent an arrival", () => {
+  const lot = {event_at: "2026-11-11T16:50:00Z", lot_number: "79087", arrival_estimate: heritagePace()};
+  for (const changes of [{session_start_at: "2026-11-11"}, {first_lot: "79001"}, {first_lot: 0},
+    {last_lot: 79000}, {lots_per_hour: 0}, {lots_per_hour: -54}, {lots_per_hour: "54"},
+    {lots_per_hour: Infinity}, {source_url: "https://example.test/?saleNo=8256"}]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...lot, arrival_estimate: {...heritagePace(), ...changes}}), null);
+  }
+  for (const lot_number of ["79000", "79231", "79087/1"]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...lot, lot_number}), null);
+  }
+  assert.equal(CalendarArtists.estimateLotArrival({...lot, is_all_day: true}), null);
+  assert.equal(CalendarArtists.estimateLotArrival({...lot, arrival_estimate: undefined}),
+    Date.parse(lot.event_at) + 79087 * 60000, "other sales keep their existing fallback");
+});
+
 test("artist summaries share per-lot suffix handling for timetable and fallback arrivals", () => {
   for (const lot of [
     {artist: "Miró", event_at: "2026-11-06T08:00:00Z", lot_number: "3466A", arrival_schedule: houseTimetable()},

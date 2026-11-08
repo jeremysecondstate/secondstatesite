@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 from django.test import SimpleTestCase, TestCase
 
-from .calendar_arrival import TIMETABLE_URL, published_lot_arrival
+from .calendar_arrival import HERITAGE_8256_URL, TIMETABLE_URL, published_lot_arrival, sale_arrival_estimate
 from .calendar_views import _lot_json
 from .tests_calendar import CALENDAR_ZONE, watch_lot
 
@@ -16,6 +17,63 @@ def source_lot(**changes):
     )
     values.update(changes)
     return SimpleNamespace(**values)
+
+
+def heritage_lot(**changes):
+    return source_lot(**(dict(
+        source_lot_id="35700126", auction_house="Heritage Auctions",
+        event_at=datetime(2026, 11, 11, 16, 50, tzinfo=timezone.utc),
+        lot_number="79087", sale_url="https://drouot.com/en/v/187633",
+    ) | changes))
+
+
+class SaleArrivalEstimateTests(SimpleTestCase):
+    def test_verified_heritage_sale_uses_official_session_and_pace(self):
+        for number in ("79001", "79087", "79095", "79230", " 079087A "):
+            with self.subTest(number=number):
+                lot = heritage_lot(lot_number=number)
+                before = vars(lot).copy()
+                self.assertEqual(sale_arrival_estimate(lot), {
+                    "session_start_at": "2026-11-11T17:00:00+00:00",
+                    "first_lot": 79001, "last_lot": 79230, "lots_per_hour": 54,
+                    "source_url": HERITAGE_8256_URL,
+                })
+                self.assertEqual(vars(lot), before)
+                self.assertIsNone(published_lot_arrival(lot))
+
+    def test_sale_identity_accepts_verified_url_forms_and_house_normalization(self):
+        for url in (
+            "https://drouot.com/en/v/187633", "https://www.drouot.com/fr/v/187633/",
+            "https://drouot.com/v/187633/tiffany-lalique-art-glass?lang=en",
+        ):
+            with self.subTest(url=url):
+                self.assertIsNotNone(sale_arrival_estimate(heritage_lot(
+                    sale_url=url, auction_house="  HERITAGE\tAuctions ",
+                    event_at=datetime(2026, 11, 11, 10, 50, tzinfo=ZoneInfo("America/Chicago")),
+                )))
+
+    def test_unverified_sales_sources_dates_and_numbers_do_not_receive_estimates(self):
+        for changes in (
+            {"auction_house": "Heritage Auctions affiliate"}, {"auction_house": "Heritage"},
+            {"source": "Invaluable"}, {"source": "Heritage"},
+            {"sale_url": "https://drouot.com/en/v/187634"},
+            {"sale_url": "https://drouot.com/en/v/1876330"},
+            {"sale_url": "https://drouot.com/en/v/187633/extra/path"},
+            {"sale_url": "https://drouot.com.evil.test/en/v/187633"},
+            {"sale_url": "https://drouot.com@evil.test/en/v/187633"},
+            {"sale_url": "http://drouot.com/en/v/187633"},
+            {"sale_url": "https://[invalid"}, {"sale_url": ""},
+            {"event_at": datetime(2026, 11, 10, 17, tzinfo=timezone.utc)},
+            {"event_at": datetime(2026, 11, 12, 17, tzinfo=timezone.utc)},
+            {"event_at": datetime(2027, 11, 11, 17, tzinfo=timezone.utc)},
+            {"event_at": datetime(2026, 11, 11, 17)},
+            {"event_at": None}, {"is_all_day": True},
+            {"lot_number": "79000"}, {"lot_number": "79231"}, {"lot_number": "80000"},
+            {"lot_number": "79087/1"}, {"lot_number": "79087-79088"},
+            {"lot_number": "79087.5"}, {"lot_number": ""},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(sale_arrival_estimate(heritage_lot(**changes)))
 
 
 class PublishedCalendarArrivalTests(SimpleTestCase):
@@ -133,6 +191,33 @@ class PublishedCalendarArrivalTests(SimpleTestCase):
 
 
 class CalendarArrivalPayloadTests(TestCase):
+    def test_official_sale_estimate_preserves_proxy_time_source_and_saved_state(self):
+        lot = watch_lot(**vars(heritage_lot()), artist="Alphonse Mucha",
+                        artist_watchlist_name="Alphonse Mucha", won_by_us=True,
+                        artprice_url="https://www.artprice.com/artist/20603/alphonse-mucha/lots/pasts")
+        lot.refresh_from_db()
+        before = {f.attname: getattr(lot, f.attname) for f in lot._meta.concrete_fields}
+        queue = {lot.pk: {"status": "queued"}}
+        payload = _lot_json(lot, CALENDAR_ZONE, selected_lot_ids={lot.pk}, research_queue_state=queue)
+        self.assertEqual(payload["arrival_estimate"], sale_arrival_estimate(lot))
+        self.assertEqual(payload["event_at"], "2026-11-11T16:50:00+00:00")
+        self.assertEqual(payload["time"], "8:50 AM")
+        self.assertEqual(payload["lot_number"], "79087")
+        self.assertEqual(payload["artist"], "Mucha, Alphonse")
+        self.assertEqual(payload["artprice_url"], lot.artprice_url)
+        self.assertEqual(payload["sale_url"], lot.sale_url)
+        self.assertEqual(payload["lot_url"], lot.lot_url)
+        self.assertTrue(payload["won_by_us"])
+        self.assertTrue(payload["email_tray_selected"])
+        self.assertTrue(payload["research_queue_selected"])
+        self.assertEqual(payload["research_queue_status"], "queued")
+        self.assertNotIn("arrival_schedule", payload)
+        lot.refresh_from_db()
+        self.assertEqual({f.attname: getattr(lot, f.attname) for f in lot._meta.concrete_fields}, before)
+        unrelated = watch_lot(source_lot_id="other-sale-estimate")
+        unrelated.refresh_from_db()
+        self.assertNotIn("arrival_estimate", _lot_json(unrelated, CALENDAR_ZONE))
+
     def test_presentation_adds_schedule_without_rewriting_source_or_saved_state(self):
         lot = watch_lot(**vars(source_lot()), artist="Joan Miró", artist_watchlist_name="Joan Miró", won_by_us=True)
         lot.refresh_from_db()

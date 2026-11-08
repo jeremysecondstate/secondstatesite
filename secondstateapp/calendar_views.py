@@ -47,7 +47,7 @@ from .auction_email import (
     validate_sending_configuration,
 )
 from .bid_board_snapshot import saved_board_summary
-from .calendar_arrival import published_lot_arrival
+from .calendar_arrival import published_lot_arrival, sale_arrival_estimate
 from .calendar_images import (
     is_saved_calendar_image_url,
     prepare_saved_calendar_image,
@@ -245,9 +245,11 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         except ValueError:
             pass
     arrival_schedule = published_lot_arrival(lot)
+    arrival_estimate = sale_arrival_estimate(lot)
     return {
         "id": lot.pk,
         **({"arrival_schedule": arrival_schedule} if arrival_schedule else {}),
+        **({"arrival_estimate": arrival_estimate} if arrival_estimate else {}),
         "artist": artist_display_name(source_artist),
         "artist_source": source_artist,
         "attribution_label": artist_attribution_label(lot.artist, source_artist, title=lot.title),

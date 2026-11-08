@@ -56,6 +56,23 @@ test("arrival sorting uses published blocks and explicit offsets across provider
   assert.equal(JSON.stringify(lots), before);
 });
 
+test("arrival sorting uses Heritage live start and pace instead of its high lot numbers", () => {
+  const arrival_estimate = {session_start_at: "2026-11-11T17:00:00Z", first_lot: 79001, last_lot: 79230,
+    lots_per_hour: 54, source_url: "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"};
+  const lots = [
+    {id: "later", event_at: "2026-11-11T16:50:00Z", lot_number: "79095", arrival_estimate},
+    {id: "unknown", event_at: null, lot_number: "1"},
+    {id: "between", event_at: "2026-11-11T18:00:00Z", lot_number: "40"},
+    {id: "earlier", event_at: "2026-11-11T16:50:00Z", lot_number: "79087", arrival_estimate},
+  ];
+  const before = JSON.stringify(lots);
+  const page = catalog(lots, "arrival_asc");
+  assert.deepEqual(page.visible().map(item => item.id), ["earlier", "between", "later", "unknown"]);
+  page.gallerySort.value = "arrival_desc";
+  assert.deepEqual(page.visible().map(item => item.id), ["later", "between", "earlier", "unknown"]);
+  assert.equal(JSON.stringify(lots), before);
+});
+
 test("prices sort numerically in both directions, preserve ties and place missing prices last", () => {
   const lots = [
     {id: "unknown", estimate_low: null},

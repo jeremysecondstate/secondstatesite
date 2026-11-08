@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 
 TIMETABLE_URL = "https://www.dobiaschofsky.com/g246.html"
+HERITAGE_8256_URL = "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"
 # A-142, 5-6 November 2026, published house timetable. Each time is
 # the start of a numbered block, not an exact promise for every lot in it.
 # Captured 2026-11-05; the date and sale checks below prevent later-sale reuse.
@@ -54,6 +55,41 @@ _MISSING_SALE_LOTS = {
     "206830784": (3443, "217ffff078"),
     "206830861": (3520, "f180321dbe"),
 }
+
+
+def sale_arrival_estimate(lot):
+    """Supply verified sale start/pace without replacing the source's timestamp."""
+    # Heritage 8256, Tiffany, Lalique & Art Glass: the official session starts
+    # at 11 AM Central on Nov 11 and lists approximately 54 lots/hour, 79001-79230.
+    # Drouot 187633 lists its proxy-bid cutoff instead. Keep that raw time and
+    # use the house's session only for arrival estimates, not promised times.
+    event = lot.event_at
+    if lot.is_all_day or not event or event.utcoffset() is None:
+        return None
+    if event.astimezone(ZoneInfo("America/Chicago")).date() != date(2026, 11, 11):
+        return None
+    house = " ".join(unicodedata.normalize("NFKC", lot.auction_house).casefold().split())
+    if lot.source != "Drouot" or house != "heritage auctions":
+        return None
+    number_match = re.fullmatch(r"([0-9]+)[A-Za-z]*", str(lot.lot_number).strip())
+    if not number_match or not 79001 <= int(number_match[1]) <= 79230:
+        return None
+    try:
+        sale = urlsplit(lot.sale_url)
+        matches_sale = sale.scheme == "https" and sale.hostname in {"drouot.com", "www.drouot.com"} and bool(
+            re.fullmatch(r"/(?:[a-z]{2}/)?v/187633(?:/[^/]+)?/?", sale.path)
+        )
+    except ValueError:
+        return None
+    if not matches_sale:
+        return None
+    return {
+        "session_start_at": "2026-11-11T17:00:00+00:00",
+        "first_lot": 79001,
+        "last_lot": 79230,
+        "lots_per_hour": 54,
+        "source_url": HERITAGE_8256_URL,
+    }
 
 
 def published_lot_arrival(lot):

@@ -101,6 +101,24 @@ test("published arrival blocks have an explicit source link and retain source ti
   assert.equal(JSON.stringify(source), before);
 });
 
+test("Heritage pace estimates link to their basis while preserving source times and saved controls", () => {
+  const source = lot({event_at: "2026-11-11T16:50:00Z", time: "8:50 AM", lot_number: "79087", won_by_us: true,
+    research_queue_selected: true, arrival_estimate: {session_start_at: "2026-11-11T17:00:00Z",
+      first_lot: 79001, last_lot: 79230, lots_per_hour: 54,
+      source_url: "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"}});
+  const before = JSON.stringify(source);
+  const card = renderer().galleryCard(source, 0);
+  assert.equal(withClass(card, "day-gallery-lot-arrival")[0].textContent, "Est. lot arrival: ≈ 10:35 AM");
+  const link = withClass(card, "day-gallery-auction-link").find(node => node.textContent === "Estimate basis ↗");
+  assert.equal(link.href, source.arrival_estimate.source_url);
+  assert.equal(link.target, "_blank");
+  assert.equal(link.rel, "noopener noreferrer");
+  assert(withClass(card, "day-gallery-meta").some(node => node.textContent.includes("Listed auction: 8:50 AM")));
+  assert.equal(withClass(card, "lot-won-badge").length, 1);
+  assert.equal(withClass(card, "lot-attribution-badge")[0].textContent, "After");
+  assert.equal(JSON.stringify(source), before);
+});
+
 for (const attribution of ["After", "Attributed to"]) {
   test(`${attribution} is readable without changing the artist name or Artprice link`, () => {
     const parent = new Element("div");
