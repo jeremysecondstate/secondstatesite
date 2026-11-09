@@ -682,6 +682,11 @@ body:has(.artwork-detail-page){
   background: rgba(0,0,0,0.75);
 }
 
+.artwork-detail-page .image-nav:focus-visible{
+  outline: 2px solid #c9d9a5;
+  outline-offset: 4px;
+}
+
 .image-nav-left{
   left: 14px;
 }

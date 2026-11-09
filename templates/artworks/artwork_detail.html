@@ -28,11 +28,11 @@
     {% if user.is_staff %}{% csrf_token %}{% endif %}
     <div class="text-center image-stage">
         {% if photos|length > 1 %}
-        <button class="image-nav image-nav-left" onclick="showPrevImage(event)">&#10094;</button>
+        <button type="button" class="image-nav image-nav-left" aria-label="Previous photo" onclick="showPrevImage(event)">&#10094;</button>
         {% endif %}
         <img id="mainImage" src="{{ photos.0.image.url }}" class="img-fluid main-img" alt="{{ artwork.title }}" onclick="openFullscreen(this)">
         {% if photos|length > 1 %}
-        <button class="image-nav image-nav-right" onclick="showNextImage(event)">&#10095;</button>
+        <button type="button" class="image-nav image-nav-right" aria-label="Next photo" onclick="showNextImage(event)">&#10095;</button>
         {% endif %}
     </div>
 

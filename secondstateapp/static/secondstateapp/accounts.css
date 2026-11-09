@@ -121,6 +121,11 @@
   color: var(--muted);
 }
 
+/* Keep the backdrop continuous when profiles extend beyond the viewport. */
+body:has(.profile-page-shell) {
+  background-attachment: fixed;
+}
+
 .profile-page-shell {
   display: grid;
   gap: 22px;
