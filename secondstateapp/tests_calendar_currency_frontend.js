@@ -8,6 +8,23 @@ function quote(sourceCurrency, sourceAmount, usdAmount, rate = "1.10") {
     rate, rate_date: "2026-10-21", provider: "Frankfurter"};
 }
 
+test("JPY estimates show USD alongside original yen and dated rate provenance", () => {
+  const lot = {currency: "JPY", estimate_low: "100000.00", estimate_high: "150000.00",
+    estimate: "JPY 100,000–150,000 estimate", usd_status: "ready",
+    usd_prices: {
+      estimate_low: quote("JPY", "100000.00", "632.09", "0.0063209"),
+      estimate_high: quote("JPY", "150000.00", "948.14", "0.0063209"),
+    }};
+  const original = JSON.stringify(lot);
+  assert.deepEqual(currency.display(lot, "estimate"), {
+    text: "≈ $632.09–948.14 USD estimate · Original: JPY 100,000–150,000 estimate",
+    title: "Frankfurter · 2026-10-21 · 1 JPY = 0.0063209 USD",
+  });
+  assert.equal(currency.sortPrice(lot), 632.09);
+  assert.equal(currency.hasUnavailablePrices(lot), false);
+  assert.equal(JSON.stringify(lot), original);
+});
+
 test("USD comparison crosses nominal JPY/EUR prices and never sorts using bids or sold results", () => {
   const lots = [
     {id: "eur", currency: "EUR", estimate_low: "100.00", current_bid: "1.00", sold_price: "2.00",

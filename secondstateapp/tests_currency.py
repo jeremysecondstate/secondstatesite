@@ -56,7 +56,8 @@ class CurrencyConversionTests(SimpleTestCase):
                 })
                 json.dumps(result)
                 self.request.assert_called_with(
-                    f"https://api.frankfurter.dev/v2/rate/{code.lower()}/usd", timeout=3,
+                    f"https://api.frankfurter.dev/v2/rate/{code.lower()}/usd",
+                    params={"date": "2026-10-17"}, timeout=3,
                 )
                 response.json.assert_called_once_with(parse_float=Decimal)
 
@@ -71,6 +72,30 @@ class CurrencyConversionTests(SimpleTestCase):
     def test_conversion_rounds_half_cent_up_without_float_loss(self):
         self.response("CAD", Decimal("0.7335"))
         self.assertEqual(convert_to_usd("10", "cad")["usd_amount"], "7.34")
+
+    def test_jpy_uses_current_utc_date_when_latest_feed_has_rolled_ahead(self):
+        self.clock.return_value = datetime(2026, 11, 8, 21, 20, tzinfo=timezone.utc)
+
+        def dated_response(url, **kwargs):
+            response = Mock()
+            # The latest feed may already be on the next publication date.
+            observed = kwargs.get("params", {}).get("date", "2026-11-09")
+            response.json.return_value = {
+                "base": "JPY", "quote": "USD", "date": observed, "rate": "0.0063209",
+            }
+            return response
+
+        self.request.side_effect = dated_response
+        low = convert_to_usd("100000", "JPY")
+        high = convert_to_usd("150000", "JPY")
+        self.assertIsNotNone(low)
+        self.assertEqual((low["usd_amount"], high["usd_amount"]), ("632.09", "948.14"))
+        self.assertEqual((low["source_amount"], high["source_amount"]), ("100000.00", "150000.00"))
+        self.assertEqual(low["rate_date"], "2026-11-08")
+        self.request.assert_called_once_with(
+            "https://api.frankfurter.dev/v2/rate/jpy/usd",
+            params={"date": "2026-11-08"}, timeout=3,
+        )
 
     def test_invalid_currencies_and_amounts_do_not_request_rates(self):
         for currency in (None, "", "unknown", "$", "US", "USDD", "US/", 123):

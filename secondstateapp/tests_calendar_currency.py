@@ -127,7 +127,9 @@ class CalendarCurrencyTests(TestCase):
         self.assertEqual(first, second)
         self.assertEqual(len(first), 4)
         self.assertEqual(next(iter(first.values()))["estimate_low"]["usd_amount"], "134.00")
-        self.request.assert_called_once_with("https://api.frankfurter.dev/v2/rate/jpy/usd", timeout=3)
+        self.request.assert_called_once_with(
+            "https://api.frankfurter.dev/v2/rate/jpy/usd", params={"date": "2026-10-22"}, timeout=3,
+        )
 
     def test_lookup_failures_unknown_currencies_and_stale_quotes_never_relabel_native_amounts(self):
         for currency, failure in (("EUR", requests.Timeout()), ("XXX", requests.HTTPError()),

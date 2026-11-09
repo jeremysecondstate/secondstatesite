@@ -71,7 +71,12 @@ def _usd_quote(currency):
             return quote
 
     try:
-        response = requests.get(_API_URL.format(currency=currency.lower()), timeout=3)
+        # Pin the observation date: the latest feed can roll ahead of UTC,
+        # which would otherwise fail our future-quote validation.
+        response = requests.get(
+            _API_URL.format(currency=currency.lower()),
+            params={"date": timezone.now().date().isoformat()}, timeout=3,
+        )
         response.raise_for_status()
         quote = _validate_quote(response.json(parse_float=Decimal), currency)
     except (requests.RequestException, ValueError, TypeError, DecimalException):
