@@ -53,15 +53,20 @@
     if (lot.arrival_estimate != null) {
       const estimate = lot.arrival_estimate;
       const start = knownInstant(estimate.session_start_at);
+      const kind = estimate.kind ?? "published_pace";
+      const verifiedBasis = kind === "published_pace"
+        ? estimate.source_url === "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"
+        : kind === "session_estimate" && estimate.lots_per_hour === 60
+          && estimate.source_url === "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf";
       if (start === null || !Number.isSafeInteger(estimate.first_lot) || estimate.first_lot <= 0
         || !Number.isSafeInteger(estimate.last_lot) || estimate.last_lot < estimate.first_lot
         || number < estimate.first_lot || number > estimate.last_lot
         || !Number.isFinite(estimate.lots_per_hour) || estimate.lots_per_hour <= 0
-        || estimate.source_url !== "https://fineart.ha.com/c/auction-home.zx?saleNo=8256") return null;
+        || !verifiedBasis) return null;
       const minutes = (number - estimate.first_lot) * 60 / estimate.lots_per_hour;
       const at = start + minutes * 60000;
       return Number.isFinite(new Date(at).getTime())
-        ? {number, time: at, startTime: start, kind: "published_pace", sourceUrl: estimate.source_url,
+        ? {number, time: at, startTime: start, kind, sourceUrl: estimate.source_url,
           firstLot: estimate.first_lot, lastLot: estimate.last_lot, lotsPerHour: estimate.lots_per_hour, minutes}
         : null;
     }

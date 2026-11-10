@@ -4,7 +4,10 @@ from zoneinfo import ZoneInfo
 
 from django.test import SimpleTestCase, TestCase
 
-from .calendar_arrival import HERITAGE_8256_URL, TIMETABLE_URL, published_lot_arrival, sale_arrival_estimate
+from .calendar_arrival import (
+    HERITAGE_8256_URL, TIMETABLE_URL, ZWAAN_117_TIMETABLE_URL,
+    published_lot_arrival, sale_arrival_estimate,
+)
 from .calendar_views import _lot_json
 from .tests_calendar import CALENDAR_ZONE, watch_lot
 
@@ -25,6 +28,90 @@ def heritage_lot(**changes):
         event_at=datetime(2026, 11, 11, 16, 50, tzinfo=timezone.utc),
         lot_number="79087", sale_url="https://drouot.com/en/v/187633",
     ) | changes))
+
+
+def zwaan_lot(**changes):
+    return source_lot(**(dict(
+        source="Invaluable", source_lot_id="207090363", auction_house="Veilinggebouw de Zwaan",
+        event_at=datetime(2026, 11, 12, 9, tzinfo=timezone.utc),
+        lot_number="6816", sale_url="",
+        lot_url="https://www.invaluable.com/auction-lot/francisco-zuniga-1912-1998-6816-c-b76b923688",
+    ) | changes))
+
+
+class ZwaanSessionArrivalTests(SimpleTestCase):
+    def test_zuniga_uses_evening_session_with_default_pace_not_whole_day_number(self):
+        lot = zwaan_lot()
+        before = vars(lot).copy()
+        self.assertEqual(sale_arrival_estimate(lot), {
+            "kind": "session_estimate",
+            "session_start_at": "2026-11-12T18:00:00+00:00",
+            "first_lot": 6800, "last_lot": 7015, "lots_per_hour": 60,
+            "source_url": ZWAAN_117_TIMETABLE_URL,
+        })
+        self.assertIsNone(published_lot_arrival(lot))
+        self.assertEqual(vars(lot), before)
+
+    def test_each_session_has_its_own_start_and_range_in_both_number_directions(self):
+        for first, last, hour in ((6000, 6233, 9), (6400, 6586, 13), (6800, 7015, 18)):
+            for number in (str(first), str(last), f"0{first}A"):
+                with self.subTest(number=number):
+                    lot = zwaan_lot(source="Drouot", auction_house="  DE ZWAAN\tAmsterdam ",
+                                    sale_url="https://drouot.com/en/v/186921", lot_number=number)
+                    result = sale_arrival_estimate(lot)
+                    self.assertEqual(result["session_start_at"], f"2026-11-12T{hour:02d}:00:00+00:00")
+                    self.assertEqual((result["first_lot"], result["last_lot"]), (first, last))
+                    self.assertEqual(result["kind"], "session_estimate")
+                    self.assertEqual(result["lots_per_hour"], 60)
+        for number in ("5999", "6234", "6399", "6587", "6799", "7016", "6816/1", "6816-6817", ""):
+            with self.subTest(number=number):
+                self.assertIsNone(sale_arrival_estimate(zwaan_lot(
+                    source="Drouot", sale_url="https://drouot.com/en/v/186921", lot_number=number)))
+
+    def test_session_matching_requires_exact_house_provider_date_and_sale(self):
+        for changes in (
+            {"auction_house": "De Zwaan Amsterdam affiliate"}, {"auction_house": "De Zwaan"},
+            {"source": "Other"}, {"is_all_day": True}, {"event_at": None},
+            {"event_at": datetime(2026, 11, 12, 9)},
+            {"event_at": datetime(2026, 11, 11, 9, tzinfo=timezone.utc)},
+            {"event_at": datetime(2026, 11, 13, 9, tzinfo=timezone.utc)},
+            {"event_at": datetime(2027, 11, 12, 9, tzinfo=timezone.utc)},
+            {"source": "Drouot", "sale_url": ""},
+            {"source": "Drouot", "sale_url": "https://drouot.com/en/v/186922"},
+            {"source": "Drouot", "sale_url": "https://drouot.com/en/v/1869210"},
+            {"source": "Drouot", "sale_url": "https://drouot.com.evil.test/en/v/186921"},
+            {"source": "Drouot", "sale_url": "http://drouot.com/en/v/186921"},
+            {"source": "Drouot", "sale_url": "https://[invalid"},
+            {"sale_url": "https://www.invaluable.com/catalog/unrelated-sale"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(sale_arrival_estimate(zwaan_lot(**changes)))
+        self.assertIsNotNone(sale_arrival_estimate(zwaan_lot(
+            event_at=datetime(2026, 11, 12, 10, tzinfo=ZoneInfo("Europe/Amsterdam")))))
+
+    def test_missing_invaluable_sale_requires_scoped_id_number_and_source_link(self):
+        for changes in (
+            {"source_lot_id": "unknown"}, {"lot_number": "6817"},
+            {"lot_url": ""},
+            {"lot_url": "https://www.invaluable.com/auction-lot/francisco-zuniga-6816-c-wrong"},
+            {"lot_url": "https://www.invaluable.com.evil.test/auction-lot/francisco-zuniga-6816-c-b76b923688"},
+            {"lot_url": "http://www.invaluable.com/auction-lot/francisco-zuniga-6816-c-b76b923688"},
+            {"lot_url": "https://[invalid"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(sale_arrival_estimate(zwaan_lot(**changes)))
+
+    def test_verified_catalogue_identifies_new_observations_without_borrowing_another_sale(self):
+        for number, expected in (("6000", "09:00"), ("6400", "13:00"), ("6816", "18:00")):
+            with self.subTest(number=number):
+                lot = zwaan_lot(source_lot_id="new-catalogue-observation", lot_number=number,
+                                sale_url="https://www.invaluable.com/catalog/9ESB0TMK4J/", lot_url="")
+                self.assertEqual(sale_arrival_estimate(lot)["session_start_at"], f"2026-11-12T{expected}:00+00:00")
+        for sale_url in ("https://www.invaluable.com/catalog/9ESB0TMK4J0",
+                         "https://www.invaluable.com.evil.test/catalog/9ESB0TMK4J",
+                         "http://www.invaluable.com/catalog/9ESB0TMK4J"):
+            with self.subTest(sale_url=sale_url):
+                self.assertIsNone(sale_arrival_estimate(zwaan_lot(sale_url=sale_url)))
 
 
 class SaleArrivalEstimateTests(SimpleTestCase):
@@ -191,6 +278,29 @@ class PublishedCalendarArrivalTests(SimpleTestCase):
 
 
 class CalendarArrivalPayloadTests(TestCase):
+    def test_zwaan_session_preserves_raw_time_provenance_and_saved_selections(self):
+        lot = watch_lot(**vars(zwaan_lot()), artist="Francisco Zúñiga",
+                        artist_watchlist_name="Francisco Zúñiga", won_by_us=True,
+                        artprice_url="https://www.artprice.com/artist/1/example/lots/pasts")
+        lot.refresh_from_db()
+        before = {f.attname: getattr(lot, f.attname) for f in lot._meta.concrete_fields}
+        payload = _lot_json(lot, CALENDAR_ZONE, selected_lot_ids={lot.pk},
+                            research_queue_state={lot.pk: {"status": "queued"}})
+        self.assertEqual(payload["arrival_estimate"], sale_arrival_estimate(lot))
+        self.assertEqual(payload["event_at"], "2026-11-12T09:00:00+00:00")
+        self.assertEqual(payload["time"], "1:00 AM")
+        self.assertEqual(payload["lot_number"], "6816")
+        self.assertEqual(payload["artist"], "Zúñiga, Francisco")
+        for field in ("artprice_url", "lot_url", "sale_url"):
+            self.assertEqual(payload[field], getattr(lot, field))
+        self.assertTrue(payload["won_by_us"])
+        self.assertTrue(payload["email_tray_selected"])
+        self.assertTrue(payload["research_queue_selected"])
+        self.assertEqual(payload["research_queue_status"], "queued")
+        self.assertNotIn("arrival_schedule", payload)
+        lot.refresh_from_db()
+        self.assertEqual({f.attname: getattr(lot, f.attname) for f in lot._meta.concrete_fields}, before)
+
     def test_official_sale_estimate_preserves_proxy_time_source_and_saved_state(self):
         lot = watch_lot(**vars(heritage_lot()), artist="Alphonse Mucha",
                         artist_watchlist_name="Alphonse Mucha", won_by_us=True,

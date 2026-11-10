@@ -417,6 +417,67 @@ const houseTimetable = (at = "2026-11-06T13:30:00Z", first = 3446, last = 3467) 
 const heritagePace = () => ({session_start_at: "2026-11-11T17:00:00Z", first_lot: 79001, last_lot: 79230,
   lots_per_hour: 54, source_url: "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"});
 
+const zwaanSession = (start = "18:00", first = 6800, last = 7015) => ({
+  kind: "session_estimate", session_start_at: `2026-11-12T${start}:00Z`,
+  first_lot: first, last_lot: last, lots_per_hour: 60,
+  source_url: "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf",
+});
+
+test("Zuniga 6816 arrives November 12 using the 6800 evening session instead of November 16", () => {
+  const lot = Object.freeze({artist: "Zúñiga, Francisco", auction_house: "Veilinggebouw de Zwaan",
+    event_at: "2026-11-12T09:00:00Z", time: "1:00 AM", lot_number: "6816",
+    arrival_estimate: Object.freeze(zwaanSession()), email_tray_selected: true, won_by_us: true,
+    saved_bid_board: Object.freeze({qualifying_bid: "1344.00"})});
+  const before = JSON.stringify(lot);
+  assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse("2026-11-12T18:16:00Z"));
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), "10:16 AM");
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/New_York"), "1:16 PM");
+  const [artist] = CalendarArtists.summarize([lot]);
+  assert.equal(artist.arrivalTime, Date.parse("2026-11-12T18:16:00Z"));
+  assert.equal(artist.arrivalStartTime, Date.parse("2026-11-12T18:00:00Z"));
+  assert.equal(artist.arrivalMinutes, 16);
+  assert.equal(artist.arrivalKind, "session_estimate");
+  assert.equal(artist.timeLabel, "1:00 AM");
+  assert.equal(CalendarArtists.formatArrival(artist, "America/Los_Angeles"), "10:16 AM");
+  assert.equal(CalendarArtists.formatLotArrival({...lot, arrival_estimate: undefined}, "America/Los_Angeles"), "Nov 16, 6:36 PM");
+  assert.equal(JSON.stringify(lot), before);
+});
+
+test("Zwaan session boundaries reset the estimate and artist summaries prefer the earliest session", () => {
+  const base = {artist: "Example", event_at: "2026-11-12T09:00:00Z", time: "1:00 AM"};
+  for (const [start, first, last, lastAt] of [["09:00", 6000, 6233, "12:53"],
+    ["13:00", 6400, 6586, "16:06"], ["18:00", 6800, 7015, "21:35"]]) {
+    const estimate = zwaanSession(start, first, last);
+    assert.equal(CalendarArtists.estimateLotArrival({...base, lot_number: String(first), arrival_estimate: estimate}), Date.parse(`2026-11-12T${start}:00Z`));
+    assert.equal(CalendarArtists.estimateLotArrival({...base, lot_number: `${last}A`, arrival_estimate: estimate}), Date.parse(`2026-11-12T${lastAt}:00Z`));
+  }
+  const lots = [
+    {...base, lot_number: "6816", arrival_estimate: zwaanSession()},
+    {...base, lot_number: "6405", arrival_estimate: zwaanSession("13:00", 6400, 6586)},
+    {...base, lot_number: "6094", arrival_estimate: zwaanSession("09:00", 6000, 6233)},
+    {...base, lot_number: "6013", arrival_estimate: zwaanSession("09:00", 6000, 6233)},
+  ];
+  for (const input of [lots, [...lots].reverse()]) {
+    const [artist] = CalendarArtists.summarize(input);
+    assert.equal(artist.arrivalLotNumber, 6013);
+    assert.equal(artist.arrivalTime, Date.parse("2026-11-12T09:13:00Z"));
+    assert.equal(artist.arrivalKind, "session_estimate");
+  }
+});
+
+test("session estimates retain an explicit default pace and reject invalid or untrusted metadata", () => {
+  const lot = {event_at: "2026-11-12T09:00:00Z", lot_number: "6816", arrival_estimate: zwaanSession()};
+  for (const changes of [{kind: "published_pace"}, {kind: "unknown"}, {lots_per_hour: 120},
+    {lots_per_hour: "60"}, {lots_per_hour: 0}, {session_start_at: "2026-11-12"},
+    {first_lot: "6800"}, {last_lot: 6799}, {source_url: "https://example.test/timetable.pdf"},
+    {source_url: "https://veilinggebouw.dezwaan.nl.evil.test/wp-content/uploads/Orde-der-veiling-V117-2.pdf"}]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...lot, arrival_estimate: {...zwaanSession(), ...changes}}), null);
+  }
+  for (const lot_number of ["6799", "7016", "6816/1"]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...lot, lot_number}), null);
+  }
+});
+
 test("Heritage estimates start with the first lot at live start, not the proxy cutoff", () => {
   const base = Object.freeze({artist: "Mucha, Alphonse", event_at: "2026-11-11T16:50:00Z", time: "8:50 AM",
     arrival_estimate: Object.freeze(heritagePace()), email_tray_selected: true, won_by_us: true});

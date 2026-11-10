@@ -3667,7 +3667,11 @@
     const arrival = window.CalendarArtists.formatLotArrival(lot, galleryArtists.dataset.timeZone);
     const arrivalDetails = window.CalendarArtists.lotArrivalDetails(lot);
     const publishedArrival = arrivalDetails?.kind === "published_timetable";
-    appendText(caption, "p", "day-gallery-lot-arrival", `${publishedArrival ? "House timetable" : "Est. lot arrival"}: ${arrival === "Unavailable" ? arrival : `≈ ${arrival}`}${publishedArrival ? ` · lots ${arrivalDetails.firstLot}–${arrivalDetails.lastLot}` : ""}`);
+    const arrivalLabel = document.createElement("p");
+    arrivalLabel.className = "day-gallery-lot-arrival";
+    arrivalLabel.textContent = `${publishedArrival ? "House timetable" : "Est. lot arrival"}: ${arrival === "Unavailable" ? arrival : `≈ ${arrival}`}${publishedArrival ? ` · lots ${arrivalDetails.firstLot}–${arrivalDetails.lastLot}` : ""}`;
+    if (arrivalDetails?.kind === "session_estimate") arrivalLabel.title = `Published session start, plus one minute per lot from lot ${arrivalDetails.firstLot}. Actual pace varies.`;
+    caption.appendChild(arrivalLabel);
     appendCurrencyPrice(caption, lot, "estimate", "day-gallery-estimate");
     appendCurrencyPrice(caption, lot, "bid", "day-gallery-bid");
     appendLotControls(caption, lot);
@@ -3677,7 +3681,7 @@
     quickLook.setAttribute("aria-label", researchLabel);
     actions.appendChild(quickLook);
     if (publishedArrival) actions.appendChild(externalLink(arrivalDetails.sourceUrl, "day-gallery-auction-link", "House timetable ↗"));
-    if (arrivalDetails?.kind === "published_pace") actions.appendChild(externalLink(arrivalDetails.sourceUrl, "day-gallery-auction-link", "Estimate basis ↗"));
+    if (["published_pace", "session_estimate"].includes(arrivalDetails?.kind)) actions.appendChild(externalLink(arrivalDetails.sourceUrl, "day-gallery-auction-link", "Estimate basis ↗"));
     if (lot.url) actions.appendChild(externalLink(lot.url, "day-gallery-auction-link", "Auction ↗"));
     if (lot.artist_invaluable_url) actions.appendChild(externalLink(lot.artist_invaluable_url, "day-gallery-auction-link", "Invaluable ↗"));
     if (lot.artist_liveart_url) {
@@ -3788,6 +3792,8 @@
         ? `Published house timetable for lots ${artist.arrivalFirstLot}–${artist.arrivalLastLot}. The source is linked on each lot card.`
         : artist.arrivalKind === "published_pace"
         ? `Estimated from the published sale start and ${artist.arrivalLotsPerHour} lots per hour, beginning with lot ${artist.arrivalFirstLot}. Actual pace varies; the source is linked on each lot card.`
+        : artist.arrivalKind === "session_estimate"
+        ? `Estimated from the published session start, assuming one minute per lot from lot ${artist.arrivalFirstLot}. Actual pace varies; the house timetable is linked on each lot card.`
         : `Assumes the listed auction time is the start, plus ${artist.arrivalMinutes} minutes after subtracting the known starting number.`;
       card.appendChild(arrival);
       if (artist.arrivalTime !== null) {

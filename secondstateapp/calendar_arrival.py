@@ -9,6 +9,26 @@ from zoneinfo import ZoneInfo
 
 TIMETABLE_URL = "https://www.dobiaschofsky.com/g246.html"
 HERITAGE_8256_URL = "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"
+ZWAAN_117_TIMETABLE_URL = "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf"
+# V117's November 12 sessions restart numbering at 6000, 6400 and 6800.
+# The house publishes session starts, not a lot pace. Keep the existing
+# one-minute assumption explicit, separate from Heritage's published pace.
+_ZWAAN_117_SESSIONS = ((6000, 6233, 10), (6400, 6586, 14), (6800, 7015, 19))
+_ZWAAN_MISSING_SALE_LOTS = {
+    "207089942": (6013, "ec74e69e12"),
+    "207090023": (6094, "8ce2d40a25"),
+    "207090363": (6816, "b76b923688"),
+    "207090373": (6826, "26fe2ebe4b"),
+    "207090378": (6831, "0412df604c"),
+    "207090388": (6841, "9a66b5395d"),
+    "207090419": (6872, "5c79b43c74"),
+    "207090428": (6881, "b8c66dea46"),
+    "207090449": (6902, "8e0a8dea68"),
+    "207090473": (6926, "daa06ad00c"),
+    "207090487": (6940, "699a5dbdf1"),
+    "207090491": (6944, "132b9d48e9"),
+    "207090507": (6960, "e4323fd328"),
+}
 # A-142, 5-6 November 2026, published house timetable. Each time is
 # the start of a numbered block, not an exact promise for every lot in it.
 # Captured 2026-11-05; the date and sale checks below prevent later-sale reuse.
@@ -57,8 +77,60 @@ _MISSING_SALE_LOTS = {
 }
 
 
+def _zwaan_session_estimate(lot):
+    event = lot.event_at
+    if lot.is_all_day or not event or event.utcoffset() is None:
+        return None
+    if event.astimezone(ZoneInfo("Europe/Amsterdam")).date() != date(2026, 11, 12):
+        return None
+    house = " ".join(unicodedata.normalize("NFKC", lot.auction_house).casefold().split())
+    if house not in {"veilinggebouw de zwaan", "de zwaan amsterdam"}:
+        return None
+    match = re.fullmatch(r"([0-9]+)[A-Za-z]*", str(lot.lot_number).strip())
+    if not match:
+        return None
+    number = int(match[1])
+    try:
+        sale = urlsplit(lot.sale_url)
+        if lot.source == "Drouot":
+            matches_sale = sale.scheme == "https" and sale.hostname in {"drouot.com", "www.drouot.com"} and bool(
+                re.fullmatch(r"/(?:[a-z]{2}/)?v/186921(?:/[^/]+)?/?", sale.path)
+            )
+        elif lot.source == "Invaluable":
+            matches_sale = sale.scheme == "https" and sale.hostname in {"invaluable.com", "www.invaluable.com"} and sale.path.rstrip("/") == "/catalog/9ESB0TMK4J"
+            if not lot.sale_url:
+                # These retained source observations omit sale_url. Require their
+                # verified provider ID, lot number and public link together.
+                expected_number, ref = _ZWAAN_MISSING_SALE_LOTS.get(str(lot.source_lot_id), (None, None))
+                link = urlsplit(lot.lot_url)
+                matches_sale = number == expected_number and link.scheme == "https" and link.hostname in {"invaluable.com", "www.invaluable.com"} and bool(
+                    re.fullmatch(rf"/auction-lot/[^/]+-{number}-c-{ref}/?", link.path)
+                )
+        else:
+            matches_sale = False
+    except ValueError:
+        return None
+    if not matches_sale:
+        return None
+    for first, last, hour in _ZWAAN_117_SESSIONS:
+        if first <= number <= last:
+            start = datetime(2026, 11, 12, hour, tzinfo=ZoneInfo("Europe/Amsterdam"))
+            return {
+                "kind": "session_estimate",
+                "session_start_at": start.astimezone(timezone.utc).isoformat(),
+                "first_lot": first,
+                "last_lot": last,
+                "lots_per_hour": 60,
+                "source_url": ZWAAN_117_TIMETABLE_URL,
+            }
+    return None
+
+
 def sale_arrival_estimate(lot):
     """Supply verified sale start/pace without replacing the source's timestamp."""
+    zwaan = _zwaan_session_estimate(lot)
+    if zwaan:
+        return zwaan
     # Heritage 8256, Tiffany, Lalique & Art Glass: the official session starts
     # at 11 AM Central on Nov 11 and lists approximately 54 lots/hour, 79001-79230.
     # Drouot 187633 lists its proxy-bid cutoff instead. Keep that raw time and

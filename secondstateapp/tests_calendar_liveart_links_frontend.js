@@ -39,15 +39,13 @@ function withClass(element, name) {
 
 function renderer(lot) {
   const document = {createElement: tag => new Element(tag)};
-  const appendText = (parent, tag, className, textContent) => parent.appendChild(
-    Object.assign(new Element(tag), {className, textContent}),
-  );
-  const source = productionBlock("  const externalLink =", "  const formatAnalysisMoney =")
+  const source = productionBlock("  const appendText =", "  const applyCurrencyPrice =")
+    + productionBlock("  const externalLink =", "  const formatAnalysisMoney =")
     + productionBlock("  const appendArtpriceEditor =", "  const appendLiveArtResearch =")
     + productionBlock("  const appendRetainedSavedWork =", "  const renderGalleryCards =")
     + productionBlock("  const renderResearchWorkspace =", "  const openResearchWorkspace =");
   const context = {
-    document, appendText, window: {CalendarArtists: require("./static/secondstateapp/calendar_artists.js")},
+    document, window: {CalendarArtists: require("./static/secondstateapp/calendar_artists.js")},
     galleryArtists: {dataset: {timeZone: "America/Los_Angeles"}}, csrfToken: "test-csrf", readDraft: () => undefined,
     registerLotInstance() {}, artpriceEditorInstances: new Map(),
     galleryResearchUrl: () => "https://secondstate.test/calendar/?view=research&lot=123",
@@ -108,6 +106,28 @@ test("Gallery Catalog and Oliver's shared lot cards include the saved LiveArt ar
   assertLiveartLink(card, source.artist);
   assert.deepEqual(withClass(card, "day-gallery-auction-link").map(link => link.href),
     [source.url, source.artist_invaluable_url, liveartUrl]);
+});
+
+test("Zwaan shared lot card shows the session-based ETA and explains its estimated pace", () => {
+  const sourceUrl = "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf";
+  const source = lot({artist: "Zúñiga, Francisco", title: "FRANCISCO ZUNIGA (1912 - 1998)",
+    lot_number: "6816", event_at: "2026-11-12T09:00:00Z", time: "1:00 AM",
+    auction_house: "Veilinggebouw de Zwaan", email_tray_selected: true,
+    arrival_estimate: {kind: "session_estimate", session_start_at: "2026-11-12T18:00:00Z",
+      first_lot: 6800, last_lot: 7015, lots_per_hour: 60, source_url: sourceUrl}});
+  const before = JSON.stringify(source);
+  const card = renderer(source).galleryCard(source, 0);
+  const [arrival] = withClass(card, "day-gallery-lot-arrival");
+  assert.equal(arrival.textContent, "Est. lot arrival: ≈ 10:16 AM");
+  assert.match(arrival.title, /Published session start, plus one minute per lot from lot 6800/);
+  assert.match(arrival.title, /Actual pace varies/);
+  const basis = withClass(card, "day-gallery-auction-link").filter(link => link.textContent === "Estimate basis ↗");
+  assert.equal(basis.length, 1);
+  assert.equal(basis[0].href, sourceUrl);
+  assert.equal(basis[0].target, "_blank");
+  assert.equal(basis[0].rel, "noopener noreferrer");
+  assert.equal(withClass(card, "day-gallery-auction-link").some(link => link.href === source.url), true);
+  assert.equal(JSON.stringify(source), before);
 });
 
 test("missing LiveArt bookmarks leave source actions and the Artprice editor usable", () => {
