@@ -209,6 +209,9 @@ _ARTISTS = (
     ("Vigil, Dan",), ("Villon, Jacques",), ("Walker, Caroline",), ("Wewerka, Stefan",),
     ("Whitney, Stanley",), ("Wieghorst, Olaf",), ("Wilson, John Woodrow",),
     ("Wylie, Rose",), ("Yoshida, Hiroshi",), ("Young, Russell",), ("Zerbini, Luiz",),
+    # Verified artist credits in Bukowskis Modern Art & Design sale 676.
+    ("Bærtling, Olle", "Olle Baertling", "Baertling, Olle"),
+    ("Dufy, Raoul",), ("Lindström, Bengt",), ("Poliakoff, Serge",),
     # Established stage names and mononyms are not given-name/surname pairs.
     ("A. R. Penck", "A.R. Penck", "Penck, A.R.", "Penck, A. R."),
     ("Invader",), ("Man Ray",), ("Panamarenko",), ("Yvaral (Jean-Pierre Vasarely)",),
