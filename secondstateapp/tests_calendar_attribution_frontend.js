@@ -101,6 +101,19 @@ test("published arrival blocks have an explicit source link and retain source ti
   assert.equal(JSON.stringify(source), before);
 });
 
+test("published lot closing cards show the exact time without approximation or added minutes", () => {
+  const url = "https://www.sothebys.com/en/buy/auction/2026/modern-contemporary-discoveries-de2640/untitled?locale=en";
+  const source = lot({event_at: "2026-11-12T13:36:00Z", time: "5:36 AM", lot_number: "37",
+    lot_url: url, url, won_by_us: true, research_queue_selected: true,
+    arrival_schedule: {kind: "published_closing", at: "2026-11-12T13:36:00Z", source_url: url}});
+  const before = JSON.stringify(source), card = renderer().galleryCard(source, 0);
+  assert.equal(withClass(card, "day-gallery-lot-arrival")[0].textContent, "Lot closes: 5:36 AM");
+  assert(withClass(card, "day-gallery-auction-link").some(node => node.href === url));
+  assert.equal(withClass(card, "lot-won-badge").length, 1);
+  assert.equal(withClass(card, "lot-attribution-badge")[0].textContent, "After");
+  assert.equal(JSON.stringify(source), before);
+});
+
 test("Heritage pace estimates link to their basis while preserving source times and saved controls", () => {
   const source = lot({event_at: "2026-11-11T16:50:00Z", time: "8:50 AM", lot_number: "79087", won_by_us: true,
     research_queue_selected: true, arrival_estimate: {session_start_at: "2026-11-11T17:00:00Z",

@@ -8,6 +8,38 @@ const CalendarArtists = require("./static/secondstateapp/calendar_artists.js");
 
 const names = (artists) => artists.map((artist) => artist.name);
 
+test("published individual closings preserve the exact source instant across numbering gaps", () => {
+  const url = "https://www.sothebys.com/en/buy/auction/2026/modern-contemporary-discoveries-de2640/untitled?locale=en";
+  const lots = [["56", "54"], ["37", "36"], ["3", "03"]].map(([number, minute]) => ({
+    artist: "Monk, Jonathan", auction_house: "Sotheby's", lot_number: number, lot_url: url,
+    event_at: `2026-11-12T13:${minute}:00Z`, time: `5:${minute} AM`,
+    arrival_schedule: {kind: "published_closing", at: `2026-11-12T13:${minute}:00Z`, source_url: url},
+  }));
+  const before = JSON.stringify(lots);
+  for (const lot of lots) {
+    assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse(lot.event_at));
+    assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), lot.time);
+    assert.equal(CalendarArtists.lotArrivalDetails(lot).kind, "published_closing");
+  }
+  const [artist] = CalendarArtists.summarize(lots);
+  assert.equal(artist.arrivalLotNumber, 3);
+  assert.equal(CalendarArtists.formatArrival(artist, "America/New_York"), "8:03 AM");
+  assert.equal(CalendarArtists.arrivalLabel(artist.arrivalKind), "Lot closes");
+  assert.equal(JSON.stringify(lots), before);
+});
+
+test("unverified or inconsistent published closing metadata cannot create a guessed estimate", () => {
+  const url = "https://www.sothebys.com/en/buy/auction/2026/modern-contemporary-discoveries-de2640/untitled";
+  const lot = {event_at: "2026-11-12T13:36:00Z", lot_number: "37", lot_url: url};
+  const schedule = {kind: "published_closing", at: lot.event_at, source_url: url};
+  for (const changes of [{at: "2026-11-12T13:37:00Z"}, {at: null},
+    {source_url: url.replace("de2640", "de2641")}, {source_url: url.replace("sothebys.com", "sothebys.com.evil.test")}]) {
+    assert.equal(CalendarArtists.lotArrivalDetails({...lot, arrival_schedule: {...schedule, ...changes}}), null);
+  }
+  assert.equal(CalendarArtists.lotArrivalDetails({...lot, is_all_day: true, arrival_schedule: schedule}), null);
+  assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse("2026-11-12T14:13:00Z"));
+});
+
 test("artist bookmarks resolve exact current labels or one retained source credit", () => {
   const lots = [
     {artist: "Ensor, James", artist_source: "James Ensor"},

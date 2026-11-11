@@ -39,6 +39,51 @@ def zwaan_lot(**changes):
     ) | changes))
 
 
+def sothebys_lot(**changes):
+    sale = "https://www.sothebys.com/en/buy/auction/2026/modern-contemporary-discoveries-de2640"
+    return source_lot(**(dict(
+        source="Sotheby's", source_lot_id="DE2640:37", auction_house="Sotheby's",
+        event_at=datetime(2026, 11, 12, 13, 36, tzinfo=timezone.utc),
+        lot_number="37", sale_url=sale, lot_url=sale + "/untitled?locale=en",
+    ) | changes))
+
+
+class SothebysClosingTests(SimpleTestCase):
+    def test_observed_per_lot_closing_is_used_without_a_number_derived_offset(self):
+        for number, minute in (("3", 3), ("37", 36), ("56", 54)):
+            lot = sothebys_lot(lot_number=number, source_lot_id=f"DE2640:{number}",
+                              event_at=datetime(2026, 11, 12, 13, minute, tzinfo=timezone.utc))
+            before = vars(lot).copy()
+            self.assertEqual(published_lot_arrival(lot), {
+                "kind": "published_closing", "at": lot.event_at.isoformat(), "source_url": lot.lot_url,
+            })
+            self.assertIsNone(sale_arrival_estimate(lot))
+            self.assertEqual(vars(lot), before)
+
+    def test_published_closing_requires_this_source_sale_id_date_and_lot_link(self):
+        sale = sothebys_lot().sale_url
+        for changes in (
+            {"source": "Invaluable"}, {"auction_house": "Sotheby's affiliate"},
+            {"source_lot_id": "DE2641:37"}, {"source_lot_id": "DE2640:38"},
+            {"lot_number": "37A"}, {"lot_number": ""}, {"is_all_day": True},
+            {"event_at": None}, {"event_at": datetime(2026, 11, 12, 13, 36)},
+            {"event_at": datetime(2026, 11, 13, 13, 36, tzinfo=timezone.utc)},
+            {"sale_url": sale + "0"}, {"sale_url": ""},
+            {"sale_url": sale.replace("https:", "http:")},
+            {"sale_url": sale.replace("sothebys.com", "sothebys.com.evil.test")},
+            {"sale_url": sale.replace("www.sothebys.com", "user@www.sothebys.com")},
+            {"sale_url": sale.replace("www.sothebys.com", "www.sothebys.com:443")},
+            {"lot_url": sale}, {"lot_url": sale + "/untitled/another-lot"},
+            {"lot_url": sale.replace("de2640", "de2641") + "/untitled"},
+            {"lot_url": sale.replace("sothebys.com", "sothebys.com.evil.test") + "/untitled"},
+            {"lot_url": sale.replace("www.sothebys.com", "user@www.sothebys.com") + "/untitled"},
+            {"lot_url": sale.replace("www.sothebys.com", "www.sothebys.com:443") + "/untitled"},
+            {"lot_url": "https://[invalid"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(published_lot_arrival(sothebys_lot(**changes)))
+
+
 class ZwaanSessionArrivalTests(SimpleTestCase):
     def test_zuniga_uses_evening_session_with_default_pace_not_whole_day_number(self):
         lot = zwaan_lot()
@@ -278,6 +323,25 @@ class PublishedCalendarArrivalTests(SimpleTestCase):
 
 
 class CalendarArrivalPayloadTests(TestCase):
+    def test_published_closing_payload_preserves_raw_credit_time_and_saved_work(self):
+        lot = watch_lot(**vars(sothebys_lot()), artist="After Pablo Picasso",
+                        artist_watchlist_name="Pablo Picasso", won_by_us=True)
+        lot.refresh_from_db()
+        before = {field.attname: getattr(lot, field.attname) for field in lot._meta.concrete_fields}
+        payload = _lot_json(lot, CALENDAR_ZONE, selected_lot_ids={lot.pk},
+                            research_queue_state={lot.pk: {"status": "queued"}})
+        self.assertEqual(payload["arrival_schedule"], published_lot_arrival(lot))
+        self.assertEqual(payload["event_at"], "2026-11-12T13:36:00+00:00")
+        self.assertEqual(payload["time"], "5:36 AM")
+        self.assertEqual(payload["attribution_label"], "After")
+        self.assertTrue(payload["won_by_us"])
+        self.assertTrue(payload["email_tray_selected"])
+        self.assertTrue(payload["research_queue_selected"])
+        self.assertEqual(payload["lot_url"], lot.lot_url)
+        self.assertNotIn("arrival_estimate", payload)
+        lot.refresh_from_db()
+        self.assertEqual({field.attname: getattr(lot, field.attname) for field in lot._meta.concrete_fields}, before)
+
     def test_zwaan_session_preserves_raw_time_provenance_and_saved_selections(self):
         lot = watch_lot(**vars(zwaan_lot()), artist="Francisco Zúñiga",
                         artist_watchlist_name="Francisco Zúñiga", won_by_us=True,

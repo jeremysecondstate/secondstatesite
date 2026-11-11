@@ -168,6 +168,8 @@ def published_lot_arrival(lot):
     event = lot.event_at
     if lot.is_all_day or not event or event.utcoffset() is None:
         return None
+    if lot.source == "Sotheby's":
+        return _sothebys_lot_closing(lot)
     sale_day = event.astimezone(ZoneInfo("Europe/Zurich")).date()
     if sale_day not in _BLOCKS:
         return None
@@ -216,3 +218,30 @@ def published_lot_arrival(lot):
                 "source_url": TIMETABLE_URL,
             }
     return None
+
+
+def _sothebys_lot_closing(lot):
+    # DE2640 publishes a separate closing time on each lot page. The saved
+    # event is that observed closing, not a sale start to offset by lot number.
+    event = lot.event_at
+    if event.astimezone(ZoneInfo("Europe/Berlin")).date() != date(2026, 11, 12):
+        return None
+    if lot.auction_house != "Sotheby's" or not re.fullmatch(r"[1-9][0-9]*", str(lot.lot_number)):
+        return None
+    if lot.source_lot_id != f"DE2640:{lot.lot_number}":
+        return None
+    sale_path = "/en/buy/auction/2026/modern-contemporary-discoveries-de2640"
+    try:
+        sale, link = urlsplit(lot.sale_url), urlsplit(lot.lot_url)
+        if any(url.scheme != "https" or url.netloc not in {"www.sothebys.com", "sothebys.com"}
+               for url in (sale, link)):
+            return None
+        if sale.path.rstrip("/") != sale_path or not re.fullmatch(rf"{sale_path}/[^/]+/?", link.path):
+            return None
+    except ValueError:
+        return None
+    return {
+        "kind": "published_closing",
+        "at": event.astimezone(timezone.utc).isoformat(),
+        "source_url": lot.lot_url,
+    }

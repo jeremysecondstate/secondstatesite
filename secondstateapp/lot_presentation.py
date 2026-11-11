@@ -212,6 +212,11 @@ _ARTISTS = (
     # Verified artist credits in Bukowskis Modern Art & Design sale 676.
     ("Bærtling, Olle", "Olle Baertling", "Baertling, Olle"),
     ("Dufy, Raoul",), ("Lindström, Bengt",), ("Poliakoff, Serge",),
+    # Verified artist credits in Sotheby's Modern & Contemporary Discoveries DE2640.
+    ("da Corte, Alex",), ("Förg, Günther",), ("Heckel, Erich",), ("Horn, Rebecca",),
+    ("Ikemura, Leiko",), ("Monk, Jonathan",), ("Nitsch, Hermann",), ("Price, Seth",),
+    ("Reyle, Anselm",), ("Scheiber, Hugó",), ("Schütte, Thomas",),
+    ("Tillmans, Wolfgang",), ("West, Franz",), ("Zimmermann, Peter",),
     # Established stage names and mononyms are not given-name/surname pairs.
     ("A. R. Penck", "A.R. Penck", "Penck, A.R.", "Penck, A. R."),
     ("Invader",), ("Man Ray",), ("Panamarenko",), ("Yvaral (Jean-Pierre Vasarely)",),

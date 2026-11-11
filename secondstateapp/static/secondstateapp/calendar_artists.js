@@ -30,7 +30,7 @@
     return Number.isFinite(time) ? time : null;
   };
 
-  // Published block times and sale-specific pace take precedence. Otherwise an explicitly supplied
+  // Published closing/block times and sale-specific pace take precedence. Otherwise an explicitly supplied
   // numbering baseline offsets the one-minute estimate; never infer one from
   // the watched subset, number length, or another sale.
   const lotArrivalDetails = (lot) => {
@@ -42,6 +42,11 @@
     if (lot.arrival_schedule != null) {
       const schedule = lot.arrival_schedule;
       const at = knownInstant(schedule.at);
+      if (schedule.kind === "published_closing") {
+        if (at !== time || schedule.source_url !== lot.lot_url
+          || !/^https:\/\/(?:www\.)?sothebys\.com\/en\/buy\/auction\/2026\/modern-contemporary-discoveries-de2640\/[^/?#]+\/?(?:\?[^#]*)?$/.test(schedule.source_url)) return null;
+        return {number, time, startTime: time, kind: schedule.kind, sourceUrl: schedule.source_url, minutes: null};
+      }
       const start = knownInstant(schedule.session_start_at);
       if (schedule.kind !== "published_timetable" || at === null || start === null || at < start
         || !Number.isSafeInteger(schedule.first_lot) || !Number.isSafeInteger(schedule.last_lot)
@@ -159,11 +164,14 @@
 
   const estimateLotArrival = (lot) => lotArrivalDetails(lot)?.time ?? null;
 
+  const arrivalLabel = (kind) => kind === "published_closing" ? "Lot closes"
+    : kind === "published_timetable" ? "House timetable" : "Est. lot arrival";
+
   const formatLotArrival = (lot, timeZone) => {
     const details = lotArrivalDetails(lot);
     if (details === null) return "Unavailable";
     return formatArrival({earliestTime: details.startTime, arrivalTime: details.time}, timeZone);
   };
 
-  return {artistKey, resolveArtistKey, summarize, sorted, formatArrival, estimateLotArrival, formatLotArrival, lotArrivalDetails};
+  return {artistKey, resolveArtistKey, summarize, sorted, formatArrival, estimateLotArrival, formatLotArrival, lotArrivalDetails, arrivalLabel};
 });

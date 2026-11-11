@@ -315,7 +315,7 @@
       </div>
       <ul id="day-gallery-artist-list" class="day-gallery-artist-list"></ul>
       <div class="day-gallery-artists-footer">
-        <p id="day-gallery-artists-note"><span id="day-gallery-artists-scope">Full-day counts across all houses.</span> Published house timetables take priority, followed by verified sale start times and estimated pace. Otherwise, estimated arrival = listed auction time + (lot number − known starting number) × 1 minute; zero is used when the starting number is unknown. Assumes the listed time is the sale start; sources may list closing times. Actual pace varies. Times use {{ timezone_label }}; unknown times sort last.</p>
+        <p id="day-gallery-artists-note"><span id="day-gallery-artists-scope">Full-day counts across all houses.</span> Published lot closing times and house timetables take priority, followed by verified sale start times and estimated pace. Otherwise, estimated arrival = listed auction time + (lot number − known starting number) × 1 minute; zero is used when the starting number is unknown. Assumes the listed time is the sale start; sources may list closing times. Actual pace varies. Times use {{ timezone_label }}; unknown times sort last.</p>
         <button id="day-gallery-artists-more" type="button" aria-expanded="false" aria-controls="day-gallery-artist-list" hidden>Show all artists</button>
       </div>
     </details>
@@ -326,7 +326,7 @@
       </div>
       <span id="day-gallery-results">0 lots</span>
     </div>
-    <p class="day-gallery-sort-note">House timetable times identify published lot blocks; sale-specific estimates use verified start times and estimated pace. Both link to the source on the card. Otherwise, estimated arrival ≈ listed auction time + (lot number − known starting number) × 1 minute; zero is used when the starting number is unknown, and letter suffixes use the numeric part. Sale pace varies; listed times may be closing times. Times use {{ timezone_label }}.</p>
+    <p class="day-gallery-sort-note">Published lot closing times use the house's stated time without an added estimate. House timetable times identify published lot blocks; sale-specific estimates use verified start times and estimated pace. Sources are linked on each card. Otherwise, estimated arrival ≈ listed auction time + (lot number − known starting number) × 1 minute; zero is used when the starting number is unknown, and letter suffixes use the numeric part. Sale pace varies; listed times may be closing times. Times use {{ timezone_label }}.</p>
     <p id="day-gallery-sort-note" class="day-gallery-sort-note" hidden>Sorted by auction estimate in USD, using the low estimate (high estimate if unavailable). Conversions use recent daily reference rates. Lots without a USD estimate appear last.</p>
     <div id="day-gallery-grid" class="day-gallery-grid"></div>
     <div class="day-gallery-pagination">
@@ -3667,9 +3667,11 @@
     const arrival = window.CalendarArtists.formatLotArrival(lot, galleryArtists.dataset.timeZone);
     const arrivalDetails = window.CalendarArtists.lotArrivalDetails(lot);
     const publishedArrival = arrivalDetails?.kind === "published_timetable";
+    const publishedClosing = arrivalDetails?.kind === "published_closing";
     const arrivalLabel = document.createElement("p");
     arrivalLabel.className = "day-gallery-lot-arrival";
-    arrivalLabel.textContent = `${publishedArrival ? "House timetable" : "Est. lot arrival"}: ${arrival === "Unavailable" ? arrival : `≈ ${arrival}`}${publishedArrival ? ` · lots ${arrivalDetails.firstLot}–${arrivalDetails.lastLot}` : ""}`;
+    arrivalLabel.textContent = `${window.CalendarArtists.arrivalLabel(arrivalDetails?.kind)}: ${arrival === "Unavailable" || publishedClosing ? arrival : `≈ ${arrival}`}${publishedArrival ? ` · lots ${arrivalDetails.firstLot}–${arrivalDetails.lastLot}` : ""}`;
+    if (publishedClosing) arrivalLabel.title = "Published lot closing time. The source is linked on this card.";
     if (arrivalDetails?.kind === "session_estimate") arrivalLabel.title = `Published session start, plus one minute per lot from lot ${arrivalDetails.firstLot}. Actual pace varies.`;
     caption.appendChild(arrivalLabel);
     appendCurrencyPrice(caption, lot, "estimate", "day-gallery-estimate");
@@ -3783,11 +3785,14 @@
       card.appendChild(auctionTime);
       const arrival = document.createElement("span");
       arrival.className = "day-gallery-artist-time day-gallery-artist-arrival";
-      appendText(arrival, "span", "", artist.arrivalKind === "published_timetable" ? "House timetable" : "Est. lot arrival");
+      const publishedClosing = artist.arrivalKind === "published_closing";
+      appendText(arrival, "span", "", window.CalendarArtists.arrivalLabel(artist.arrivalKind));
       appendText(arrival, "span", "", artist.arrivalTime === null
-        ? "Unavailable" : `≈ ${window.CalendarArtists.formatArrival(artist, galleryArtists.dataset.timeZone)}`);
+        ? "Unavailable" : `${publishedClosing ? "" : "≈ "}${window.CalendarArtists.formatArrival(artist, galleryArtists.dataset.timeZone)}`);
       arrival.title = artist.arrivalTime === null
         ? "A known auction time and numeric lot number in that earliest auction are needed."
+        : publishedClosing
+        ? "Published lot closing time. The source is linked on each lot card."
         : artist.arrivalKind === "published_timetable"
         ? `Published house timetable for lots ${artist.arrivalFirstLot}–${artist.arrivalLastLot}. The source is linked on each lot card.`
         : artist.arrivalKind === "published_pace"
@@ -3801,7 +3806,7 @@
       }
       card.setAttribute("aria-description", [
         `Listed auction: ${artist.earliestTime === null ? "Time TBA" : artist.timeLabel}.`,
-        `${artist.arrivalKind === "published_timetable" ? "House timetable" : "Estimated lot arrival"}: ${artist.arrivalTime === null ? "Unavailable" : window.CalendarArtists.formatArrival(artist, galleryArtists.dataset.timeZone)}.`,
+        `${publishedClosing ? "Lot closes" : artist.arrivalKind === "published_timetable" ? "House timetable" : "Estimated lot arrival"}: ${artist.arrivalTime === null ? "Unavailable" : window.CalendarArtists.formatArrival(artist, galleryArtists.dataset.timeZone)}.`,
         artist.arrivalTime === null ? "" : `Lot ${artist.arrivalLotNumber}, ${artist.arrivalHouse}.`,
       ].filter(Boolean).join(" "));
       item.appendChild(card);
