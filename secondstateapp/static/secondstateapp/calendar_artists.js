@@ -62,6 +62,7 @@
       const kind = estimate.kind ?? "published_pace";
       const verifiedBasis = kind === "published_pace"
         ? estimate.source_url === "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"
+          || (estimate.source_url === "https://historia.de/en/auction/182-auction/" && estimate.lots_per_hour === 80)
         : kind === "session_estimate" && estimate.lots_per_hour === 60
           && estimate.source_url === "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf";
       if (start === null || !Number.isSafeInteger(estimate.first_lot) || estimate.first_lot <= 0

@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from django.test import SimpleTestCase, TestCase
 
 from .calendar_arrival import (
-    HERITAGE_8256_URL, TIMETABLE_URL, ZWAAN_117_TIMETABLE_URL,
+    HERITAGE_8256_URL, HISTORIA_182_TIMETABLE_URL, TIMETABLE_URL, ZWAAN_117_TIMETABLE_URL,
     published_lot_arrival, sale_arrival_estimate,
 )
 from .calendar_views import _lot_json
@@ -37,6 +37,86 @@ def zwaan_lot(**changes):
         lot_number="6816", sale_url="",
         lot_url="https://www.invaluable.com/auction-lot/francisco-zuniga-1912-1998-6816-c-b76b923688",
     ) | changes))
+
+
+def historia_lot(**changes):
+    return source_lot(**(dict(
+        source="Invaluable", source_lot_id="206926827", auction_house="Historia Auctionata",
+        event_at=datetime(2026, 11, 11, 9, tzinfo=timezone.utc),
+        lot_number="8016", sale_url="",
+        lot_url="https://www.invaluable.com/auction-lot/james-rizzi-19502011-self-po-8016-c-a8376b68f2",
+    ) | changes))
+
+
+class HistoriaSessionArrivalTests(SimpleTestCase):
+    def test_current_lot_uses_afternoon_session_and_published_typical_pace(self):
+        lot = historia_lot()
+        before = vars(lot).copy()
+        self.assertEqual(sale_arrival_estimate(lot), {
+            "kind": "published_pace", "session_start_at": "2026-11-11T14:00:00+00:00",
+            "first_lot": 8000, "last_lot": 8377, "lots_per_hour": 80,
+            "source_url": HISTORIA_182_TIMETABLE_URL,
+        })
+        self.assertIsNone(published_lot_arrival(lot))
+        self.assertEqual(vars(lot), before)
+
+    def test_verified_catalogues_use_two_separate_session_ranges(self):
+        for source, house, sale in (
+            ("Drouot", "Historia Auktionshaus", "https://drouot.com/en/v/186571"),
+            ("Invaluable", "  HISTORIA\tAuctionata ", "https://www.invaluable.com/catalog/X05NBF4PNX/"),
+        ):
+            for first, last, hour in ((7350, 7686, 9), (8000, 8377, 14)):
+                for number in (str(first), str(last), f"0{first}A"):
+                    with self.subTest(source=source, number=number):
+                        result = sale_arrival_estimate(historia_lot(
+                            source=source, auction_house=house, sale_url=sale,
+                            source_lot_id="new-catalogue-observation", lot_number=number))
+                        self.assertEqual(result["session_start_at"], f"2026-11-11T{hour:02d}:00:00+00:00")
+                        self.assertEqual((result["first_lot"], result["last_lot"]), (first, last))
+                        self.assertEqual(result["lots_per_hour"], 80)
+            for number in ("7349", "7687", "7999", "8378", "8016/1", "8016-8017", ""):
+                with self.subTest(source=source, number=number):
+                    self.assertIsNone(sale_arrival_estimate(historia_lot(source=source, sale_url=sale, lot_number=number)))
+
+    def test_unrelated_sales_dates_houses_and_malformed_urls_do_not_match(self):
+        for changes in (
+            {"auction_house": "Historia"}, {"auction_house": "Historia Auctionata affiliate"},
+            {"source": "Other"}, {"is_all_day": True}, {"event_at": None},
+            {"event_at": datetime(2026, 11, 11, 9)},
+            {"event_at": datetime(2026, 11, 10, 9, tzinfo=timezone.utc)},
+            {"event_at": datetime(2026, 11, 12, 9, tzinfo=timezone.utc)},
+            {"event_at": datetime(2027, 11, 11, 9, tzinfo=timezone.utc)},
+            {"source": "Drouot", "sale_url": ""},
+            {"source": "Drouot", "sale_url": "https://drouot.com/en/v/186572"},
+            {"source": "Drouot", "sale_url": "https://drouot.com/en/v/1865710"},
+            {"source": "Drouot", "sale_url": "https://drouot.com.evil.test/en/v/186571"},
+            {"source": "Drouot", "sale_url": "https://user@drouot.com/en/v/186571"},
+            {"source": "Drouot", "sale_url": "https://drouot.com:443/en/v/186571"},
+            {"sale_url": "https://www.invaluable.com/catalog/OTHER"},
+            {"sale_url": "https://www.invaluable.com/catalog/X05NBF4PNX0"},
+            {"sale_url": "http://www.invaluable.com/catalog/X05NBF4PNX"},
+            {"sale_url": "https://www.invaluable.com.evil.test/catalog/X05NBF4PNX"},
+            {"sale_url": "https://user@www.invaluable.com/catalog/X05NBF4PNX"},
+            {"sale_url": "https://www.invaluable.com:443/catalog/X05NBF4PNX"},
+            {"sale_url": "https://[invalid"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(sale_arrival_estimate(historia_lot(**changes)))
+        self.assertIsNotNone(sale_arrival_estimate(historia_lot(
+            event_at=datetime(2026, 11, 11, 10, tzinfo=ZoneInfo("Europe/Berlin")))))
+
+    def test_missing_sale_fallback_requires_provider_id_number_and_exact_link(self):
+        for changes in (
+            {"source_lot_id": "unknown"}, {"lot_number": "8017"}, {"lot_url": ""},
+            {"lot_url": "https://www.invaluable.com/auction-lot/rizzi-8016-c-wrong"},
+            {"lot_url": "http://www.invaluable.com/auction-lot/rizzi-8016-c-a8376b68f2"},
+            {"lot_url": "https://www.invaluable.com.evil.test/auction-lot/rizzi-8016-c-a8376b68f2"},
+            {"lot_url": "https://user@www.invaluable.com/auction-lot/rizzi-8016-c-a8376b68f2"},
+            {"lot_url": "https://www.invaluable.com:443/auction-lot/rizzi-8016-c-a8376b68f2"},
+            {"lot_url": "https://[invalid"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(sale_arrival_estimate(historia_lot(**changes)))
 
 
 def sothebys_lot(**changes):
@@ -369,6 +449,27 @@ class PublishedCalendarArrivalTests(SimpleTestCase):
 
 
 class CalendarArrivalPayloadTests(TestCase):
+    def test_historia_presentation_keeps_source_time_attribution_links_and_saved_work(self):
+        lot = watch_lot(**vars(historia_lot()), artist="After James Rizzi",
+                        artist_watchlist_name="James Rizzi", won_by_us=True,
+                        artprice_url="https://www.artprice.com/artist/1/example/lots/pasts")
+        lot.refresh_from_db()
+        before = {field.attname: getattr(lot, field.attname) for field in lot._meta.concrete_fields}
+        payload = _lot_json(lot, CALENDAR_ZONE, selected_lot_ids={lot.pk},
+                            research_queue_state={lot.pk: {"status": "queued"}})
+        self.assertEqual(payload["arrival_estimate"], sale_arrival_estimate(lot))
+        self.assertEqual(payload["event_at"], "2026-11-11T09:00:00+00:00")
+        self.assertEqual(payload["time"], "1:00 AM")
+        self.assertEqual(payload["attribution_label"], "After")
+        self.assertTrue(payload["won_by_us"])
+        self.assertTrue(payload["email_tray_selected"])
+        self.assertTrue(payload["research_queue_selected"])
+        for field in ("lot_url", "sale_url", "artprice_url"):
+            self.assertEqual(payload[field], getattr(lot, field))
+        self.assertNotIn("arrival_schedule", payload)
+        lot.refresh_from_db()
+        self.assertEqual({field.attname: getattr(lot, field.attname) for field in lot._meta.concrete_fields}, before)
+
     def test_ketterer_keeps_source_data_and_shared_controls_in_both_calendars(self):
         lot = watch_lot(**vars(ketterer_lot()), artist="Peter Nagel", artist_watchlist_name="Peter Nagel",
                         won_by_us=True)

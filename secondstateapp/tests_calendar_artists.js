@@ -465,6 +465,83 @@ const houseTimetable = (at = "2026-11-06T13:30:00Z", first = 3446, last = 3467) 
 const heritagePace = () => ({session_start_at: "2026-11-11T17:00:00Z", first_lot: 79001, last_lot: 79230,
   lots_per_hour: 54, source_url: "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"});
 
+const historiaPace = (start = "14:00", first = 8000, last = 8377) => ({
+  kind: "published_pace", session_start_at: `2026-11-11T${start}:00Z`,
+  first_lot: first, last_lot: last, lots_per_hour: 80,
+  source_url: "https://historia.de/en/auction/182-auction/",
+});
+
+test("Historia screenshot lots use the afternoon session and published pace on November 11", () => {
+  const base = Object.freeze({artist: "Rizzi, James", auction_house: "Historia Auctionata",
+    event_at: "2026-11-11T09:00:00Z", time: "1:00 AM", arrival_estimate: Object.freeze(historiaPace()),
+    email_tray_selected: true, research_queue_selected: true, won_by_us: true,
+    saved_bid_board: Object.freeze({qualifying_bid: "300.00"})});
+  for (const [lot_number, at, pacific, eastern] of [
+    ["8016", "14:12:00", "6:12 AM", "9:12 AM"],
+    ["8063", "14:47:15", "6:47 AM", "9:47 AM"],
+    ["8103", "15:17:15", "7:17 AM", "10:17 AM"],
+    ["8198", "16:28:30", "8:28 AM", "11:28 AM"],
+  ]) {
+    const lot = Object.freeze({...base, lot_number});
+    const before = JSON.stringify(lot);
+    assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse(`2026-11-11T${at}Z`));
+    assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), pacific);
+    assert.equal(CalendarArtists.formatLotArrival(lot, "America/New_York"), eastern);
+    const [artist] = CalendarArtists.summarize([lot]);
+    assert.equal(artist.arrivalTime, CalendarArtists.estimateLotArrival(lot));
+    assert.equal(artist.arrivalStartTime, Date.parse("2026-11-11T14:00:00Z"));
+    assert.equal(artist.arrivalKind, "published_pace");
+    assert.equal(artist.arrivalLotsPerHour, 80);
+    assert.equal(artist.arrivalFirstLot, 8000);
+    assert.equal(artist.timeLabel, "1:00 AM");
+    assert.equal(CalendarArtists.arrivalLabel(artist.arrivalKind), "Est. lot arrival");
+    assert.equal(JSON.stringify(lot), before);
+  }
+  assert.equal(CalendarArtists.formatLotArrival({...base, lot_number: "8016", arrival_estimate: undefined},
+    "America/Los_Angeles"), "Nov 16, 2:36 PM", "reproduce the reported old estimate");
+});
+
+test("Historia estimates reset at each session and retain the earliest session in artist summaries", () => {
+  const base = {artist: "Example", event_at: "2026-11-11T09:00:00Z", time: "1:00 AM"};
+  for (const [start, first, last, end] of [["09:00", 7350, 7686, "13:12:00"],
+    ["14:00", 8000, 8377, "18:42:45"]]) {
+    const arrival_estimate = historiaPace(start, first, last);
+    assert.equal(CalendarArtists.estimateLotArrival({...base, lot_number: String(first), arrival_estimate}),
+      Date.parse(`2026-11-11T${start}:00Z`));
+    assert.equal(CalendarArtists.estimateLotArrival({...base, lot_number: `${last}A`, arrival_estimate}),
+      Date.parse(`2026-11-11T${end}Z`));
+    for (const lot_number of [String(first - 1), String(last + 1), "7900", `${first}/1`]) {
+      assert.equal(CalendarArtists.estimateLotArrival({...base, lot_number, arrival_estimate}), null);
+    }
+  }
+  const lots = [
+    {...base, lot_number: "8016", arrival_estimate: historiaPace()},
+    {...base, lot_number: "7431", arrival_estimate: historiaPace("09:00", 7350, 7686)},
+    {...base, lot_number: "7368", arrival_estimate: historiaPace("09:00", 7350, 7686)},
+  ];
+  for (const input of [lots, [...lots].reverse()]) {
+    const [artist] = CalendarArtists.summarize(input);
+    assert.equal(artist.arrivalLotNumber, 7368);
+    assert.equal(artist.arrivalTime, Date.parse("2026-11-11T09:13:30Z"));
+    assert.equal(artist.arrivalStartTime, Date.parse("2026-11-11T09:00:00Z"));
+    assert.equal(artist.arrivalKind, "published_pace");
+  }
+});
+
+test("Historia published pace requires its exact source and rejects invalid session metadata", () => {
+  const lot = {event_at: "2026-11-11T09:00:00Z", lot_number: "8016", arrival_estimate: historiaPace()};
+  for (const changes of [
+    {source_url: "https://historia.de/en/auction/183-auction/"},
+    {source_url: "https://historia.de.evil.test/en/auction/182-auction/"},
+    {source_url: "http://historia.de/en/auction/182-auction/"},
+    {kind: "session_estimate"}, {kind: "unknown"}, {lots_per_hour: 60}, {lots_per_hour: "80"},
+    {lots_per_hour: 0}, {first_lot: "8000"}, {last_lot: 7999}, {session_start_at: "2026-11-11"},
+  ]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...lot, arrival_estimate: {...historiaPace(), ...changes}}), null);
+  }
+  assert.equal(CalendarArtists.estimateLotArrival({...lot, is_all_day: true}), null);
+});
+
 const zwaanSession = (start = "18:00", first = 6800, last = 7015) => ({
   kind: "session_estimate", session_start_at: `2026-11-12T${start}:00Z`,
   first_lot: first, last_lot: last, lots_per_hour: 60,

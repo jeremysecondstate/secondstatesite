@@ -3672,6 +3672,7 @@
     arrivalLabel.className = "day-gallery-lot-arrival";
     arrivalLabel.textContent = `${window.CalendarArtists.arrivalLabel(arrivalDetails?.kind)}: ${arrival === "Unavailable" || publishedClosing ? arrival : `≈ ${arrival}`}${publishedArrival ? ` · lots ${arrivalDetails.firstLot}–${arrivalDetails.lastLot}` : ""}`;
     if (publishedClosing) arrivalLabel.title = "Published lot closing time. The source is linked on this card.";
+    if (arrivalDetails?.kind === "published_pace") arrivalLabel.title = `Estimated from the published session start at approximately ${arrivalDetails.lotsPerHour} lots per hour, beginning with lot ${arrivalDetails.firstLot}. Actual pace varies.`;
     if (arrivalDetails?.kind === "session_estimate") arrivalLabel.title = `Published session start, plus one minute per lot from lot ${arrivalDetails.firstLot}. Actual pace varies.`;
     caption.appendChild(arrivalLabel);
     appendCurrencyPrice(caption, lot, "estimate", "day-gallery-estimate");

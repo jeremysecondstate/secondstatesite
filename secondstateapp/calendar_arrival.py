@@ -35,6 +35,29 @@ _KETTERER_609_ITEMS = {
 TIMETABLE_URL = "https://www.dobiaschofsky.com/g246.html"
 HERITAGE_8256_URL = "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"
 ZWAAN_117_TIMETABLE_URL = "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf"
+HISTORIA_182_TIMETABLE_URL = "https://historia.de/en/auction/182-auction/"
+# Auction 182's November 11 timetable restarts at 8000 in the afternoon.
+# The house publishes a typical (not guaranteed) pace of 80 lots/hour.
+_HISTORIA_182_SESSIONS = ((7350, 7686, 10), (8000, 8377, 15))
+# These Invaluable observations have no sale_url. Verified November 11, 2026
+# against catalog X05NBF4PNX; bind provider ID, lot number and public link.
+_HISTORIA_MISSING_SALE_LOTS = {
+    "206926492": (7368, "cd566fd9bb"),
+    "206926555": (7431, "a7c1eb0a3f"),
+    "206926827": (8016, "a8376b68f2"),
+    "206926871": (8060, "a5c8d84ae1"),
+    "206926872": (8061, "80adbfa4b6"),
+    "206926874": (8063, "8750eba9a0"),
+    "206926910": (8099, "494309a1c3"),
+    "206926914": (8103, "29d271d654"),
+    "206926915": (8104, "08ef8397b9"),
+    "206926981": (8170, "5a30ade25e"),
+    "206927009": (8198, "3002746e2a"),
+    "206927019": (8208, "9492324646"),
+    "206927020": (8209, "63d14f2459"),
+    "206927029": (8218, "725b2b527b"),
+    "206927101": (8290, "444c6654b2"),
+}
 # V117's November 12 sessions restart numbering at 6000, 6400 and 6800.
 # The house publishes session starts, not a lot pace. Keep the existing
 # one-minute assumption explicit, separate from Heritage's published pace.
@@ -151,11 +174,62 @@ def _zwaan_session_estimate(lot):
     return None
 
 
+def _historia_session_estimate(lot):
+    event = lot.event_at
+    if lot.is_all_day or not event or event.utcoffset() is None:
+        return None
+    if event.astimezone(ZoneInfo("Europe/Berlin")).date() != date(2026, 11, 11):
+        return None
+    house = " ".join(unicodedata.normalize("NFKC", lot.auction_house).casefold().split())
+    if house not in {"historia auctionata", "historia auktionshaus"}:
+        return None
+    match = re.fullmatch(r"([0-9]+)[A-Za-z]*", str(lot.lot_number).strip())
+    if not match:
+        return None
+    number = int(match[1])
+    try:
+        sale = urlsplit(lot.sale_url)
+        valid_sale_url = sale.scheme == "https" and not sale.username and not sale.password and sale.port is None
+        if lot.source == "Drouot":
+            matches_sale = valid_sale_url and sale.hostname in {"drouot.com", "www.drouot.com"} and bool(
+                re.fullmatch(r"/(?:[a-z]{2}/)?v/186571(?:/[^/]+)?/?", sale.path)
+            )
+        elif lot.source == "Invaluable":
+            matches_sale = valid_sale_url and sale.hostname in {"invaluable.com", "www.invaluable.com"} and sale.path.rstrip("/") == "/catalog/X05NBF4PNX"
+            if not lot.sale_url:
+                expected_number, ref = _HISTORIA_MISSING_SALE_LOTS.get(str(lot.source_lot_id), (None, None))
+                link = urlsplit(lot.lot_url)
+                matches_sale = number == expected_number and link.scheme == "https" and not link.username and not link.password and link.port is None and link.hostname in {"invaluable.com", "www.invaluable.com"} and bool(
+                    re.fullmatch(rf"/auction-lot/[^/]+-{number}-c-{ref}/?", link.path)
+                )
+        else:
+            matches_sale = False
+    except ValueError:
+        return None
+    if not matches_sale:
+        return None
+    for first, last, hour in _HISTORIA_182_SESSIONS:
+        if first <= number <= last:
+            start = datetime(2026, 11, 11, hour, tzinfo=ZoneInfo("Europe/Berlin"))
+            return {
+                "kind": "published_pace",
+                "session_start_at": start.astimezone(timezone.utc).isoformat(),
+                "first_lot": first,
+                "last_lot": last,
+                "lots_per_hour": 80,
+                "source_url": HISTORIA_182_TIMETABLE_URL,
+            }
+    return None
+
+
 def sale_arrival_estimate(lot):
     """Supply verified sale start/pace without replacing the source's timestamp."""
     zwaan = _zwaan_session_estimate(lot)
     if zwaan:
         return zwaan
+    historia = _historia_session_estimate(lot)
+    if historia:
+        return historia
     # Heritage 8256, Tiffany, Lalique & Art Glass: the official session starts
     # at 11 AM Central on Nov 11 and lists approximately 54 lots/hour, 79001-79230.
     # Drouot 187633 lists its proxy-bid cutoff instead. Keep that raw time and
