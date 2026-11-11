@@ -11,7 +11,10 @@ class OliverHouseMembershipTests(SimpleTestCase):
             "Freeman's", "Artcurial", "Dorotheum", "Bukowskis", "Bradford's Auction Galleries",
             "Los Angeles Modern Auctions (LAMA)", "Clars Auctions",
         )
-        self.assertEqual(oliver_house_names(), expected)
+        self.assertEqual(oliver_house_names()[:17], expected)
+        self.assertEqual(oliver_house_names()[17:], ("Ketterer Kunst",))
+        self.assertTrue(is_oliver_house("Ketterer Kunst"))
+        self.assertFalse(is_oliver_house("Ketterer Kunst affiliate"))
         for name in expected:
             with self.subTest(name=name):
                 self.assertTrue(is_oliver_house(name))

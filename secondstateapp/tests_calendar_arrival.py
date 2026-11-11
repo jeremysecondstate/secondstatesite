@@ -84,6 +84,52 @@ class SothebysClosingTests(SimpleTestCase):
                 self.assertIsNone(published_lot_arrival(sothebys_lot(**changes)))
 
 
+def ketterer_lot(**changes):
+    return source_lot(**(dict(
+        source="Ketterer Kunst", source_lot_id="609:149", auction_house="Ketterer Kunst",
+        event_at=datetime(2026, 11, 15, 15, 14, tzinfo=timezone.utc),
+        lot_number="149", sale_url="https://onlinesale.kettererkunst.com/browse.php",
+        lot_url="https://onlinesale.kettererkunst.com/item.php?id=126000766",
+    ) | changes))
+
+
+class KettererClosingTests(SimpleTestCase):
+    def test_verified_pairs_use_observed_closes_including_simultaneous_lots(self):
+        for number, item, hour, minute in ((1, "126000604", 14, 0), (2, "126000603", 14, 0),
+                                           (149, "126000766", 15, 14), (149, "126000766", 15, 17)):
+            lot = ketterer_lot(lot_number=str(number), source_lot_id=f"609:{number}",
+                lot_url=f"https://onlinesale.kettererkunst.com/item.php?id={item}",
+                event_at=datetime(2026, 11, 15, hour, minute, tzinfo=timezone.utc))
+            before = vars(lot).copy()
+            self.assertEqual(published_lot_arrival(lot), {
+                "kind": "published_closing", "at": lot.event_at.isoformat(), "source_url": lot.lot_url,
+            })
+            self.assertIsNone(sale_arrival_estimate(lot))
+            self.assertEqual(vars(lot), before)
+
+    def test_closing_requires_verified_sale_number_item_pair_and_date(self):
+        for changes in (
+            {"source": "Invaluable"}, {"auction_house": "Ketterer Kunst affiliate"},
+            {"source_lot_id": "610:149"}, {"source_lot_id": "609:148"},
+            {"lot_number": "21", "source_lot_id": "609:21"}, {"lot_number": "149A"},
+            {"is_all_day": True}, {"event_at": None}, {"event_at": datetime(2026, 11, 15, 15, 14)},
+            {"event_at": datetime(2026, 11, 16, 15, 14, tzinfo=timezone.utc)},
+            {"lot_url": "https://onlinesale.kettererkunst.com/item.php?id=117000067"},
+            {"lot_url": "https://onlinesale.kettererkunst.com/item.php?id=126000766&id=126000766"},
+            {"lot_url": "https://onlinesale.kettererkunst.com/item.php?id=126000766&other=1"},
+            {"lot_url": "https://onlinesale.kettererkunst.com/item.php?id=126000766#other"},
+            {"lot_url": "https://onlinesale.kettererkunst.com/browse.php?objsei=1"},
+            {"lot_url": "https://onlinesale.kettererkunst.com.evil.test/item.php?id=126000766"},
+            {"lot_url": "https://user@onlinesale.kettererkunst.com/item.php?id=126000766"},
+            {"lot_url": "https://onlinesale.kettererkunst.com:443/item.php?id=126000766"},
+            {"lot_url": "http://onlinesale.kettererkunst.com/item.php?id=126000766"},
+            {"sale_url": "https://onlinesale.kettererkunst.com/browse.php?anummer=610"},
+            {"sale_url": "https://[invalid"}, {"sale_url": ""},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(published_lot_arrival(ketterer_lot(**changes)))
+
+
 class ZwaanSessionArrivalTests(SimpleTestCase):
     def test_zuniga_uses_evening_session_with_default_pace_not_whole_day_number(self):
         lot = zwaan_lot()
@@ -323,6 +369,26 @@ class PublishedCalendarArrivalTests(SimpleTestCase):
 
 
 class CalendarArrivalPayloadTests(TestCase):
+    def test_ketterer_keeps_source_data_and_shared_controls_in_both_calendars(self):
+        lot = watch_lot(**vars(ketterer_lot()), artist="Peter Nagel", artist_watchlist_name="Peter Nagel",
+                        won_by_us=True)
+        lot.refresh_from_db()
+        before = {field.attname: getattr(lot, field.attname) for field in lot._meta.concrete_fields}
+        payload = _lot_json(lot, CALENDAR_ZONE, selected_lot_ids={lot.pk},
+                            research_queue_state={lot.pk: {"status": "queued"}})
+        self.assertEqual(payload["arrival_schedule"], published_lot_arrival(lot))
+        self.assertEqual(payload["event_at"], "2026-11-15T15:14:00+00:00")
+        self.assertEqual(payload["time"], "7:14 AM")
+        self.assertEqual(payload["artist"], "Nagel, Peter")
+        self.assertTrue(payload["oliver_house"])
+        self.assertEqual(payload["oliver_house_name"], "Ketterer Kunst")
+        self.assertTrue(payload["won_by_us"])
+        self.assertTrue(payload["email_tray_selected"])
+        self.assertTrue(payload["research_queue_selected"])
+        self.assertEqual(payload["lot_url"], lot.lot_url)
+        lot.refresh_from_db()
+        self.assertEqual({field.attname: getattr(lot, field.attname) for field in lot._meta.concrete_fields}, before)
+
     def test_published_closing_payload_preserves_raw_credit_time_and_saved_work(self):
         lot = watch_lot(**vars(sothebys_lot()), artist="After Pablo Picasso",
                         artist_watchlist_name="Pablo Picasso", won_by_us=True)

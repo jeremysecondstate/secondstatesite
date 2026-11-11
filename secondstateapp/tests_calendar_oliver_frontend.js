@@ -220,7 +220,7 @@ test("Oliver house, artist and Email Tray counts use its complete scoped day bef
   const context = page({[dayA]: lots});
   context.gallerySort.value = "price_asc";
   context.run("renderGalleryFilters(); renderGalleryArtists(); renderGalleryCards()");
-  assert.equal(context.galleryHouseFilters.children.length, 18);
+  assert.equal(context.galleryHouseFilters.children.length, 19);
   const phillips = context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:Phillips");
   assert.equal(phillips.children[1].textContent, "30");
   assert.equal(context.galleryFilters.children[1].children[1].textContent, "10");
@@ -239,25 +239,25 @@ test("Oliver house, artist and Email Tray counts use its complete scoped day bef
   assert(context.galleryGrid.children.every(card => lots[card.id - 1].oliver_house));
 });
 
-test("Oliver always shows all 17 workbook houses in stable order, including zero counts and empty days", () => {
+test("Oliver always shows all 18 configured houses in stable order, including zero counts and empty days", () => {
   const context = page({
     [dayA]: [lot(1, "Phillips", true), lot(2, "Other", false)],
     [dayB]: [lot(3, "Other", false)],
   });
-  assert.equal(oliverHouseNames.length, 17);
+  assert.equal(oliverHouseNames.length, 18);
   context.run("renderGalleryFilters()");
   const labels = () => context.galleryHouseFilters.children.slice(1).map(button => button.children[0].textContent);
   const counts = () => context.galleryHouseFilters.children.slice(1).map(button => button.children[1].textContent);
   assert.deepEqual(labels(), oliverHouseNames);
   assert.deepEqual(counts(), oliverHouseNames.map(name => name === "Phillips" ? "1" : "0"));
   assert.equal(context.galleryFilters.children[0].children[1].textContent, String(context.run("dayLots().length")));
-  assert.match(context.galleryHousesSummary.textContent, /^17 houses · 1 with lots/);
+  assert.match(context.galleryHousesSummary.textContent, /^18 houses · 1 with lots/);
   context.selectedDay = dayB;
   context.run("renderGalleryFilters()");
   assert.deepEqual(labels(), oliverHouseNames, "house order must survive day changes");
-  assert.deepEqual(counts(), Array(17).fill("0"));
+  assert.deepEqual(counts(), Array(18).fill("0"));
   assert.equal(context.galleryFilters.children[0].children[1].textContent, String(context.run("dayLots().length")));
-  assert.match(context.galleryHousesSummary.textContent, /^17 houses · 0 with lots/);
+  assert.match(context.galleryHousesSummary.textContent, /^18 houses · 0 with lots/);
 });
 
 test("Oliver combines verified aliases under one canonical house while regular Gallery keeps actual source names", () => {
@@ -270,7 +270,7 @@ test("Oliver combines verified aliases under one canonical house while regular G
   const context = page({[dayA]: lots});
   context.run("renderGalleryFilters()");
   const rago = context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:Rago Auctions");
-  assert.equal(context.galleryHouseFilters.children.length, 18);
+  assert.equal(context.galleryHouseFilters.children.length, 19);
   assert.equal(rago.children[1].textContent, "2");
   assert.equal(context.galleryHouseFilters.children.some(button => button.children[0].textContent === "Rago Arts and Auction Center"), false);
   rago.click();
@@ -297,7 +297,7 @@ test("a zero-count Oliver house stays selected with no lot cards and All houses 
   context.nextGalleryDay = () => undefined;
   vm.runInContext(declaration("renderGalleryCatalog"), context);
   context.run("renderGalleryCatalog()");
-  assert.match(context.gallerySummary.textContent, /1 of 17 auction houses with lots/);
+  assert.match(context.gallerySummary.textContent, /1 of 18 auction houses with lots/);
   const zeroHouse = oliverHouseNames.find(name => name !== "Phillips");
   context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === `house:${zeroHouse}`).click();
   context.run("renderGalleryCatalog()");

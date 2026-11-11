@@ -118,7 +118,7 @@ class OliverCalendarTests(TestCase):
                 self.assertEqual(set(records), {partner.pk, unrelated.pk})
                 self.assertTrue(records[partner.pk]["oliver_house"])
                 self.assertFalse(records[unrelated.pk]["oliver_house"])
-                self.assertEqual(response.context["oliver_house_count"], 17)
+                self.assertEqual(response.context["oliver_house_count"], 18)
                 self.assertEqual(response.context["oliver_house_names"], list(oliver_house_names()))
         self.sender.assert_not_called()
 
@@ -132,7 +132,7 @@ class OliverCalendarTests(TestCase):
                 })
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.context["oliver_house_names"], list(oliver_house_names()))
-                self.assertEqual(len(response.context["oliver_house_names"]), 17)
+                self.assertEqual(len(response.context["oliver_house_names"]), 18)
                 records = response.context["calendar_data"].get("2026-07-25", [])
                 self.assertFalse(any(record["oliver_house_name"] for record in records))
         self.sender.assert_not_called()

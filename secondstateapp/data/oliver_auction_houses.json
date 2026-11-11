@@ -23,6 +23,7 @@
     {"name": "Bukowskis", "url": "https://www.bukowskis.com", "aliases": []},
     {"name": "Bradford's Auction Galleries", "url": "https://www.bradfordsauction.com/auctions/upcoming-auctions/", "aliases": ["Bradford's"]},
     {"name": "Los Angeles Modern Auctions (LAMA)", "url": "https://www.lamodern.com", "aliases": ["Los Angeles Modern Auctions"]},
-    {"name": "Clars Auctions", "url": "https://www.clars.com", "aliases": []}
+    {"name": "Clars Auctions", "url": "https://www.clars.com", "aliases": []},
+    {"name": "Ketterer Kunst", "url": "https://www.kettererkunst.com", "aliases": [], "source": "Direct request, 2026-11-11: include the selected sale 609 lots in both Calendars"}
   ]
 }

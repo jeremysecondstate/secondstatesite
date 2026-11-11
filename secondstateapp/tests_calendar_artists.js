@@ -8,6 +8,22 @@ const CalendarArtists = require("./static/secondstateapp/calendar_artists.js");
 
 const names = (artists) => artists.map((artist) => artist.name);
 
+test("Ketterer closing metadata uses exact source time and preserves shared source data", () => {
+  const url = "https://onlinesale.kettererkunst.com/item.php?id=126000766";
+  const lot = {artist: "Nagel, Peter", lot_number: "149", lot_url: url, event_at: "2026-11-15T15:14:00Z",
+    arrival_schedule: {kind: "published_closing", at: "2026-11-15T15:14:00Z", source_url: url}};
+  const before = JSON.stringify(lot);
+  assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse(lot.event_at));
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), "7:14 AM");
+  assert.equal(CalendarArtists.arrivalLabel(CalendarArtists.lotArrivalDetails(lot).kind), "Lot closes");
+  for (const source_url of [url + "&other=1", url + "#other", url.replace(".com", ".com.evil.test"),
+    url.replace("https:", "http:"), url.replace("/item.php", "/browse.php")]) {
+    assert.equal(CalendarArtists.lotArrivalDetails({...lot, lot_url: source_url,
+      arrival_schedule: {...lot.arrival_schedule, source_url}}), null);
+  }
+  assert.equal(JSON.stringify(lot), before);
+});
+
 test("published individual closings preserve the exact source instant across numbering gaps", () => {
   const url = "https://www.sothebys.com/en/buy/auction/2026/modern-contemporary-discoveries-de2640/untitled?locale=en";
   const lots = [["56", "54"], ["37", "36"], ["3", "03"]].map(([number, minute]) => ({

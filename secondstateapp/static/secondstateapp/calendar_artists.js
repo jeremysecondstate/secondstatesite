@@ -43,8 +43,9 @@
       const schedule = lot.arrival_schedule;
       const at = knownInstant(schedule.at);
       if (schedule.kind === "published_closing") {
-        if (at !== time || schedule.source_url !== lot.lot_url
-          || !/^https:\/\/(?:www\.)?sothebys\.com\/en\/buy\/auction\/2026\/modern-contemporary-discoveries-de2640\/[^/?#]+\/?(?:\?[^#]*)?$/.test(schedule.source_url)) return null;
+        const verifiedSource = /^https:\/\/(?:www\.)?sothebys\.com\/en\/buy\/auction\/2026\/modern-contemporary-discoveries-de2640\/[^/?#]+\/?(?:\?[^#]*)?$/.test(schedule.source_url)
+          || /^https:\/\/onlinesale\.kettererkunst\.com\/item\.php\?id=[0-9]+$/.test(schedule.source_url);
+        if (at !== time || schedule.source_url !== lot.lot_url || !verifiedSource) return null;
         return {number, time, startTime: time, kind: schedule.kind, sourceUrl: schedule.source_url, minutes: null};
       }
       const start = knownInstant(schedule.session_start_at);

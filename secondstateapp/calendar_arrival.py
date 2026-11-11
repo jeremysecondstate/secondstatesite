@@ -3,9 +3,34 @@
 import re
 import unicodedata
 from datetime import date, datetime, timezone
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
+
+# Verified sale 609 selection, captured November 11, 2026. Each pair binds
+# the source lot number to its stable public SHARE LINK item identity.
+_KETTERER_609_ITEMS = {
+    1: "126000604", 2: "126000603", 3: "126000602", 4: "126000601",
+    5: "126000908", 6: "126000167", 7: "100902390", 8: "100902395",
+    9: "123000206", 10: "123000207", 11: "120000252", 12: "120000260",
+    13: "126000760", 14: "126000930", 19: "126000588", 20: "126000752",
+    31: "126000607", 32: "126000612", 33: "126000614", 34: "126000615",
+    35: "126000068", 36: "126000071", 37: "123001044", 38: "123001051",
+    45: "126000657", 46: "126000788", 49: "126000909", 50: "126000742",
+    51: "125001456", 54: "126000091", 57: "126000605", 61: "126000674",
+    62: "126000699", 63: "126000022", 64: "126000201", 65: "126000761",
+    66: "126000931", 71: "126000708", 72: "126000709", 77: "122002532",
+    78: "126000688", 79: "126000411", 80: "126000807", 81: "126000983",
+    82: "125000193", 83: "125001444", 84: "126000735", 86: "126000990",
+    87: "126000591", 88: "126000587", 92: "113002338", 93: "126000020",
+    94: "126000863", 95: "126000862", 97: "126000667", 98: "119002887",
+    99: "126000085", 100: "126000791", 102: "126000775", 104: "126000649",
+    105: "126000378", 106: "126000687", 107: "126000935", 108: "126001002",
+    111: "126000426", 113: "126000237", 118: "126000090", 120: "126000992",
+    123: "126000941", 127: "126000824", 129: "126000277", 131: "122001718",
+    134: "126000731", 138: "126000655", 139: "126000986", 141: "126000564",
+    142: "126000991", 147: "126000989", 148: "117000067", 149: "126000766",
+}
 
 TIMETABLE_URL = "https://www.dobiaschofsky.com/g246.html"
 HERITAGE_8256_URL = "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"
@@ -170,6 +195,8 @@ def published_lot_arrival(lot):
         return None
     if lot.source == "Sotheby's":
         return _sothebys_lot_closing(lot)
+    if lot.source == "Ketterer Kunst":
+        return _ketterer_lot_closing(lot)
     sale_day = event.astimezone(ZoneInfo("Europe/Zurich")).date()
     if sale_day not in _BLOCKS:
         return None
@@ -237,6 +264,35 @@ def _sothebys_lot_closing(lot):
                for url in (sale, link)):
             return None
         if sale.path.rstrip("/") != sale_path or not re.fullmatch(rf"{sale_path}/[^/]+/?", link.path):
+            return None
+    except ValueError:
+        return None
+    return {
+        "kind": "published_closing",
+        "at": event.astimezone(timezone.utc).isoformat(),
+        "source_url": lot.lot_url,
+    }
+
+
+def _ketterer_lot_closing(lot):
+    # The three published city clocks agree on each saved closing instant.
+    # Never derive it from the lot number or the auction's first closing.
+    event = lot.event_at
+    if event.astimezone(ZoneInfo("Europe/Berlin")).date() != date(2026, 11, 15):
+        return None
+    if lot.auction_house != "Ketterer Kunst" or not re.fullmatch(r"[1-9][0-9]*", str(lot.lot_number)):
+        return None
+    item_id = _KETTERER_609_ITEMS.get(int(lot.lot_number))
+    if not item_id or lot.source_lot_id != f"609:{lot.lot_number}":
+        return None
+    try:
+        sale, link = urlsplit(lot.sale_url), urlsplit(lot.lot_url)
+        if any(url.scheme != "https" or url.netloc != "onlinesale.kettererkunst.com"
+               or url.fragment for url in (sale, link)):
+            return None
+        if sale.path != "/browse.php" or sale.query or link.path != "/item.php":
+            return None
+        if parse_qs(link.query, keep_blank_values=True) != {"id": [item_id]}:
             return None
     except ValueError:
         return None
