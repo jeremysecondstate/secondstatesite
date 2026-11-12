@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=catalog-organization-20261104">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=catalog-location-20261112">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=finite-tier-notes-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
@@ -284,6 +284,11 @@
         </select>
       </label>
     </div>
+    <div class="day-gallery-location-tools">
+      <span id="day-gallery-location-label" class="day-gallery-location-label">Sale location</span>
+      <div id="day-gallery-region-filters" class="day-gallery-region-filters" role="group" aria-labelledby="day-gallery-location-label" aria-describedby="day-gallery-location-status"></div>
+    </div>
+    <p id="day-gallery-location-status" class="day-gallery-sort-note" role="status" hidden></p>
     <p id="day-gallery-attribution-status" class="day-gallery-sort-note" role="status" hidden></p>
     <details id="day-gallery-houses" class="day-gallery-section">
       <summary class="day-gallery-section-toggle">
@@ -3371,15 +3376,16 @@
     return window.CalendarCurrency.sortPrice(lot);
   };
 
-  const galleryOrganization = {house: "", group: ""};
+  const galleryOrganization = {house: "", group: "", region: ""};
   const gallerySortOrders = ["catalog", "lot_asc", "lot_desc", "artist", "artist_desc", "house", "time_asc", "time_desc", "arrival_asc", "arrival_desc", "price_asc", "price_desc"];
   const restoreGalleryOrganization = (params) => {
     galleryOrganization.house = params.get("house") || (params.get("filter")?.startsWith("house:") ? params.get("filter").slice(6) : "");
     galleryOrganization.group = params.get("group") === "house" ? "house" : "";
+    galleryOrganization.region = ["us", "outside_us"].includes(params.get("sale_region")) ? params.get("sale_region") : "";
     gallerySort.value = gallerySortOrders.includes(params.get("sort")) ? params.get("sort") : "catalog";
   };
   const writeGalleryOrganization = (url) => {
-    [["house", galleryOrganization.house], ["group", galleryOrganization.group], ["sort", gallerySort.value === "catalog" ? "" : gallerySort.value]].forEach(([key, value]) => {
+    [["house", galleryOrganization.house], ["group", galleryOrganization.group], ["sale_region", galleryOrganization.region], ["sort", gallerySort.value === "catalog" ? "" : gallerySort.value]].forEach(([key, value]) => {
       if (value) url.searchParams.set(key, value);
       else url.searchParams.delete(key);
     });
@@ -3401,19 +3407,21 @@
 
   const matchesGalleryAttribution = (lot) => !galleryHideAttributed
     || !["After", "Attributed to"].includes(lot.attribution_label);
-  const galleryBrowsableLots = () => dayLots().filter(matchesGalleryAttribution);
+  const matchesGalleryRegion = (lot) => !galleryOrganization.region || lot.sale_region === galleryOrganization.region;
+  const galleryRegionLabel = () => galleryOrganization.region === "us" ? "U.S. sales" : "Outside the U.S.";
+  const galleryBrowsableLots = () => dayLots().filter((lot) => matchesGalleryAttribution(lot) && matchesGalleryRegion(lot));
+  const matchesGallerySelection = (lot) => {
+    if (galleryOrganization.house && galleryHouseName(lot) !== galleryOrganization.house) return false;
+    if (galleryFilter === "qualifying") return lotHasQualifyingBid(lot);
+    if (galleryFilter === "tray") return Boolean(lot.email_tray_selected || lot.retained_saved_work?.some((work) => work.email_tray_selected));
+    if (galleryFilter === "bidboards") return Boolean(lot.saved_bid_board || lot.retained_saved_work?.some((work) => work.saved_bid_board));
+    if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
+    return galleryFilter === "all" || galleryHouseName(lot) === galleryFilter.slice(6);
+  };
 
   const visibleGalleryLots = () => {
     const lots = dayLots().map((lot, index) => ({lot, index}));
-    const filtered = lots.filter(({lot}) => {
-      if (!matchesGalleryAttribution(lot)) return false;
-      if (galleryOrganization.house && galleryHouseName(lot) !== galleryOrganization.house) return false;
-      if (galleryFilter === "qualifying") return lotHasQualifyingBid(lot);
-      if (galleryFilter === "tray") return Boolean(lot.email_tray_selected || lot.retained_saved_work?.some((work) => work.email_tray_selected));
-      if (galleryFilter === "bidboards") return Boolean(lot.saved_bid_board || lot.retained_saved_work?.some((work) => work.saved_bid_board));
-      if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
-      return galleryFilter === "all" || galleryHouseName(lot) === galleryFilter.slice(6);
-    });
+    const filtered = lots.filter(({lot}) => matchesGalleryAttribution(lot) && matchesGalleryRegion(lot) && matchesGallerySelection(lot));
     if (gallerySort.value === "artist" || gallerySort.value === "artist_desc") {
       const direction = gallerySort.value === "artist" ? 1 : -1;
       filtered.sort((a, b) => direction * galleryArtistKey(a.lot).localeCompare(galleryArtistKey(b.lot), "en", {sensitivity: "base"}) || a.index - b.index);
@@ -3465,11 +3473,47 @@
   const renderGalleryFilters = () => {
     const lots = galleryBrowsableLots();
     galleryGroup.value = galleryOrganization.group;
-    const hiddenCount = dayLots().length - lots.length;
+    const hiddenCount = dayLots().filter(matchesGalleryRegion).length - lots.length;
+    const regionControls = document.getElementById("day-gallery-region-filters");
+    const focusedRegion = document.activeElement?.closest?.("[data-sale-region]")?.dataset.saleRegion;
+    const locationStatus = document.getElementById("day-gallery-location-status");
+    const regionLots = dayLots().filter((lot) => matchesGalleryAttribution(lot) && matchesGallerySelection(lot));
+    const unknownCount = regionLots.filter((lot) => !["us", "outside_us"].includes(lot.sale_region)).length;
+    locationStatus.hidden = unknownCount === 0;
+    locationStatus.textContent = unknownCount
+      ? `${unknownCount} lot${unknownCount === 1 ? " has" : "s have"} an unconfirmed sale location and ${unknownCount === 1 ? "appears" : "appear"} only in All locations.` : "";
+    regionControls.replaceChildren();
+    [["", "All locations"], ["us", "U.S. sales"], ["outside_us", "Outside the U.S."]].forEach(([region, label]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "day-gallery-filter";
+      button.dataset.saleRegion = region;
+      button.setAttribute("aria-pressed", String(galleryOrganization.region === region));
+      button.setAttribute("aria-controls", "day-gallery-grid day-gallery-artists day-gallery-house-filters");
+      const name = document.createElement("span");
+      name.className = "day-gallery-filter-name";
+      name.textContent = label;
+      const count = document.createElement("span");
+      count.className = "day-gallery-filter-count";
+      count.textContent = String(region ? regionLots.filter((lot) => lot.sale_region === region).length : regionLots.length);
+      button.append(name, count);
+      button.addEventListener("click", () => {
+        galleryOrganization.region = region;
+        galleryVisibleCount = 24;
+        renderGalleryFilters();
+        renderGalleryArtists();
+        renderGalleryCards();
+        updateCalendarLocation();
+        Array.from(regionControls.children).find((item) => item.dataset.saleRegion === region)?.focus({preventScroll: true});
+      });
+      regionControls.appendChild(button);
+    });
+    if (focusedRegion !== undefined) Array.from(regionControls.children)
+      .find((item) => item.dataset.saleRegion === focusedRegion)?.focus({preventScroll: true});
     galleryAttributionToggle.setAttribute("aria-pressed", String(galleryHideAttributed));
     galleryAttributionStatus.hidden = !galleryHideAttributed;
     galleryAttributionStatus.textContent = galleryHideAttributed
-      ? `${hiddenCount} After / Attributed work${hiddenCount === 1 ? "" : "s"} hidden for this day. Turn off “Hide After & Attributed” to show them. Saved selections are kept.`
+      ? `${hiddenCount} After / Attributed work${hiddenCount === 1 ? "" : "s"} hidden for ${galleryOrganization.region ? "this sale location" : "this day"}. Turn off “Hide After & Attributed” to show them. Saved selections are kept.`
       : "";
     const houseCounts = new Map(activeView === "oliver" ? oliverHouseNames.map((name) => [name, 0]) : []);
     const countedLots = lots.filter((lot) => !galleryOrganization.house || galleryHouseName(lot) === galleryOrganization.house);
@@ -3724,7 +3768,9 @@
       galleryGrid.appendChild(galleryCard(lot, index));
     });
     if (!lots.length) {
-      appendText(galleryGrid, "p", "day-gallery-empty", galleryOrganization.house
+      appendText(galleryGrid, "p", "day-gallery-empty", galleryOrganization.region
+        ? "No lots match this sale location and the selected filters. Choose All locations or change another filter."
+        : galleryOrganization.house
         ? `No lots match these filters at ${galleryOrganization.house}. Choose All auction houses or change the selected filter.`
         : galleryHideAttributed
         ? "No lots match these filters. Try showing After & Attributed works or changing the selected filter."
@@ -3746,6 +3792,7 @@
       : galleryFilter === "qualifying" ? "Saved Bid Boards with a qualifying bid"
       : galleryFilter === "bidboards" ? "Saved Bid Boards · qualifying, no qualifying bid, and unavailable results" : galleryFilter.slice(6);
     if (galleryOrganization.house) galleryDescription.textContent += ` · ${galleryOrganization.house}`;
+    if (galleryOrganization.region) galleryDescription.textContent += ` · ${galleryRegionLabel()}`;
     galleryResults.textContent = lots.length
       ? `Showing ${Math.min(galleryVisibleCount, lots.length)} of ${lots.length} watched lot${lots.length === 1 ? "" : "s"}`
       : "0 watched lots";

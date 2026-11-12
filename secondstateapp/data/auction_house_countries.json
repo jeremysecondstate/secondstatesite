@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "policy": "Presentation-only exact house aliases. Explicit sale location takes precedence. No global fallback for Sotheby's, Christie's, Bonhams, Phillips or Heritage; unknowns remain unknown.",
+  "houses": [
+    {
+      "name": "Copake Auction Inc.",
+      "country_code": "US",
+      "aliases": [
+        "Copake Auction"
+      ],
+      "evidence_url": "https://www.copakeauction.com/",
+      "evidence": "Auction gallery and November13 sale in Copake, New York.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Cross Gate Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://crossgategallery.com/contact",
+      "evidence": "431 Old Vine Street, Lexington, Kentucky.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Dennis Auction Service",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.dennisauction.com/location",
+      "evidence": "723 State Highway57, Stewartsville, New Jersey.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "DuMouchelles",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.dumoart.com/",
+      "evidence": "Detroit auction house; November13 sale listed on official page.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Thomaston Place Auction Galleries",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.thomastonauction.com/consign",
+      "evidence": "Gallery auctions and51 Atlantic Highway, Thomaston, Maine.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Aalders Auctions",
+      "country_code": "AU",
+      "aliases": [],
+      "evidence_url": "https://aaldersauctions.com/contact/",
+      "evidence": "18 Parramatta Road, Stanmore NSW2048, Australia.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Britannica Auctions",
+      "country_code": "GB",
+      "aliases": [],
+      "evidence_url": "https://britannicaauctions.com/elementor-page-1707/",
+      "evidence": "Online auction house based in North Yorkshire, UK.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Crait + Müller",
+      "country_code": "FR",
+      "aliases": [
+        "Crait & Müller"
+      ],
+      "evidence_url": "https://www.crait-muller.com/en/home",
+      "evidence": "November13 sale at Hotel Drouot, Paris; both offices in France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Ferri & Associés",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://www.ferri-drouot.com/",
+      "evidence": "November13 sale at Hotel Drouot, Paris.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Gregory's Casa d'Aste",
+      "country_code": "IT",
+      "aliases": [],
+      "evidence_url": "https://gregorysaste.it/en/",
+      "evidence": "Palazzo Brazzetti, Via San Vitale13, Bologna, Italy.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Mytika",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://www.mytika.com/vendre",
+      "evidence": "Auction rooms in Honfleur and Lisieux, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Nosbüsch & Stucke GmbH",
+      "country_code": "DE",
+      "aliases": [
+        "Nosbüsch & Stucke"
+      ],
+      "evidence_url": "https://nosbuesch-stucke.berlin/",
+      "evidence": "November13 sale and auction house at Fasanenstrasse28, Berlin, Germany.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Rossini",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://www.rossini.fr/",
+      "evidence": "November13 and upcoming auctions in Salle Rossini, Paris; overseas appraisal offices are not auction venues.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Templum Fine Art Auctions",
+      "country_code": "ES",
+      "aliases": [
+        "Templum Fine art Auction"
+      ],
+      "evidence_url": "https://www.interencheres.com/commissaire-priseur/templum-fine-art-auctions-2442",
+      "evidence": "Seller-published profile:193 Carrer Rossello, Barcelona, Spain.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Swann Auction Galleries",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.swanngalleries.com/contact",
+      "evidence": "104 East25th Street, New York.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Doyle",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://doyle.com/locations/new-york/",
+      "evidence": "175 East87th Street, New York.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Rago Auctions",
+      "country_code": "US",
+      "aliases": [
+        "Rago Arts and Auction Center"
+      ],
+      "evidence_url": "https://www.ragoarts.com/buying/bidding/",
+      "evidence": "Official bidding page locates auctions in Lambertville, New Jersey.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Wright",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.wright20.com/contact/",
+      "evidence": "1440 West Hubbard Street, Chicago.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "John Moran Auctioneers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.johnmoran.com/about/",
+      "evidence": "145 East Walnut Avenue, Monrovia, California.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Bradford's Auction Galleries",
+      "country_code": "US",
+      "aliases": [
+        "Bradford's"
+      ],
+      "evidence_url": "https://www.bradfordsauction.com/find-us/",
+      "evidence": "15210 North99th Avenue, Sun City, Arizona.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Los Angeles Modern Auctions (LAMA)",
+      "country_code": "US",
+      "aliases": [
+        "Los Angeles Modern Auctions",
+        "LAMA"
+      ],
+      "evidence_url": "https://www.lamodern.com/contact/",
+      "evidence": "6666 Lexington Avenue, Los Angeles, California.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Clars Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://clars.com/",
+      "evidence": "Live auctions at5644 Telegraph Avenue, Oakland, California.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Ketterer Kunst",
+      "country_code": "DE",
+      "aliases": [],
+      "evidence_url": "https://www.kettererkunst.de/kontakt/abteilungen.php",
+      "evidence": "Auction house offices in Munich, Hamburg, Berlin and Cologne, Germany.",
+      "verified_at": "2026-11-12"
+    }
+  ]
+}

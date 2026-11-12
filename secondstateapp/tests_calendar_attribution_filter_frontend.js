@@ -550,3 +550,158 @@ test("grouped qualifying results sort the complete set before pagination and pre
   for (const node of p.galleryGrid.children.filter(node => node.id)) assert.equal(lots[node.index].id, node.id);
   assert.equal(JSON.stringify(lots), before);
 });
+
+
+const regionalLots = () => [
+  lot(1, {sale_region: "us", attribution_label: "After", won_by_us: true, email_tray_selected: true, saved_bid_board: {qualifying_bid: "100"}}),
+  lot(2, {sale_region: "us", email_tray_selected: true, saved_bid_board: {qualifying_bid: "0"}}),
+  lot(3, {sale_region: "outside_us", auction_house: "Bonhams", email_tray_selected: true,
+    retained_saved_work: [{id: 30, saved_bid_board: {qualifying_bid: "250"}, email_tray_selected: true, saved_bid_board_url: "/saved/30/"}]}),
+  lot(4, {sale_region: "outside_us", attribution_label: "Attributed to"}),
+  lot(5, {sale_region: "unknown", email_tray_selected: true, saved_bid_board: {qualifying_bid: "75"}}),
+  lot(6),
+  lot(7, {sale_region: "us", oliver_house: false, auction_house: "Other"}),
+];
+const regionButtons = p => p.document.getElementById("day-gallery-region-filters").children;
+const selectRegion = (p, region) => regionButtons(p).find(button => button.dataset.saleRegion === region).events.click();
+const regionCounts = p => Object.fromEntries(regionButtons(p).map(button => [button.dataset.saleRegion, button.children[1].textContent]));
+
+for (const view of ["catalog", "oliver"]) {
+  test(`${view} location browsing composes with attribution and preserves unknown lots and research indices`, () => {
+    const lots = regionalLots(), before = JSON.stringify(lots), p = page(lots, view);
+    p.render();
+    assert.deepEqual(regionCounts(p), {"": view === "oliver" ? "6" : "7", us: view === "oliver" ? "2" : "3", outside_us: "2"});
+    assert.equal(regionButtons(p)[0].attributes["aria-pressed"], "true");
+    assert.match(p.document.getElementById("day-gallery-location-status").textContent, /2 lots have an unconfirmed sale location/);
+    p.galleryHideAttributed = true;
+    p.render();
+    selectRegion(p, "us");
+    assert.deepEqual(p.visible().map(x => x.id), view === "oliver" ? [2] : [2, 7]);
+    assert.match(p.galleryAttributionStatus.textContent, /^1 After \/ Attributed work hidden for this sale location/);
+    assert.equal(p.galleryAttributionToggle.attributes["aria-pressed"], "true");
+    selectRegion(p, "outside_us");
+    assert.deepEqual(p.visible(), [{id: 3, index: 2}]);
+    assert.match(p.galleryAttributionStatus.textContent, /^1 After \/ Attributed work hidden/);
+    selectRegion(p, "");
+    assert.deepEqual(p.visible().map(x => x.id), view === "oliver" ? [2, 3, 5, 6] : [2, 3, 5, 6, 7]);
+    assert.match(p.galleryAttributionStatus.textContent, /^2 After \/ Attributed works hidden for this day/);
+    p.galleryHideAttributed = false;
+    p.render();
+    assert.deepEqual(p.visible().map(x => x.id), view === "oliver" ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7]);
+    for (const item of p.visible()) assert.equal(p.run("dayLots()")[item.index].id, item.id);
+    assert.equal(JSON.stringify(lots), before);
+  });
+
+  test(`${view} location changes retain independent house, artist and saved-work selections`, () => {
+    const lots = regionalLots(), before = JSON.stringify(lots), p = page(lots, view);
+    p.galleryHideAttributed = true;
+    for (const filter of ["tray", "bidboards", "qualifying"]) {
+      p.galleryFilter = filter;
+      p.run('galleryOrganization.house = "Phillips"');
+      p.render();
+      assert.deepEqual(regionCounts(p), {"": "2", us: "1", outside_us: "0"});
+      p.galleryVisibleCount = 72;
+      selectRegion(p, "outside_us");
+      assert.equal(p.galleryVisibleCount, 24);
+      assert.equal(p.galleryFilter, filter);
+      assert.equal(p.run("galleryOrganization.house"), "Phillips");
+      assert.deepEqual(p.visible(), []);
+      assert.match(p.galleryGrid.textContent, /Choose All locations or change another filter/);
+      p.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === "house:").events.click();
+      assert.deepEqual(p.visible(), [{id: 3, index: 2}], "retained saved work remains reachable via the canonical card");
+      assert.equal(p.galleryFilter, filter);
+      selectRegion(p, "us");
+      assert.deepEqual(p.visible(), [{id: 2, index: 1}]);
+      selectRegion(p, "");
+      assert.deepEqual(p.visible().map(x => x.id), [2, 3, 5]);
+    }
+    p.galleryFilter = `artist:${CalendarArtists.artistKey(lots[2])}`;
+    p.render();
+    selectRegion(p, "us");
+    assert.deepEqual(p.visible(), []);
+    assert.equal(p.galleryFilter, `artist:${CalendarArtists.artistKey(lots[2])}`);
+    selectRegion(p, "outside_us");
+    assert.deepEqual(p.visible(), [{id: 3, index: 2}]);
+    assert.equal(JSON.stringify(lots), before);
+  });
+}
+
+test("location and attribution preferences round-trip day, month, research, and history URLs", () => {
+  const lots = regionalLots(), before = JSON.stringify(lots), p = page(lots);
+  p.galleryFilter = "qualifying";
+  p.galleryHideAttributed = true;
+  p.run('galleryOrganization.region = "outside_us"');
+  p.run('galleryOrganization.house = "Bonhams"');
+  p.run("updateCalendarLocation()");
+  for (const href of [p.window.history.url, ...p.monthLinks.map(x => x.href), ...p.catalogLinks.map(x => x.href), p.run("galleryResearchUrl(dayLots()[2])")]) {
+    const url = new URL(href);
+    assert.equal(url.searchParams.get("sale_region"), "outside_us");
+    assert.equal(url.searchParams.get("hide_attributed"), "1");
+    assert.equal(url.searchParams.get("house"), "Bonhams");
+    assert.equal(url.searchParams.get("filter"), "qualifying");
+  }
+  p.activeView = "research";
+  p.researchIndex = 0;
+  assert.deepEqual(p.ids("dayLots()"), [1, 2, 3, 4, 5, 6, 7], "location cannot hide an explicitly opened or saved research record");
+  p.run("updateCalendarLocation()");
+  assert.equal(new URL(p.window.history.url).searchParams.get("lot"), "1");
+  assert.equal(new URL(p.window.history.url).searchParams.get("sale_region"), "outside_us");
+  p.setCalendarView = value => { p.activeView = value || "calendar"; p.render(); };
+  p.showDay = value => { p.selectedDay = value; };
+  vm.runInContext(between('  window.addEventListener("popstate"', '  researchPrevious.addEventListener("click"'), p);
+  for (const [region, ids] of [["us", [2]], ["outside_us", [3]], ["", [2, 3, 5]], ["invalid", [2, 3, 5]]]) {
+    p.window.location.search = `?day=${day}&view=catalog&filter=qualifying&hide_attributed=1&sale_region=${region}`;
+    p.window.location.href = `https://secondstate.art/calendar/${p.window.location.search}`;
+    p.listeners.get("popstate")();
+    assert.deepEqual(p.visible().map(x => x.id), ids);
+    assert.equal(p.run("galleryOrganization.region"), region === "invalid" ? "" : region);
+    assert.equal(p.restoringHistory, false);
+    const expected = ["us", "outside_us"].includes(region) ? region : null;
+    for (const link of [...p.monthLinks, ...p.catalogLinks]) assert.equal(new URL(link.href).searchParams.get("sale_region"), expected);
+  }
+  assert.equal(JSON.stringify(lots), before);
+});
+
+test("initial location is opt-in and only explicit supported regions narrow the catalog", () => {
+  const lots = regionalLots();
+  for (const [value, expected] of [["us", [1, 2, 7]], ["outside_us", [3, 4]], ["", [1, 2, 3, 4, 5, 6, 7]], ["unknown", [1, 2, 3, 4, 5, 6, 7]], ["US", [1, 2, 3, 4, 5, 6, 7]]]) {
+    const p = page(lots);
+    p.window.location.search = `?sale_region=${value}`;
+    vm.runInContext(between("  const initialParams =", "  const requestedView ="), p);
+    assert.deepEqual(p.visible().map(x => x.id), expected);
+  }
+});
+
+test("location filtering precedes grouping, sorting and pagination without changing original lot identities", () => {
+  const lots = Array.from({length: 90}, (_, index) => lot(index + 1, {
+    sale_region: index % 3 === 0 ? "outside_us" : "us", auction_house: index % 2 ? "Phillips" : "Bonhams",
+    estimate_low: String(100 - index), email_tray_selected: true,
+  }));
+  const p = page(lots), before = JSON.stringify(lots);
+  p.galleryFilter = "tray";
+  p.gallerySort.value = "price_asc";
+  p.run('galleryOrganization.group = "house"; galleryOrganization.region = "us"');
+  const expected = ["Bonhams", "Phillips"].flatMap(house => lots.filter(l => l.sale_region === "us" && l.auction_house === house).reverse().map(l => l.id));
+  p.render();
+  assert.deepEqual(p.galleryGrid.children.filter(x => x.id).map(x => x.id), expected.slice(0, 24));
+  p.galleryVisibleCount = 72;
+  p.render();
+  assert.deepEqual(p.galleryGrid.children.filter(x => x.id).map(x => x.id), expected);
+  assert.equal(p.galleryMore.hidden, true);
+  for (const item of p.visible()) assert.equal(lots[item.index].id, item.id);
+  assert.equal(JSON.stringify(lots), before);
+});
+
+
+test("location controls preserve keyboard focus when their counts refresh", () => {
+  const p = page(regionalLots());
+  p.render();
+  for (const region of ["", "us", "outside_us"]) {
+    const focused = regionButtons(p).find(button => button.dataset.saleRegion === region);
+    p.document.activeElement = {closest: selector => selector === "[data-sale-region]" ? focused : null};
+    p.render();
+    const replacement = regionButtons(p).find(button => button.dataset.saleRegion === region);
+    assert.notEqual(replacement, focused);
+    assert.equal(replacement.focused, true);
+  }
+});

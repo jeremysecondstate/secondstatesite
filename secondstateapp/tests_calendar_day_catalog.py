@@ -21,6 +21,29 @@ class CalendarDayCatalogLinkTests(TestCase):
             get_user_model().objects.create_user("day-catalog-admin", is_staff=True)
         )
 
+    def test_sale_location_choices_keep_all_source_records_available_for_research(self):
+        domestic = watch_lot(source_lot_id="region-us", auction_house="DuMouchelles", location="Detroit, MI, US",
+                             artist="After Pablo Picasso", artist_watchlist_name="Pablo Picasso")
+        overseas = watch_lot(source_lot_id="region-overseas", auction_house="Bonhams", location="London, United Kingdom")
+        unknown = watch_lot(source_lot_id="region-unknown", auction_house="Unverified Auction House", location="", currency="USD")
+        originals = {lot.pk: lot.__class__.objects.filter(pk=lot.pk).values().get() for lot in (domestic, overseas, unknown)}
+
+        response = self.client.get(reverse("auction_calendar"), {
+            "month": "2026-07", "day": "2026-07-25", "view": "catalog",
+            "sale_region": "us", "hide_attributed": "1",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        lots = {lot["id"]: lot for lot in response.context["calendar_data"]["2026-07-25"]}
+        self.assertEqual(set(lots), set(originals), "Browsing choices must not remove source records from research data")
+        self.assertEqual((lots[domestic.pk]["sale_region"], lots[domestic.pk]["sale_country"]), ("us", "US"))
+        self.assertEqual(lots[domestic.pk]["attribution_label"], "After")
+        self.assertEqual((lots[overseas.pk]["sale_region"], lots[overseas.pk]["sale_country"]), ("outside_us", "GB"))
+        self.assertEqual((lots[unknown.pk]["sale_region"], lots[unknown.pk]["sale_country"]), ("unknown", ""))
+        for lot in (domestic, overseas, unknown):
+            self.assertEqual(lots[lot.pk]["lot_url"], lot.lot_url)
+            self.assertEqual(lot.__class__.objects.filter(pk=lot.pk).values().get(), originals[lot.pk])
+
     def test_catalog_price_sort_receives_numeric_estimates_and_missing_values(self):
         priced = watch_lot(
             source_lot_id="catalog-price-estimates",

@@ -2901,6 +2901,30 @@ body:has(.lot-browser[open]) {
   color: #101311;
 }
 
+.day-gallery-location-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin: 16px 0 0;
+}
+
+.day-gallery-location-label {
+  color: var(--calendar-muted);
+  font-size: 12px;
+}
+
+.day-gallery-region-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.day-gallery-region-filters .day-gallery-filter-name {
+  white-space: nowrap;
+}
+
 .day-gallery-send-launch {
   min-height: 44px;
   padding: 10px 18px;
@@ -3660,7 +3684,12 @@ button.day-gallery-visual {
     flex: 1 1 100%;
   }
 
-  .day-gallery-filters .day-gallery-filter {
+  .day-gallery-region-filters {
+    flex: 1 1 100%;
+  }
+
+  .day-gallery-filters .day-gallery-filter,
+  .day-gallery-region-filters .day-gallery-filter {
     flex: 1 1 auto;
     justify-content: center;
   }

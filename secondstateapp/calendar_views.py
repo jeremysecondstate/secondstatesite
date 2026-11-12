@@ -63,6 +63,7 @@ from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPL
 from .lot_presentation import artist_attribution_label, artist_display_name, artist_sort_key, clean_display_text
 from .oliver_houses import is_oliver_house, oliver_house_name, oliver_house_names
 from .research_queue import selected_queue_state
+from .sale_geography import sale_geography
 from .models import (
     AuctionEmailBatch,
     AuctionEmailBatchItem,
@@ -256,6 +257,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
     arrival_schedule = published_lot_arrival(lot)
     arrival_estimate = sale_arrival_estimate(lot)
     numbering_baseline = sale_numbering_baseline(lot)
+    geography = sale_geography(lot)
     return {
         "id": lot.pk,
         **({"numbering_baseline": numbering_baseline} if numbering_baseline is not None else {}),
@@ -273,6 +275,8 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "lot_number": lot.lot_number,
         "medium": clean_display_text(lot.medium),
         "location": clean_display_text(lot.location),
+        "sale_region": geography["region"],
+        "sale_country": geography["country_code"],
         "estimate": _estimate_label(lot),
         "bid": _bid_label(lot),
         "sold": _sold_label(lot),
