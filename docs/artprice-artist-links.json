@@ -31,6 +31,22 @@
       "resolved_at": "2026-10-23T07:29:32+00:00"
     },
     {
+      "name": "Alex da Corte",
+      "url": "https://www.artprice.com/artist/444640/alex-da-corte/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/444640/alex-da-corte",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/444640/alex-da-corte",
+      "result_title": "Alex DA CORTE (1980) Worth, Auction prices, value, estimate",
+      "evidence_text": "Alex DA CORTE (1980) Worth, Auction prices, value, estimate",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/444640/alex-da-corte"
+      ],
+      "query": "Alex da Corte Artprice ID",
+      "calendar_name": "Alex da Corte",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Amy Sillman",
       "url": "https://www.artprice.com/artist/188391/amy-sillman/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/188391/amy-sillman",
@@ -51,6 +67,73 @@
       ]
     },
     {
+      "name": "Anselm Reyle",
+      "url": "https://www.artprice.com/artist/256901/anselm-reyle/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/256901/anselm-reyle",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/256901/anselm-reyle",
+      "result_title": "Anselm REYLE (1970) Estimate, Auction prices, Value, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Anselm REYLE (1970) Estimate, Auction prices, Value, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nAnselm REYLE is an artist born in Germany in 1970. The artist's works have gone up for sale at public auction 570 times, mostly in the Painting category.Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/256901/anselm-reyle",
+        "https://www.artprice.com/artist/256901/anselm-reyle/biography"
+      ],
+      "query": "Anselm Reyle Artprice ID",
+      "calendar_name": "Anselm Reyle",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Antoni Clavé",
+      "url": "https://www.artprice.com/artist/5851/antoni-clave/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/5851/antoni-clave",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/5851/antoni-clave",
+      "result_title": "Antoni CLAVÉ (1913-2005) Value, Worth, Auction Prices, ...",
+      "evidence_text": "Antoni CLAVÉ (1913-2005) Value, Worth, Auction Prices, ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/5851/antoni-clave"
+      ],
+      "query": "Antoni Clavé Artprice ID",
+      "calendar_name": "Antoni Clavé",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Arnulf Rainer",
+      "url": "https://www.artprice.com/artist/23786/arnulf-rainer/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/23786/arnulf-rainer",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/23786/arnulf-rainer",
+      "result_title": "Arnulf RAINER (1929-2025) Auction prices, Worth, ...\n\nArtprice.com\nhttps://www.artprice.com › artist › arnulf-rainer",
+      "evidence_text": "Arnulf RAINER (1929-2025) Auction prices, Worth, ...\n\nArtprice.com\nhttps://www.artprice.com › artist › arnulf-rainer\n7 works by Arnulf RAINER will soon be offered at auction. 27 works by the artist are for sale on the Artprice Marketplace, offered by 9 Artprice Stores. + See ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/23786/arnulf-rainer",
+        "https://www.artprice.com/artist/23786/arnulf-rainer/biography"
+      ],
+      "query": "Arnulf Rainer Artprice ID",
+      "calendar_name": "Arnulf Rainer",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Asger Jorn",
+      "url": "https://www.artprice.com/artist/14883/asger-jorn/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/14883/asger-jorn",
+      "source": "public-search-index-url",
+      "resolved_at": "2026-11-11T06:04:37+00:00",
+      "observed_url": "https://fr.artprice.com/artiste/14883/asger-jorn",
+      "result_title": "Asger JORN (1914-1973) Cote. Prix aux enchères. Estimer, acheter, vendre - Artprice",
+      "evidence_text": "Indexed Artprice artist profile identifies Asger Jorn, 1914–1973, Denmark; the result also lists Asger Oluf Jorgensen as another name. Profile ID 14883 is explicitly present in the observed URL.",
+      "evidence_urls": [
+        "https://fr.artprice.com/artiste/14883/asger-jorn"
+      ],
+      "query": "site:artprice.com \"Asger JORN\"",
+      "notes": "Exact observed French URL retained. No Artprice page opened or fetched. Canonical English URL not separately observed; any normalization must be labeled derived. Alias: Asger Oluf Jorgensen.",
+      "calendar_name": "Asger Jorn",
+      "verification": "Indexed URL and identity evidence; no direct Artprice page request. English path and print-history query formatted offline."
+    },
+    {
       "name": "BANKSY",
       "url": "https://www.artprice.com/artist/282428/banksy/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/282428/banksy",
@@ -61,6 +144,22 @@
         "https://www.artprice.com/artprice-news/6827/keith-haring-art-is-for-everyone-",
         "https://www.artprice.com/artprice-news/7724/Capital%2Bgains%2Band%2Blosses%2Bin%2Bthe%2BContemporary%2Bart%2Bfield"
       ]
+    },
+    {
+      "name": "Bengt Lindström",
+      "url": "https://www.artprice.com/artist/17626/bengt-lindstrom/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/17626/bengt-lindstrom",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/17626/bengt-lindstrom",
+      "result_title": "Bengt LINDSTRÖM (1925-2008) Auction prices, Worth, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Bengt LINDSTRÖM (1925-2008) Auction prices, Worth, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nNov 19, 2024 — Bengt LINDSTRÖM is an artist born in Sweden in 1925 and deceased in 2008. The artist's works have gone up for sale at public auction 6,832 ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/17626/bengt-lindstrom"
+      ],
+      "query": "Bengt Lindström Artprice ID",
+      "calendar_name": "Bengt Lindström",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Brice Marden",
@@ -83,6 +182,22 @@
       ]
     },
     {
+      "name": "Christian Rohlfs",
+      "url": "https://www.artprice.com/artist/24765/christian-rohlfs/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/24765/christian-rohlfs",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/24765/christian-rohlfs",
+      "result_title": "Christian ROHLFS (1849-1938) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Christian ROHLFS (1849-1938) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nMar 13, 2020 — Christian ROHLFS is an artist born in Germany in 1849 and deceased in 1938. The artist's works have gone up for sale at public auction 3,280 ...Read more\n14-day returns\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/24765/christian-rohlfs"
+      ],
+      "query": "Christian Rohlfs Artprice ID",
+      "calendar_name": "Christian Rohlfs",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Cindy Sherman",
       "url": "https://www.artprice.com/artist/26554/cindy-sherman/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/26554/cindy-sherman",
@@ -92,6 +207,38 @@
         "https://www.artprice.com/artprice-news/14492/richard-prince-a-l-albertina-museum-de-vienne-une-grande-retrospective-de-la-photographie-d-appropriation",
         "https://www.artprice.com/artprice-news/8222/flash-news-wols-the-mysterious-at-sotheby-s-cindy-sherman-in-london"
       ]
+    },
+    {
+      "name": "Conrad Felixmüller",
+      "url": "https://www.artprice.com/artist/9631/conrad-felixmuller/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/9631/conrad-felixmuller",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/9631/conrad-felixmuller",
+      "result_title": "Conrad FELIXMÜLLER (1897-1977) Value, Worth, Auction ...",
+      "evidence_text": "Conrad FELIXMÜLLER (1897-1977) Value, Worth, Auction ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/9631/conrad-felixmuller"
+      ],
+      "query": "Conrad Felixmüller Artprice ID",
+      "calendar_name": "Conrad Felixmüller",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Curt Ehrhardt",
+      "url": "https://www.artprice.com/artist/106447/curt-ehrhardt/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/106447/curt-ehrhardt",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/106447/curt-ehrhardt",
+      "result_title": "Curt EHRHARDT (1895-1972) Value, Worth, Auction ...",
+      "evidence_text": "Curt EHRHARDT (1895-1972) Value, Worth, Auction ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/106447/curt-ehrhardt"
+      ],
+      "query": "Curt Ehrhardt Artprice ID",
+      "calendar_name": "Curt Ehrhardt",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Cy Twombly",
@@ -106,6 +253,39 @@
       ]
     },
     {
+      "name": "Dado",
+      "url": "https://www.artprice.com/artist/6805/dado/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/6805/dado",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/6805/dado",
+      "result_title": "DADO (1933-2010) Estimate, Auction prices ...",
+      "evidence_text": "DADO (1933-2010) Estimate, Auction prices ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/6805/dado"
+      ],
+      "query": "Dado Artprice ID",
+      "calendar_name": "Dado",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Daniel Richter",
+      "url": "https://www.artprice.com/artist/163677/daniel-richter/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/163677/daniel-richter",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/163677/daniel-richter",
+      "result_title": "Daniel RICHTER (1962) Estimate, Auction prices, Value, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Daniel RICHTER (1962) Estimate, Auction prices, Value, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nDaniel RICHTER is an artist born in Germany in 1962. The artist's works have gone up for sale at public auction 841 times, mostly in the Print-Multiple ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/163677/daniel-richter",
+        "https://www.artprice.com/artista/163677/daniel-richter/biografia"
+      ],
+      "query": "Daniel Richter Artprice ID",
+      "calendar_name": "Daniel Richter",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "David Shrigley",
       "url": "https://www.artprice.com/artist/188291/david-shrigley/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/188291/david-shrigley",
@@ -114,6 +294,56 @@
       "evidence_urls": [
         "https://www.artprice.com/artprice-news/773/Contemporary%2BArt%3A%2BYoshitomo%2BNara%2BJoins%2BDavid%2BZwirner%2BGallery"
       ]
+    },
+    {
+      "name": "Dörte Clara Wolff",
+      "url": "https://www.artprice.com/artist/422844/dorte-clara-wolff/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/422844/dorte-clara-wolff",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/422844/dorte-clara-wolff",
+      "result_title": "Dörte Clara WOLFF (1907-1998) Worth, Auction prices ...",
+      "evidence_text": "Dörte Clara WOLFF (1907-1998) Worth, Auction prices ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/422844/dorte-clara-wolff"
+      ],
+      "query": "Dodo (d. i. Dörte Clara Wolff) Artprice ID",
+      "alias_evidence": {
+        "artist": "Dodo (d. i. Dörte Clara Wolff)",
+        "status": "confirmed",
+        "identity": "Dodo, born Dörte Clara Wolff (1907–1998)",
+        "calendar_lot": {
+          "id": 10317,
+          "auction_house": "Ketterer Kunst",
+          "lot_number": "98",
+          "title": "Hure",
+          "day": "2026-11-15",
+          "lot_url": "https://onlinesale.kettererkunst.com/item.php?id=119002887"
+        },
+        "evidence": [
+          {
+            "url": "https://www.smb.museum/ausstellungen/detail/dodo-1907-1998/",
+            "title": "Dodo (1907–1998): Ein Leben in Bildern — Staatliche Museen zu Berlin",
+            "access": "opened",
+            "location": "lines 137–142",
+            "summary": "Museum's retrospective title gives Dodo (1907–1998), and accompanying text says she was born in Berlin in 1907 as Dörte Clara Wolff."
+          },
+          {
+            "url": "https://kettererkunst.com/result.php?auswahl=kommend&int=72&int_as=10288&limit_von_details=26&notkuenstlernr=10288&objsei=1&shw=1",
+            "title": "Ketterer Kunst — Dodo, Hure, 1934, lot 98",
+            "access": "search result",
+            "summary": "Auction-house indexed result matches Calendar lot 98, Hure (1934), and names Dodo (d. i. Dörte Clara Wolff), 1907–1998."
+          }
+        ],
+        "query": "Dodo Dörte Clara Wolff 1907 1998 Ketterer",
+        "additional_queries": [
+          "site.kettererkunst.com \"Dodo\" \"Hure\" 1907",
+          "site:smb.museum Dodo Dörte Clara Wolff 1907 1998"
+        ],
+        "notes": "Additional queries followed inaccessible original onlinesale page and oversized/timed-out Ketterer catalog PDFs. A broad Ketterer results URL had stale search content and opened to a different lot, so that opened page is excluded from evidence. Museum independently confirms full alias and years. No Artprice page was visited."
+      },
+      "calendar_name": "Dodo (d. i. Dörte Clara Wolff)",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Ed Ruscha",
@@ -126,6 +356,22 @@
         "https://www.artprice.com/artprice-news/6905/2024%E2%80%99s%2Btop%2Bten%2Bart%2Bauction%2Bresults",
         "https://www.artprice.com/artprice-news/8108/our-blue-chip-artists-index-outperforms-the-s-p-500"
       ]
+    },
+    {
+      "name": "Eduard Wiiralt",
+      "url": "https://www.artprice.com/artist/42912/eduard-wiiralt/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/42912/eduard-wiiralt",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/42912/eduard-wiiralt",
+      "result_title": "Eduard WIIRALT - Artprice.com\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Eduard WIIRALT - Artprice.com\n\nArtprice.com\nhttps://www.artprice.com › Artists\n3 works by Eduard WIIRALT will soon be offered at auction. 15 works by the artist are for sale on the Artprice Marketplace, offered by 2 Artprice Stores.Read more\n14-day returns\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/42912/eduard-wiiralt"
+      ],
+      "query": "Eduard Wiiralt Artprice ID",
+      "calendar_name": "Eduard Wiiralt",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "El Anatsui",
@@ -150,6 +396,128 @@
       ]
     },
     {
+      "name": "Emil Nolde",
+      "url": "https://www.artprice.com/artist/21258/emil-nolde/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/21258/emil-nolde",
+      "source": "saved-artprice-pdf-hyperlink",
+      "resolved_at": "2026-11-11T06:05:24+00:00",
+      "observed_url": "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/40035948/lis-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+      "result_title": "Saved Artprice search results: Nolde, Emil – Lis (Lis Vilstrup) AP",
+      "evidence_text": "Page 1 contains the artist name Emil NOLDE 4 times and a matching artist-ID/slug lot hyperlink. All extracted matching lot hyperlinks use the same artist ID and slug.",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/40035948/lis-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/37401564/lis-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/35453886/junge-madchen-ada-nolde-und-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/34029264/lis-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/31605354/junge-madchen-ada-nolde-und-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/28471164/wie-vogel-ada-nolde-und-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/21536082/lis-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/21536085/junge-madchen-ada-nolde-und-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/21284475/lis-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/20075328/junge-madchen-ada-nolde-und-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/15404292/junge-madchen-ada-nolde-und-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/6295689/lis-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/3393165/mann-und-frau-profil-bolling-vilstrup-und-lis?keyword=Lis+%28Lis+Vilstrup%29&p=1",
+        "https://www.artprice.com/artist/21258/emil-nolde/print-multiple/2225405/junge-madchen-ada-nolde-und-lis-vilstrup?keyword=Lis+%28Lis+Vilstrup%29&p=1"
+      ],
+      "notes": "Read-only extraction from an existing local PDF. observed_url is an actual PDF link annotation. profile_url_derived truncates that observed URL to the artist prefix; it was not fetched or guessed. No Artprice network request.",
+      "source_basename": "Nolde, Emil – Lis (Lis Vilstrup) AP.pdf",
+      "evidence_page": 1,
+      "calendar_name": "Emil Nolde",
+      "verification": "Saved PDF hyperlink and artist-name evidence; artist prefix extracted offline. No Artprice request."
+    },
+    {
+      "name": "Emil Schumacher",
+      "url": "https://www.artprice.com/artist/26169/emil-schumacher/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/26169/emil-schumacher",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/26169/emil-schumacher",
+      "result_title": "Emil SCHUMACHER (1912-1999) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Emil SCHUMACHER (1912-1999) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\n7 works by Emil SCHUMACHER will soon be offered at auction. 16 works by the artist are for sale on the Artprice Marketplace, offered by 4 Artprice Stores. + See ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/26169/emil-schumacher"
+      ],
+      "query": "Emil Schumacher Artprice ID",
+      "calendar_name": "Emil Schumacher",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Erich Heckel",
+      "url": "https://www.artprice.com/artist/13017/erich-heckel/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/13017/erich-heckel",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/13017/erich-heckel",
+      "result_title": "Erich HECKEL (1883-1970) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Erich HECKEL (1883-1970) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nMay 9, 2026 — 11 works by Erich HECKEL will soon be offered at auction. 7 works by the artist are for sale on the Artprice Marketplace, offered by 3 Artprice ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/13017/erich-heckel",
+        "https://www.artprice.com/artist/13017/erich-heckel/biography?section=personaldata"
+      ],
+      "query": "Erich Heckel Artprice ID",
+      "calendar_name": "Erich Heckel",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Ernst Ludwig Kirchner",
+      "url": "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner",
+      "source": "saved-artprice-pdf-hyperlink",
+      "resolved_at": "2026-11-11T06:05:24+00:00",
+      "observed_url": "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/38115906/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+      "result_title": "Saved Artprice search results: Alte und junge Frau AP",
+      "evidence_text": "Page 1 contains the artist name Ernst Ludwig KIRCHNER 4 times and a matching artist-ID/slug lot hyperlink. All extracted matching lot hyperlinks use the same artist ID and slug.",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/38115906/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/37808307/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/9305787/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/3954156/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/2249459/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/17344887/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/2802939/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/33889227/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/16339062/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/13245351/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/15906300/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/12846537/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/3368780/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/14186391/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/89741/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/21441873/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/18472620/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/14620800/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/12587394/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/1244747/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/611284/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/2876913/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/40035984/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1",
+        "https://www.artprice.com/artist/15397/ernst-ludwig-kirchner/print-multiple/26772039/alte-und-junge-frau?keyword=Alte+und+junge+Frau&p=1"
+      ],
+      "notes": "Read-only extraction from an existing local PDF. observed_url is an actual PDF link annotation. profile_url_derived truncates that observed URL to the artist prefix; it was not fetched or guessed. No Artprice network request.",
+      "source_basename": "Alte und junge Frau AP.pdf",
+      "evidence_page": 1,
+      "calendar_name": "Ernst Ludwig Kirchner",
+      "verification": "Saved PDF hyperlink and artist-name evidence; artist prefix extracted offline. No Artprice request."
+    },
+    {
+      "name": "Ernst Wilhelm Nay",
+      "url": "https://www.artprice.com/artist/20941/ernst-wilhelm-nay/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/20941/ernst-wilhelm-nay",
+      "source": "public-search-index-url",
+      "resolved_at": "2026-11-11T06:04:37+00:00",
+      "observed_url": "https://www.artprice.com/artist/20941/ernst-wilhelm-nay?cl=en",
+      "result_title": "Ernst Wilhelm NAY (1902-1968) Estimate, Auction prices, Value, Worth, Buy, Sell – Artprice",
+      "evidence_text": "Indexed Artprice artist profile explicitly names Ernst Wilhelm NAY (1902-1968), German artist, with more than 2,630 auction records, mostly Print-Multiple. Exact full-name and dates match.",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/20941/ernst-wilhelm-nay?cl=en"
+      ],
+      "query": "\"Ernst Wilhelm Nay\" \"artprice\"",
+      "notes": "Direct indexed English artist profile. No Artprice page opened or fetched.",
+      "calendar_name": "Ernst Wilhelm Nay",
+      "verification": "Indexed URL and identity evidence; no direct Artprice page request. English path and print-history query formatted offline."
+    },
+    {
       "name": "Etel Adnan",
       "url": "https://www.artprice.com/artist/316149/etel-adnan/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/316149/etel-adnan",
@@ -171,6 +539,55 @@
         "https://de.artprice.com/artprice-news/9152/latest-new-york-summits",
         "https://www.artprice.com/artprice-news/8222/flash-news-wols-the-mysterious-at-sotheby-s-cindy-sherman-in-london"
       ]
+    },
+    {
+      "name": "Franz West",
+      "url": "https://www.artprice.com/artist/30564/franz-west/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/30564/franz-west",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/30564/franz-west",
+      "result_title": "Franz WEST - Artprice.com\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Franz WEST - Artprice.com\n\nArtprice.com\nhttps://www.artprice.com › Artists\nGoing under the hammer for $71 million, the gilded bronze set a new record for the artist, earlier at $57 million",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/30564/franz-west"
+      ],
+      "query": "Franz West Artprice ID",
+      "calendar_name": "Franz West",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Friedrich Schroeder-Sonnenstern",
+      "url": "https://www.artprice.com/artist/26129/friedrich-schroeder-sonnenstern/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/26129/friedrich-schroeder-sonnenstern",
+      "source": "public-search-index-url",
+      "resolved_at": "2026-11-11T06:04:37+00:00",
+      "observed_url": "https://www.artprice.com/check_browser?from=%252Fartist%252F26129%252Ffriedrich-schroeder-sonnenstern",
+      "result_title": "Friedrich SCHROEDER-SONNENSTERN (1892-1982) Estimate, Auction prices, Value, Worth, Buy, Sell – Artprice",
+      "evidence_text": "Indexed profile explicitly includes the aliases Friedrich SCHRÖDER-SONNENSTERN and Emil Friedrich SCHRÖDER-SONNENSTERN; dates 1892–1982.",
+      "evidence_urls": [
+        "https://www.artprice.com/check_browser?from=%252Fartist%252F26129%252Ffriedrich-schroeder-sonnenstern"
+      ],
+      "query": "site:artprice.com \"Friedrich Schröder-Sonnenstern\"",
+      "notes": "Exact indexed wrapper preserved and decoded twice offline. Slug uses schroeder while target uses schröder; explicit indexed alias supports the identity, but a simple accent-stripping resolver may need an explicit alias. No Artprice page was requested.",
+      "calendar_name": "Friedrich Schröder-Sonnenstern",
+      "verification": "Indexed URL and identity evidence; no direct Artprice page request. English path and print-history query formatted offline."
+    },
+    {
+      "name": "Fritz Winter",
+      "url": "https://www.artprice.com/artist/30841/fritz-winter/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/30841/fritz-winter",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/30841/fritz-winter",
+      "result_title": "Fritz WINTER (1905-1976) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Fritz WINTER (1905-1976) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nMar 13, 2020 — Fritz WINTER is an artist born in Germany in 1905 and deceased in 1976. The artist's works have gone up for sale at public auction 2,669 ...Read more\n14-day returns\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/30841/fritz-winter"
+      ],
+      "query": "Fritz Winter Artprice ID",
+      "calendar_name": "Fritz Winter",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "George Condo",
@@ -213,6 +630,55 @@
       "source_file": "docs/artist-links-bulks.html"
     },
     {
+      "name": "Günther Förg",
+      "url": "https://www.artprice.com/artist/10081/gunther-forg/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/10081/gunther-forg",
+      "source": "user-supplied-public-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/10081/gunther-forg/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "result_title": "Günther FÖRG (1952-2013) Estimate, Auction prices ... - Artprice",
+      "evidence_text": "User supplied this exact URL and a Google search screenshot showing the Artprice profile title, artist ID 10081 and artist dates 1952–2013.",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/10081/gunther-forg/lots/pasts?idcategory=2&p=1&sort=datesale_desc"
+      ],
+      "query": "",
+      "calendar_name": "Günther Förg",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Günther Uecker",
+      "url": "https://www.artprice.com/artist/28991/gunther-uecker/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/28991/gunther-uecker",
+      "source": "public-search-index-url",
+      "resolved_at": "2026-11-11T06:04:37+00:00",
+      "observed_url": "https://www.artprice.com/artist/28991/gunther-uecker",
+      "result_title": "Günther UECKER (1930-2025) Value, Worth, Auction Prices, Estimate, Buy, Sell – Artprice",
+      "evidence_text": "Indexed Artprice artist profile explicitly names Günther UECKER (1930-2025), German artist, alias Guenther UECKER, mostly Print-Multiple. Exact full-name and dates match.",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/28991/gunther-uecker"
+      ],
+      "query": "\"Günther Uecker\" \"artprice\"",
+      "notes": "Direct indexed English artist profile. No Artprice page opened or fetched.",
+      "calendar_name": "Günther Uecker",
+      "verification": "Indexed URL and identity evidence; no direct Artprice page request. English path and print-history query formatted offline."
+    },
+    {
+      "name": "Hans Purrmann",
+      "url": "https://www.artprice.com/artist/23602/hans-purrmann/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/23602/hans-purrmann",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/23602/hans-purrmann",
+      "result_title": "Hans PURRMANN - Artprice.com\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Hans PURRMANN - Artprice.com\n\nArtprice.com\nhttps://www.artprice.com › Artists\n2 works by Hans PURRMANN will soon be offered at auction. 1 work by the artist is for sale on the Artprice Marketplace, offered by one Artprice Store.Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/23602/hans-purrmann"
+      ],
+      "query": "Hans Purrmann Artprice ID",
+      "calendar_name": "Hans Purrmann",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "HARING, KEITH",
       "url": "https://www.artprice.com/artist/12810/keith-haring/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/12810/keith-haring",
@@ -225,6 +691,22 @@
         "https://www.artprice.com/artprice-news/6800/have-prints-become-fashionable-",
         "https://www.artprice.com/artprice-news/6827/keith-haring-art-is-for-everyone-"
       ]
+    },
+    {
+      "name": "Henk Helmantel",
+      "url": "https://www.artprice.com/artist/49880/henk-helmantel/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/49880/henk-helmantel",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/49880/henk-helmantel",
+      "result_title": "Henk HELMANTEL\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Henk HELMANTEL\n\nArtprice.com\nhttps://www.artprice.com › Artists\nHenk HELMANTEL is an artist born in 1945. The artist's works have gone up for sale at public auction 141 times, mostly in the Painting category.Read more\n14-day returns\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/49880/henk-helmantel"
+      ],
+      "query": "Henk Helmantel Artprice ID",
+      "calendar_name": "Henk Helmantel",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Henri de Toulouse-Lautrec",
@@ -240,11 +722,95 @@
       ]
     },
     {
+      "name": "Hermann Max Pechstein",
+      "url": "https://www.artprice.com/artist/22341/hermann-max-pechstein/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/22341/hermann-max-pechstein",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/22341/hermann-max-pechstein",
+      "result_title": "Hermann Max PECHSTEIN (1881-1955) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Hermann Max PECHSTEIN (1881-1955) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nAug 31, 2021 — Hermann Max PECHSTEIN is an artist born in Germany in 1881 and deceased in 1955. The artist's works have gone up for sale at public auction ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/22341/hermann-max-pechstein",
+        "https://www.artprice.com/artist/22341/hermann-max-pechstein/biography"
+      ],
+      "query": "Hermann Max Pechstein Artprice ID",
+      "calendar_name": "Hermann Max Pechstein",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Hermann Nitsch",
+      "url": "https://www.artprice.com/artist/21195/hermann-nitsch/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/21195/hermann-nitsch",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/21195/hermann-nitsch",
+      "result_title": "Hermann NITSCH (1938-2022) Value, Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Hermann NITSCH (1938-2022) Value, Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nOct 7, 2016 — Hermann NITSCH is an artist born in Austria in 1938 and deceased in 2022. The artist's works have gone up for sale at public auction 4,902 ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/21195/hermann-nitsch",
+        "https://www.artprice.com/artist/21195/hermann-nitsch/biography"
+      ],
+      "query": "Hermann Nitsch Artprice ID",
+      "calendar_name": "Hermann Nitsch",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Hugó Scheiber",
+      "url": "https://www.artprice.com/artist/25870/hugo-scheiber/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/25870/hugo-scheiber",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/25870/hugo-scheiber",
+      "result_title": "Hugo SCHEIBER (1873-1950) Auction prices, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Hugo SCHEIBER (1873-1950) Auction prices, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nHugo SCHEIBER is an artist born in Hungary in 1873 and deceased in 1950. The artist's works have gone up for sale at public auction 2,773 times, ...Read more\n14-day returns\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/25870/hugo-scheiber"
+      ],
+      "query": "Hugó Scheiber Artprice ID",
+      "calendar_name": "Hugó Scheiber",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Imi Knoebel",
+      "url": "https://www.artprice.com/artist/55124/imi-knoebel/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/55124/imi-knoebel",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/55124/imi-knoebel",
+      "result_title": "Imi KNOEBEL (1940) Worth, Auction prices, value, estimate\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Imi KNOEBEL (1940) Worth, Auction prices, value, estimate\n\nArtprice.com\nhttps://www.artprice.com › Artists\n10 works by Imi KNOEBEL will soon be offered at auction. 16 works by the artist are for sale on the Artprice Marketplace, offered by 6 Artprice Stores. + See ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/55124/imi-knoebel",
+        "https://it.artprice.com/artista/55124/imi-knoebel/biografia"
+      ],
+      "query": "Imi Knoebel Artprice ID",
+      "calendar_name": "Imi Knoebel",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Jacob Lawrence",
       "url": "https://www.artprice.com/artist/16734/jacob-lawrence/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/16734/jacob-lawrence",
       "source": "user-supplied-public-url",
       "resolved_at": "2026-10-22T14:01:54+00:00"
+    },
+    {
+      "name": "Jannis Kounellis",
+      "url": "https://www.artprice.com/artist/15781/jannis-kounellis/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/15781/jannis-kounellis",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/15781/jannis-kounellis",
+      "result_title": "Jannis KOUNELLIS - Artprice\n\nartprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Jannis KOUNELLIS - Artprice\n\nartprice.com\nhttps://www.artprice.com › Artists\n14 works by the artist are for sale on the Artprice Marketplace, offered by 9 Artprice Stores. Find prices (1,674) Get an estimate within 72 hours.\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/15781/jannis-kounellis",
+        "https://www.artprice.com/artist/15781/jannis-kounellis/biography"
+      ],
+      "query": "Jannis Kounellis Artprice ID",
+      "calendar_name": "Jannis Kounellis",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Jasper Johns",
@@ -309,6 +875,39 @@
       ]
     },
     {
+      "name": "Jonathan Monk",
+      "url": "https://www.artprice.com/artist/31230/jonathan-monk/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/31230/jonathan-monk",
+      "source": "public-search-index-url",
+      "resolved_at": "2026-11-11T06:04:37+00:00",
+      "observed_url": "https://fr.artprice.com/check_browser?from=%252Fartiste%252F31230%252Fjonathan-monk",
+      "result_title": "Jonathan MONK (1969) Prix aux enchères. Estimer, Acheter, Vendre, Cote - Artprice",
+      "evidence_text": "Indexed profile names Jonathan Monk, born 1969, and lists print/multiple and photographic auction works.",
+      "evidence_urls": [
+        "https://fr.artprice.com/check_browser?from=%252Fartiste%252F31230%252Fjonathan-monk"
+      ],
+      "query": "site:artprice.com \"Jonathan MONK\"",
+      "notes": "Exact indexed wrapper preserved; decoded twice offline. Locale /artiste path normalized to English /artist without requesting either URL.",
+      "calendar_name": "Jonathan Monk",
+      "verification": "Indexed URL and identity evidence; no direct Artprice page request. English path and print-history query formatted offline."
+    },
+    {
+      "name": "Jorinde Voigt",
+      "url": "https://www.artprice.com/artist/395482/jorinde-voigt/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/395482/jorinde-voigt",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/395482/jorinde-voigt",
+      "result_title": "Jorinde VOIGT (1977) Auction prices, Worth, Estimate, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Jorinde VOIGT (1977) Auction prices, Worth, Estimate, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nJorinde VOIGT is an artist born in Germany in 1977. The artist's works have gone up for sale at public auction 209 times, mostly in the Drawing-Watercolor ...Read more\n14-day returns\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/395482/jorinde-voigt"
+      ],
+      "query": "Jorinde Voigt Artprice ID",
+      "calendar_name": "Jorinde Voigt",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Julie Mehretu",
       "url": "https://www.artprice.com/artist/242404/julie-mehretu/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/242404/julie-mehretu",
@@ -322,6 +921,59 @@
       ]
     },
     {
+      "name": "Julius Heinrich Bissier",
+      "url": "https://www.artprice.com/artist/2698/julius-heinrich-bissier/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/2698/julius-heinrich-bissier",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/2698/julius-heinrich-bissier",
+      "result_title": "Julius Heinrich BISSIER (1893-1965) Auction prices, Worth ...",
+      "evidence_text": "Julius Heinrich BISSIER (1893-1965) Auction prices, Worth ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/2698/julius-heinrich-bissier"
+      ],
+      "query": "Julius Bissier Artprice ID",
+      "alias_evidence": {
+        "artist": "Julius Bissier",
+        "status": "confirmed",
+        "identity": "Julius Heinrich Bissier (1893–1965)",
+        "calendar_lot": {
+          "id": 10307,
+          "auction_house": "Ketterer Kunst",
+          "lot_number": "83",
+          "title": "Ohne Titel",
+          "day": "2026-11-15",
+          "lot_url": "https://onlinesale.kettererkunst.com/item.php?id=125001444"
+        },
+        "evidence": [
+          {
+            "url": "https://www.guggenheim-venice.it/en/art/artists/julius-bissier/",
+            "title": "Julius Bissier | Peggy Guggenheim Collection",
+            "access": "opened",
+            "location": "lines 34–41",
+            "summary": "Museum identifies Julius Bissier as born December 3, 1893 in Freiburg and died June 18, 1965 in Ascona."
+          },
+          {
+            "url": "https://www.deutsche-biographie.de/pnd118511378.html",
+            "title": "Bissier, Julius Heinrich — Deutsche Biographie",
+            "access": "opened",
+            "location": "lines 22–33",
+            "summary": "Authority record names Julius Heinrich Bissier, lifespan 1893–1965, birthplace Freiburg im Breisgau, death place Ascona, GND 118511378. Matching places and years corroborate the expanded name."
+          },
+          {
+            "url": "https://www.ernst-von-siemens-kunststiftung.de/files/evs/inhalte/stiftung/Jahresberichte/JB%2021-22_HP.pdf",
+            "title": "Ernst von Siemens Kunststiftung Jahresbericht 2021–2022",
+            "access": "search excerpt; document opened but targeted find timed out",
+            "summary": "Foundation's report on acquisitions for Museum für Neue Kunst, Städtische Museen Freiburg, uses both Julius Heinrich Bissier and Julius Bissier (1893–1965) for the same acquisition."
+          }
+        ],
+        "query": "Julius Heinrich Bissier 1893 1965 museum",
+        "notes": "Confirms expanded-name identity. No Artprice page was visited."
+      },
+      "calendar_name": "Julius Bissier",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Kara Walker",
       "url": "https://www.artprice.com/artist/145335/kara-walker/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/145335/kara-walker",
@@ -331,6 +983,39 @@
         "https://www.artprice.com/artprice-news/15398/hammer-museum-five-centuries-of-works-on-paper-for-the-70th-anniversary-of-the-grunwald-center",
         "https://www.artprice.com/artprice-news/2375/focus-sur-kara-walker"
       ]
+    },
+    {
+      "name": "Karl Otto Götz",
+      "url": "https://www.artprice.com/artist/11723/karl-otto-gotz/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/11723/karl-otto-gotz",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/11723/karl-otto-gotz",
+      "result_title": "Karl Otto GÖTZ (1914-2017) Value, Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Karl Otto GÖTZ (1914-2017) Value, Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nKarl Otto GÖTZ is an artist born in Germany in 1914 and deceased in 2017. Find prices 2,213 auction results for Karl Otto GÖTZ and their other attributions. ...\n14-day returns\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/11723/karl-otto-gotz"
+      ],
+      "query": "Karl Otto Götz Artprice ID",
+      "calendar_name": "Karl Otto Götz",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Karl Schmidt-Rottluff",
+      "url": "https://www.artprice.com/artist/26004/karl-schmidt-rottluff/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/26004/karl-schmidt-rottluff",
+      "source": "public-search-index-url",
+      "resolved_at": "2026-11-11T06:04:37+00:00",
+      "observed_url": "https://fr.artprice.com/check_browser?from=%252Fartiste%252F26004%252Fkarl-schmidt-rottluff",
+      "result_title": "Karl SCHMIDT-ROTTLUFF (1884-1976) Prix aux enchères, cote - Acheter et vendre avec Artprice",
+      "evidence_text": "Indexed French Artprice profile explicitly names Karl SCHMIDT-ROTTLUFF (1884-1976), German artist; snippet describes works mostly in print-multiple. The observed URL from parameter decodes twice to /artiste/26004/karl-schmidt-rottluff.",
+      "evidence_urls": [
+        "https://fr.artprice.com/check_browser?from=%252Fartiste%252F26004%252Fkarl-schmidt-rottluff"
+      ],
+      "query": "\"Karl Schmidt-Rottluff\" \"artprice\"",
+      "notes": "Search returned an Artprice check_browser wrapper. Preserved the observed URL; its encoded path supplies artist ID 26004 and slug karl-schmidt-rottluff. No Artprice page or wrapper opened or fetched.",
+      "calendar_name": "Karl Schmidt-Rottluff",
+      "verification": "Indexed URL and identity evidence; no direct Artprice page request. English path and print-history query formatted offline."
     },
     {
       "name": "Katherine Bernhardt",
@@ -363,6 +1048,22 @@
       "evidence_urls": [
         "https://www.artprice.com/artprice-news/665/witches-exhibition-at-the-pont-aven-museum-major-works-and-the-female-figure-in-art-1860-1920-"
       ]
+    },
+    {
+      "name": "Leiko Ikemura",
+      "url": "https://www.artprice.com/artist/14247/leiko-ikemura/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/14247/leiko-ikemura",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/14247/leiko-ikemura",
+      "result_title": "Leiko IKEMURA (1951) Value, Worth, Auction Prices ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Leiko IKEMURA (1951) Value, Worth, Auction Prices ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nJan 12, 2026 — Leiko IKEMURA is an artist born in Japan in 1951. Find prices 483 auction results for Leiko IKEMURA. Drawing-Watercolor (266)Painting (92)Print ...\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/14247/leiko-ikemura"
+      ],
+      "query": "Leiko Ikemura Artprice ID",
+      "calendar_name": "Leiko Ikemura",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Leonora Carrington",
@@ -426,6 +1127,38 @@
       ]
     },
     {
+      "name": "Markus Lüpertz",
+      "url": "https://www.artprice.com/artist/18112/markus-lupertz/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/18112/markus-lupertz",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/18112/markus-lupertz",
+      "result_title": "Markus LÜPERTZ (1941) Worth, Auction ... - Artprice.com\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Markus LÜPERTZ (1941) Worth, Auction ... - Artprice.com\n\nArtprice.com\nhttps://www.artprice.com › Artists\nMarkus LÜPERTZ is an artist born in the Czechia in 1941. Print-Multiple category. 25 works by the artist are for sale on the Artprice Marketplace, offered by ...\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/18112/markus-lupertz"
+      ],
+      "query": "Markus Lüpertz Artprice ID",
+      "calendar_name": "Markus Lüpertz",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Martin Disler",
+      "url": "https://www.artprice.com/artist/7800/martin-disler/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/7800/martin-disler",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/7800/martin-disler",
+      "result_title": "Martin DISLER (1949-1996) Worth, Auction ...",
+      "evidence_text": "Martin DISLER (1949-1996) Worth, Auction ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/7800/martin-disler"
+      ],
+      "query": "Martin Disler Artprice ID",
+      "calendar_name": "Martin Disler",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Max Beckmann",
       "url": "https://www.artprice.com/artist/1856/max-beckmann/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/1856/max-beckmann",
@@ -437,6 +1170,22 @@
         "https://www.artprice.com/artprice-news/3185/le-top-de-londres",
         "https://www.artprice.com/artprice-news/artist/1856/1"
       ]
+    },
+    {
+      "name": "Max Slevogt",
+      "url": "https://www.artprice.com/artist/26829/max-slevogt/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/26829/max-slevogt",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/26829/max-slevogt",
+      "result_title": "Max SLEVOGT (1868-1932) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Max SLEVOGT (1868-1932) Estimate, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nApr 21, 2026 — Max SLEVOGT is an artist born in Germany in 1868 and deceased in 1932. The artist's works have gone up for sale at public auction 2,196 ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/26829/max-slevogt"
+      ],
+      "query": "Max Slevogt Artprice ID",
+      "calendar_name": "Max Slevogt",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Mel Ramos",
@@ -480,6 +1229,73 @@
       ]
     },
     {
+      "name": "Olle Baertling",
+      "url": "https://www.artprice.com/artist/1176/olle-baertling/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/1176/olle-baertling",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/1176/olle-baertling",
+      "result_title": "Olle BAERTLING (1911-1981) Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Olle BAERTLING (1911-1981) Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/1176/olle-baertling"
+      ],
+      "query": "Olle Bærtling Artprice ID",
+      "alias_evidence": {
+        "identity": "Olle Bærtling / Olle Baertling (1911-1981)",
+        "summary": "Google profile title uses Olle BAERTLING. All five saved Calendar lots labelled Olle Bærtling have original Bukowskis URLs containing olle-baertling; two artwork titles also explicitly use Baertling.",
+        "evidence_urls": [
+          "https://www.bukowskis.com/en/auctions/676/938-olle-baertling-rebamaki",
+          "https://www.bukowskis.com/en/auctions/676/939-olle-baertling-the-angles-of-baertling-open-form-infinite-space-from-cinetisme-to-open-form-1949-1968",
+          "https://www.bukowskis.com/en/auctions/676/940-olle-baertling-dene",
+          "https://www.bukowskis.com/en/auctions/676/941-olle-baertling-deny-from-les-triangles-de-baertling",
+          "https://www.bukowskis.com/en/auctions/676/942-olle-baertling-karamy"
+        ]
+      },
+      "calendar_name": "Olle Bærtling",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Otto Piene",
+      "url": "https://www.artprice.com/artist/22845/otto-piene/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/22845/otto-piene",
+      "source": "saved-artprice-pdf-hyperlink",
+      "resolved_at": "2026-11-11T06:05:24+00:00",
+      "observed_url": "https://www.artprice.com/artist/22845/otto-piene/print-multiple/41835525/blue-eye-blue?keyword=Blue+Eye+blue&p=1",
+      "result_title": "Saved Artprice search results: Blue Eye blue AP",
+      "evidence_text": "Page 1 contains the artist name Otto PIENE 3 times and a matching artist-ID/slug lot hyperlink. All extracted matching lot hyperlinks use the same artist ID and slug.",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/22845/otto-piene/print-multiple/41835525/blue-eye-blue?keyword=Blue+Eye+blue&p=1",
+        "https://www.artprice.com/artist/22845/otto-piene/print-multiple/37460031/blue-eye-blue?keyword=Blue+Eye+blue&p=1",
+        "https://www.artprice.com/artist/22845/otto-piene/print-multiple/28676970/blue-eye-blue?keyword=Blue+Eye+blue&p=1",
+        "https://www.artprice.com/artist/22845/otto-piene/print-multiple/22962261/blue-eye-blue?keyword=Blue+Eye+blue&p=1",
+        "https://www.artprice.com/artist/22845/otto-piene/print-multiple/9646199/blue-eye-silver?keyword=Blue+Eye+blue&p=1",
+        "https://www.artprice.com/artist/22845/otto-piene/print-multiple/9646200/blue-eye-blue?keyword=Blue+Eye+blue&p=1",
+        "https://www.artprice.com/artist/22845/otto-piene/print-multiple/8773903/blue-eye-blue?keyword=Blue+Eye+blue&p=1"
+      ],
+      "notes": "Read-only extraction from an existing local PDF. observed_url is an actual PDF link annotation. profile_url_derived truncates that observed URL to the artist prefix; it was not fetched or guessed. No Artprice network request.",
+      "source_basename": "Blue Eye blue AP.pdf",
+      "evidence_page": 1,
+      "calendar_name": "Otto Piene",
+      "verification": "Saved PDF hyperlink and artist-name evidence; artist prefix extracted offline. No Artprice request."
+    },
+    {
+      "name": "Panamarenko",
+      "url": "https://www.artprice.com/artist/21994/panamarenko/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/21994/panamarenko",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/21994/panamarenko",
+      "result_title": "PANAMARENKO (1940-2019) Auction prices, Worth ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "PANAMARENKO (1940-2019) Auction prices, Worth ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nRanked 1305th in the top 5000 world rankings of best-selling artists at auction (Turnover 2026). This year, the artist's best sales came mainly from Belgium.Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/21994/panamarenko"
+      ],
+      "query": "Panamarenko Artprice ID",
+      "calendar_name": "Panamarenko",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Paul Gauguin",
       "url": "https://www.artprice.com/artist/10904/paul-gauguin/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/10904/paul-gauguin",
@@ -493,11 +1309,60 @@
       ]
     },
     {
+      "name": "Per Kirkeby",
+      "url": "https://www.artprice.com/artist/15403/per-kirkeby/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/15403/per-kirkeby",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/15403/per-kirkeby",
+      "result_title": "Per KIRKEBY (1938-2018) Value, Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Per KIRKEBY (1938-2018) Value, Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nNov 17, 2017 — Per KIRKEBY is an artist born in Denmark in 1938 and deceased in 2018. sales totalling $491 million,\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/15403/per-kirkeby",
+        "https://www.artprice.com/artist/15403/per-kirkeby/biography"
+      ],
+      "query": "Per Kirkeby Artprice ID",
+      "calendar_name": "Per Kirkeby",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Peter Max",
       "url": "https://www.artprice.com/artist/69415/peter-max/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/69415/peter-max",
       "source": "user-supplied-public-url",
       "resolved_at": "2026-10-22T08:53:16+00:00"
+    },
+    {
+      "name": "Peter Nagel",
+      "url": "https://www.artprice.com/artist/42237/peter-nagel/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/42237/peter-nagel",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/42237/peter-nagel",
+      "result_title": "Peter NAGEL (1941) Estimate, Auction prices, Value, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Peter NAGEL (1941) Estimate, Auction prices, Value, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nDiscover the value of Peter NAGEL. Peter NAGEL is an artist born in Denmark in 1941. Print-Multiple category. Find prices 272 auction results for Peter NAGEL. ...\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/42237/peter-nagel"
+      ],
+      "query": "Peter Nagel Artprice ID",
+      "calendar_name": "Peter Nagel",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Peter Zimmermann",
+      "url": "https://www.artprice.com/artist/173854/peter-zimmermann/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/173854/peter-zimmermann",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/173854/peter-zimmermann",
+      "result_title": "Peter ZIMMERMANN (1956) Auction prices, Worth, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Peter ZIMMERMANN (1956) Auction prices, Worth, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\n2 works by Peter ZIMMERMANN will soon be offered at auction. 1 work by the artist is for sale on the Artprice Marketplace, offered by one Artprice Store. + See ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/173854/peter-zimmermann"
+      ],
+      "query": "Peter Zimmermann Artprice ID",
+      "calendar_name": "Peter Zimmermann",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Philip Guston",
@@ -510,6 +1375,22 @@
       ]
     },
     {
+      "name": "Pier Paolo Calzolari",
+      "url": "https://www.artprice.com/artist/4568/pier-paolo-calzolari/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/4568/pier-paolo-calzolari",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/4568/pier-paolo-calzolari",
+      "result_title": "Pier Paolo CALZOLARI (1943) Worth, Auction prices, value ...",
+      "evidence_text": "Pier Paolo CALZOLARI (1943) Worth, Auction prices, value ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/4568/pier-paolo-calzolari"
+      ],
+      "query": "Pier Paolo Calzolari Artprice ID",
+      "calendar_name": "Pier Paolo Calzolari",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Pierre Soulages",
       "url": "https://www.artprice.com/artist/27103/pierre-soulages/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/27103/pierre-soulages",
@@ -518,6 +1399,39 @@
       "evidence_urls": [
         "https://de.artprice.com/check_browser?from=%252Fartist%252F27103%252Fpierre-soulages"
       ]
+    },
+    {
+      "name": "Raoul Dufy",
+      "url": "https://www.artprice.com/artist/8248/raoul-dufy/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/8248/raoul-dufy",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/8248/raoul-dufy",
+      "result_title": "Raoul DUFY - Artprice.com",
+      "evidence_text": "Raoul DUFY - Artprice.com",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/8248/raoul-dufy"
+      ],
+      "query": "Raoul Dufy Artprice ID",
+      "calendar_name": "Raoul Dufy",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Rebecca Horn",
+      "url": "https://www.artprice.com/artist/67051/rebecca-horn/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/67051/rebecca-horn",
+      "source": "public-search-index-url",
+      "resolved_at": "2026-11-11T06:04:37+00:00",
+      "observed_url": "https://www.artprice.com/artist/67051/rebecca-horn?cl=en",
+      "result_title": "Rebecca HORN (1944-2024) Value, Worth, Auction Prices, Estimate, Buy, Sell – Artprice",
+      "evidence_text": "Indexed Artprice artist profile explicitly names Rebecca HORN, born 1944 and deceased 2024, German artist; snippet describes auction records mostly in Photography. Exact full-name and dates match.",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/67051/rebecca-horn?cl=en"
+      ],
+      "query": "\"Rebecca Horn\" \"artprice\"",
+      "notes": "Direct indexed English artist profile. Also independently returned to another agent in search results. No Artprice page opened or fetched.",
+      "calendar_name": "Rebecca Horn",
+      "verification": "Indexed URL and identity evidence; no direct Artprice page request. English path and print-history query formatted offline."
     },
     {
       "name": "Rembrandt van Rijn",
@@ -566,6 +1480,38 @@
       ]
     },
     {
+      "name": "Rudolf Schlichter",
+      "url": "https://www.artprice.com/artist/25960/rudolf-schlichter/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/25960/rudolf-schlichter",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/25960/rudolf-schlichter",
+      "result_title": "Rudolf SCHLICHTER (1890-1955) Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Rudolf SCHLICHTER (1890-1955) Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nRudolf SCHLICHTER is an artist born in 1890 and deceased in 1955. The artist's works have gone up for sale at public auction 1,135 times, mostly in the ...Read more\n14-day returns\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/25960/rudolf-schlichter"
+      ],
+      "query": "Rudolf Schlichter Artprice ID",
+      "calendar_name": "Rudolf Schlichter",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Rémy Zaugg",
+      "url": "https://www.artprice.com/artist/26303/remy-zaugg/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/26303/remy-zaugg",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/26303/remy-zaugg/biography",
+      "result_title": "The biography of Rémy ZAUGG\n\nArtprice.com\nhttps://www.artprice.com › artist",
+      "evidence_text": "The biography of Rémy ZAUGG\n\nArtprice.com\nhttps://www.artprice.com › artist\n·\nTranslate this page\nArtprice is the world leader of art market information with a coverage of ... biography of Rémy ZAUGG (1943-2005). Share ... Artprice.com, partner of the Lyon ...\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/26303/remy-zaugg/biography"
+      ],
+      "query": "Rémy Zaugg Artprice ID",
+      "calendar_name": "Rémy Zaugg",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Salvador Dalí",
       "url": "https://www.artprice.com/artist/6866/salvador-dali/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/6866/salvador-dali",
@@ -575,6 +1521,38 @@
         "https://www.artprice.com/artprice-news/13157/modern-art-and-politics-in-germany-1910-1945-au-minneapolis-institute-of-art-chefs-d-uvre-de-la-neue-nationalgalerie-de-berlin",
         "https://www.artprice.com/artprice-news/8564/top-of-surrealism-in-2018"
       ]
+    },
+    {
+      "name": "Serge Poliakoff",
+      "url": "https://www.artprice.com/artist/23163/serge-poliakoff/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/23163/serge-poliakoff",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/23163/serge-poliakoff",
+      "result_title": "Serge POLIAKOFF (1900-1969) Value, Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Serge POLIAKOFF (1900-1969) Value, Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nSerge POLIAKOFF is an artist born in Russia in 1900 and deceased in 1969. 54 works by the artist are for sale on the Artprice Marketplace, Find prices 6,606 ...\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/23163/serge-poliakoff"
+      ],
+      "query": "Serge Poliakoff Artprice ID",
+      "calendar_name": "Serge Poliakoff",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Seth Price",
+      "url": "https://www.artprice.com/artist/244277/seth-price/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/244277/seth-price",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/244277/seth-price/index",
+      "result_title": "Seth PRICE - Intuitive ArtMarket - Intuitive Art Market\n\nArtprice.com\nhttps://www.artprice.com › artist › seth-price",
+      "evidence_text": "Seth PRICE - Intuitive ArtMarket - Intuitive Art Market\n\nArtprice.com\nhttps://www.artprice.com › artist › seth-price\nSeth PRICE: the artist's price levels and indices in the art market, evolution of Seth PRICE's market on artprice.com.\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/244277/seth-price/index"
+      ],
+      "query": "Seth Price Artprice ID",
+      "calendar_name": "Seth Price",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Shepard Fairey",
@@ -609,6 +1587,38 @@
       ]
     },
     {
+      "name": "Thomas Schütte",
+      "url": "https://www.artprice.com/artist/35350/thomas-schutte/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/35350/thomas-schutte",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/35350/thomas-schutte",
+      "result_title": "Thomas SCHÜTTE (1954) Auction prices, Worth, Estimate, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Thomas SCHÜTTE (1954) Auction prices, Worth, Estimate, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nThomas SCHÜTTE is an artist born in Germany in 1954. The artist's works have gone up for sale at public auction 862 times, mostly in the Print-Multiple ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/35350/thomas-schutte"
+      ],
+      "query": "Thomas Schütte Artprice ID",
+      "calendar_name": "Thomas Schütte",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
+      "name": "Till Freiwald",
+      "url": "https://www.artprice.com/artist/239176/till-freiwald/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/239176/till-freiwald",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/239176/till-freiwald",
+      "result_title": "Till FREIWALD (1963) Worth, Auction prices, value, estimate\n\nArtprice.com\nhttps://www.artprice.com › artist › till-freiwald",
+      "evidence_text": "Till FREIWALD (1963) Worth, Auction prices, value, estimate\n\nArtprice.com\nhttps://www.artprice.com › artist › till-freiwald\nSee the auction prices of Till FREIWALD artworks. Find prices 73 auction results for Till FREIWALD. Drawing-Watercolor (69)Painting (3)Print-Multiple (1) 2026 ...\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/239176/till-freiwald"
+      ],
+      "query": "Till Freiwald Artprice ID",
+      "calendar_name": "Till Freiwald",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Titus Kaphar",
       "url": "https://www.artprice.com/artist/444858/titus-kaphar/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/444858/titus-kaphar",
@@ -619,11 +1629,43 @@
       ]
     },
     {
+      "name": "Walter Dexel",
+      "url": "https://www.artprice.com/artist/7640/walter-dexel/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/7640/walter-dexel",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/7640/walter-dexel",
+      "result_title": "Walter DEXEL (1890-1973) Worth, Auction prices ...",
+      "evidence_text": "Walter DEXEL (1890-1973) Worth, Auction prices ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/7640/walter-dexel"
+      ],
+      "query": "Walter Dexel Artprice ID",
+      "calendar_name": "Walter Dexel",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Wassily Kandinsky",
       "url": "https://www.artprice.com/artist/15079/wassily-kandinsky/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
       "source_url": "https://www.artprice.com/artist/15079/wassily-kandinsky",
       "source": "user-supplied-public-url",
       "resolved_at": "2026-10-23T07:00:12+00:00"
+    },
+    {
+      "name": "Willi Baumeister",
+      "url": "https://www.artprice.com/artist/1716/willi-baumeister/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/1716/willi-baumeister",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/1716/willi-baumeister",
+      "result_title": "Willi BAUMEISTER (1889-1955) Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Willi BAUMEISTER (1889-1955) Worth, Auction ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/1716/willi-baumeister"
+      ],
+      "query": "Willi Baumeister Artprice ID",
+      "calendar_name": "Willi Baumeister",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "William Blake",
@@ -636,6 +1678,52 @@
       ]
     },
     {
+      "name": "William Nelson Copley",
+      "url": "https://www.artprice.com/artist/6252/william-nelson-copley/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/6252/william-nelson-copley",
+      "source": "google-search-result-url-recovered",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/6252/william-nelson-copley",
+      "result_title": "William Nelson COPLEY (1919-1996) Worth, Auction ...",
+      "evidence_text": "William Nelson COPLEY (1919-1996) Worth, Auction ...",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/6252/william-nelson-copley"
+      ],
+      "query": "William N. Copley Artprice ID",
+      "alias_evidence": {
+        "artist": "William N. Copley",
+        "status": "confirmed",
+        "identity": "William Nelson Copley (1919–1996)",
+        "calendar_lot": {
+          "id": 10298,
+          "auction_house": "Ketterer Kunst",
+          "lot_number": "66",
+          "title": "Saga",
+          "day": "2026-11-15",
+          "lot_url": "https://onlinesale.kettererkunst.com/item.php?id=126000931"
+        },
+        "evidence": [
+          {
+            "url": "https://williamncopley.com/about/biography-page/",
+            "title": "William N. Copley — About the Artist",
+            "access": "opened",
+            "location": "lines 0–8",
+            "summary": "Artist-estate website headed William N. Copley begins its biography with the full name William Nelson Copley, born 1919 in New York and died 1996 in Sugarloaf Key."
+          },
+          {
+            "url": "https://www.aaa.si.edu/collections/interviews/oral-history-interview-william-nelson-copley-12646",
+            "title": "Oral history interview with William Nelson Copley, 1968 January 30 — Smithsonian Archives of American Art",
+            "access": "search result",
+            "summary": "Smithsonian interview record identifies the painter William Nelson Copley (1919–1996)."
+          }
+        ],
+        "query": "William Nelson Copley 1919 1996 estate",
+        "notes": "Estate explicitly establishes N. as Nelson. No Artprice page was visited."
+      },
+      "calendar_name": "William N. Copley",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
+    },
+    {
       "name": "Wolf Kahn",
       "url": "https://www.artprice.com/artist/15037/wolf-kahn/lots/pasts?idcategory[]=2",
       "source_url": "https://www.artprice.com/artist/15037/wolf-kahn",
@@ -645,6 +1733,22 @@
         "https://www.artprice.com/artist/15037/wolf-kahn/lots/pasts?idcategory[]=2"
       ],
       "source_file": "docs/artist-links-bulks.html"
+    },
+    {
+      "name": "Wolfgang Tillmans",
+      "url": "https://www.artprice.com/artist/135198/wolfgang-tillmans/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+      "source_url": "https://www.artprice.com/artist/135198/wolfgang-tillmans",
+      "source": "google-search-result-url",
+      "resolved_at": "2026-11-11T22:07:55+00:00",
+      "observed_url": "https://www.artprice.com/artist/135198/wolfgang-tillmans",
+      "result_title": "Wolfgang TILLMANS (1968) Auction prices, Worth, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists",
+      "evidence_text": "Wolfgang TILLMANS (1968) Auction prices, Worth, ...\n\nArtprice.com\nhttps://www.artprice.com › Artists\nWolfgang TILLMANS is an artist born in Germany in 1968. The artist's works have gone up for sale at public auction 1,676 times, mostly in the Photography ...Read more\nMissing: ID ‎| Show results with: ID",
+      "evidence_urls": [
+        "https://www.artprice.com/artist/135198/wolfgang-tillmans"
+      ],
+      "query": "Wolfgang Tillmans Artprice ID",
+      "calendar_name": "Wolfgang Tillmans",
+      "verification": "Observed profile URL and identity checked offline; no direct Artprice request."
     },
     {
       "name": "Yoshitomo Nara",
