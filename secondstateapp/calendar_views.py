@@ -47,7 +47,7 @@ from .auction_email import (
     validate_sending_configuration,
 )
 from .bid_board_snapshot import saved_board_summary
-from .calendar_arrival import published_lot_arrival, sale_arrival_estimate
+from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
 from .calendar_sales import verified_sale
 from .calendar_images import (
     is_saved_calendar_image_url,
@@ -255,8 +255,10 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
             pass
     arrival_schedule = published_lot_arrival(lot)
     arrival_estimate = sale_arrival_estimate(lot)
+    numbering_baseline = sale_numbering_baseline(lot)
     return {
         "id": lot.pk,
+        **({"numbering_baseline": numbering_baseline} if numbering_baseline is not None else {}),
         **({"arrival_schedule": arrival_schedule} if arrival_schedule else {}),
         **({"arrival_estimate": arrival_estimate} if arrival_estimate else {}),
         "artist": artist_display_name(source_artist),

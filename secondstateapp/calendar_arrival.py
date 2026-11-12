@@ -36,6 +36,23 @@ TIMETABLE_URL = "https://www.dobiaschofsky.com/g246.html"
 HERITAGE_8256_URL = "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"
 ZWAAN_117_TIMETABLE_URL = "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf"
 HISTORIA_182_TIMETABLE_URL = "https://historia.de/en/auction/182-auction/"
+# DuMouchelles, November 13, 2026, catalog ZEHO4544S4. Jeremy supplied
+# the numbering baseline 1000. These identities were matched to the catalog
+# on November 12 so retained observations without sale_url get the same ETA.
+_DUMOUCHELLES_NOV13_LOTS = {
+    "207125599": (1051, "dd21d0b713"), "207125590": (1042, "55b70d1140"),
+    "207125738": (1190, "c376e91321"), "207125739": (1191, "4cdeb11dd7"),
+    "207125592": (1044, "01cfcf1f4a"), "207125593": (1045, "37db8dfce3"),
+    "207125589": (1041, "88c2b89f98"), "207125712": (1164, "e06a527bfb"),
+    "207125713": (1165, "41052e2867"), "207125815": (1267, "08da27935d"),
+    "207125816": (1268, "b711321328"), "207125817": (1269, "f828a583f9"),
+    "207125791": (1243, "33438092ce"), "207125618": (1070, "f93e4ed993"),
+    "207125615": (1067, "95608cc21e"), "207125606": (1058, "cc53ce0c7b"),
+    "207125612": (1064, "1752b18b7e"), "207125722": (1174, "78c35547df"),
+    "207125607": (1059, "1511f6ea40"), "207125608": (1060, "411cdcbad8"),
+    "207125724": (1176, "62181a9f17"), "207125723": (1175, "cdd51cf5c2"),
+    "207125720": (1172, "bf4331f62a"), "207125721": (1173, "bb72abe492"),
+}
 # Auction 182's November 11 timetable restarts at 8000 in the afternoon.
 # The house publishes a typical (not guaranteed) pace of 80 lots/hour.
 _HISTORIA_182_SESSIONS = ((7350, 7686, 10), (8000, 8377, 15))
@@ -220,6 +237,38 @@ def _historia_session_estimate(lot):
                 "source_url": HISTORIA_182_TIMETABLE_URL,
             }
     return None
+
+
+def sale_numbering_baseline(lot):
+    """Apply an explicit sale baseline without changing saved source fields."""
+    event = lot.event_at
+    if lot.source != "Invaluable" or lot.is_all_day or not event or event.utcoffset() is None:
+        return None
+    if event.astimezone(ZoneInfo("America/New_York")).date() != date(2026, 11, 13):
+        return None
+    house = " ".join(unicodedata.normalize("NFKC", lot.auction_house).casefold().split())
+    if house != "dumouchelles":
+        return None
+    match = re.fullmatch(r"([0-9]+)[A-Za-z]*", str(lot.lot_number).strip())
+    if not match or int(match[1]) < 1000:
+        return None
+    number = int(match[1])
+    try:
+        if lot.sale_url:
+            sale = urlsplit(lot.sale_url)
+            matches = (sale.scheme == "https" and not sale.username and not sale.password
+                       and sale.port is None and sale.hostname in {"invaluable.com", "www.invaluable.com"}
+                       and sale.path.rstrip("/") == "/catalog/ZEHO4544S4")
+        else:
+            expected_number, ref = _DUMOUCHELLES_NOV13_LOTS.get(str(lot.source_lot_id), (None, None))
+            link = urlsplit(lot.lot_url)
+            matches = (number == expected_number and link.scheme == "https"
+                       and not link.username and not link.password and link.port is None
+                       and link.hostname in {"invaluable.com", "www.invaluable.com"}
+                       and re.fullmatch(rf"/auction-lot/[^/]+-{number}-c-{ref}/?", link.path))
+    except ValueError:
+        return None
+    return 1000 if matches else None
 
 
 def sale_arrival_estimate(lot):

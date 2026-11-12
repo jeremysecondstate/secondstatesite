@@ -6,7 +6,7 @@ from django.test import SimpleTestCase, TestCase
 
 from .calendar_arrival import (
     HERITAGE_8256_URL, HISTORIA_182_TIMETABLE_URL, TIMETABLE_URL, ZWAAN_117_TIMETABLE_URL,
-    published_lot_arrival, sale_arrival_estimate,
+    published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline,
 )
 from .calendar_views import _lot_json
 from .tests_calendar import CALENDAR_ZONE, watch_lot
@@ -46,6 +46,78 @@ def historia_lot(**changes):
         lot_number="8016", sale_url="",
         lot_url="https://www.invaluable.com/auction-lot/james-rizzi-19502011-self-po-8016-c-a8376b68f2",
     ) | changes))
+
+
+def dumouchelles_lot(**changes):
+    return source_lot(**(dict(
+        source="Invaluable", source_lot_id="207125720", auction_house="DuMouchelles",
+        event_at=datetime(2026, 11, 13, 16, tzinfo=timezone.utc),
+        lot_number="1172", sale_url="https://www.invaluable.com/catalog/ZEHO4544S4",
+        lot_url="https://www.invaluable.com/auction-lot/walasse-ting-1172-c-bf4331f62a",
+    ) | changes))
+
+
+class DuMouchellesNumberingBaselineTests(SimpleTestCase):
+    def test_this_sale_uses_the_user_supplied_1000_baseline_without_changing_source_time(self):
+        for number in ("1000", "1172", "1173", " 01172A "):
+            with self.subTest(number=number):
+                lot = dumouchelles_lot(lot_number=number)
+                before = vars(lot).copy()
+                self.assertEqual(sale_numbering_baseline(lot), 1000)
+                self.assertIsNone(sale_arrival_estimate(lot))
+                self.assertIsNone(published_lot_arrival(lot))
+                self.assertEqual(vars(lot), before)
+
+    def test_catalogue_identity_accepts_the_saved_filter_url_and_house_case(self):
+        for url in (
+            "https://www.invaluable.com/catalog/ZEHO4544S4",
+            "https://invaluable.com/catalog/ZEHO4544S4/",
+            "https://www.invaluable.com/catalog/ZEHO4544S4?Fine%20Art=Prints&size=192",
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(sale_numbering_baseline(dumouchelles_lot(
+                    sale_url=url, auction_house="  DUMOUCHELLES  ",
+                    event_at=datetime(2026, 11, 13, 11, tzinfo=ZoneInfo("America/New_York")),
+                )), 1000)
+
+    def test_unrelated_sales_and_unknown_times_keep_their_existing_behavior(self):
+        for changes in (
+            {"source": "Drouot"}, {"source": "Other"},
+            {"auction_house": "DuMouchelles affiliate"}, {"auction_house": "Other House"},
+            {"event_at": datetime(2026, 11, 12, 16, tzinfo=timezone.utc)},
+            {"event_at": datetime(2026, 11, 14, 16, tzinfo=timezone.utc)},
+            {"event_at": datetime(2027, 11, 13, 16, tzinfo=timezone.utc)},
+            {"event_at": datetime(2026, 11, 13, 16)},
+            {"event_at": None}, {"is_all_day": True},
+            {"sale_url": "https://www.invaluable.com/catalog/OTHER"},
+            {"sale_url": "https://www.invaluable.com/catalog/ZEHO4544S40"},
+            {"sale_url": "https://www.invaluable.com/catalog/ZEHO4544S4/extra"},
+            {"sale_url": "http://www.invaluable.com/catalog/ZEHO4544S4"},
+            {"sale_url": "https://www.invaluable.com.evil.test/catalog/ZEHO4544S4"},
+            {"sale_url": "https://user@www.invaluable.com/catalog/ZEHO4544S4"},
+            {"sale_url": "https://www.invaluable.com:443/catalog/ZEHO4544S4"},
+            {"sale_url": "https://[invalid"},
+            {"lot_number": "999"}, {"lot_number": ""}, {"lot_number": "TBA"},
+            {"lot_number": "1172/1"}, {"lot_number": "1172-1173"}, {"lot_number": "1172.5"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(sale_numbering_baseline(dumouchelles_lot(**changes)))
+
+    def test_missing_sale_url_requires_the_verified_provider_id_number_and_link_together(self):
+        lot = dumouchelles_lot(sale_url="")
+        self.assertEqual(sale_numbering_baseline(lot), 1000)
+        for changes in (
+            {"source_lot_id": "unknown"}, {"lot_number": "1173"}, {"lot_url": ""},
+            {"lot_url": "https://www.invaluable.com/auction-lot/walasse-ting-1172-c-wrong"},
+            {"lot_url": "https://www.invaluable.com/auction-lot/walasse-ting-1173-c-bf4331f62a"},
+            {"lot_url": "http://www.invaluable.com/auction-lot/walasse-ting-1172-c-bf4331f62a"},
+            {"lot_url": "https://www.invaluable.com.evil.test/auction-lot/walasse-ting-1172-c-bf4331f62a"},
+            {"lot_url": "https://user@www.invaluable.com/auction-lot/walasse-ting-1172-c-bf4331f62a"},
+            {"lot_url": "https://www.invaluable.com:443/auction-lot/walasse-ting-1172-c-bf4331f62a"},
+            {"lot_url": "https://[invalid"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(sale_numbering_baseline(dumouchelles_lot(sale_url="", **changes)))
 
 
 class HistoriaSessionArrivalTests(SimpleTestCase):
@@ -449,6 +521,35 @@ class PublishedCalendarArrivalTests(SimpleTestCase):
 
 
 class CalendarArrivalPayloadTests(TestCase):
+    def test_dumouchelles_baseline_reaches_shared_payload_without_changing_saved_records(self):
+        for number, source_id, ref in (("1172", "207125720", "bf4331f62a"),
+                                       ("1173", "207125721", "bb72abe492")):
+            with self.subTest(number=number):
+                lot = watch_lot(**vars(dumouchelles_lot(
+                    lot_number=number, source_lot_id=source_id,
+                    lot_url=f"https://www.invaluable.com/auction-lot/walasse-ting-{number}-c-{ref}")),
+                    artist="Walasse Ting", artist_watchlist_name="Walasse Ting", won_by_us=True,
+                    artprice_url="https://www.artprice.com/artist/28448/walasse-ting/lots/pasts")
+                lot.refresh_from_db()
+                before = {field.attname: getattr(lot, field.attname) for field in lot._meta.concrete_fields}
+                payload = _lot_json(lot, CALENDAR_ZONE, selected_lot_ids={lot.pk},
+                                    research_queue_state={lot.pk: {"status": "queued"}})
+                self.assertEqual(payload["numbering_baseline"], 1000)
+                self.assertEqual(payload["event_at"], "2026-11-13T16:00:00+00:00")
+                self.assertEqual(payload["time"], "8:00 AM")
+                self.assertEqual(payload["artist"], "Ting, Walasse")
+                self.assertEqual(payload["lot_number"], number)
+                self.assertTrue(payload["won_by_us"])
+                self.assertTrue(payload["email_tray_selected"])
+                self.assertTrue(payload["research_queue_selected"])
+                for field in ("lot_url", "sale_url", "artprice_url"):
+                    self.assertEqual(payload[field], getattr(lot, field))
+                lot.refresh_from_db()
+                self.assertEqual({field.attname: getattr(lot, field.attname) for field in lot._meta.concrete_fields}, before)
+        unrelated = watch_lot(source_lot_id="other-numbering-sale")
+        unrelated.refresh_from_db()
+        self.assertNotIn("numbering_baseline", _lot_json(unrelated, CALENDAR_ZONE))
+
     def test_historia_presentation_keeps_source_time_attribution_links_and_saved_work(self):
         lot = watch_lot(**vars(historia_lot()), artist="After James Rizzi",
                         artist_watchlist_name="James Rizzi", won_by_us=True,

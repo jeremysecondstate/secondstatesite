@@ -439,6 +439,32 @@ test("per-lot arrival preserves source data and calculates elapsed minutes throu
   assert.equal(JSON.stringify(lot), before);
 });
 
+test("DuMouchelles Ting prints count from lot 1000 in both arrival labels and artist summaries", () => {
+  const base = {artist: "Ting, Walasse", auction_house: "DuMouchelles", event_at: "2026-11-13T16:00:00Z",
+    time: "8:00 AM", numbering_baseline: 1000, email_tray_selected: true, won_by_us: true};
+  const lots = [["1172", "18:52", "10:52 AM", "1:52 PM"], ["1173", "18:53", "10:53 AM", "1:53 PM"]]
+    .map(([lot_number, at, pacific, eastern]) => {
+      const lot = Object.freeze({...base, lot_number});
+      const before = JSON.stringify(lot);
+      assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse(`2026-11-13T${at}:00Z`));
+      assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), pacific);
+      assert.equal(CalendarArtists.formatLotArrival(lot, "America/New_York"), eastern);
+      assert.equal(CalendarArtists.lotArrivalDetails(lot).minutes, Number(lot_number) - 1000);
+      assert.equal(JSON.stringify(lot), before);
+      return lot;
+    });
+  assert.equal(CalendarArtists.estimateLotArrival({...base, lot_number: "1000"}), Date.parse(base.event_at));
+  for (const input of [lots, [...lots].reverse()]) {
+    const [artist] = CalendarArtists.summarize(input);
+    assert.equal(artist.arrivalLotNumber, 1172);
+    assert.equal(artist.arrivalMinutes, 172);
+    assert.equal(artist.timeLabel, "8:00 AM");
+    assert.equal(CalendarArtists.formatArrival(artist, "America/New_York"), "1:52 PM");
+  }
+  assert.equal(CalendarArtists.formatLotArrival({...lots[0], numbering_baseline: undefined}, "America/New_York"),
+    "Nov 14, 6:32 AM", "reproduce the previous number-from-zero estimate");
+});
+
 test("explicit numbering baselines subtract the sale offset without guessing from watched lots", () => {
   const lot = Object.freeze({artist: "Example", event_at: "2026-11-06T08:00:00Z", lot_number: "3325", numbering_baseline: 3000});
   const expected = Date.parse("2026-11-06T13:25:00Z");
