@@ -13,6 +13,14 @@ Calendar's **Add to research** checkbox saves a shared staff selection against t
 
 Checking a box never starts research. Tell LiveArt Worker **“Process my LiveArt queue.”** The first manual start captures only currently Queued selections, in their saved order, with their instructions. Later additions and edits wait for the next start. There is no three-lot cap, automatic catalog scan, polling, or website launch button. The `artprice-worker` automation remains PAUSED.
 
+## Artwork identity and signature lessons
+
+Jeremy's default preference is for works hand-signed by the artist. A signature printed in the plate is a reproduced mark and does not satisfy that preference. Pencil numbering, an estate stamp or a publisher's annotation does not substitute for the artist's hand signature. A work can carry both a plate signature and a separate hand signature; distinguish them before excluding it. Hand signing is not limited to pencil. Preserve the canonical brief's historical Old Master exceptions and any explicit lot-specific user instruction.
+
+When comparing an apparent original with a reproduction, compare the stated dimensions first, then medium and signature type. Normalize orientation by comparing long and short sides, and keep image, sheet, sight and frame measurements distinct where the source identifies them. Matching composition, date or signature shape is expected when a reproduction copies an original; that match alone does not establish that the queued object is the reproduction.
+
+**Zúñiga correction, November 9, 2026:** For Calendar lot 7544 / De Zwaan lot 6816, [the house lists a signed pastel-and-charcoal drawing at 61 × 36 cm](https://catalogus.dezwaan.nl/auction_lot/70721-francisco-zuniga-1912-1998). [The Misrachi offset comparison is listed at 48 × 64 cm](https://subastas.auragalerias.com/subastas/lote/b2427a23-d9ea-4bc1-836d-558cdfabea4c), larger on both corresponding axes, and explicitly described as “Signed and dated in the plate, not in pencil.” Neither listing establishes here whether those measurements are sheet or sight sizes. Jeremy identifies the queued object as the original drawing, with a hand signature rather than a plate signature. Record that user identification separately from physical inspection. The earlier composition-match concern must not be carried forward as an automatic reproduction/unsigned blocker; use original-drawing comparables for subsequent authorized valuation.
+
 ## State and ownership
 
 Migration `0048_research_queue` adds selection, run, immutable run-item and operation-receipt tables. Existing lot IDs are protected references; auction synchronization does not replace selections. A locked singleton serializes queue changes and snapshot creation. A durable request UUID makes an interrupted start idempotent. The local pointer is `private_data/liveart-worker-runs/manual-queue.json`.

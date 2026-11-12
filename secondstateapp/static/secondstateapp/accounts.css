@@ -51,7 +51,8 @@
 }
 
 .account-card .btn:focus-visible,
-.profile-card--editor button.btn:focus-visible {
+.profile-hero-card__actions .btn:focus-visible,
+.profile-card--editor .form-actions-row .btn:focus-visible {
   outline: 2px solid var(--text);
   outline-offset: 3px;
 }
@@ -121,8 +122,9 @@
   color: var(--muted);
 }
 
-/* Keep the backdrop continuous when profiles extend beyond the viewport. */
-body:has(.profile-page-shell) {
+/* Keep the backdrop continuous when account pages extend beyond the viewport. */
+body:has(.profile-page-shell),
+body:has(.account-shell) {
   background-attachment: fixed;
 }
 

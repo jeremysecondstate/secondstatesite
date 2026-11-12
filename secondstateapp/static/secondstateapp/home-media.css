@@ -93,6 +93,28 @@ body {
   outline-offset: 3px;
 }
 
+/* Keep the heading and links inside the window even on short desktop viewports. */
+#etching-intro {
+  min-height: 13.25rem;
+}
+
+@media (max-width: 600px) and (max-height: 25rem) {
+  /* Leave room for the wrapped title, links, and motion control on short screens. */
+  #etching-intro {
+    min-height: 20rem;
+  }
+
+  /* Give the links a consistent position whether the title wraps or not. */
+  #etching-intro .hero-overlay {
+    justify-content: flex-end;
+    padding-bottom: 5.5rem;
+  }
+
+  #etching-intro .btn {
+    scroll-margin-block: 6px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .etching-scene,
   .motion-toggle { display: none; }

@@ -79,6 +79,277 @@ class DrouotCaptureTests(TestCase):
     def run_import(self, payload):
         return import_saved_drouot_capture(self.capture_file(payload), [ENTRY], self.cache, now=NOW)
 
+    def test_terminal_source_qualifier_after_known_as_clause_remains_visible(self):
+        heading = "Giovanni Battista PIRANESI (1720–1778), known as Jean-Baptiste Piranèse. From"
+        result = self._validate_named_source("Giovanni Battista Piranesi", heading,
+            heading + '\n"Veduta della Basilica"\nTwo engravings enhanced with watercolor')
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].artist, "Giovanni Battista PIRANESI, known as Jean-Baptiste Piranèse, From")
+        self.assertTrue(result.lots[0].title.startswith(result.lots[0].artist + " — "))
+        plain = heading.removesuffix(". From")
+        result = self._validate_named_source("Giovanni Battista Piranesi", plain,
+            plain + '\n"From the Basilica"\nTwo engravings enhanced with watercolor')
+        self.assertEqual(result.lots[0].artist, "Giovanni Battista Piranesi")
+
+    def test_goya_complete_source_name_matches_only_its_primary_credit(self):
+        heading = "Francisco José de Goya y Lucientes"
+        result = self._validate_named_source("Francisco de Goya", heading,
+            heading + "\n(Fuendetodos – Zaragoza, 1746 – 1828)\nThe Portrait\nEtching and aquatint on paper")
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].title, "The Portrait")
+        self.assertEqual(self._validate_named_source("Francisco de Goya", "Another Artist",
+            "Another Artist\nEtching mentioning " + heading).lots, [])
+
+    def test_numbered_poster_primary_credit_requires_full_name_and_print_medium(self):
+        for artist, credit, title in (
+            ("Robert Indiana", "Robert Indiana (1928-2018)", "Indiana LOVE Louisiana"),
+            ("Victor Vasarely", "Victor Vasarely (1908-1997)", "galerie der spiegel"),
+            ("Andy Warhol", "After Andy Warhol (1928-1987)", "Marilyn"),
+            ("Joan Miró", "Joan Miró (1893-1983) (after)", "Composition"),
+        ):
+            with self.subTest(credit=credit):
+                heading = f"Lot 531: Poster (1) by {credit}: {title} Lot Details: 62x85, 1972, silkscreen"
+                result = self._validate_named_source(artist, heading, heading)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].medium, "silkscreen")
+                self.assertIn(title, result.lots[0].title)
+                if "after" in credit.lower():
+                    self.assertIn("after", result.lots[0].artist.lower())
+                    self.assertTrue(result.lots[0].title.startswith(result.lots[0].artist + " — "))
+                self.assertEqual(self._validate_named_source(artist, heading, heading.replace("silkscreen", "unknown technique")).lots, [])
+                self.assertEqual(self._validate_named_source(artist, heading, heading.replace(credit, "Wim Crouwel (1928-2019)", 1)).lots, [])
+        for credit in ("Indiana", "Robert Indiana and Andy Warhol", "Robert Indiana with Andy Warhol", "Robert Indiana, an admirer of Andy Warhol"):
+            heading = f"Lot 531: Poster (1) by {credit}: LOVE Lot Details: silkscreen"
+            self.assertEqual(self._validate_named_source("Robert Indiana", heading, heading).lots, [])
+        heading = "Poster about Robert Indiana. Lot 531: Poster (1) by Robert Indiana: LOVE Lot Details: silkscreen"
+        self.assertEqual(self._validate_named_source("Robert Indiana", heading, heading).lots, [])
+
+    def test_new_explicit_media_and_biography_line_after_credit_stay_visible(self):
+        for artist, description, medium in (
+            ("James Rizzi", "James Rizzi\nYellow Cab\n3D-Konstruktion/Farblithographie, handsigniert", "Farblithographie"),
+            ("Henri Matisse", "Henri Matisse\nTeeny\nLinoleum print · 30 x 22 cm", "Linoleum print"),
+            ("Friedensreich Hundertwasser", "Friedensreich Hundertwasser\nThe House, print 1985, printed on silk, mounted", "printed"),
+            ("Man Ray", "Man Ray\nA Dozen Surrealist Post Cards\nThe set of 24 postcards of the same design printed in different colours", "printed"),
+        ):
+            with self.subTest(artist=artist):
+                result = self._validate_named_source(artist, artist, description)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].medium, medium)
+        description = ('Fernand Léger\n1881 Argentan – 1955 Gif-sur-Yvette, after – '
+                       '"La chaise et la vache" – (1952) stencil (after a gouache by the artist)/paper.')
+        result = self._validate_named_source("Fernand Léger", "Fernand Léger", description)
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].medium, "stencil")
+        self.assertEqual(result.lots[0].artist, "Fernand Léger, after")
+        self.assertIn('La chaise et la vache', result.lots[0].title)
+        self.assertNotIn("1881 Argentan", result.lots[0].title)
+        for work in ('Metal stencil tool', 'Poster. Biography: printed on silk',
+                     'Poster.\nShipping: Farblithographie', 'Display titled "Linoleum print"'):
+            self.assertEqual(self._validate_named_source("Joan Miró", "Joan Miró", "Joan Miró\n" + work).lots, [])
+
+    def test_abbreviated_portfolio_roles_require_both_source_fields_and_direct_creator(self):
+        cases = (
+            ("Alexander Calder", "Calder. Santa Claus. Portfolio. Illustrated by Alexander Calder with 9 etching in black.", "Calder", "Santa Claus"),
+            ("Fernand Léger", "Leger. Cirque. Portfolio with 63 lithographs by Fernand Leger.", "Leger", "Cirque"),
+            ("Joan Miró", "Miro. La Bague De Aurore. With 5 original full-page color etchings by Joan Miro.", "Miro", "La Bague De Aurore"),
+            ("Louis Icart", "Icart. Chrysis. A tale illustrated with fifteen etchings in color by Louis Icart.", "Icart", "Chrysis"),
+            ("Georges Braque", "Braque. Theogonie. Illustrated with 20 etchings by George Braque.", "Braque", "Theogonie"),
+            ("Marc Chagall", "Chagall. La Poesie. A portfolio with a lithograph in color by Marc Chagall.", "Chagall", "La Poesie"),
+        )
+        for artist, source, credit, title in cases:
+            with self.subTest(artist=artist):
+                result = self._validate_named_source(artist, source, source)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].artist, credit)
+                self.assertEqual(result.lots[0].title, credit + " — " + title)
+                self.assertEqual(len(result.attribution_notes), 1)
+                self.assertEqual(self._validate_named_source(artist, "Another Artist", source).lots, [])
+        for source in (
+            "Calder. Santa Claus. Etching. Biography: Illustrated by Alexander Calder with 9 etching.",
+            "Calder. Santa Claus. Etching.\nNotes: Illustrated by Alexander Calder with 9 etching.",
+            "Calder. Santa Claus. Illustrated by Sandy Calder with 9 etching.",
+        ):
+            self.assertEqual(self._validate_named_source("Alexander Calder", source, source).lots, [])
+
+    def test_portfolio_coauthors_and_mixed_print_artists_remain_visible(self):
+        for artist, source, credit in (
+            ("Alex Katz", "Katz, Ratcliff. Give me Tomorrow. Complete portfolio with 13 original soft-ground and aquatint prints by Alex Katz, accompanied by text by Carter Ratcliff.", "Katz, Ratcliff"),
+            ("Alexander Calder", "Calder - Prevert. Fêtes. Text by Jacques Prevert illustrated with 8 etchings by Alexander Calder.", "Calder - Prevert"),
+            ("Alberto Giacometti", "Giacometti. La Danse du Chateau. With Alberto Giacometti etching in frontispiece and 14 etchings by Louis Chavigner.", "Giacometti (frontispiece) and Louis Chavigner (14 etchings)"),
+        ):
+            with self.subTest(artist=artist):
+                result = self._validate_named_source(artist, source, source)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].artist, credit)
+                self.assertTrue(result.lots[0].title.startswith(credit + " — "))
+        conflict = "Katz, Ratcliff. Give me Tomorrow. Complete portfolio with 13 original soft-ground and aquatint prints by Alex Katz, accompanied by text by Another Author."
+        self.assertEqual(self._validate_named_source("Alex Katz", conflict, conflict).lots, [])
+
+    def test_qualified_short_print_and_production_credits_are_not_promoted(self):
+        description = ('Print after Matisse\n20th century. Print, likely a lithograph after Henry Matisse, '
+                       'Nu Bleu, signed and dated on the print H. Matisse 52')
+        result = self._validate_named_source("Henri Matisse", "Print after Matisse", description)
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].artist, "Print after Matisse")
+        self.assertEqual(result.lots[0].medium, "Print")
+        self.assertIn("likely a lithograph after Henry Matisse", result.lots[0].title)
+        for source in (
+            "Chagall. Le Coq. Lithograph in color. After Marc Chagall color lithograph executed by Charles Sorlier 1952.",
+            "Chagall: Suite of Ten Color Prints After Gouaches, 1959 Marc Chagall Ten color collotypes from gouache by Marc Chagall from 1959.",
+        ):
+            result = self._validate_named_source("Marc Chagall", source, source)
+            self.assertEqual(len(result.lots), 1)
+            self.assertIn("after", result.lots[0].artist.lower())
+            self.assertTrue(result.attribution_notes)
+
+    def test_catalogue_qualifier_layouts_keep_uncertainty_outside_artist_name(self):
+        for artist, heading, description, expected in (
+            ("Pablo Picasso", "Pablo Picasso [after], Avant la Pique", "Pablo Picasso [after], Avant la Pique. Linocut.", "Pablo Picasso, [after]"),
+            ("Andy Warhol", "Andy Warhol", 'Andy Warhol\n1928 Pittsburgh – 1987 New York, after “Mechanical Terrier” (1986). Granolithograph on paper.', "Andy Warhol, after"),
+            ("Victor Vasarely", "Victor Vasarely", "Victor Vasarely\nAttributed to, unsigned, titled Planetary Folklore\nColor lithograph", "Victor Vasarely, Attributed to"),
+            ("Banksy", "BANKSY (born in 1974), from", 'BANKSY (born in 1974), from\n"Walled Hotel"\nColor print on paper', "BANKSY, from"),
+            ("Louis Icart", "Icart, Louis Justin Laurent; attributed", "Icart, Louis Justin Laurent; attributed\nWoman\nEtching on paper", "Icart, Louis Justin Laurent, attributed"),
+        ):
+            with self.subTest(artist=artist):
+                result = self._validate_named_source(artist, heading, description)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].artist, expected)
+                self.assertTrue(result.attribution_notes)
+                self.assertTrue(result.lots[0].title.startswith(expected + " — "))
+        for work in ('Color offset print after the 1985 silkscreen',
+                     'Original lithograph from the 1954 edition after Matisse’s cut outs'):
+            artist = "Henri Matisse" if "Matisse" in work else "Andy Warhol"
+            result = self._validate_named_source(artist, artist, artist + "\nThe Work\n" + work)
+            self.assertIn("after", result.lots[0].artist)
+        result = self._validate_named_source("Andy Warhol", "Andy Warhol", "Andy Warhol\nFrom the Garden\nColor lithograph")
+        self.assertEqual(result.lots[0].artist, "Andy Warhol")
+        self.assertEqual(result.lots[0].title, "From the Garden")
+
+    def test_multilingual_techniques_and_process_evidence_do_not_accept_references(self):
+        for medium in ("Etsning och färgakvatint", "Färglitografi", "Färgserigrafi",
+                       "Stencil (Jacomet process) on Vélin Aussedat", "Jacomet process, edition of 500",
+                       "Printed color plate bearing an embossed seal"):
+            with self.subTest(medium=medium):
+                result = self._validate_named_source("Joan Miró", "Joan Miró (After)", "Joan Miró (After)\nThe Work\n" + medium)
+                self.assertEqual(len(result.lots), 1)
+                self.assertIn("After", result.lots[0].artist)
+                self.assertEqual(self._validate_named_source("Joan Miró", "Joan Miró",
+                    "Joan Miró\nPoster. Biography: " + medium).lots, [])
+
+    def test_later_full_credit_resolution_does_not_omit_portfolio_contents(self):
+        source = ("DALI. L'Art d'Aimer. Salvador Dalí & Ovid, L'Art d'Aimer. Complete portfolio comprising "
+                  "15 original color prints signed in the plate, plus an extra suite of 4 wood engravings "
+                  "individually signed and numbered in pencil by Dalí.")
+        result = self._validate_named_source("Salvador Dalí", source, source)
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].artist, "Salvador Dalí & Ovid")
+        self.assertIn("15 prints plus suite of 4 wood engravings", result.lots[0].title)
+        self.assertEqual(self._validate_named_source("Salvador Dalí", source,
+            source.replace("Salvador Dalí & Ovid", "Another Artist & Ovid")).lots, [])
+        source = "Signed etching by Roberto Matta. One of 160 copies. Episstil et pistelle. Original Etching from a portfolio."
+        result = self._validate_named_source("Roberto Matta", source, source)
+        self.assertEqual(result.lots[0].title, "Roberto Matta — Episstil et pistelle")
+
+    def test_matisse_portfolios_require_explicit_roles_and_retain_other_source_names(self):
+        cases = (
+            ("Matisse. Une Fete en Cimmerie, with 31 lithographs. Henri Matisse. Duthuit, Georges. "
+             "Illustrated with 31 lithographs by Matisse.", "Henri Matisse; Duthuit, Georges"),
+            ("Matisse. Poesies Antillaises. Deluxe Portfolio Featuring 40 Portrait Lithographs. "
+             "John-Antoine; Henri Matisse. Includes 28 full-page brown lithographs, and a separate "
+             "suite of 12 women’s portrait lithographs.", "John-Antoine; Henri Matisse"),
+            ("MATISSE Repli. 1947. ROUVEYRE, André; MATISSE, Henri (illus.).\n"
+             "Illustrated with 12 original lithographs by Matisse, signed by both author and artist.",
+             "ROUVEYRE, André; MATISSE, Henri (illus.)"),
+        )
+        for description, credit in cases:
+            with self.subTest(credit=credit):
+                heading = description.splitlines()[0]
+                result = self._validate_named_source("Henri Matisse", heading, description)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].artist, credit)
+                self.assertTrue(result.lots[0].title.startswith(credit + " — "))
+                self.assertTrue(result.attribution_notes)
+                self.assertEqual(self._validate_named_source("Henri Matisse", "Another Artist", description).lots, [])
+                changed = description.replace("Henri Matisse", "Pierre Matisse").replace("MATISSE, Henri", "MATISSE, Pierre")
+                self.assertEqual(self._validate_named_source("Henri Matisse", changed.splitlines()[0], changed).lots, [])
+        title_first = "The World of Matisse. Henri Matisse. Duthuit, Georges. Illustrated with 31 lithographs by Matisse."
+        self.assertEqual(self._validate_named_source("Henri Matisse", title_first, title_first).lots, [])
+
+    def test_mezzotint_xylograph_and_print_labels_describe_offered_objects(self):
+        for artist, heading, description, medium in (
+            ("Yozo Hamaguchi", "HAMAGUCHI Yozo, Ladybirds from HAMAGUCHI'S SIX ORIGINAL COLOR MEZZOTINTS,",
+             "HAMAGUCHI Yozo, Ladybirds from HAMAGUCHI'S SIX ORIGINAL COLOR MEZZOTINTS,\n1978, mezzotint, signed, ed.75", "mezzotint"),
+            ("Salvador Dalí", 'after Salvador Dalí, "The Furies"',
+             'after Salvador Dalí, "The Furies"\na figure surrounded by flames, colour xylograph, c.1960', "xylograph"),
+            ("Leonor Fini", "Leonor Fini", 'Leonor Fini\nPrint : "Female nude". Artist’s proof. Signed.', "Print"),
+        ):
+            with self.subTest(artist=artist):
+                result = self._validate_named_source(artist, heading, description)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].medium, medium)
+        heading = "HAMAGUCHI Yozo, HAMAGUCHI'S COLOR MEZZOTINTS (special edition),"
+        self.assertEqual(self._validate_named_source("Yozo Hamaguchi", heading, heading + "\nPoster. Unknown technique.").lots, [])
+        self.assertEqual(self._validate_named_source("Leonor Fini", "Leonor Fini",
+            'Leonor Fini\nPoster titled "Print: Female Nude". Unknown technique.').lots, [])
+
+    def test_xylography_and_bullet_print_dimensions_require_offered_work_context(self):
+        heading = "DURER Albrecht (1471-1528)"
+        result = self._validate_named_source("Albrecht Dürer", heading,
+            heading + "\nHercules fighting Cacus\nXylography")
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].medium, "Xylography")
+        self.assertEqual(result.lots[0].title, "Hercules fighting Cacus")
+        for bullet in ("-", "•"):
+            result = self._validate_named_source("Roy Lichtenstein", "LICHTENSTEIN, Roy (1923–1997)",
+                'LICHTENSTEIN, Roy (1923–1997)\n"CRACK!"\nColor exhibition poster. Framed under glass.\n'
+                f'Dimensions:\n{bullet} print: 72.5 x 53.5 cm\n- frame: 81 x 61 cm')
+            self.assertEqual(len(result.lots), 1)
+            self.assertEqual(result.lots[0].medium, "print")
+        for work in (
+            'Poster. Biography: famous for xylography.',
+            'Display card for the exhibition "Xylography". Unknown technique.',
+            'Poster.\nDimensions:\n- frame: 81 x 61 cm',
+            'Poster.\n- print: unidentified',
+            'Poster.\nProvenance: Exhibition display\n- print: 72.5 x 53.5 cm',
+            'Ink drawing on paper.\n- print: 72.5 x 53.5 cm',
+        ):
+            with self.subTest(work=work):
+                self.assertEqual(self._validate_named_source("Albrecht Dürer", heading,
+                    heading + "\nComposition\n" + work).lots, [])
+        self.assertEqual(self._validate_named_source("Albrecht Dürer", "Another Artist",
+            "Another Artist\nXylography mentioning Albrecht Dürer").lots, [])
+
+    def test_reproduction_sets_and_explicit_engraver_roles_are_retained(self):
+        description = 'Francisco de Goya\nLa Tauromaquia\n3 reprints based on engravings from the famous work:\nPlate No.7: "The Origin"'
+        result = self._validate_named_source("Francisco de Goya", "Francisco de Goya", description)
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].medium, "reprints")
+        self.assertIn("reprints based on engravings", result.lots[0].artist)
+        self.assertEqual(self._validate_named_source("Francisco de Goya", "Francisco de Goya",
+            description.replace("3 reprints", "Reproductions")).lots, [])
+        heading = "Rembrandt - Jewish Merchant etched by Leon Richeton 1884."
+        result = self._validate_named_source("Rembrandt", heading,
+            heading + "\nThis print is from The Portfolio, an Artistic Periodical.")
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].artist, "Rembrandt - etched by Leon Richeton")
+        self.assertIn("Jewish Merchant", result.lots[0].title)
+
+    def test_source_roles_preserve_book_author_and_concept_collaborator(self):
+        description = ("Miró, Joan - Hirtz, Lise. *Il était une petite pie*. With 8 full-page stencils "
+                       "based on Miró’s gouaches.")
+        result = self._validate_named_source("Joan Miró", description, description)
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].artist, "Miró, Joan - Hirtz, Lise (stencils based on Miró’s gouaches)")
+        description = ('MAN RAY & DUCHAMP (Marcel). “Boxing Match” (1970). Lithograph. '
+                       'The composition was created by Man Ray based on an idea and instructions '
+                       'from Marcel Duchamp, and then printed in a lithographic edition of one hundred copies.')
+        result = self._validate_named_source("Man Ray", description, description)
+        self.assertEqual(len(result.lots), 1)
+        self.assertEqual(result.lots[0].artist, "MAN RAY & DUCHAMP (Marcel)")
+        self.assertIn("Boxing Match", result.lots[0].title)
+        changed = description.replace("from Marcel Duchamp,", "from another artist,")
+        self.assertEqual(self._validate_named_source("Man Ray", changed, changed).lots, [])
+
     def test_public_source_and_dom_normalize_stable_id_currency_and_real_image(self):
         raw, card = evidence()
         card["image_url"] = "data:image/png;base64,placeholder"
@@ -980,6 +1251,29 @@ class DrouotCaptureTests(TestCase):
         result = self._validate_named_source("Shepard Fairey", "Shepard Fairey",
             "Shepard Fairey\n(Obey the Rules)\nOffset lithograph on paper")
         self.assertEqual(result.lots[0].title, "(Obey the Rules)")
+
+    def test_fairey_inline_alias_and_date_keep_work_title_and_source_qualifier(self):
+        for prefix in ("FAIREY Shepard", "After FAIREY Shepard"):
+            for work, title in (
+                ('“Make art not war.” Color silkscreen on paper.', "Make art not war"),
+                ('Liberty, Equality, Fraternity. Color silkscreen print on paper.', "Liberty, Equality, Fraternity"),
+            ):
+                heading = prefix + ", known as Obey (1970–). " + work
+                result = self._validate_named_source("Shepard Fairey", heading, heading)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].medium, "silkscreen")
+                if prefix.startswith("After"):
+                    self.assertEqual(result.lots[0].artist, "After FAIREY Shepard")
+                    self.assertEqual(result.lots[0].title, "After FAIREY Shepard — " + title)
+                    self.assertEqual(result.attribution_notes[0]['source_artist_credit'], "After FAIREY Shepard")
+                else:
+                    self.assertEqual(result.lots[0].title, title)
+                    self.assertEqual(result.attribution_notes, [])
+        heading = 'FAIREY Shepard, known as Obey the Rules (1970–). Silkscreen on paper.'
+        result = self._validate_named_source("Shepard Fairey", heading, heading)
+        self.assertTrue(result.lots[0].title.startswith("known as Obey the Rules"))
+        heading = 'Another Artist, known as Obey (1970–). Make art not war. Silkscreen on paper.'
+        self.assertEqual(self._validate_named_source("Shepard Fairey", heading, heading).lots, [])
 
     def test_spelling_variant_requires_immediate_canonical_primary_credit(self):
         for artist, variant, canonical in (

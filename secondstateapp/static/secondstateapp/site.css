@@ -79,6 +79,12 @@ body{
       background: rgba(255,255,255,.06);
       color: var(--text);
     }
+    .nav nav a[aria-current="page"]{
+      color: var(--text);
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: .28em;
+    }
     .container{
       max-width: var(--max);
       margin: 0 auto;
@@ -252,6 +258,7 @@ body{
     }
     .about-card p{
       max-width:68ch;
+      text-wrap: pretty;
     }
     .contact-card p + p,
     .about-card + .about-card{
@@ -637,6 +644,10 @@ body:has(.artwork-detail-page){
 
 .artwork-detail-page{
   padding-top: 4px;
+}
+
+.artwork-no-images{
+  color: var(--muted);
 }
 
 

@@ -41,8 +41,8 @@ _PRINT_MEDIUM = re.compile(
     r"\b(?:(?:photo|grano|chromo|grapho)?lithograph(?:ic|ie|y|s|ies)?|lithographie[s]?|etching[s]?|engraving[s]?|"
     r"screen\s?print(?:ed|s)?|silk\s?screen[s]?|serigraph(?:ie|y|s|ies)?|s[eé]rigraphie[s]?|"
     r"gravure[s]?|estampe[s]?|eau[x]?[ -]forte[s]?|aquatin[dt](?:e|s)?|drypoint|"
-    r"pointe[ -]s[eè]che|woodcut[s]?|woodblock|stencil\s+print[s]?|linocut[s]?|linogravure[s]?|"
-    r"monotype[s]?|monoprint[s]?|gicl[eé]e[s]?|phototype[s]?|photogravure[s]?|zincograph(?:y|s)?|burin|(?:photo|foto)print[s]?|collotype[s]?|pochoir|h[eé]liogravure[s]?|letterpress|offset|printed(?=\s+poster\b)|engraved(?=\s+(?:colou?r\s+)?poster\b)|print[s]?)\b",
+    r"pointe[ -]s[eè]che|woodcut[s]?|woodblock|stencil\s+print[s]?|stencil(?=\s*\((?:Jacomet\s+process\)\s+on\b|after\s+(?:an?\s+|the\s+)?gouache\b[^)\n]*\)\s*/\s*paper\b))|Jacomet\s+process|linocut[s]?|linogravure[s]?|linoleum\s+print[s]?|Farblithographie[n]?|etsning|(?:färg)?(?:litografi|serigrafi|akvatint)|printed\s+colou?r\s+plate|"
+    r"monotype[s]?|monoprint[s]?|mezzotint[s]?|xylograph(?:y|s)?|full-page\s+stencils|reprints(?=\s+based\s+on\s+engravings\b)|gicl[eé]e[s]?|phototype[s]?|photogravure[s]?|zincograph(?:y|s)?|burin|(?:photo|foto)print[s]?|collotype[s]?|pochoir[s]?|h[eé]liogravure[s]?|letterpress|offset|printed(?=\s+(?:poster\b|on\s+silk\b|in\s+different\s+colou?rs\b))|engraved(?=\s+(?:colou?r\s+)?poster\b)|print[s]?)\b",
     re.IGNORECASE,
 )
 _QUALIFIED_CREDIT = re.compile(
@@ -53,10 +53,11 @@ _QUALIFIED_CREDIT = re.compile(
     r"homage\s+to\b|hommage\s+[aà]\b)\)?\s*", re.IGNORECASE,
 )
 _FOLLOWING_QUALIFIER = re.compile(
-    r"^[\s,;:.\u2013\u2014-]*(?P<qualifier>\(?(?:after|according\s+to|attributed(?:\s+to)?|"
+    r"^[\s,;:.\u2013\u2014-]*(?P<qualifier>[\[(]?(?:after|according\s+to|attributed(?:\s+to)?|"
     r"d[\u2019']?apr[eè]s|attribu[eé](?:e)?(?:\s+[aà])?|circle\s+of|school\s+of|"
     r"in\s+(?:the\s+)?(?:style|manner|taste)(?:\s+of)?|despu[eé]s(?:\s+de)?|naar|"
-    r"homage\s+to|hommage\s+[aà]|based\s+on|copy\s+after)\)?)(?=\s|[.,;:\u2013\u2014-]|$)", re.IGNORECASE,
+    r"homage\s+to|hommage\s+[aà]|based\s+on|copy\s+after|from(?=\s*$))[\])]?)"
+    r"(?=\s|[.,;:\u2013\u2014-]|$)", re.IGNORECASE,
 )
 _REFERENCE_SECTION = re.compile(
     r"\b(?:provenance|bibliograph(?:y|ie)|literature|exhibition(?:\s+history)?|expositions?|"
@@ -77,8 +78,9 @@ _SOURCE_CREDIT_ALIASES = {
     "jean pierre vasarely yvaral": ("Jean-Pierre Vasarely",),
     "manolo valdes": ("Manolo Valdes Blasco",),
     "arman": ("Armand Pierre Fernandez known as Arman",),
-    "de francisco goya": ("Francisco de Goya y Lucientes",),
+    "de francisco goya": ("Francisco José de Goya y Lucientes", "Francisco de Goya y Lucientes"),
     "jacques villon": ("Jacques Villon Gaston Duchamp dit",),
+    "icart louis": ("Louis Justin Laurent Icart",),
 }
 
 
@@ -290,6 +292,16 @@ def _separate_line_qualifier(credit: str, following: str, aliases: Iterable[str]
     # Require the source's colon. A work title such as After the Rain is not
     # an attribution qualifier, nor is a later biography/reference mention.
     match = re.match(r"^(?P<qualifier>after)\s*:\s*(?P<title>.*)$", following, re.IGNORECASE)
+    if not match:
+        # This catalogue puts the explicit qualifier after a separate
+        # birth/death-and-place line, before the quoted offered-work title.
+        match = re.match(
+            r"^[0-9]{4}\s+[^\n\u2013\u2014]+\s+[\u2013\u2014]\s+[0-9]{4}\s+[^,\n]+,\s*"
+            r"(?P<qualifier>after)\s*(?:[\u2013\u2014-]\s*)?(?P<title>[\"\u201c].*)$",
+            following, re.IGNORECASE,
+        )
+    if not match:
+        match = re.match(r"^(?P<qualifier>attributed(?:\s+to)?),\s*unsigned,\s*titled\s+(?P<title>.+)$", following, re.IGNORECASE)
     return (match.group("qualifier"), match.group("title")) if match else ("", following)
 
 
@@ -353,6 +365,19 @@ def _title(description: str, heading: str, aliases: Iterable[str]) -> str:
                 value = re.sub(r"^\d{4}\b\s+(?=\S)", "", value)
                 if value == before:
                     break
+            if any(artist_identity_key(alias) == "fairey shepard" for alias in aliases):
+                # A verified inline alias/date clause precedes these work
+                # titles. Do not treat arbitrary "known as" text as an alias.
+                inline_alias = re.match(
+                    r"^(?:also\s+)?known\s+as\s+OBEY(?:\s+GIANT)?\s*"
+                    r"\([^)]*\d{4}[^)]*\)\.\s+(?P<work>.+)$", value, re.IGNORECASE,
+                )
+                if inline_alias:
+                    work = inline_alias.group("work")
+                    quoted_work = re.match(r'^["\u201c\u00ab](.+?)["\u201d\u00bb]', work)
+                    if quoted_work:
+                        return quoted_work.group(1).rstrip(".").replace("*", "")[:500]
+                    return work.split(". ", 1)[0].rstrip(".").replace("*", "")[:500]
             if (not value or _biography_line(value)
                     or re.fullmatch(r"(?:(?:also\s+)?known\s+as|aka)\s+[^,;:()\n]+(?:\s*\([^)]*\d{4}[^)]*\))?",
                                     value, re.IGNORECASE)
@@ -430,7 +455,7 @@ def _work_level_after(description: str, aliases: Iterable[str]) -> str:
             continue
         for match in re.finditer(r"\bafter\s+", line, re.IGNORECASE):
             following = line[match.end():]
-            work_object = re.match(r"(?:an?\s+|the\s+)?(?:original|oil\s+painting|painting|pastel|drawing|design|work|"
+            work_object = re.match(r"(?:an?\s+|the\s+)?(?:original|oil\s+painting|painting|pastel|drawing|design|work|ceramic\s+plates|"
                                    r"d[eé]coupage|gouache|gouche)\b",
                                    following, re.IGNORECASE)
             if work_object:
@@ -438,9 +463,24 @@ def _work_level_after(description: str, aliases: Iterable[str]) -> str:
                 if named_creator:
                     named_credit = re.sub(r"\band\s+under\s+(?:his|her|their)\s+direction\b", "",
                                           named_creator.group(1), flags=re.IGNORECASE)
-                    if not _leading_credit_matches(named_credit, aliases):
+                    short_name = re.match(r"([^\W\d_]+)\b", named_credit)
+                    same_surname = "ceramic" in work_object.group().lower() and short_name and any(normalize_artist_name(alias).split()[-1:] ==
+                        [normalize_artist_name(short_name.group(1))] for alias in aliases)
+                    if not re.match(r"(?:the\s+)?artist\b", named_credit, re.IGNORECASE) and not _leading_credit_matches(named_credit, aliases) and not same_surname:
                         continue
             if work_object or _leading_credit_matches(following, aliases):
+                return match.group().strip()
+            if re.match(r"(?:the\s+)?[0-9]{4}\s+(?:silkscreen|screen\s?print|lithograph|etching)\b", following, re.IGNORECASE):
+                return match.group().strip()
+            named_original = re.match(r"([^\W\d_]+)[\u2019']s\s+(?:cut\s+outs|paintings|drawings)\b", following, re.IGNORECASE)
+            if named_original and any(normalize_artist_name(alias).split()[-1:] ==
+                                      [normalize_artist_name(named_original.group(1))] for alias in aliases):
+                return match.group().strip()
+            # A full primary credit can be abbreviated in this explicit
+            # production relationship; do not create a global surname alias.
+            short_artworks = re.match(r"([^\W\d_]+)\s+art\s+works\b", following, re.IGNORECASE)
+            if short_artworks and any(normalize_artist_name(alias).split()[-1:] ==
+                                      [normalize_artist_name(short_artworks.group(1))] for alias in aliases):
                 return match.group().strip()
     return ""
 
@@ -457,6 +497,15 @@ def _qualified_source_credit(heading: str, description: str, aliases: Iterable[s
         # The matched name/qualifier span is the source credit. Everything
         # after it may be a long work description, certificate or dimensions.
         name = " ".join(credit[:name_end].split()).strip(" .,;:-")
+        alias_qualifier = re.fullmatch(
+            r"[\s,;:.]*(?P<alias>(?:also\s+)?known\s+as\s+[^.;\n]+)\.\s*"
+            r"(?P<qualifier>from|after|attributed(?:\s+to)?)\.?\s*",
+            _strip_leading_biography(credit[name_end:]), re.IGNORECASE,
+        )
+        if alias_qualifier:
+            # Preserve a literal terminal qualifier separated from the full
+            # primary name by an explicit alias clause.
+            return name + ", " + alias_qualifier.group("alias") + ", " + alias_qualifier.group("qualifier")
         if _QUALIFIED_CREDIT.match(credit):
             return name
         qualifier, _ = _following_qualifier(credit[name_end:])
@@ -465,6 +514,8 @@ def _qualified_source_credit(heading: str, description: str, aliases: Iterable[s
         if qualifier:
             return name + (" " if qualifier.startswith("(") else ", ") + qualifier
     work_qualifier = _work_level_after(description, aliases)
+    if not work_qualifier and re.search(r"(?m)^\s*[1-9][0-9]*\s+reprints\s+based\s+on\s+engravings\b", _offered_work_prefix(description), re.IGNORECASE):
+        work_qualifier = "reprints based on engravings"
     if work_qualifier:
         # Preserve the spelling/order of the source's primary artist credit.
         for value, _ in candidates:
@@ -502,8 +553,16 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
     # the technique of this offered impression.
     work = re.sub(r"\((?:From\s+the\s+(?:set|series)\b)[^()\n]*\)",
                   lambda match: " " * len(match.group()), work, flags=re.IGNORECASE)
+    def mask_reproduced_medium(match):
+        # An explicit counted set of reprints establishes printed objects.
+        # Keep that phrase so its leading reprint noun supplies the medium;
+        # uncounted reproduction references still cannot qualify the object.
+        if (match.group().lower().startswith("reprints ")
+                and re.search(r"(?m)^\s*[1-9][0-9]*\s*$", work[:match.start()])):
+            return match.group()
+        return " " * len(match.group())
     work = re.sub(r"\b(?:reprints?|reproductions?)\s+(?:based\s+on|after)\s+(?:the\s+)?" + _PRINT_MEDIUM.pattern,
-                  lambda match: " " * len(match.group()), work, flags=re.IGNORECASE)
+                  mask_reproduced_medium, work, flags=re.IGNORECASE)
     # A catalogue work called "Lithograph No. 22" may be reproduced as a
     # poster. Its title identifies the original work, not the offered medium.
     # Mask bare numbered titles and explicit references to them, preserving
@@ -545,6 +604,10 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
     )
     nonprint = _NONPRINT_MEDIUM.search(work)
     for positive in _PRINT_MEDIUM.finditer(work):
+        if positive.group().casefold() == "mezzotints" and re.search(
+            r"(?:\bfrom\b|[\u2019']s)\s+(?:(?:six|original|colou?r)\s+)*$", work[:positive.start()], re.IGNORECASE,
+        ):
+            continue
         # A lithographic pencil/crayon is a drawing implement; its name does
         # not establish that the offered sheet is a printed impression.
         if positive.group().casefold() == "lithographic" and re.match(
@@ -565,13 +628,13 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
             if re.search(r"\b(?:signed|dated|monogrammed|numbered)(?:\s+and\s+(?:signed|dated|monogrammed|numbered))?\s+in\s+$",
                          before, re.IGNORECASE):
                 continue
-            modifier = re.search(r"\b(?:art|original|color|colour|vintage|fine\s+art|digital|pigment|signed|numbered|"
+            modifier = re.search(r"\b(?:art|original|color|colour|quadrichrome|vintage|fine\s+art|digital|pigment|signed|numbered|"
                                  r"reproduction|offset|gicl[eé]e|edition|relief|sepia[ -]toned|\d+)\s+$", before, re.IGNORECASE)
             context = re.match(
                 r"\s*(?:on\b|in\b|with\b|signed\b|numbered\b|edition\b|n[\u00b0o.]\s*\d|"
                 r"\((?:(?:minor|slight|some)\s+)?(?:wear|damage|foxing|staining|creases?)\b|"
                 r"(?:after|based\s+on)\s+(?:an?\s+|the\s+)?(?:original\s+)?(?:work|painting|drawing|design)\b|"
-                r"produced\s+for\s+(?:the\s+|a\s+)?book\b|[,;.]|$)", after, re.IGNORECASE,
+                r"produced\s+for\s+(?:the\s+|a\s+)?book\b|is\s+from\b|[,;.]|$)", after, re.IGNORECASE,
             )
             # Auction headings can name a group as "PRINTS (3)" and put
             # the sheet dimensions on the following line. The plural/count
@@ -602,7 +665,16 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
                 and re.match(r"\s+from\b", after, re.IGNORECASE)
                 and re.search(r"\b[0-9]+(?:[.,][0-9]+)?\s*[x\u00d7]\s*[0-9]+(?:[.,][0-9]+)?\s*(?:cm|mm|in(?:ches)?)\b", work, re.IGNORECASE)
             )
-            if not (modifier or context or counted_prints or dash_medium or written_count):
+            labelled_print = not before.rsplit("\n", 1)[-1].strip() and re.match(r"\s*:", after)
+            # A bullet-labelled sheet measurement also identifies the offered
+            # print; require both dimensions and a unit, not a bare poster.
+            bullet_print_dimensions = (
+                re.fullmatch(r"\s*[-\u2022]\s*", before.rsplit("\n", 1)[-1])
+                and re.match(r"\s*:\s*[0-9]+(?:[.,][0-9]+)?\s*[x\u00d7]\s*"
+                             r"[0-9]+(?:[.,][0-9]+)?\s*(?:cm|mm|in(?:ches)?)\b", after, re.IGNORECASE)
+                and not re.search(r"\bink\s+drawing\b", before, re.IGNORECASE)
+            )
+            if not (modifier or context or counted_prints or dash_medium or written_count or labelled_print or bullet_print_dimensions):
                 continue
         if nonprint and nonprint.start() < positive.start() and not re.search(r"\bmixed[ -]media\b|\btechnique\s+mixte\b", work, re.IGNORECASE):
             continue
@@ -620,6 +692,25 @@ def _corroborated_short_credit(description: str, heading: str, artist: str) -> t
     lines = [line.strip() for line in description.splitlines() if line.strip()]
     if not lines or lines[0] != heading.strip():
         return None
+    # A numbered catalogue wrapper can state the primary creator explicitly
+    # before the work title. Require the same complete heading in both fields,
+    # a full watched name, and a closed credit boundary; later mentions and
+    # unresolved co-credits cannot supply this alias. Medium remains separate.
+    poster = re.match(
+        r"^Lot\s+[1-9][0-9]*:\s+Posters?\s+\([1-9][0-9]*\)\s+by\s+"
+        r"(?P<credit>[^:\n]+):\s*(?P<title>.+?)\s+Lot\s+Details:",
+        heading, re.IGNORECASE,
+    )
+    if poster:
+        credit = poster.group("credit").strip()
+        end = _credit_prefix_end(credit, (artist,))
+        if (end is not None and _leading_credit_matches(credit, (artist,))
+                and not _following_qualifier(credit[end:])[1].strip(" ,;:.-")):
+            visible = _qualified_source_credit(credit, credit, (artist,))
+            visible = visible or " ".join(credit[:end].split()).strip(" ,;:.-")
+            prefix = re.sub(r"\([^)]*\d{4}[^)]*\)", " ", heading[:poster.end("credit")])
+            prefix = prefix.replace("(", "").replace(")", "")
+            return prefix, (visible, poster.group("title").strip(), "")
     # These observed spelling variants require the immediately repeated full
     # canonical name, never an incidental name mention or a surname-only alias.
     variant = {"albrecht durer": "Albert Durer", "alphonse mucha": "Alfons Mucha",
@@ -631,6 +722,126 @@ def _corroborated_short_credit(description: str, heading: str, artist: str) -> t
     work = _offered_work_prefix(description)
     work = re.split(r"(?im)^\s*(?:shipping|registered\s+colissimo|notes?|references?)\s*:", work, maxsplit=1)[0]
     key = artist_identity_key(artist)
+    # Some book/portfolio catalogues repeat the whole description as their
+    # card heading. Resolve their abbreviated leading credit only against
+    # explicit offered-print roles in that same text. These bounded role
+    # patterns never turn an incidental surname or bibliography into credit.
+    catalogue_roles = {
+        "alexander calder": (
+            r"Calder", r"(?:Alexander\s+Calder\s+etching\s+and\s+aquatint\s+in\s+colors|"
+            r"Illustrated\s+by\s+Alexander\s+Calder\s+with\s+[0-9]+\s+etching)",
+        ),
+        "fernand leger": (r"Leger", r"Portfolio\s+with\s+[0-9]+\s+lithographs\s+by\s+Fernand\s+L[eé]ger"),
+        "joan miro": (r"Miro", r"(?:illustrated\s+with\s+an\s+original\s+etching\s+signed\s+in\s+pencil\s+by\s+Joan\s+Mir[oó]|"
+                      r"[0-9]+\s+original\s+full-page\s+color\s+etchings\s+by\s+Joan\s+Mir[oó])"),
+        "icart louis": (r"Icart", r"illustrated\s+with\s+fifteen\s+etchings\s+in\s+color\s+by\s+Louis\s+Icart"),
+        "braque georges": (r"Braque", r"Illustrated\s+with\s+[0-9]+\s+etchings\s+by\s+George\s+Braque"),
+        "chagall marc": (r"Chagall", r"(?:with\s+a\s+lithograph\s+in\s+color\s+by\s+Marc\s+Chagall|"
+                         r"Contains\s+an\s+original\s+black\s+and\s+white\s+lithograph\s+made\s+by\s+Marc\s+Chagall)"),
+        "ernst max": (r"Ernst", r"With\s+[0-9]+\s+etchings\s+in\s+color\s+by\s+Max\s+Ernst"),
+        "dali salvador": (r"Dali", r"Illustrated\s+with\s+an\s+engraving\s+with\s+burin\s+in\s+frontispiece\s+by\s+Salvador\s+Dal[ií]"),
+    }
+    role = catalogue_roles.get(key)
+    if role:
+        short = re.match(r"^(?P<credit>" + role[0] + r")\.\s*(?P<title>[^.\n]+)\.", heading, re.IGNORECASE)
+        if short and re.search(role[1] + r"\b", work, re.IGNORECASE):
+            return short.group("credit"), (short.group("credit"), short.group("title").strip(), "")
+    if key == "alexander calder":
+        joint = re.match(r"^(?P<credit>Calder\s*[-\u2013\u2014]\s*Prevert)\.\s*(?P<title>[^.\n]+)\.", heading, re.IGNORECASE)
+        if joint and re.search(r"Text\s+by\s+Jacques\s+Prevert\s+illustrated\s+with\s+[0-9]+\s+etchings\s+by\s+Alexander\s+Calder\b", work, re.IGNORECASE):
+            return joint.group("credit"), (joint.group("credit"), joint.group("title").strip(), "")
+    if key == "alex katz":
+        joint = re.match(r"^(?P<credit>Katz,\s*Ratcliff)\.\s*(?P<title>[^.\n]+)\.", heading, re.IGNORECASE)
+        if joint and re.search(r"Complete\s+portfolio\s+with\s+[0-9]+\s+original\s+soft-ground\s+and\s+aquatint\s+prints\s+by\s+Alex\s+Katz,\s+accompanied\s+by\s+text\s+by\s+Carter\s+Ratcliff\b", work, re.IGNORECASE):
+            return joint.group("credit"), (joint.group("credit"), joint.group("title").strip(), "")
+    if key == "alberto giacometti":
+        short = re.match(r"^(?P<credit>Giacometti)\.\s*(?P<title>[^.\n]+)\.", heading, re.IGNORECASE)
+        role = re.search(r"With\s+Alberto\s+Giacometti\s+etching\s+in\s+frontispiece\s+and\s+(?P<count>[0-9]+)\s+etchings\s+by\s+Louis\s+Chavigner\b", work, re.IGNORECASE)
+        if short and role:
+            credit = "Giacometti (frontispiece) and Louis Chavigner (" + role.group("count") + " etchings)"
+            return short.group("credit"), (credit, short.group("title").strip(), "")
+    if key == "joan miro":
+        joint = re.match(r"^(?P<credit>Mir[oó],\s+Joan\s*[-\u2013\u2014]\s*Hirtz,\s+Lise)\.\s*\*(?P<title>[^*]+)\*", heading, re.IGNORECASE)
+        if joint and re.search(r"With\s+8\s+full-page\s+stencils\s+based\s+on\s+Mir[oó][\u2019']s\s+gouaches\b", work, re.IGNORECASE):
+            return "Miró, Joan", (joint.group("credit") + " (stencils based on Miró’s gouaches)", joint.group("title"), "")
+        short = re.match(r"^(?P<credit>Miro)\.?\s+(?P<title>[^.\n]+)\.", heading, re.IGNORECASE)
+        if short and re.search(r"Illustrated\s+with\s+an\s+aquatint\s+in\s+color,\s+in\s+frontispiece,\s+signed\s+in\s+pencil\s+on\s+the\s+bottom\s+right\s+corner\s+by\s+Joan\s+Mir[oó]\b", work, re.IGNORECASE):
+            return short.group("credit"), (short.group("credit"), short.group("title"), "")
+        if (short and re.search(r"Joan\s+Mir[oó],\s+Alice\s+Paalen\.", work, re.IGNORECASE)
+                and re.search(r"with\s+one\s+original\s+red\s+etching\s+in\s+frontispiece\s+by\s+Mir[oó],\s+signed\s+and\s+numbered\s+in\s+pencil\b", work, re.IGNORECASE)
+                and re.search(r"Signed\s+in\s+justification\s+page\s+by\s+Alice\s+Paalen\b", work, re.IGNORECASE)):
+            return short.group("credit"), ("Joan Miro, Alice Paalen", short.group("title"), "")
+    if key == "icart louis":
+        short = re.match(r"^(?P<credit>Icart)\.\s*(?P<title>[^.\n]+)\.", heading, re.IGNORECASE)
+        if (short and re.search(r"ICART\s+Louis\s*\([^)]*\d{4}[^)]*\)\s*&\s*CASTEL\s+Therese\b", work, re.IGNORECASE)
+                and re.search(r"Illustrated\s+with\s+[0-9]+\s+colored\s+etchings\s+by\s+Icart\b", work, re.IGNORECASE)):
+            return short.group("credit"), ("ICART Louis & CASTEL Therese", short.group("title"), "")
+    if key == "dali salvador":
+        short = re.match(r"^(?P<credit>Dali)\.\s*(?P<title>[^.\n]+)\.", heading, re.IGNORECASE)
+        if (short and re.search(r"Salvador\s+Dal[ií]\s*&\s*Ovid,", work, re.IGNORECASE)
+                and re.search(r"Complete\s+portfolio\s+comprising\s+15\s+original\s+color\s+prints\b", work, re.IGNORECASE)
+                and re.search(r"plus\s+an\s+extra\s+suite\s+of\s+4\s+wood\s+engravings\s+individually\s+signed\s+and\s+numbered\s+in\s+pencil\s+by\s+Dal[ií]\b", work, re.IGNORECASE)):
+            return short.group("credit"), ("Salvador Dalí & Ovid", short.group("title") + " (15 prints plus suite of 4 wood engravings)", "")
+        if (short and re.search(r"Dali,\s+Salvador\s+Malraux,\s+Andr[eé]\.", work, re.IGNORECASE)
+                and re.search(r"signed\s+by\s+Salvador\s+Dali,\s+Andr[eé]\s+Malraux\s+and\s+Albert\s+Skira\b", work, re.IGNORECASE)
+                and re.search(r"The\s+portfolio\s+contains:\s+12\s+drypoints\s+printed\s+on\s+parchment\s+paper\s+signed\s+and\s+numbered\s+in\s+pencil\s+by\s+Dali,\s+two\s+etchings\b", work, re.IGNORECASE)):
+            return short.group("credit"), ("Dali, Salvador; Malraux, André", short.group("title") + " (12 drypoints and two etchings)", "")
+    if key == "chagall marc":
+        short = re.match(r"^(?P<credit>Chagall)\.\s*(?P<title>[^.\n]+)\.", heading, re.IGNORECASE)
+        if short and re.search(r"After\s+Marc\s+Chagall\s+color\s+lithograph\s+executed\s+by\s+Charles\s+Sorlier\b", work, re.IGNORECASE):
+            return short.group("credit"), ("After Marc Chagall (lithograph executed by Charles Sorlier)", short.group("title"), " (lithograph executed by Charles Sorlier)")
+        short = re.match(r"^(?P<credit>Chagall):\s*(?P<title>Suite\s+of\s+Ten\s+Color\s+Prints\s+After\s+Gouaches),\s*1959\b", heading, re.IGNORECASE)
+        if short and re.search(r"Marc\s+Chagall\s+Ten\s+color\s+collotypes\s+from\s+gouache\s+by\s+Marc\s+Chagall\b", work, re.IGNORECASE):
+            return short.group("credit"), ("Chagall, After Gouaches", short.group("title"), "")
+    if key == "henri matisse":
+        short = re.match(r"^(?P<credit>Matisse)\.\s*(?P<title>[^.\n]+)\.", heading, re.IGNORECASE)
+        if (short and re.search(r"Henri\s+Matisse\.\s+Duthuit,\s+Georges\.", work, re.IGNORECASE)
+                and re.search(r"Illustrated\s+with\s+31\s+lithographs\s+by\s+Matisse\b", work, re.IGNORECASE)):
+            return short.group("credit"), ("Henri Matisse; Duthuit, Georges", short.group("title"), "")
+        joint = re.search(r"(?P<credit>John-Antoine;\s+Henri\s+Matisse)\.", work, re.IGNORECASE)
+        if (short and joint and re.search(r"Deluxe\s+Portfolio\s+Featuring\s+40\s+Portrait\s+Lithographs\b", work, re.IGNORECASE)
+                and re.search(r"Includes\s+28\s+full-page\s+brown\s+lithographs\b", work, re.IGNORECASE)
+                and re.search(r"a\s+separate\s+suite\s+of\s+12\s+women[\u2019']s\s+portrait\s+lithographs\b", work, re.IGNORECASE)):
+            return short.group("credit"), (joint.group("credit"), short.group("title") + " (28 lithographs and separate suite of 12)", "")
+        short = re.match(r"^(?P<credit>MATISSE)\s+(?P<title>Repli)\.", heading, re.IGNORECASE)
+        joint = re.search(r"(?P<credit>ROUVEYRE,\s+Andr[eé];\s+MATISSE,\s+Henri\s+\(illus\.\))", work, re.IGNORECASE)
+        if (short and joint and re.search(r"Illustrated\s+with\s+12\s+original\s+lithographs\s+by\s+Matisse\b", work, re.IGNORECASE)
+                and re.search(r"signed\s+by\s+both\s+author\s+and\s+artist\b", work, re.IGNORECASE)):
+            return short.group("credit"), (joint.group("credit"), short.group("title"), "")
+    if key == "henri matisse" and re.fullmatch(r"Print\s+after\s+Matisse", heading, re.IGNORECASE):
+        offered = re.search(r"(?:^|\n)20th\s+century[.,]\s*(?P<medium>Print,\s+likely\s+a\s+lithograph\s+after\s+Henry\s+Matisse),\s*(?P<title>[^,\n]+),\s*signed\s+and\s+dated\b", work, re.IGNORECASE)
+        if offered:
+            return heading, (heading, offered.group("title") + " — " + offered.group("medium"), "")
+    if key == "de niki phalle saint" and normalize_artist_name(heading) == "de saint phalle nike":
+        if re.search(r"Stamped\s+signature\s+in\s+the\s+lower\s+right:\s*Niki\s+de\s+Saint\s+Phalle\.\s+Signed\s+and\s+dated\s+in\s+the\s+stone:\s*Niki\s+de\s+Saint\s+Phalle\b", work, re.IGNORECASE):
+            return heading, None
+    if key == "pablo picasso":
+        joint = re.match(r"^(?P<credit>Picasso,\s*Kochno)\s+(?P<title>Le\s+Ballet)\.", heading, re.IGNORECASE)
+        if (joint and re.search(r"Robert\s+Kochno\s+with\s+a\s+collaboration\s+of\s+Maria\s+Luz,\s+includes\s+an\s+original\s+lithograph\s+in\s+color\s+by\s+Pablo\s+Picasso\b", work, re.IGNORECASE)
+                and re.search(r"cover\s+engraved\s+after\s+a\s+drawing\s+by\s+Henri\s+Matisse\b", work, re.IGNORECASE)):
+            return joint.group("credit"), (joint.group("credit"), joint.group("title") + " (Picasso lithograph; cover after Henri Matisse)", "")
+        if re.match(r"^After\s+Picasso,\s+[0-9]+\s+facsimile\b", heading, re.IGNORECASE) and len(lines) >= 2:
+            if re.match(r"^Pablo\s+(?:Ruiz\s+)?Picasso\s*\([^)]*\d{4}[^)]*\),\s*after\b", lines[1], re.IGNORECASE):
+                return "Picasso", None
+        if re.match(r"^Picasso\s+pochoir\.", heading, re.IGNORECASE):
+            if re.search(r"Color\s+pochoir\s+after\s+Pablo\s+Picasso\b", work, re.IGNORECASE):
+                return "Picasso", ("After Pablo Picasso", heading.split(".", 1)[1].strip(), "")
+    if key == "matta roberto":
+        leading = re.match(r"^(?P<credit>Signed\s+etching\s+by\s+Roberto\s+Matta)\.\s*One\s+of\s+[0-9]+\s+copies\.\s*(?P<title>[^.\n]+)\.\s*Original\s+Etching\s+from\b", heading, re.IGNORECASE)
+        if leading:
+            return leading.group("credit"), ("Roberto Matta", leading.group("title"), "")
+    if key == "man ray":
+        joint = re.match(r"^(?P<credit>MAN\s+RAY\s*&\s*DUCHAMP\s*\(Marcel\))\.\s*[\"\u201c](?P<title>[^\"\u201d]+)[\"\u201d]", heading, re.IGNORECASE)
+        if joint and re.search(r"The\s+composition\s+was\s+created\s+by\s+Man\s+Ray\s+based\s+on\s+an\s+idea\s+and\s+instructions\s+from\s+Marcel\s+Duchamp,\s+and\s+then\s+printed\s+in\s+a\s+lithographic\s+edition\b", work, re.IGNORECASE):
+            return joint.group("credit"), (joint.group("credit"), joint.group("title"), "")
+    if key == "rembrandt":
+        joint = re.match(r"^(?P<credit>Rembrandt)\s*[-\u2013\u2014]\s*(?P<title>[^.\n]+?)\s+etched\s+by\s+Leon\s+Richeton\s+[0-9]{4}\.", heading, re.IGNORECASE)
+        if joint and re.search(r"(?m)^This\s+print\s+is\s+from\s+The\s+Portfolio,\s+an\s+Artistic\s+Periodical\b", work, re.IGNORECASE):
+            return joint.group("credit"), ("Rembrandt - etched by Leon Richeton", joint.group("title"), "")
+    if key == "jacques villon":
+        source = re.match(r"^Jacques\s+Villon,\s*\*(?P<title>[^*]+)\*,\s*after\s+Renoir\.", heading, re.IGNORECASE)
+        if source and "RENOIR PINX" in work and "JACQUES VILLON SC." in work:
+            return "Jacques Villon", ("Jacques Villon, after Renoir", source.group("title"), "")
     if key == "alphonse mucha" and re.match(r"^Mucha\s+[-\u2013\u2014]\s+\S", heading, re.IGNORECASE):
         if re.search(r"(?im)^This\s+(?:attractive\s+)?colou?r\s+lithograph\s+is\s+by\s+Alphonse\s+Mucha\b", work):
             return "Mucha", None

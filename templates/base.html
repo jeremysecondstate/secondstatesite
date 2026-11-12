@@ -20,9 +20,9 @@
   <header class="nav">
     <a class="brand" href="{% url 'home' %}">SecondState</a>
     <nav>
-      <a href="{% url 'about' %}">About</a>
-      <a href="{% url 'gallery' %}">Gallery</a>
-      <a href="{% url 'contact' %}">Contact</a>
+      <a href="{% url 'about' %}"{% if request.resolver_match.url_name == 'about' %} aria-current="page"{% endif %}>About</a>
+      <a href="{% url 'gallery' %}"{% if request.resolver_match.url_name == 'gallery' or request.resolver_match.url_name == 'artwork_list' %} aria-current="page"{% endif %}>Gallery</a>
+      <a href="{% url 'contact' %}"{% if request.resolver_match.url_name == 'contact' %} aria-current="page"{% endif %}>Contact</a>
       {% if user.is_authenticated %}
         {% if user.is_staff %}
           <a href="{% url 'capital_dashboard' %}">Capital Dashboard</a>
