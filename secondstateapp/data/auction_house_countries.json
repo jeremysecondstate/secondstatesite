@@ -200,6 +200,328 @@
       "evidence_url": "https://www.kettererkunst.de/kontakt/abteilungen.php",
       "evidence": "Auction house offices in Munich, Hamburg, Berlin and Cologne, Germany.",
       "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Auktionshaus Angerland GmbH",
+      "country_code": "DE",
+      "aliases": [
+        "Auktionshaus Angerland"
+      ],
+      "evidence_url": "https://www.auktionshaus-angerland.de/",
+      "evidence": "Auction room at Krummenweger Strasse 21, 40885 Ratingen, Germany.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Auktionshaus Arnold",
+      "country_code": "DE",
+      "aliases": [],
+      "evidence_url": "https://www.auktionshaus-arnold.de/impressum/",
+      "evidence": "Auction house at Bleichstrasse 40-42, 60313 Frankfurt am Main, Germany.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "DEWIT Auctions",
+      "country_code": "BE",
+      "aliases": [],
+      "evidence_url": "https://www.interencheres.com/en-US/commissaire-priseur/dewit-auctions-3275",
+      "evidence": "Seller-published profile and November 11-14 auctions at 473 Torhoutsesteenweg, 8400 Oostende, Belgium.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Kunst- und Auktionshaus Quedlinburg",
+      "country_code": "DE",
+      "aliases": [],
+      "evidence_url": "https://www.versteigerungshaus.de/web/de/index.html",
+      "evidence": "Auction house at Blasiistrasse 21, 06484 Quedlinburg, Germany.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "FauveParis",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://www.fauveparis.com/faq/",
+      "evidence": "Official FAQ states auctions take place in its own auction room, 49 rue Saint-Sabin, Paris, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Richard Maison de ventes",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://www.richardmdv.com/conditions-generales-utilisation",
+      "evidence": "Official terms locate its auctions at Hotel des ventes de Villefranche-sur-Saone, France, or online.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Kunst & Design Auktionshaus Schops Turowski",
+      "country_code": "DE",
+      "aliases": [
+        "Kunst und Design Auktionshaus Schops Turowski"
+      ],
+      "evidence_url": "https://www.kunstunddesign-auktionen.de/de/impressum/",
+      "evidence": "Auction house at Wiedstrasse 21, 47799 Krefeld; parent company in Munich, Germany.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "ArteIn Gallery",
+      "country_code": "IT",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-house/artein-gallery-qeuc7fjrco",
+      "evidence": "Seller-published profile lists Milan and Monza, Italy; auction history lists those same Italian locations.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Briscadieu",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://www.briscadieu-bordeaux.com/contact",
+      "evidence": "Hotel des Ventes Bordeaux Sainte-Croix, 12-14 rue Peyronnet, 33800 Bordeaux, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Hôtel des Ventes de Grasse",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://drouot.com/fr/auctioneer/2182/hotel-des-ventes-de-grasse?tab=sales",
+      "evidence": "Seller-published profile and November 14 auction at 98 avenue Frederic Mistral, 06130 Grasse, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Jakobowicz & Associés",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://www.jakobowiczmelun.com/",
+      "evidence": "November 14 sale and auction house at 746 rue du Marechal Juin, 77000 Vaux-le-Penil, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Carcassonne Enchères",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://drouot.com/fr/auctioneer/1002/carcassonne-ench-res",
+      "evidence": "Seller-published auction-room profile at 1 rue des Gabarres, 11000 Carcassonne, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Richard Bedot Auction",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://drouot.com/de/auctioneer/331/richard-bedot-auction",
+      "evidence": "Seller-published profile and online auction venues at 13 quai d'Anjou, 75004 Paris, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Phillip Caldwell Auctioneers",
+      "country_code": "AU",
+      "aliases": [],
+      "evidence_url": "https://fineauctions.biz/contact-us/",
+      "evidence": "Office and warehouse at 36A Hartnett Drive, Seaford, Victoria 3198, Australia; official history lists Australian estate auctions.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "De Baecque et Associés",
+      "country_code": "FR",
+      "aliases": [
+        "De Baecque & Associés"
+      ],
+      "evidence_url": "https://www.debaecque.fr/actualites/espace-presse",
+      "evidence": "Official description locates auctions in Paris, Lyon, Marseille and Versailles, France. Riviera appraisal coverage is not an overseas auction venue.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Domusarte",
+      "country_code": "PT",
+      "aliases": [],
+      "evidence_url": "https://domusarte.pt/web/leiloeira/sobre-nos",
+      "evidence": "Official public exhibition and collection venue at Rua Garcia de Resende 14A, 2500-208 Caldas da Rainha, Portugal.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Emmanuel Layan & Associés",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://emmanuellayan.com/wp-content/uploads/2025/06/grande-vente-tresor-2025.pdf",
+      "evidence": "Official auction catalogue locates Hotel des Ventes Tourny at 38 rue Lafaurie de Monbadon, 33000 Bordeaux, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Enchères Maisons-Laffitte",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://www.yvelines-encheres.com/conditions-generales-utilisation",
+      "evidence": "Official terms specify auctions at 29 bis rue de Paris, 78600 Maisons-Laffitte, France, or online.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Pastor Maison de Ventes",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://pastor-mdv.fr/mentions-legales/",
+      "evidence": "Official auction room at 58 boulevard Pierre Lefaucheux, 72100 Le Mans, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Villemur.art",
+      "country_code": "FR",
+      "aliases": [],
+      "evidence_url": "https://villemur.art/",
+      "evidence": "November 15 and upcoming auction venues at 5 rue de Provence or Hotel Drouot, Paris, France.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Nadeau's Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.nadeausauction.com/about-us/contact-us/",
+      "evidence": "25 Meadow Road, Windsor, Connecticut 06095, United States.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Westport Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://westportauction.com/contact-us/",
+      "evidence": "595 Westport Avenue, Norwalk, Connecticut 06851, United States.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Sarasota Estate Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://sarasotaestateauction.com/contact-us/",
+      "evidence": "522 South Pineapple Avenue, Sarasota, Florida 34236, United States.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "EJ'S Auction & Appraisal",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.ejsauction.com/about-ejs/",
+      "evidence": "Official description names Glendale, Arizona estate auctions; 5880 West Bell Road, Suite B, Glendale, Arizona 85308.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Lion and Unicorn",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://lionandunicorn.com/terms-and-conditions/",
+      "evidence": "Official terms specify in-person auctions at 200 Oakwood Lane, Suite 200, Hollywood, Florida 33020.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Burchard Galleries Inc",
+      "country_code": "US",
+      "aliases": [
+        "Burchard Galleries"
+      ],
+      "evidence_url": "https://burchardgalleries.com/",
+      "evidence": "Offices and Auction Galleries at 2522 30th Avenue North, St. Petersburg, Florida 33713.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Fine Estate Inc.",
+      "country_code": "US",
+      "aliases": [
+        "Fine Estate, Inc."
+      ],
+      "evidence_url": "https://finesf.com/",
+      "evidence": "November 15, 2026 Fall Auction at 121 Jordan Street, San Rafael, California 94901.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Grogan & Company",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.groganco.com/contact",
+      "evidence": "Auction gallery at 20 Charles Street, Boston, Massachusetts 02114.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Hughes Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.hughesauctions.com/",
+      "evidence": "November 15 California Riviera Auction preview at 8059 Foothill Boulevard, Sunland, California 91040.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Lewis & Maese Antiques & Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.lmauctionco.com/about/contact-us/",
+      "evidence": "7777 Blankenship Drive, Houston, Texas 77055, United States.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Roland Auctions NY",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://rolandauctions.com/contact/",
+      "evidence": "150 School Street, Glen Cove, New York 11542, United States.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Terri Peters & Associates",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.tpaauctions.com/contact",
+      "evidence": "6500 New Venture Gear Drive, East Syracuse, New York 13057, United States.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Trillium Antique Prints & Rare Books",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://trilliumrareprints.com/policies/refund-policy",
+      "evidence": "115 Hampsted Lane, Franklin, Tennessee 37069; official auction platform lists the November 14 sale.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Florida Estate Sales Inc.",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://gulfcoast.hibid.com/company/73084/florida-estate-sales-inc-",
+      "evidence": "House-published November 14-15 catalogues list 1500 Apalachee Parkway #2135, Tallahassee, Florida 32301.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Clarke Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://clarkeny.com/",
+      "evidence": "November 15 auction and gallery at 2372 Boston Post Road, Larchmont, New York 10538.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Helmuth Stone",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://helmuthstone.com/contact/",
+      "evidence": "Auction previews at gallery, 1467 Main Street, Sarasota, Florida 34236.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Locati LLC",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.locatillc.com/contact",
+      "evidence": "Auction gallery at 761 Durham Road, Pineville, Pennsylvania; official events lists November 15 live auction in Pineville.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "Neely Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://neelyauction.com/contact-us/",
+      "evidence": "5284 SE Harbor Terrace, Stuart, Florida 34997, United States.",
+      "verified_at": "2026-11-12"
+    },
+    {
+      "name": "White's Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.whitesauctions.com/location",
+      "evidence": "Auction gallery at 19 Jackson Street, Middleboro, Massachusetts 02346.",
+      "verified_at": "2026-11-12"
     }
   ]
 }

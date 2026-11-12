@@ -304,7 +304,7 @@ test("a zero-count Oliver house stays selected with no lot cards and All houses 
   assert.equal(context.run("galleryOrganization.house"), zeroHouse, "a full catalog refresh preserves the independent zero-count house");
   assert.equal(context.run("visibleGalleryLots().length"), 0);
   assert.equal(context.galleryGrid.children.filter(card => card.id !== undefined).length, 0);
-  assert.equal(context.galleryResults.textContent, "0 watched lots");
+  assert.equal(context.galleryResults.textContent, "Matching filters: 0 of 1 day lots · 0 cards shown");
   const selected = context.galleryHouseFilters.children.find(button => button.dataset.galleryFilter === `house:${zeroHouse}`);
   assert.equal(selected.getAttribute("aria-pressed"), "true");
   assert.equal(selected.children[1].textContent, "0");
@@ -593,7 +593,7 @@ test("an artist card reveals its full-day lots before pagination and preserves s
   assert.equal(context.galleryVisibleCount, 24);
   assert.deepEqual(context.galleryGrid.children.map(card => card.id), matching.slice(0, 24).map(item => item.id));
   assert.equal(context.galleryMore.hidden, false);
-  assert.match(context.galleryResults.textContent, /24 of 40/);
+  assert.match(context.galleryResults.textContent, /Matching filters: 40 of \d+ day lots · 24 cards shown/);
   assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "true");
   assert.equal(context.galleryDescription.focused, true);
   assert.equal(context.galleryDescription.scrollOptions.block, "start");
@@ -755,7 +755,7 @@ test("Bid Boards preserves an empty filter through full catalog refresh and neve
   assert.equal(button.getAttribute("aria-pressed"), "true");
   assert.equal(context.galleryGrid.children.length, 1);
   assert.match(context.galleryGrid.children[0].textContent, /No lots have a saved Bid Board.*this date/);
-  assert.equal(context.galleryResults.textContent, "0 watched lots");
+  assert.equal(context.galleryResults.textContent, "Matching filters: 0 of 2 day lots · 0 cards shown");
   assert.equal(context.galleryMore.hidden, true);
 });
 
@@ -885,7 +885,7 @@ for (const view of ["catalog", "oliver"]) {
     navigation.initialize("all", {artist: "james ensor", house: "Phillips", hide_attributed: "1"});
     assert.equal(context.galleryFilter, "artist:ensor, james");
     assert.equal(context.run("galleryOrganization.house"), "Phillips");
-    assert.equal(context.galleryResults.textContent, "0 watched lots", "hidden/other-house lots still resolve the saved artist");
+    assert.equal(context.galleryResults.textContent, `Matching filters: 0 of ${view === "oliver" ? 3 : 4} day lots · 0 cards shown`, "hidden/other-house lots still resolve the saved artist");
     assert.equal(new URL(context.window.location.href).searchParams.get("artist"), "ensor, james");
     context.galleryAttributionToggle.click();
     assert.deepEqual(context.galleryGrid.children.map(card => card.id), [1]);
@@ -1132,7 +1132,7 @@ test("saved-board events tolerate publisher mutations and update membership with
   context.data[dayA][1].saved_bid_board = null;
   emit(2, null);
   assert.equal(count(), "0");
-  assert.equal(context.galleryResults.textContent, "0 watched lots");
+  assert.equal(context.galleryResults.textContent, "Matching filters: 0 of 2 day lots · 0 cards shown");
   assert.equal(context.galleryGrid.children.some(card => card.id !== undefined), false);
   context.galleryFilter = "all";
   context.run("renderGalleryFilters(); renderGalleryCards()");
@@ -1244,7 +1244,7 @@ for (const view of ["catalog", "oliver"]) {
     context.selectedDay = dayB;
     context.run("renderGalleryCatalog(); updateCalendarLocation()");
     assert.equal(context.galleryFilter, "qualifying");
-    assert.equal(context.galleryResults.textContent, "0 watched lots");
+    assert.equal(context.galleryResults.textContent, "Matching filters: 0 of 1 day lots · 0 cards shown");
     assert.match(context.galleryGrid.children[0].textContent, /After & Attributed/);
     context.galleryAttributionToggle.click();
     assert.match(context.galleryGrid.children[0].textContent, /qualifying bid/i);

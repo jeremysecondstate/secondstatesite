@@ -139,7 +139,7 @@ test("filters and Show more keep price order across the full day and retain rese
   page.selectedDay = "2026-10-23";
   page.render();
   assert.equal(page.galleryGrid.cards.length, 0);
-  assert.equal(page.galleryResults.textContent, "0 watched lots");
+  assert.equal(page.galleryResults.textContent, "Matching filters: 0 of 0 day lots · 0 cards shown");
 });
 
 test("Bid Boards retains every saved outcome through all catalog sorts and preserves research indices", () => {
@@ -181,7 +181,7 @@ test("Bid Boards sorts the complete saved set before pagination and resets Show 
   const saved = lots.filter(lot => lot.saved_bid_board).map(lot => lot.id);
   page.render();
   assert.deepEqual(page.galleryGrid.cards.map(card => card.id), [...saved].reverse().slice(0, 24));
-  assert.equal(page.galleryResults.textContent, "Showing 24 of 40 watched lots");
+  assert.equal(page.galleryResults.textContent, "Matching filters: 40 of 60 day lots · 24 cards shown");
   assert.equal(page.galleryMore.hidden, false);
   page.galleryVisibleCount += 24;
   page.render();

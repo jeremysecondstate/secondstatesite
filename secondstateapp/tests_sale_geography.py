@@ -53,7 +53,7 @@ class SaleGeographyTests(SimpleTestCase):
                 self.assert_country("", location=location)
 
     def test_multinational_house_requires_sale_location(self):
-        for house in ("Sotheby's", "Christie's", "Bonhams", "Phillips", "Heritage Auctions"):
+        for house in ("Sotheby's", "Christie's", "Bonhams", "Phillips", "Heritage Auctions", "Artvisory"):
             with self.subTest(house=house):
                 self.assert_country("", auction_house=house)
                 self.assert_country("US", auction_house=house, location="New York")
@@ -104,4 +104,29 @@ class SaleGeographyTests(SimpleTestCase):
         for house, country in countries.items():
             with self.subTest(house=house):
                 self.assert_country(country, auction_house=house)
+
+    def test_blank_locations_on_following_days_use_verified_house_aliases(self):
+        # These observed import labels previously left most November 14/15 lots
+        # unclassified. Include cross-provider spellings and both US/foreign
+        # houses; the absence of imported location must not discard them.
+        countries = {
+            "Auktionshaus Angerland": "DE", "Auktionshaus Angerland GmbH": "DE",
+            "DEWIT Auctions": "BE", "Dewit Auctions": "BE",
+            "Kunst & Design Auktionshaus Schops Turowski": "DE",
+            "Kunst und Design Auktionshaus Schops Turowski": "DE",
+            "Richard Bedot Auction": "FR", "Pastor Maison de Ventes": "FR",
+            "FauveParis": "FR", "ArteIn Gallery": "IT",
+            "Phillip Caldwell Auctioneers": "AU", "Domusarte": "PT",
+            "Neely Auction": "US", "Sarasota Estate Auction": "US",
+            "Grogan & Company": "US", "Roland Auctions NY": "US",
+            "Burchard Galleries Inc": "US", "Fine Estate Inc.": "US",
+            "Trillium Antique Prints & Rare Books": "US",
+        }
+        for house, country in countries.items():
+            with self.subTest(house=house):
+                self.assert_country(country, auction_house=house)
+                self.assert_country("", auction_house=house, location="Unconfirmed venue")
+                self.assert_country("", auction_house=house + " affiliate")
+                other_country, location = ("FR", "Paris, France") if country == "US" else ("US", "New York, US")
+                self.assert_country(other_country, auction_house=house, location=location)
 
