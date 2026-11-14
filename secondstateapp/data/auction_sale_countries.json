@@ -1,0 +1,524 @@
+{
+  "version": 1,
+  "policy": "Country evidence for exact sales of multinational houses. Match source, auction house, UTC sale date and observed sale URL or the exact source lot identity/URL/number; never infer from headquarters.",
+  "sales": [
+    {
+      "auction_house": "Heritage Auctions",
+      "source": "Heritage",
+      "date": "2026-10-22",
+      "country_code": "US",
+      "sale_urls": [
+        "https://fineart.ha.com/c/search.zx?saleNo=8280"
+      ],
+      "evidence_url": "https://www.ha.com/heritage-auctions-schedule.s?category=prints-and-multiples",
+      "evidence": "Official auction schedule: Prints and Multiples #8280, October 22, 2026, Dallas, TX. Separate traveling previews are not the sale venue.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "auction_house": "Heritage Auctions",
+      "source": "Heritage",
+      "date": "2026-11-18",
+      "country_code": "US",
+      "sale_urls": [
+        "https://fineart.ha.com/c/search.zx?saleNo=18242"
+      ],
+      "evidence_url": "https://www.ha.com/heritage-auctions-schedule.s?category=prints-and-multiples",
+      "evidence": "Official auction schedule: Prints and Multiples Showcase #18242, November 18, 2026, Dallas, TX.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "auction_house": "Heritage Auctions",
+      "source": "Drouot",
+      "date": "2026-11-11",
+      "country_code": "US",
+      "sale_urls": [
+        "https://drouot.com/en/v/187633"
+      ],
+      "evidence_url": "https://www.gazette-drouot.com/en/auctions/187633-early-20th-century-design-8256",
+      "evidence": "Auctioneer-published sale details: Early 20th Century Design 8256, November 11, 2026, 2801 W Airport Freeway, Dallas, Texas, United States.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "auction_house": "Bonhams",
+      "source": "Invaluable",
+      "date": "2026-10-28",
+      "country_code": "US",
+      "lots": {
+        "207195647": {
+          "lot_number": "29",
+          "lot_url": "https://www.invaluable.com/auction-lot/albrecht-durer-1471-1528-the-large-horse-29-c-2f5e2703c1"
+        }
+      },
+      "evidence_url": "https://www.invaluable.com/auction-lot/albrecht-durer-1471-1528-the-large-horse-29-c-2f5e2703c1",
+      "evidence": "Live rendered Invaluable auctioneer listing verified November 13, 2026: Marlborough, Massachusetts, United States; sale timestamp 2026-10-28T16:00:00Z. Country fallback is restricted to the observed source IDs, lot numbers and URLs in this catalog group, never all Bonhams sales on that date.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "auction_house": "Bonhams",
+      "source": "Invaluable",
+      "date": "2026-11-03",
+      "country_code": "US",
+      "lots": {
+        "207023639": {
+          "lot_number": "99",
+          "lot_url": "https://www.invaluable.com/auction-lot/norman-rockwell-1894-1978-portrait-of-donald-a-wells-26-x-21-3-4-in-66-x-55-2-cm-executed-in-1971-99-c-cde025340e"
+        },
+        "207023565": {
+          "lot_number": "25",
+          "lot_url": "https://www.invaluable.com/auction-lot/thomas-hart-benton-1889-1975-industrial-scene-11-1-4-x-8-1-2-in-28-6-x-21-6-cm-image-14-x-11-1-8-in-35-6-x-28-3-cm-sheet-executed-circa-1930-25-c-29eb2ac642"
+        },
+        "207023542": {
+          "lot_number": "2",
+          "lot_url": "https://www.invaluable.com/auction-lot/wolf-kahn-1927-2020-conifers-9-x-11-3-4-in-22-9-x-29-9-cm-2-c-1a49c6eccc"
+        },
+        "207023543": {
+          "lot_number": "3",
+          "lot_url": "https://www.invaluable.com/auction-lot/wolf-kahn-1927-2020-across-the-grand-canal-ii-17-7-8-x-23-1-2-in-45-4-x-59-7-cm-image-24-3-4-x-29-1-4-in-62-9-x-74-3-cm-sheet-executed-in-1989-3-c-afc77edf12"
+        },
+        "207023544": {
+          "lot_number": "4",
+          "lot_url": "https://www.invaluable.com/auction-lot/wolf-kahn-1927-2020-pennsylvania-barn-11-x-13-3-4-in-27-9-x-34-9-cm-executed-in-1998-4-c-3c33b72d7d"
+        },
+        "207023545": {
+          "lot_number": "5",
+          "lot_url": "https://www.invaluable.com/auction-lot/wolf-kahn-1927-2020-barn-on-a-ridge-15-x-20-in-38-1-x-50-8-cm-executed-in-1970-5-c-730fc4e724"
+        },
+        "207023546": {
+          "lot_number": "6",
+          "lot_url": "https://www.invaluable.com/auction-lot/wolf-kahn-1927-2020-untitled-small-village-by-a-pond-13-7-8-x-17-in-35-2-x-43-2-cm-executed-circa-1960s-6-c-9d7aab8e84"
+        },
+        "207023547": {
+          "lot_number": "7",
+          "lot_url": "https://www.invaluable.com/auction-lot/wolf-kahn-1927-2020-untitled-landscape-with-a-pond-11-x-14-in-27-9-x-35-6-cm-executed-circa-1960s-7-c-9f79103654"
+        }
+      },
+      "evidence_url": "https://www.invaluable.com/auction-lot/norman-rockwell-1894-1978-portrait-of-donald-a-wells-26-x-21-3-4-in-66-x-55-2-cm-executed-in-1971-99-c-cde025340e",
+      "evidence": "Live rendered Invaluable auctioneer listing verified November 13, 2026: New York, New York, United States; sale timestamp 2026-11-03T19:00:00Z. Country fallback is restricted to the observed source IDs, lot numbers and URLs in this catalog group, never all Bonhams sales on that date.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "auction_house": "Bonhams",
+      "source": "Invaluable",
+      "date": "2026-11-10",
+      "country_code": "US",
+      "lots": {
+        "207146526": {
+          "lot_number": "25",
+          "lot_url": "https://www.invaluable.com/auction-lot/alberto-giacometti-1901-1966-nu-assis-seated-nude-25-c-d8b60b2136"
+        },
+        "207146502": {
+          "lot_number": "1",
+          "lot_url": "https://www.invaluable.com/auction-lot/albrecht-durer-1471-1528-harrowing-of-hell-christ-in-limbo-from-the-engraved-passion-1-c-b4a50c9b5e"
+        },
+        "207146632": {
+          "lot_number": "131",
+          "lot_url": "https://www.invaluable.com/auction-lot/alex-katz-born-1927-night-william-dunas-dancers-1-2-2-131-c-39ae8c89c0"
+        },
+        "207146604": {
+          "lot_number": "103",
+          "lot_url": "https://www.invaluable.com/auction-lot/alexander-calder-1898-1976-composition-with-circles-103-c-8e9ad97d95"
+        },
+        "207146670": {
+          "lot_number": "169",
+          "lot_url": "https://www.invaluable.com/auction-lot/andy-warhol-1928-1987-plate-4-from-flash-november-22-1963-169-c-8992ce0795"
+        },
+        "207146671": {
+          "lot_number": "170",
+          "lot_url": "https://www.invaluable.com/auction-lot/andy-warhol-1928-1987-flowers-170-c-997220e8a8"
+        },
+        "207146672": {
+          "lot_number": "171",
+          "lot_url": "https://www.invaluable.com/auction-lot/andy-warhol-1928-1987-mick-jagger-171-c-4f03e43d23"
+        },
+        "207146574": {
+          "lot_number": "73",
+          "lot_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-1841-1919-la-danse-a-la-campagne-2e-planche-dance-in-the-country-2nd-plate-73-c-e20e8f2c0d"
+        },
+        "207146575": {
+          "lot_number": "74",
+          "lot_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-1841-1919-louis-valtat-from-douze-lithographies-originales-de-pierre-auguste-renoir-12-original-lithographs-by-pierre-auguste-renoir-74-c-c5bb04242f"
+        },
+        "207146606": {
+          "lot_number": "105",
+          "lot_url": "https://www.invaluable.com/auction-lot/chuck-close-1940-2021-leslie-105-c-6cf76f2e52"
+        },
+        "207146621": {
+          "lot_number": "120",
+          "lot_url": "https://www.invaluable.com/auction-lot/david-hockney-1937-2026-the-old-guitarist-from-the-blue-guitar-120-c-16ce86a566"
+        },
+        "207146622": {
+          "lot_number": "121",
+          "lot_url": "https://www.invaluable.com/auction-lot/david-hockney-1937-2026-bill-and-james-ii-from-a-series-of-hand-drawn-lithographs-from-1979-80-121-c-1a383956e5"
+        },
+        "207146623": {
+          "lot_number": "122",
+          "lot_url": "https://www.invaluable.com/auction-lot/david-hockney-1937-2026-los-angeles-olympic-games-swimming-pool-122-c-dbccaae700"
+        },
+        "207146624": {
+          "lot_number": "123",
+          "lot_url": "https://www.invaluable.com/auction-lot/david-hockney-1937-2026-untitled-mother-123-c-8e81adc797"
+        },
+        "207146625": {
+          "lot_number": "124",
+          "lot_url": "https://www.invaluable.com/auction-lot/david-hockney-1937-2026-glyndebourne-124-c-a5b115b147"
+        },
+        "207146626": {
+          "lot_number": "125",
+          "lot_url": "https://www.invaluable.com/auction-lot/david-hockney-born-1937-breakfast-with-stanley-in-malibu-125-c-5696f2cabf"
+        },
+        "207146627": {
+          "lot_number": "126",
+          "lot_url": "https://www.invaluable.com/auction-lot/david-hockney-1937-2026-pool-made-with-paper-and-blue-ink-for-book-126-c-75d64a8ae7"
+        },
+        "207146605": {
+          "lot_number": "104",
+          "lot_url": "https://www.invaluable.com/auction-lot/elizabeth-catlett-1915-2012-sharecropper-104-c-df3b5cd5fe"
+        },
+        "207146634": {
+          "lot_number": "133",
+          "lot_url": "https://www.invaluable.com/auction-lot/ellsworth-kelly-1923-2015-colors-on-a-grid-133-c-b1c60ef635"
+        },
+        "207146635": {
+          "lot_number": "134",
+          "lot_url": "https://www.invaluable.com/auction-lot/ellsworth-kelly-1923-2015-red-curve-for-joel-134-c-e216e55319"
+        },
+        "207146530": {
+          "lot_number": "29",
+          "lot_url": "https://www.invaluable.com/auction-lot/fernand-leger-1881-1955-le-vase-the-vase-29-c-f47c7e1778"
+        },
+        "207146508": {
+          "lot_number": "7",
+          "lot_url": "https://www.invaluable.com/auction-lot/grant-wood-1891-1942-fertility-7-c-617e12e525"
+        },
+        "207146505": {
+          "lot_number": "4",
+          "lot_url": "https://www.invaluable.com/auction-lot/gustave-baumann-1881-1971-el-santo-the-saint-4-c-83122ea596"
+        },
+        "207146590": {
+          "lot_number": "89",
+          "lot_url": "https://www.invaluable.com/auction-lot/henri-de-toulouse-lautrec-1864-1901-elles-89-c-f471aa6855"
+        },
+        "207146531": {
+          "lot_number": "30",
+          "lot_url": "https://www.invaluable.com/auction-lot/henri-matisse-1869-1954-massia-au-visage-allonge-massia-with-an-elongated-face-30-c-1d1e75e874"
+        },
+        "207146532": {
+          "lot_number": "31",
+          "lot_url": "https://www.invaluable.com/auction-lot/henri-matisse-1869-1954-loulou-masque-chapeau-fleuri-loulou-flowered-hat-31-c-94b453d643"
+        },
+        "207146533": {
+          "lot_number": "32",
+          "lot_url": "https://www.invaluable.com/auction-lot/henri-matisse-1869-1954-jeune-fille-au-col-d-organdi-young-girl-with-organdy-collar-32-c-1ac79bf4c1"
+        },
+        "207146534": {
+          "lot_number": "33",
+          "lot_url": "https://www.invaluable.com/auction-lot/henri-matisse-1869-1954-jeune-fille-en-robe-fleurie-au-col-d-organdi-young-girl-in-flowered-dress-with-organdy-collar-33-c-06d9a44bdd"
+        },
+        "207146535": {
+          "lot_number": "34",
+          "lot_url": "https://www.invaluable.com/auction-lot/henri-matisse-1869-1954-jeune-femme-au-collier-young-woman-with-necklace-34-c-7a156d1166"
+        },
+        "207146652": {
+          "lot_number": "151",
+          "lot_url": "https://www.invaluable.com/auction-lot/james-rosenquist-1933-2017-the-stowaway-peers-out-at-the-speed-of-light-151-c-7cbe12a3f3"
+        },
+        "207146611": {
+          "lot_number": "110",
+          "lot_url": "https://www.invaluable.com/auction-lot/jim-dine-born-1935-happy-new-year-new-delhi-110-c-c5ea607cd3"
+        },
+        "207146536": {
+          "lot_number": "35",
+          "lot_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-one-plate-pl-13-from-album-13-35-c-547d6d5fb6"
+        },
+        "207146537": {
+          "lot_number": "36",
+          "lot_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-four-plates-from-album-13-36-c-b57041a22e"
+        },
+        "207146538": {
+          "lot_number": "37",
+          "lot_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-one-plate-from-les-brisants-37-c-cd5407a8d1"
+        },
+        "207146539": {
+          "lot_number": "38",
+          "lot_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-das-lebenslangliches-interview-the-lifelong-interview-38-c-24cfe14d8d"
+        },
+        "207146540": {
+          "lot_number": "39",
+          "lot_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-one-plate-from-les-voyants-the-seers-39-c-77bf467625"
+        },
+        "207146542": {
+          "lot_number": "41",
+          "lot_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-montroig-3-41-c-af45dd63f6"
+        },
+        "207146543": {
+          "lot_number": "42",
+          "lot_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-74-plates-from-cantic-del-sol-42-c-8eea3f1a33"
+        },
+        "207146544": {
+          "lot_number": "43",
+          "lot_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-l-egyptienne-the-egyptian-woman-43-c-5eb080f760"
+        },
+        "207146545": {
+          "lot_number": "44",
+          "lot_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-son-abrines-i-44-c-cce485b09c"
+        },
+        "207146619": {
+          "lot_number": "118",
+          "lot_url": "https://www.invaluable.com/auction-lot/keith-haring-1958-1990-apocalypse-1-118-c-520de6dab2"
+        },
+        "207146527": {
+          "lot_number": "26",
+          "lot_url": "https://www.invaluable.com/auction-lot/louis-icart-1888-1950-two-beauties-26-c-15396f1bf9"
+        },
+        "207146511": {
+          "lot_number": "10",
+          "lot_url": "https://www.invaluable.com/auction-lot/marc-chagall-1887-1985-l-opera-the-opera-10-c-7f4730e278"
+        },
+        "207146512": {
+          "lot_number": "11",
+          "lot_url": "https://www.invaluable.com/auction-lot/marc-chagall-1887-1985-le-jeu-des-arlequins-the-harlequin-s-game-11-c-2c6166860f"
+        },
+        "207146513": {
+          "lot_number": "12",
+          "lot_url": "https://www.invaluable.com/auction-lot/marc-chagall-1887-1985-le-soleil-jaune-the-yellow-sun-12-c-3149062d5e"
+        },
+        "207146509": {
+          "lot_number": "8",
+          "lot_url": "https://www.invaluable.com/auction-lot/marc-chagall-1887-1985-bella-8-c-0acd4b2d06"
+        },
+        "207146510": {
+          "lot_number": "9",
+          "lot_url": "https://www.invaluable.com/auction-lot/marc-chagall-1887-1985-ouvert-la-nuit-open-at-night-9-c-f64d5bafe5"
+        },
+        "207146649": {
+          "lot_number": "148",
+          "lot_url": "https://www.invaluable.com/auction-lot/mel-ramos-1935-2018-batman-148-c-50530ec5ec"
+        },
+        "207146503": {
+          "lot_number": "2",
+          "lot_url": "https://www.invaluable.com/auction-lot/rembrandt-harmensz-van-rijn-1606-1669-three-oriental-figures-jacob-and-laban-2-c-26dba10cb3"
+        },
+        "207146504": {
+          "lot_number": "3",
+          "lot_url": "https://www.invaluable.com/auction-lot/rembrandt-harmensz-van-rijn-1606-1669-self-portrait-etching-at-a-window-3-c-1373fd838f"
+        },
+        "207146608": {
+          "lot_number": "107",
+          "lot_url": "https://www.invaluable.com/auction-lot/richard-diebenkorn-1922-1993-small-red-from-eight-color-etchings-107-c-639c6b0446"
+        },
+        "207146609": {
+          "lot_number": "108",
+          "lot_url": "https://www.invaluable.com/auction-lot/richard-diebenkorn-1922-1993-tri-color-spade-from-five-spades-108-c-67a9849c8d"
+        },
+        "207146610": {
+          "lot_number": "109",
+          "lot_url": "https://www.invaluable.com/auction-lot/richard-diebenkorn-1922-1993-blue-surround-109-c-7519656cc5"
+        },
+        "207146646": {
+          "lot_number": "145",
+          "lot_url": "https://www.invaluable.com/auction-lot/robert-motherwell-1915-1991-the-basque-suite-145-c-43ee022839"
+        },
+        "207146647": {
+          "lot_number": "146",
+          "lot_url": "https://www.invaluable.com/auction-lot/robert-motherwell-1915-1991-three-plates-from-london-series-i-146-c-9c8bc3ac34"
+        },
+        "207146638": {
+          "lot_number": "137",
+          "lot_url": "https://www.invaluable.com/auction-lot/roy-lichtenstein-1923-1997-bicentennial-print-from-america-the-third-century-137-c-06e0a60ea1"
+        },
+        "207146639": {
+          "lot_number": "138",
+          "lot_url": "https://www.invaluable.com/auction-lot/roy-lichtenstein-1923-1997-mirror-from-harvey-gantt-portfolio-138-c-b2112a6242"
+        },
+        "207146640": {
+          "lot_number": "139",
+          "lot_url": "https://www.invaluable.com/auction-lot/roy-lichtenstein-1923-1997-forms-in-space-139-c-0dc7766c0b"
+        },
+        "207146578": {
+          "lot_number": "77",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-langosta-lobster-77-c-b0b86c8a79"
+        },
+        "207146579": {
+          "lot_number": "78",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-quetzalcoatl-78-c-70db94ee2c"
+        },
+        "207146580": {
+          "lot_number": "79",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-personaje-en-gris-personage-in-gray-from-rufino-tamayo-15-aguafuertes-1980-79-c-fcecb79610"
+        },
+        "207146581": {
+          "lot_number": "80",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-figura-en-negro-figure-in-black-from-rufino-tamayo-15-aguafuertes-1980-80-c-f33aa5d5eb"
+        },
+        "207146582": {
+          "lot_number": "81",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-bodegon-still-life-from-rufino-tamayo-15-aguafuertes-1980-81-c-53b461236b"
+        },
+        "207146583": {
+          "lot_number": "82",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-hombre-en-la-ventana-man-at-the-window-82-c-905a4c5556"
+        },
+        "207146584": {
+          "lot_number": "83",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-hombre-con-brazos-en-alto-man-with-arms-held-up-83-c-e1f03477f4"
+        },
+        "207146585": {
+          "lot_number": "84",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-perfil-con-sombrero-profile-with-hat-84-c-14b29654ff"
+        },
+        "207146586": {
+          "lot_number": "85",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-busto-en-rojo-bust-in-red-85-c-933d1cd643"
+        },
+        "207146587": {
+          "lot_number": "86",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-cabeza-sobre-fondo-azul-head-on-blue-background-86-c-aec83a6e2a"
+        },
+        "207146588": {
+          "lot_number": "87",
+          "lot_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-1899-1991-sandias-con-manzana-watermelons-with-apple-87-c-41deffc597"
+        },
+        "207146516": {
+          "lot_number": "15",
+          "lot_url": "https://www.invaluable.com/auction-lot/salvador-dali-1904-1989-seven-plates-from-tristan-et-iseult-15-c-d67ef49cfa"
+        },
+        "207146517": {
+          "lot_number": "16",
+          "lot_url": "https://www.invaluable.com/auction-lot/salvador-dali-1904-1989-19-plates-from-les-caprices-de-goya-de-dali-dali-s-caprichos-by-goya-16-c-bc0aef5f46"
+        },
+        "207146518": {
+          "lot_number": "17",
+          "lot_url": "https://www.invaluable.com/auction-lot/salvador-dali-1904-1989-five-plates-from-les-caprices-de-goya-de-dali-dali-s-caprichos-by-goya-17-c-44866da9c5"
+        },
+        "207146519": {
+          "lot_number": "18",
+          "lot_url": "https://www.invaluable.com/auction-lot/salvador-dali-1904-1989-l-art-d-aimer-d-ovide-the-art-of-love-18-c-d20a950131"
+        },
+        "207146520": {
+          "lot_number": "19",
+          "lot_url": "https://www.invaluable.com/auction-lot/salvador-dali-1904-1989-viviane-et-lancelot-from-la-quete-du-graal-the-quest-for-the-grail-19-c-5ccab4429c"
+        },
+        "207146612": {
+          "lot_number": "111",
+          "lot_url": "https://www.invaluable.com/auction-lot/sam-francis-1923-1994-for-the-blue-sons-of-the-air-111-c-cfad80fd2c"
+        },
+        "207146664": {
+          "lot_number": "163",
+          "lot_url": "https://www.invaluable.com/auction-lot/wayne-thiebaud-1920-2021-peppermints-163-c-9ef6daf180"
+        },
+        "207146665": {
+          "lot_number": "164",
+          "lot_url": "https://www.invaluable.com/auction-lot/wayne-thiebaud-1920-2021-glasses-from-seven-still-lifes-and-a-rabbit-164-c-22b9cd8c47"
+        },
+        "207146666": {
+          "lot_number": "165",
+          "lot_url": "https://www.invaluable.com/auction-lot/wayne-thiebaud-1920-2021-hill-street-165-c-4070066818"
+        },
+        "207146667": {
+          "lot_number": "166",
+          "lot_url": "https://www.invaluable.com/auction-lot/wayne-thiebaud-1920-2021-candy-apples-166-c-0bb7c7ef35"
+        }
+      },
+      "evidence_url": "https://www.invaluable.com/auction-lot/alberto-giacometti-1901-1966-nu-assis-seated-nude-25-c-d8b60b2136",
+      "evidence": "Live rendered Invaluable auctioneer listing verified November 13, 2026: Los Angeles, California, United States; sale timestamp 2026-11-10T19:00:00Z. Country fallback is restricted to the observed source IDs, lot numbers and URLs in this catalog group, never all Bonhams sales on that date.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "auction_house": "Bonhams",
+      "source": "Invaluable",
+      "date": "2026-11-18",
+      "country_code": "US",
+      "lots": {
+        "207351935": {
+          "lot_number": "16A",
+          "lot_url": "https://www.invaluable.com/auction-lot/henri-matisse-1869-1954-lydia-en-blouse-brodee-19-3-4-x-25-3-4-in-50-1-x-65-5-cm-executed-in-1936-16a-c-60a0fc09ce"
+        },
+        "207351923": {
+          "lot_number": "4A",
+          "lot_url": "https://www.invaluable.com/auction-lot/rene-magritte-1898-1967-sans-titre-5-1-2-x-7-3-8-in-14-x-18-8-cm-executed-circa-1943-4a-c-ec9e0d81af"
+        },
+        "207351921": {
+          "lot_number": "2A",
+          "lot_url": "https://www.invaluable.com/auction-lot/roy-lichtenstein-1923-1997-water-lilies-with-cloud-67-3-4-x-46-3-8-in-172-x-117-8-cm-executed-in-1992-this-work-is-one-of-three-printer-s-proofs-set-aside-from-an-edition-of-23-plus-six-artist-s-proofs-one-bon-a-tirer-two-presentatio-2a-c-793589ee87"
+        }
+      },
+      "evidence_url": "https://www.invaluable.com/auction-lot/henri-matisse-1869-1954-lydia-en-blouse-brodee-19-3-4-x-25-3-4-in-50-1-x-65-5-cm-executed-in-1936-16a-c-60a0fc09ce",
+      "evidence": "Live rendered Invaluable auctioneer listing verified November 13, 2026: 111 West 57th Street, New York, NY 10019, United States; sale timestamp 2026-11-18T21:00:00Z. Country fallback is restricted to the observed source IDs, lot numbers and URLs in this catalog group, never all Bonhams sales on that date.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "auction_house": "Bonhams",
+      "source": "Invaluable",
+      "date": "2026-11-19",
+      "country_code": "US",
+      "lots": {
+        "207381835": {
+          "lot_number": "143",
+          "lot_url": "https://www.invaluable.com/auction-lot/edgar-degas-1834-1917-jockey-7-1-8-x-4-7-16-in-18-1-x-11-3-cm-executed-circa-1885-1890-143-c-2167200d3b"
+        },
+        "207381809": {
+          "lot_number": "117",
+          "lot_url": "https://www.invaluable.com/auction-lot/henry-moore-1898-1986-ideas-for-reclining-figure-sculpture-21-3-4-x-14-15-16-in-55-2-x-37-9-cm-executed-in-1934-117-c-c8414fe0ca"
+        },
+        "207381839": {
+          "lot_number": "147",
+          "lot_url": "https://www.invaluable.com/auction-lot/max-ernst-1891-1976-tilleul-docile-8-1-4-x-6-3-8-in-21-x-16-2-cm-executed-in-1925-147-c-564ce9a111"
+        },
+        "207381793": {
+          "lot_number": "101",
+          "lot_url": "https://www.invaluable.com/auction-lot/pablo-picasso-1881-1973-portrait-de-guillaume-apollinaire-buste-8-1-8-x-5-3-16-in-20-6-x-13-2-cm-executed-in-spring-1905-101-c-ceaf8b25ca"
+        }
+      },
+      "evidence_url": "https://www.invaluable.com/auction-lot/edgar-degas-1834-1917-jockey-7-1-8-x-4-7-16-in-18-1-x-11-3-cm-executed-circa-1885-1890-143-c-2167200d3b",
+      "evidence": "Live rendered Invaluable auctioneer listing verified November 13, 2026: 111 West 57th Street, New York, NY 10019, United States; sale timestamp 2026-11-19T17:00:00Z. Country fallback is restricted to the observed source IDs, lot numbers and URLs in this catalog group, never all Bonhams sales on that date.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "auction_house": "Bonhams",
+      "source": "Invaluable",
+      "date": "2026-11-19",
+      "country_code": "US",
+      "lots": {
+        "207384091": {
+          "lot_number": "242",
+          "lot_url": "https://www.invaluable.com/auction-lot/alex-katz-b-1927-kym-1-30-x-95-5-8-in-76-3-x-242-7-cm-executed-in-1989-242-c-95658fb889"
+        },
+        "207384092": {
+          "lot_number": "243",
+          "lot_url": "https://www.invaluable.com/auction-lot/alex-katz-b-1927-ena-22-1-8-x-14-7-8-in-56-2-x-37-7-cm-executed-in-1987-243-c-0624d155dc"
+        },
+        "207384086": {
+          "lot_number": "237",
+          "lot_url": "https://www.invaluable.com/auction-lot/banksy-b-1974-gangsta-rat-mint-19-3-4-x-13-7-8-in-50-x-35-2-cm-executed-in-2004-this-work-is-number-three-from-an-edition-of-eight-237-c-9b9f45ac72"
+        },
+        "207384065": {
+          "lot_number": "216",
+          "lot_url": "https://www.invaluable.com/auction-lot/christo-1935-2020-380-wrapped-trees-project-for-the-avenue-des-champs-elysees-and-the-rond-point-de-champs-elysees-27-7-8-x-22-in-70-7-x-56-cm-executed-in-1969-216-c-9b0ec52aed"
+        },
+        "207384087": {
+          "lot_number": "238",
+          "lot_url": "https://www.invaluable.com/auction-lot/david-hockney-1937-2026-coloured-cubist-punchinella-14-x-11-in-25-5-x-28-1-cm-executed-in-1980-238-c-c028b3cd2e"
+        },
+        "207384089": {
+          "lot_number": "240",
+          "lot_url": "https://www.invaluable.com/auction-lot/fernando-botero-1932-2023-back-of-a-nude-30-1-8-x-22-1-2-in-76-5-x-57-1-cm-executed-in-1977-240-c-406974d5e3"
+        },
+        "207384057": {
+          "lot_number": "208",
+          "lot_url": "https://www.invaluable.com/auction-lot/frank-stella-1936-2024-rakow-sketch-28-x-29-7-8-in-70-9-x-75-8-cm-executed-in-1972-208-c-aa68a13aba"
+        },
+        "207384062": {
+          "lot_number": "213",
+          "lot_url": "https://www.invaluable.com/auction-lot/willem-de-kooning-1904-1997-woman-11-x-8-1-2-in-27-8-x-21-5-cm-executed-in-1963-213-c-8aadc67f2a"
+        },
+        "207384063": {
+          "lot_number": "214",
+          "lot_url": "https://www.invaluable.com/auction-lot/willem-de-kooning-1904-1997-untitled-11-x-8-1-2-in-27-8-x-21-5-cm-executed-in-1959-214-c-f414075718"
+        }
+      },
+      "evidence_url": "https://www.invaluable.com/auction-lot/alex-katz-b-1927-kym-1-30-x-95-5-8-in-76-3-x-242-7-cm-executed-in-1989-242-c-95658fb889",
+      "evidence": "Live rendered Invaluable auctioneer listing verified November 13, 2026: 111 West 57th Street, New York, NY 10019, United States; sale timestamp 2026-11-19T19:00:00Z. Country fallback is restricted to the observed source IDs, lot numbers and URLs in this catalog group, never all Bonhams sales on that date.",
+      "verified_at": "2026-11-13"
+    }
+  ]
+}

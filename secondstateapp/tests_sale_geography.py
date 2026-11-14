@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from django.test import SimpleTestCase
@@ -75,13 +76,34 @@ class SaleGeographyTests(SimpleTestCase):
         self.assert_country("US", auction_house="Dennis Auction Service", location="Online only")
         self.assert_country("GB", auction_house="Britannica Auctions", location="online")
 
-    def test_currency_provider_title_and_links_do_not_establish_country(self):
+    def test_provider_title_and_links_do_not_establish_country(self):
         lot = self.lot(currency="USD", source="Invaluable", title="New York / American artist",
                        lot_url="https://www.example.us/item", sale_url="https://drouot.com/en/v/123")
         self.assertEqual(sale_geography(lot), {"region": "unknown", "country_code": ""})
         lot.currency = "EUR"
         lot.source = "Drouot"
-        self.assertEqual(sale_geography(lot), {"region": "unknown", "country_code": ""})
+        self.assertEqual(sale_geography(lot), {"region": "outside_us", "country_code": ""})
+
+    def test_native_non_usd_currency_classifies_the_sale_without_inventing_a_country(self):
+        for currency in ("EUR", "GBP", "CAD", "AUD", "CHF", "JPY", "HKD", "SEK", " eur "):
+            with self.subTest(currency=currency):
+                lot = self.lot(currency=currency, location="Unconfirmed venue")
+                self.assertEqual(sale_geography(lot), {"region": "outside_us", "country_code": ""})
+
+    def test_non_usd_category_rule_preserves_verified_country_metadata(self):
+        self.assertEqual(sale_geography(self.lot(currency="EUR", location="Paris, France")),
+                         {"region": "outside_us", "country_code": "FR"})
+        self.assertEqual(sale_geography(self.lot(currency="CAD", location="New York, US")),
+                         {"region": "outside_us", "country_code": "US"})
+        self.assertEqual(sale_geography(self.lot(currency="USD", location="London, UK")),
+                         {"region": "outside_us", "country_code": "GB"})
+
+    def test_missing_currency_and_display_or_research_currency_do_not_classify_sale(self):
+        for currency in ("", None, "unknown", "XXX", "€", "USD"):
+            with self.subTest(currency=currency):
+                lot = self.lot(currency=currency, sold_currency="EUR", usd_currency="USD",
+                               original_currency="GBP", usd_prices={"source_currency": "EUR"})
+                self.assertEqual(sale_geography(lot), {"region": "unknown", "country_code": ""})
 
     def test_presentation_helper_does_not_modify_source_or_saved_fields(self):
         lot = self.lot(auction_house="DuMouchelles", source_lot_id="source-1", won_by_us=True,
@@ -129,4 +151,40 @@ class SaleGeographyTests(SimpleTestCase):
                 self.assert_country("", auction_house=house + " affiliate")
                 other_country, location = ("FR", "Paris, France") if country == "US" else ("US", "New York, US")
                 self.assert_country(other_country, auction_house=house, location=location)
+
+    def test_usd_sales_outside_us_keep_verified_foreign_country(self):
+        for house, country in (("Alyes Auctions", "HK"), ("Hammersite", "IL"), ("Zorrilla Subastas", "UY")):
+            with self.subTest(house=house):
+                self.assert_country(country, auction_house=house, currency="USD")
+        self.assert_country("IL", auction_house="Pasarel", location="Netanya, IL", currency="USD")
+
+    def test_verified_heritage_sale_requires_exact_source_house_date_and_url(self):
+        fields = dict(auction_house="Heritage Auctions", source="Heritage", currency="USD",
+                      event_at=datetime(2026, 11, 18, 7, tzinfo=timezone.utc),
+                      sale_url="https://fineart.ha.com/c/search.zx?saleNo=18242")
+        self.assert_country("US", **fields)
+        for changed in (
+            {"source": "Other provider"}, {"auction_house": "Unverified house"},
+            {"event_at": datetime(2026, 11, 19, 7, tzinfo=timezone.utc)},
+            {"sale_url": "https://fineart.ha.com/c/search.zx?saleNo=182420"},
+            {"sale_url": "https://other.example/c/search.zx?saleNo=18242"},
+        ):
+            with self.subTest(changed=changed):
+                self.assert_country("", **{**fields, **changed})
+        self.assert_country("GB", **fields, location="London, UK")
+
+    def test_verified_bonhams_source_lot_fallback_does_not_cover_other_sales(self):
+        fields = dict(auction_house="Bonhams", source="Invaluable", currency="USD",
+                      source_lot_id="207195647", lot_number="29",
+                      event_at=datetime(2026, 10, 28, 16, tzinfo=timezone.utc),
+                      lot_url="https://www.invaluable.com/auction-lot/albrecht-durer-1471-1528-the-large-horse-29-c-2f5e2703c1")
+        self.assert_country("US", **fields)
+        for changed in (
+            {"source_lot_id": "another-id"}, {"lot_number": "30"},
+            {"lot_url": "https://www.invaluable.com/auction-lot/different-lot"},
+            {"sale_url": "https://www.invaluable.com/catalog/another-sale"},
+            {"event_at": datetime(2026, 10, 29, 16, tzinfo=timezone.utc)},
+        ):
+            with self.subTest(changed=changed):
+                self.assert_country("", **{**fields, **changed})
 

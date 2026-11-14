@@ -1,14 +1,17 @@
 """Sale geography for Calendar browsing, without rewriting source observations.
 
-Explicit sale location takes precedence. Empty/online-only locations can use an
-exact, evidence-backed house alias. International houses deliberately have no
-global fallback: the country of their headquarters is not a sale location.
+Native non-USD sales belong to the Outside the U.S. browsing category. Country
+metadata comes from explicit sale location or an exact, evidence-backed house
+alias for empty/online-only locations. International houses deliberately have
+no global country fallback: headquarters are not a sale location.
 """
 
 import json
 import re
 import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def _key(value):
@@ -25,6 +28,9 @@ _HOUSE_COUNTRIES = {
     for house in _REGISTRY["houses"]
     for name in (house["name"], *house.get("aliases", []))
 }
+_SALE_COUNTRIES = json.loads(
+    (Path(__file__).with_name("data") / "auction_sale_countries.json").read_text(encoding="utf-8")
+)["sales"]
 _COUNTRY_NAMES = {
     "US": ("United States", "United States of America", "USA", "U.S.", "U.S.A."),
     "GB": ("United Kingdom", "Great Britain", "UK", "U.K.", "England", "Scotland", "Wales", "Northern Ireland"),
@@ -70,6 +76,7 @@ _COUNTRY_NAMES = {
     "AR": ("Argentina",),
     "CO": ("Colombia",),
     "CL": ("Chile",),
+    "UY": ("Uruguay",),
 }
 _COUNTRY_LABELS = {
     _key(name): code for code, names in _COUNTRY_NAMES.items() for name in names
@@ -86,7 +93,7 @@ _AMBIGUOUS_CODE_CITIES = {
     "IN": {"mumbai", "new delhi", "delhi", "kolkata", "bengaluru"},
     "AR": {"buenos aires"},
     "CO": {"bogota", "medellin"},
-    "IL": {"tel aviv", "jerusalem"},
+    "IL": {"tel aviv", "jerusalem", "netanya"},
 }
 # These labels occur as complete sale locations, rather than inferred words in
 # artwork descriptions or titles. New York denotes the US city/state; the
@@ -127,19 +134,63 @@ def _location_country(location):
     return ""
 
 
-def sale_geography(lot):
-    """Return region/country from explicit location or a verified exact house.
+def _source_url(value):
+    """Ignore a trailing slash, but retain provider paths and sale queries."""
+    try:
+        parsed = urlsplit(str(value or ""))
+    except ValueError:
+        return ""
+    if parsed.scheme not in {"http", "https"}:
+        return ""
+    return f"{parsed.hostname}{parsed.path.rstrip('/')}" + (f"?{parsed.query}" if parsed.query else "")
 
-    Unknown locations never silently become "outside_us". A nonempty,
-    unresolved sale location is also not overridden by the house's usual
-    country. No network requests, database reads or source mutation occur.
+
+def _verified_sale_country(lot):
+    event_at = getattr(lot, "event_at", None)
+    if isinstance(event_at, datetime):
+        day = (event_at.astimezone(timezone.utc) if event_at.tzinfo else event_at).date().isoformat()
+    else:
+        day = str(event_at or "")[:10]
+    house = _key(getattr(lot, "auction_house", ""))
+    source = _key(getattr(lot, "source", ""))
+    sale_url = _source_url(getattr(lot, "sale_url", ""))
+    for sale in _SALE_COUNTRIES:
+        if (house, source, day) != (_key(sale["auction_house"]), _key(sale["source"]), sale["date"]):
+            continue
+        if sale_url and sale_url in {_source_url(url) for url in sale.get("sale_urls", [])}:
+            return sale["country_code"]
+        # Old imports may have no catalog URL. Exact source identity, lot URL,
+        # number, house and date bind these entries to the verified sale.
+        if not sale_url:
+            known = sale.get("lots", {}).get(str(getattr(lot, "source_lot_id", "")))
+            if (
+                known
+                and str(getattr(lot, "lot_number", "")).strip() == known["lot_number"]
+                and _source_url(getattr(lot, "lot_url", "")) == _source_url(known["lot_url"])
+            ):
+                return sale["country_code"]
+    return ""
+
+
+def sale_geography(lot):
+    """Return the browsing region and independently verified country.
+
+    The Calendar's native-currency rule puts non-USD sales outside the US,
+    without inventing a specific country. Use only the imported lot.currency;
+    USD display conversions and research/sold currencies are not sale currency.
+    USD or missing currencies still require location/house evidence. A nonempty,
+    unresolved sale location is not overridden by the house's usual country.
+    No network requests, database reads or source mutation occur.
     """
     location = getattr(lot, "location", "") or ""
     country = _location_country(location)
     if not country and _key(location) in _ONLINE_LOCATIONS:
-        country = _HOUSE_COUNTRIES.get(_key(getattr(lot, "auction_house", "")), "")
+        country = _verified_sale_country(lot) or _HOUSE_COUNTRIES.get(_key(getattr(lot, "auction_house", "")), "")
+    currency = str(getattr(lot, "currency", "") or "").strip().upper()
+    native_foreign_currency = bool(re.fullmatch(r"[A-Z]{3}", currency)) and currency not in {"USD", "XXX"}
+    region = "us" if country == "US" else "outside_us" if country else "unknown"
     return {
-        "region": "us" if country == "US" else "outside_us" if country else "unknown",
+        "region": "outside_us" if native_foreign_currency else region,
         "country_code": country,
     }
 

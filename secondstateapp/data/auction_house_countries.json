@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "policy": "Presentation-only exact house aliases. Explicit sale location takes precedence. No global fallback for Sotheby's, Christie's, Bonhams, Phillips or Heritage; unknowns remain unknown.",
+  "policy": "Native non-USD currency classifies Outside the U.S. Country metadata uses explicit sale location or evidence-backed exact house aliases for blank/online locations. Multinational houses require exact verified sale evidence, never a headquarters fallback.",
   "houses": [
     {
       "name": "Copake Auction Inc.",
@@ -522,6 +522,732 @@
       "evidence_url": "https://www.whitesauctions.com/location",
       "evidence": "Auction gallery at 19 Jackson Street, Middleboro, Massachusetts 02346.",
       "verified_at": "2026-11-12"
+    },
+    {
+      "name": "A.B.Levy’s Palm Beach",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/joan-miro-spanish-1893-1983-print-17-c-a45ffb0aec",
+      "evidence": "Explicit source sale location: West Palm Beach , FL, US. Observed in imported Calendar lot 2246 / 206677726; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Abell Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/joan-miro-1893-1983-136-c-3ab24dbd28",
+      "evidence": "Explicit source sale location: Los Angeles, CA, US. Observed in imported Calendar lot 203 / 205421380; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Abington Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/roy-lichtenstein-limited-edition-pistol-print-110-c-5781f53a42",
+      "evidence": "Explicit source sale location: Fort Lauderdale, FL, US. Observed in imported Calendar lot 151 / 205377119; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Akiba Galleries",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-french-1841-1919-l-enfant-au-biscuit-lithograph-362-c-bca2c89c40",
+      "evidence": "Explicit source sale location: Dania Beach, FL, US. Observed in imported Calendar lot 66 / 205213952; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Alex Cooper",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-la-femme-couche-etching-1252-c-2c5e7379a9",
+      "evidence": "Explicit source sale location: Towson, MD, US. Observed in imported Calendar lot 39 / 205274687; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Alyes Auctions",
+      "country_code": "HK",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/banksy-60-c-c4e4101187",
+      "evidence": "Explicit source sale location: Hong Kong, HK. Observed in imported Calendar lot 209 / 205433392; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Amelia Auctions & Appraisals",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alexander-calder-american-1898-1976-crossroads-lithograph-in-colors-337-c-e88276bb04",
+      "evidence": "Explicit source sale location: Columbus, OH, US. Observed in imported Calendar lot 2585 / 206883428; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Andrew Jones Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/joseph-fernand-henri-leger-france-1881-1955-composition-with-three-keys-and-the-singer-on-the-radio-2-two-lithographs-in-colors-on-wove-papers-largest-25-3-4-x-19-3-4in-65-x-50cm-296-c-8b4cb93dc8",
+      "evidence": "Explicit source sale location: Los Angeles, CA, US. Observed in imported Calendar lot 651 / 205779391; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Auction Gallery of the Palm Beaches",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/two-keith-haring-american-1958-1990-two-pop-shop-color-prints-both-signed-in-black-marker-with-the-certification-stamps-17-1-4-x-12-1-2-loose-and-unframed-277-c-1faae5085a",
+      "evidence": "Explicit source sale location: West Palm Beach, FL, US. Observed in imported Calendar lot 804 / 205818693; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Auctions at Showplace",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/joan-miro-sobreteixims-lithograph-ca-1973-4-c-08f5b59538",
+      "evidence": "Explicit source sale location: Astoria, NY, US. Observed in imported Calendar lot 118 / 204329372; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Austin Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/pedro-friedeberg-mexico-d-2026-serigraph-print-almanaque-o-365-suenitos-surrealistas-1267-c-3192b0508d",
+      "evidence": "Explicit source sale location: Austin, TX, US. Observed in imported Calendar lot 614 / 205692064; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Blackwell Auctions LLC",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/henri-matisse-lithograph-la-gerbe-242-c-83fe9d731b",
+      "evidence": "Explicit source sale location: Clearwater, FL, US. Observed in imported Calendar lot 2466 / 206790123; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Casco Bay Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/shepard-fairey-b-1970-empire-state-of-mind-8-c-14d02c19ef",
+      "evidence": "Explicit source sale location: Freeport, ME, US. Observed in imported Calendar lot 2453 / 206838214; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Charleston Estate Services Auctions & Appraisals",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/leroy-neiman-hand-signed-arnie-in-the-rain-lithograph-65-c-51d1450be9",
+      "evidence": "Explicit source sale location: Mount Pleasant, SC, US. Observed in imported Calendar lot 56 / 205317762; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Charlton Hall",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/joan-miro-289-c-f4707ff4b2",
+      "evidence": "Explicit source sale location: West Columbia, SC, US. Observed in imported Calendar lot 1033 / 205868288; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Clark's Fine Art & Auctioneers Inc.",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alexander-calder-1898-1976-american-19-c-d484af7a26",
+      "evidence": "Explicit source sale location: Tarzana, CA, US. Observed in imported Calendar lot 503 / 205645418; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Collective Hudson, LLC",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/thomas-hart-benton-moonlight-changes-the-shape-of-the-river-signed-limited-edition-print-no-reserve-603-c-feccf909ec",
+      "evidence": "Explicit source sale location: Kingston, NY, US. Observed in imported Calendar lot 2211 / 206683313; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Concept Art Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/george-rodrigue-blue-dog-orig-signed-screenprint-ho-ho-ho-762-c-6120d21acf",
+      "evidence": "Explicit source sale location: Pittsburgh, PA, US. Observed in imported Calendar lot 286 / 205441828; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Crafted Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-french-1841-1919-madame-georges-charpentier-and-her-children-framed-print-321-c-be501ff4be",
+      "evidence": "Explicit source sale location: Germantown Hills, IL, US. Observed in imported Calendar lot 150 / 205130134; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Crescent City Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/john-sloan-american-1871-1951-bandits-cave-1920-sight-h-7-3-4-in-w-5-1-2-in-framed-h-14-3-4-in-w-11-3-4-in-2163-c-afe7dc5d29",
+      "evidence": "Explicit source sale location: New Orleans, LA, US. Observed in imported Calendar lot 294 / 205438210; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Curated Gallery Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/after-roy-lichtenstein-1923-1997-ohhh-alright-pop-art-woman-framed-color-print-195-c-bc6b9ade61",
+      "evidence": "Explicit source sale location: BUFFALO, NY, US. Observed in imported Calendar lot 2531 / 206878291; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Direct Auction Galleries, Inc.",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/toots-shor-bar-signed-leroy-neiman-serigraph-203-c-81ab4a04c0",
+      "evidence": "Explicit source sale location: Chicago, IL, US. Observed in imported Calendar lot 428 / 205614891; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Duran Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/andy-warhol-american-1928-1987-ladies-gentlemen-fs-ii-137-screenprint-13-c-0cdd00d8f4",
+      "evidence": "Explicit source sale location: Wellington, FL, US. Observed in imported Calendar lot 1687 / 206373734; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Eldred's",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alex-katz-new-york-maine-1927-gray-day-1992-color-screenprint-on-arches-sheet-22-x-72-framed-35-x-83-25-3018-c-153061ec17",
+      "evidence": "Explicit source sale location: East Dennis, MA, US. Observed in imported Calendar lot 199 / 205324409; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Everard Auctions and Appraisals",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/after-henri-matisse-palme-blanche-sur-fond-rouge-497-c-2f0f3184cb",
+      "evidence": "Explicit source sale location: Savannah, GA, US. Observed in imported Calendar lot 2469 / 206800179; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Fontaine's Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alex-katz-american-b-1927-five-women-295-c-41b43bea79",
+      "evidence": "Explicit source sale location: Pittsfield, MA, US. Observed in imported Calendar lot 1402 / 206111474; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Freeman’s",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alexander-calder-american-1898-1976-les-trois-oeufs-1974-191-c-0722f5fda6",
+      "evidence": "Explicit source sale location: Chicago, IL, US. Observed in imported Calendar lot 687 / 205789050; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Gary R. Wallace Auctioneers Inc.",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/thomas-hart-benton-lithograph-limited-edition-98-c-5d80193c01",
+      "evidence": "Explicit source sale location: Brookfield, NH, US. Observed in imported Calendar lot 2507 / 206813043; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Hill Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alexander-calder-1898-1976-abstract-litho-signed-30-c-cdced17f89",
+      "evidence": "Explicit source sale location: Sunrise, FL, US. Observed in imported Calendar lot 94 / 205239665; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Joshua Kodner",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/andy-warhol-1928-1987-serigraph-300-c-4d8b865d18",
+      "evidence": "Explicit source sale location: Dania Beach, FL, US. Observed in imported Calendar lot 336 / 205466183; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Kaminski Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alexander-calder-squash-blossoms-color-lithograph-385-c-510d3d4a3c",
+      "evidence": "Explicit source sale location: Beverly, MA, US. Observed in imported Calendar lot 778 / 205786799; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Kodner Galleries",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/fernando-botero-picador-200-c-2968c6ca01",
+      "evidence": "Explicit source sale location: Dania Beach, FL, US. Observed in imported Calendar lot 234 / 205420325; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Leonard Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/antoni-tapies-spanish-1923-2012-lithographs-245-c-ff48b047e6",
+      "evidence": "Explicit source sale location: Addison, IL, US. Observed in imported Calendar lot 638 / 205753739; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Link Auction Galleries",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/joan-miro-spanish-1893-1983-francois-chapon-from-francis-ponge-manuscripts-livres-peintures-1977-color-lithograph-203-c-519eb95868",
+      "evidence": "Explicit source sale location: St. Louis, MO, US. Observed in imported Calendar lot 339 / 205526777; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Lone Star Art Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/andy-warhol-1928-1987-toy-painting-fish-unique-1983-synthetic-polymer-paint-and-silkscreen-on-canvas-8-x-10-inches-14-25-x-17-25-inches-frame-87-c-cbba1eca8b",
+      "evidence": "Explicit source sale location: Dallas, TX, US. Observed in imported Calendar lot 1874 / 206449279; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Market Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-french-18411919-la-danse-a-la-campagne-17-c-9616f084be",
+      "evidence": "Explicit source sale location: Lake Worth, FL, US. Observed in imported Calendar lot 60 / 205289208; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "MiddleManBrokers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/fernand-leger-la-partie-de-campagne-lithograph-616-c-45a0145cec",
+      "evidence": "Explicit source sale location: Sunrise, FL, US. Observed in imported Calendar lot 1718 / 206520754; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Neal Auction Company",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alexander-calder-travaux-dacier-1961-lithograph-407-c-472c40c3d3",
+      "evidence": "Explicit source sale location: New Orleans, LA, US. Observed in imported Calendar lot 918 / 205874970; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Neue Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/zao-wou-ki-aquatint-untitled-abstraction-28-c-379828ffd3",
+      "evidence": "Explicit source sale location: Beachwood, OH, US. Observed in imported Calendar lot 124 / 205357962; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "New Orleans Auction Galleries",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/andy-warhol-american-1928-1987-teddy-roosevelt-f-s-ii-373-376-1986-724-c-8dc0a94634",
+      "evidence": "Explicit source sale location: New Orleans, LA, US. Observed in imported Calendar lot 2212 / 206571708; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Nye & Company",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alexander-calder-american-1898-1976-os-et-serpent-bone-and-snake-print-520-c-e7e1009692",
+      "evidence": "Explicit source sale location: Bloomfield , NJ, US. Observed in imported Calendar lot 1150 / 205970423; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Orion Antiques",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/francisco-de-goya-spanish-1746-1828-138-c-cc3cad6227",
+      "evidence": "Explicit source sale location: Pompano Beach, FL, US. Observed in imported Calendar lot 48 / 205318170; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Rachel Davis Fine Arts",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-french-1841-1919-etching-45-c-0c1bc9f696",
+      "evidence": "Explicit source sale location: Cleveland, OH, US. Observed in imported Calendar lot 274 / 205366221; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Revere Auctions",
+      "country_code": "US",
+      "aliases": [
+        "Revere Auction"
+      ],
+      "evidence_url": "https://www.invaluable.com/auction-lot/rufino-tamayo-cabeza-en-rojo-color-etching-101-c-bd2d326e3c",
+      "evidence": "Explicit source sale location: St Paul, MN, US. Observed in imported Calendar lot 1272 / 206015788; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13",
+      "alias_evidence_url": "https://drouot.com/en/v/187373",
+      "alias_evidence": "November 17 Fine Jewelry and Luxury Goods sale: 755 Prior Ave N Unit 235 C, St. Paul, Minnesota 55104; same revereauctions.com contact."
+    },
+    {
+      "name": "Ripley Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-french-1841-1919-une-mere-et-deux-enfants-a-mother-and-two-children-ca-1905-1912-lithograph-14-1-4-h-x-18-3-4-w-sight-25-h-x-30-1-4-w-frame-103-c-83e276a28b",
+      "evidence": "Explicit source sale location: Indianapolis, IN, US. Observed in imported Calendar lot 277 / 205440212; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Santa Monica Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alex-katz-1927-night-william-dunas-dance-4-pamela-1983-46-c-ae464ba19a",
+      "evidence": "Explicit source sale location: Santa Monica, CA, US. Observed in imported Calendar lot 1240 / 205978965; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Selkirk Auctioneers & Appraisers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/leroy-neiman-american-1921-2012-338-c-7a47fd37fb",
+      "evidence": "Explicit source sale location: St. Louis, MO, US. Observed in imported Calendar lot 273 / 205442884; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Sloans & Kenyon",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-french-18411919-le-chapeau-epingle-circa-1894-drypoint-plate-5-x-3-5-inches-sheet-8-x-6-inches-594-c-23f1cf5f34",
+      "evidence": "Explicit source sale location: Chevy Chase, MD, US. Observed in imported Calendar lot 308 / 205491058; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "South Bay Auctions Inc",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alexander-calder-american-1898-1976-le-jardin-fleuriste-1971-lithograph-in-colors-121-c-9eebf5b134",
+      "evidence": "Explicit source sale location: East Moriches, NY, US. Observed in imported Calendar lot 386 / 205470265; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "STAIR",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.stairgalleries.com/bidding/AUC00630-modern-contemporary-fine-art-objects-628/228-chuck-close-1940-2021-lucas-179916",
+      "evidence": "Explicit source sale location: Hudson, New York, United States. Observed in imported Calendar lot 10387 / 179916; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "The Auction Barn",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/5-etchings-by-francisco-de-goya-27-c-da01e6c96c",
+      "evidence": "Explicit source sale location: New Milford, CT, US. Observed in imported Calendar lot 63 / 205330613; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "The East Is Red Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/henri-matisse-the-cut-outs-1985-lithograph-attributed-to-314-c-ae66c1bc5a",
+      "evidence": "Explicit source sale location: New Castle, DE, US. Observed in imported Calendar lot 57 / 205342974; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Toomey & Co. Auctioneers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/alexander-calder-untitled-spanish-refugee-aid-c-105-c-83c16c9e5c",
+      "evidence": "Explicit source sale location: Chicago, IL, US. Observed in imported Calendar lot 11 / 205236204; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Tremont Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/andy-warhol-mick-jagger-color-screenprint-from-the-mick-jagger-series-signed-by-warhol-in-pencil-lower-right-and-inscribed-to-terry-lower-center-in-margin-signed-by-mick-jagger-in-black-felt-pen-lower-left-un-429-c-62a6dcb3d9",
+      "evidence": "Explicit source sale location: Sudbury, MA, US. Observed in imported Calendar lot 2603 / 206886134; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Weschler's",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/leroy-neiman-american-1921-2012-ocean-sailing-serigraph-in-color-labeled-p-p-frame-43-3-4-x-51-1-2-in-111-1-x-130-8-cm-518-c-d5f7c4a6f7",
+      "evidence": "Explicit source sale location: Rockville, MD, US. Observed in imported Calendar lot 408 / 205650658; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Williamson Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/danseuse-creole-by-henri-matisse-france-1869-1954-w-docs-433-c-f92ca56cfa",
+      "evidence": "Explicit source sale location: Hollywood, FL, US. Observed in imported Calendar lot 129 / 205354417; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Wooten & Wooten Auctioneers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/victor-vasarely-447-c-5bc6c2484f",
+      "evidence": "Explicit source sale location: Camden, SC, US. Observed in imported Calendar lot 181 / 205401703; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "World Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-lot/fernand-leger-french-1881-1955-serigraph-280-c-754aa7a8cf",
+      "evidence": "Explicit source sale location: East Meadow, NY, US. Observed in imported Calendar lot 187 / 205390181; matching house records have no contradictory country.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Artemis Fine Arts",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://auctions.artemisgallery.com/online-auctions/",
+      "evidence": "Official November 16 and December 3 auction listings locate the sales in Louisville, Colorado, US.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Austin York LLC",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://hibid.com/aliin.hibid.com/catalog/780883/october-fall-sale?apage=2",
+      "evidence": "Auctioneer-published October 22 sale at 2 Mill Street, Cornwall, New York 12518.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Bunch Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.bunchauctions.com/buying-at-auction",
+      "evidence": "Official buying page locates previews and auction galleries in Chadds Ford, Pennsylvania.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Cottone Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.liveauctioneers.com/auctioneer/1116/cottone-auctions/",
+      "evidence": "Auctioneer-published profile: 120 Court Street, Geneseo, New York 14454, USA.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Dargate Auction Galleries",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.auctionzip.com/PA-Auctioneers/838.html",
+      "evidence": "Auctioneer-published profile: 326 Munson Avenue, McKees Rocks, Pennsylvania 15136.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "District Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.districtauction.com/buy/bidding//",
+      "evidence": "Official gallery auction bidding page: 5531 Airport Way South, Seattle, Washington 98108.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Hammersite",
+      "country_code": "IL",
+      "aliases": [],
+      "evidence_url": "https://www.hammersite.com/wp-content/uploads/2026/02/Terms-and-Conditions-2026.pdf",
+      "evidence": "Official 2026 buyers guide: 40 Tagore Street, Tel Aviv, Israel 6920342.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Hotspot Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.hotspotauctions.com/contact-us",
+      "evidence": "Official contact page: 50 Meyer Road, Amherst, New York 14226.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Jacksons Auction & Real Estate Company",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.jacksons-auction.com/about/contact/",
+      "evidence": "Official contact page: 617 East North Street, Indianapolis, Indiana 46204.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "James Cox Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://visitulstercountyny.com/plan-your-visit/things-to-do/james-cox-gallery-at-woodstock-2/",
+      "evidence": "Official Ulster County tourism listing: gallery at 4666 Route 212, Willow, New York 12495.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Kamelot Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://kamelotauctions.com/about.php",
+      "evidence": "Official gallery and bidding information: 2220 East Allegheny Avenue, Philadelphia, Pennsylvania 19134.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Schwenke Auctioneers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://woodburyauction.com/pdf/072018-Registration.pdf",
+      "evidence": "Official bidder registration form specifies auction location at 710 Main Street South, Woodbury, Connecticut 06798.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Shapiro Auctions LLC",
+      "country_code": "US",
+      "aliases": [
+        "Shapiro Auctions & Appraisals"
+      ],
+      "evidence_url": "https://www.shapiroauctions.com/",
+      "evidence": "Official November 7, 2026 Fine Art Auction is in Bedford Hills, New York; site identifies the same firm as Shapiro Auctions and Appraisals.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "The Red Finch Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.theredfinch.net/buying/terms-of-sale/",
+      "evidence": "Official terms and gallery address: Reston, Virginia 20191.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Vero Beach Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.verobeachauction.com/contact-us/",
+      "evidence": "Official contact page: 492 Old Dixie Highway, Vero Beach, Florida 32962.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "William Smith Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://wsmithauction.com/buying-at-auction/",
+      "evidence": "Official gallery auction terms: Plainfield, New Hampshire 03781.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Zorrilla Subastas",
+      "country_code": "UY",
+      "aliases": [],
+      "evidence_url": "https://drouot.com/en/auctioneer/2644/zorrilla-subastas?tab=sales",
+      "evidence": "Auctioneer-published profile locates auction house at Soriano 990, Montevideo, Uruguay.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Material Culture",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://materialculture.com/contact/",
+      "evidence": "Auction gallery at 4700 Wissahickon Avenue, Suite 101, Philadelphia, Pennsylvania 19144.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Meridian Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.meridianauctiongallery.com/",
+      "evidence": "Auction gallery at 205 South Mission Road, Los Angeles, California 90033; official November sale page identifies Los Angeles previews.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Merrill's Auctioneers & Appraisers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.merrillsauction.com/contact-merrills-auctioneers",
+      "evidence": "Auction house at 137 James Brown Drive, Williston, Vermont 05495.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "New England Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.newenglandauctions.com/contact-us",
+      "evidence": "Auction previews, warehouse and showroom at 14 Business Park Drive, Suite 5, Branford, Connecticut 06405.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "New Hampshire Auctions and Appraisals LLC",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://nhauctionsandappraisals.com/contact/",
+      "evidence": "Official auction-house contact address is 41 Main Street, Goffstown, New Hampshire 03045, USA.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Newel Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.newelauctions.com/contact-newel-auctions",
+      "evidence": "Auction contact and previews at 32-00 Skillman Avenue, Long Island City, New York 11101; pickup warehouse also in Long Island City.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "O'Gallerie",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.ogallerie.com/contact/",
+      "evidence": "Auction building at 228 Northeast Seventh Avenue, Portland, Oregon 97232.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "One Source Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.onesourceauctions.com/about-us/",
+      "evidence": "Online auction house with previews by appointment at 177 South Main Street, Canandaigua, New York 14424.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Poster Auctions International Inc",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.posterauctions.com/buying/bidding",
+      "evidence": "Official bidding page identifies US auction venues: 1440 West Hubbard Street, Chicago, Illinois, and 333 North Main Street, Lambertville, New Jersey.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Potomack Company",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.potomackcompany.com/departments/",
+      "evidence": "Auction preview gallery at 1120 North Fairfax Street, Alexandria, Virginia 22314.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Potter & Potter Auctions Inc.",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://potterauctions.com/contact",
+      "evidence": "Auction gallery at 5001 West Belmont Avenue, Chicago, Illinois 60641.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Premier Auction Galleries",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://pag4u.com/contact/",
+      "evidence": "Official contact lists USA and 12587 Chillicothe Road, Chesterland, Ohio 44026.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Public Sale Auction House",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://publicsale.com/about-public-sale-auction-house",
+      "evidence": "Auction showroom, previews and collection location at 90 Green Street, Hudson, New York 12534.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Regency Auction House",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://regencyauction.com/about",
+      "evidence": "Auction facility at 419 Franklin Avenue, Rockaway, New Jersey 07866.",
+      "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Santa Fe Art Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.santafeartauction.com/contact//",
+      "evidence": "Auction showroom at 932 Railfan Road, Santa Fe, New Mexico 87505.",
+      "verified_at": "2026-11-13"
     }
   ]
 }

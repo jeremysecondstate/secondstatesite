@@ -259,7 +259,7 @@
     <div class="day-gallery-tools">
       <div class="day-gallery-primary-actions">
         <div id="day-gallery-filters" class="day-gallery-filters" role="group" aria-label="Filter the day's lots"></div>
-        <button id="day-gallery-hide-attributed" class="day-gallery-filter" type="button" aria-pressed="false" aria-controls="day-gallery-grid day-gallery-artists day-gallery-house-filters" aria-describedby="day-gallery-attribution-status">Hide After &amp; Attributed</button>
+        <button id="day-gallery-hide-attributed" class="day-gallery-filter" type="button" aria-pressed="false" aria-controls="day-gallery-grid day-gallery-artists day-gallery-house-filters" aria-describedby="day-gallery-attribution-status" title="Hide works marked After or Attributed to. Saved selections are kept.">Hide After &amp; Attributed</button>
         <button id="day-gallery-send-launch" class="day-gallery-send-launch" type="button" hidden>Send Email</button>
       </div>
       <label class="day-gallery-sort-label" for="day-gallery-group">Group lots
@@ -284,13 +284,17 @@
         </select>
       </label>
     </div>
-    <div class="day-gallery-location-tools">
-      <span id="day-gallery-location-label" class="day-gallery-location-label">Sale location</span>
-      <div id="day-gallery-region-filters" class="day-gallery-region-filters" role="group" aria-labelledby="day-gallery-location-label" aria-describedby="day-gallery-location-status"></div>
+    <div class="day-gallery-refinements">
+      <div class="day-gallery-location-tools">
+        <span id="day-gallery-location-label" class="day-gallery-location-label">Sale location</span>
+        <div id="day-gallery-region-filters" class="day-gallery-region-filters" role="group" aria-labelledby="day-gallery-location-label" aria-describedby="day-gallery-location-status" title="Counts reflect the active lot filters."></div>
+      </div>
+      <div class="day-gallery-filter-summary">
+        <p id="day-gallery-results" class="day-gallery-results" role="status">Matching filters: 0 of 0 day lots · 0 cards shown</p>
+        <p id="day-gallery-attribution-status" class="day-gallery-filter-note" role="status" hidden></p>
+      </div>
+      <p id="day-gallery-location-status" class="day-gallery-location-status" role="status" hidden></p>
     </div>
-    <p id="day-gallery-location-status" class="day-gallery-sort-note" role="status" hidden></p>
-    <p id="day-gallery-attribution-status" class="day-gallery-sort-note" role="status" hidden></p>
-    <p id="day-gallery-results" class="day-gallery-results" role="status">Matching filters: 0 of 0 day lots · 0 cards shown</p>
     <details id="day-gallery-houses" class="day-gallery-section">
       <summary class="day-gallery-section-toggle">
         <span>
@@ -3472,6 +3476,13 @@
   };
 
   const renderGalleryFilters = () => {
+    // Old links may still request Unconfirmed after all sale locations have
+    // been resolved. Judge the entire scoped day, not the other active filters.
+    if (galleryOrganization.region === "unknown" && !dayLots().some((lot) => galleryLotRegion(lot) === "unknown")) {
+      galleryOrganization.region = "";
+      galleryVisibleCount = 24;
+      updateCalendarLocation();
+    }
     const lots = galleryBrowsableLots();
     galleryGroup.value = galleryOrganization.group;
     const hiddenCount = dayLots().filter((lot) => !matchesGalleryAttribution(lot)).length;
@@ -3481,11 +3492,12 @@
     const locationStatus = document.getElementById("day-gallery-location-status");
     const regionLots = dayLots().filter((lot) => matchesGalleryAttribution(lot) && matchesGallerySelection(lot));
     const unknownCount = regionLots.filter((lot) => galleryLotRegion(lot) === "unknown").length;
-    locationStatus.hidden = false;
-    locationStatus.textContent = "Location counts reflect your other filters."
-      + (unknownCount ? ` ${unknownCount} lot${unknownCount === 1 ? " has" : "s have"} an unconfirmed sale location; view Unconfirmed or All locations.` : "");
+    locationStatus.hidden = !unknownCount;
+    locationStatus.textContent = unknownCount
+      ? `${unknownCount} lot${unknownCount === 1 ? " has" : "s have"} an unconfirmed sale location.` : "";
     regionControls.replaceChildren();
     [["", "All locations"], ["us", "U.S. sales"], ["outside_us", "Outside the U.S."], ["unknown", "Unconfirmed"]].forEach(([region, label]) => {
+      if (region === "unknown" && !unknownCount && galleryOrganization.region !== "unknown") return;
       const button = document.createElement("button");
       button.type = "button";
       button.className = "day-gallery-filter";
@@ -3513,9 +3525,9 @@
     if (focusedRegion !== undefined) Array.from(regionControls.children)
       .find((item) => item.dataset.saleRegion === focusedRegion)?.focus({preventScroll: true});
     galleryAttributionToggle.setAttribute("aria-pressed", String(galleryHideAttributed));
-    galleryAttributionStatus.hidden = !galleryHideAttributed;
-    galleryAttributionStatus.textContent = galleryHideAttributed
-      ? `${hiddenCount} After / Attributed work${hiddenCount === 1 ? "" : "s"} hidden for this day${galleryOrganization.region ? ` (${hiddenRegionCount} in ${galleryRegionLabel()})` : ""}. Turn off “Hide After & Attributed” to show them. Saved selections are kept.`
+    galleryAttributionStatus.hidden = !galleryHideAttributed || !hiddenCount;
+    galleryAttributionStatus.textContent = galleryHideAttributed && hiddenCount
+      ? `${hiddenCount} After / Attributed hidden${galleryOrganization.region ? ` · ${hiddenRegionCount} in ${galleryRegionLabel()}` : ""}`
       : "";
     const houseCounts = new Map(activeView === "oliver" ? oliverHouseNames.map((name) => [name, 0]) : []);
     const countedLots = lots.filter((lot) => !galleryOrganization.house || galleryHouseName(lot) === galleryOrganization.house);

@@ -244,6 +244,19 @@ class AuctionWatchLot(models.Model):
         return f"{label} - {self.title or self.source_lot_id}"
 
 
+class AuctionLotSupersessionReceipt(models.Model):
+    """Persist the exact display-state changes made by a reviewed cleanup."""
+
+    operation = models.CharField(max_length=80)
+    lot = models.ForeignKey(AuctionWatchLot, on_delete=models.PROTECT, related_name="supersession_receipts")
+    replacement = models.ForeignKey(AuctionWatchLot, on_delete=models.PROTECT, related_name="+")
+    active_before = models.BooleanField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("operation", "lot"), name="unique_calendar_supersession_receipt")]
+
+
 class AuctionMaxBidAnalysis(models.Model):
     """Normalized Artprice comparables and maximum-bid calculations for one lot."""
 

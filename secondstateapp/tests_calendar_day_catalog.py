@@ -26,7 +26,8 @@ class CalendarDayCatalogLinkTests(TestCase):
                              artist="After Pablo Picasso", artist_watchlist_name="Pablo Picasso")
         overseas = watch_lot(source_lot_id="region-overseas", auction_house="Bonhams", location="London, United Kingdom")
         unknown = watch_lot(source_lot_id="region-unknown", auction_house="Unverified Auction House", location="", currency="USD")
-        originals = {lot.pk: lot.__class__.objects.filter(pk=lot.pk).values().get() for lot in (domestic, overseas, unknown)}
+        native_foreign = watch_lot(source_lot_id="region-native-foreign", auction_house="Unverified Auction House", location="", currency="EUR")
+        originals = {lot.pk: lot.__class__.objects.filter(pk=lot.pk).values().get() for lot in (domestic, overseas, unknown, native_foreign)}
 
         response = self.client.get(reverse("auction_calendar"), {
             "month": "2026-07", "day": "2026-07-25", "view": "catalog",
@@ -40,9 +41,23 @@ class CalendarDayCatalogLinkTests(TestCase):
         self.assertEqual(lots[domestic.pk]["attribution_label"], "After")
         self.assertEqual((lots[overseas.pk]["sale_region"], lots[overseas.pk]["sale_country"]), ("outside_us", "GB"))
         self.assertEqual((lots[unknown.pk]["sale_region"], lots[unknown.pk]["sale_country"]), ("unknown", ""))
-        for lot in (domestic, overseas, unknown):
+        self.assertEqual((lots[native_foreign.pk]["sale_region"], lots[native_foreign.pk]["sale_country"]), ("outside_us", ""))
+        self.assertEqual(lots[native_foreign.pk]["currency"], "EUR")
+        for lot in (domestic, overseas, unknown, native_foreign):
             self.assertEqual(lots[lot.pk]["lot_url"], lot.lot_url)
             self.assertEqual(lot.__class__.objects.filter(pk=lot.pk).values().get(), originals[lot.pk])
+
+    def test_native_currency_region_is_shared_by_both_calendars_and_catalogs(self):
+        foreign = watch_lot(source_lot_id="native-currency-shared", auction_house="Bonhams", currency="GBP")
+        for view in ("calendar", "catalog", "oliver-calendar", "oliver"):
+            with self.subTest(view=view):
+                response = self.client.get(reverse("auction_calendar"), {
+                    "month": "2026-07", "day": "2026-07-25", "view": view,
+                })
+                payload = next(lot for lot in response.context["calendar_data"]["2026-07-25"] if lot["id"] == foreign.pk)
+                self.assertEqual(payload["sale_region"], "outside_us")
+                self.assertTrue(payload["oliver_house"])
+                self.assertEqual(payload["currency"], "GBP")
 
     def test_catalog_price_sort_receives_numeric_estimates_and_missing_values(self):
         priced = watch_lot(
