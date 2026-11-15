@@ -1248,6 +1248,134 @@
       "evidence_url": "https://www.santafeartauction.com/contact//",
       "evidence": "Auction showroom at 932 Railfan Road, Santa Fe, New Mexico 87505.",
       "verified_at": "2026-11-13"
+    },
+    {
+      "name": "Clements",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.clementsauctions.com/contact/",
+      "evidence": "Auction gallery at 7022 Highway 153, Hixson, Tennessee 37343; the exact Clements provider profile confirms Hixson, TN, US.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "J. Garrett Auctioneers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.jgarrettauctioneers.com/contact/",
+      "evidence": "Auction showroom at 130 Cole Street, Dallas, Texas 75207.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Ararity Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.ararityauctions.com/contact/",
+      "evidence": "Auction company at 8210 Cinderbed Road, Suite 300, Lorton, Virginia 22079; its official About page describes Washington, DC region operations and local collection.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Morphy Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://morphyauctions.com/locations/morphy-auctions/",
+      "evidence": "Auction gallery at 2000 North Reading Road, Denver, Pennsylvania 17517, United States; this location lists Fine & Decorative Arts on December 1–2, 2026. Other listed auction venues are also in the US.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Gray's Auctioneers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.graysauctioneers.com/contact",
+      "evidence": "Auction house at 10717 Detroit Avenue, Cleveland, Ohio 44102.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "SebastianCharles Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.sebastiancharles.com/contact",
+      "evidence": "Auction gallery at 5263 Edina Industrial Boulevard, Edina, Minnesota 55439; the December 2 sale page also specifies collection there.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Cordier Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/auction-house/cordier-auctions-v1b9u9spfo",
+      "evidence": "Exact Cordier Auctions provider profile lists its auction house at 1500 Paxton Street, Harrisburg, Pennsylvania, US.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Willow Auction House",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://willowauctionhouse.com/contact-willow-auction-house/",
+      "evidence": "Auction showroom at 2 Frassetto Way, Lincoln Park, New Jersey 07035.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Taos Auction Co",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://taosauction.com/",
+      "evidence": "December 3 sale announcement identifies its office and showroom at 825 Early Street, Suite B, Santa Fe, New Mexico 87505.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Mebane Antique Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://mebaneauction.com/contact-us/",
+      "evidence": "Physical auction address at 7607 US-70, Mebane, North Carolina 27302.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Soulis Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://soulisauctions.com/contact/",
+      "evidence": "Auction house at 529 W Lone Jack Lees Summit Road, Lone Jack, Missouri 64070.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Rafael Osona Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.rafaelosonaauction.com/about/visit-us/",
+      "evidence": "Auctions and showroom at American Legion Hall, 21 Washington Street, Nantucket, Massachusetts 02554.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Armstrong Fine Art",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.armstrongfineartllc.com/contact/",
+      "evidence": "Official auction business contact lists 1200 West 35th Street #186, Chicago, Illinois 60609; the gallery contact corroborates Chicago.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Kiechel Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.liveauctioneers.com/auctioneer/8576/kiechel-auction/",
+      "evidence": "Exact Kiechel Auction provider profile lists 1208 O Street, Lincoln, Nebraska 68508, USA; the official gallery site uses the same address and links its auction platform.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Butterscotch Auction Gallery LLC",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.butterscotchauction.com/locations",
+      "evidence": "Auctions at Historical Hall, 608 Old Post Road, Bedford, New York 10506; office in Pound Ridge, New York. Official terms identify the LLC name.",
+      "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Caza Sikes",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://cazasikes.connectwp.invaluable.com/about/about-contact/",
+      "evidence": "Official provider-hosted contact identifies its gallery and auction house at 3078 Madison Road, Cincinnati, Ohio 45209; the current official website corroborates the address.",
+      "verified_at": "2026-11-14"
     }
   ]
 }
