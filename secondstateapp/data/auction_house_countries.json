@@ -1376,6 +1376,14 @@
       "evidence_url": "https://cazasikes.connectwp.invaluable.com/about/about-contact/",
       "evidence": "Official provider-hosted contact identifies its gallery and auction house at 3078 Madison Road, Cincinnati, Ohio 45209; the current official website corroborates the address.",
       "verified_at": "2026-11-14"
+    },
+    {
+      "name": "Marion Antique Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.marionantiqueauctions.com/auction/winter-classic/",
+      "evidence": "Official December 5, 2026 Winter Classic sale lists viewings at 13 Atlantis Drive, Marion, Massachusetts; the auction house contact lists the same venue, Marion, MA 02738.",
+      "verified_at": "2026-11-15"
     }
   ]
 }
