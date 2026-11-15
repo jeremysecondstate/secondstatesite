@@ -23,6 +23,17 @@ flags and staff selections are omitted. Superseded records remain readable here.
 
 Only Invaluable and Drouot records are exposed by this endpoint.
 
+The maintained local CLI loads existing `.env` Calendar credentials without printing them:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\calendar_reconciliation.py --output RUN/calendar-before.json
+.\.venv\Scripts\python.exe scripts\calendar_reconciliation.py --audit --start 2026-11-14 --end 2027-01-14 --output RUN/candidates.json
+```
+
+Snapshot files contain a `lots` array and page observation times. Pagination is a sequence
+of reads, not a single database snapshot; keep the original source timestamps and compare
+changed rows again immediately before applying. Output paths must be new files.
+
 ## Apply a reviewed plan
 
 Confirm the same house, sale/session/date and lot number, corroborated by source links,
@@ -56,6 +67,19 @@ Retry an uncertain request with the identical operation ID and plan: the endpoin
 returns the same stored receipt without another mutation. Reusing the ID for a different
 plan returns 409. A replay confirms the original operation, not the present display
 state; use GET to verify current records after every mutation or replay.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\calendar_reconciliation.py --apply RUN/reviewed-plan.json --receipt RUN/receipt.json
+.\.venv\Scripts\python.exe scripts\calendar_reconciliation.py --operation lot-updater-20261115T030840Z-part1 --output RUN/operation-readback.json
+```
+
+The CLI reserves the new receipt path and durably records the operation ID/hash before
+sending one POST. A success file contains the reversible receipt plus attempt metadata.
+On timeout, malformed response or server failure it instead saves an explicitly unknown
+attempt; never treat that file as a rollback receipt. A known validation/authentication
+rejection is labeled rejected. The CLI never automatically retries a POST. Read the
+operation and current public rows first; if another POST is needed, retain the identical
+plan and operation ID and use a new local receipt path.
 
 The database transaction stores both the full receipt and per-lot supersession receipts.
 The returned receipt uses the existing `secondstate-calendar-duplicate-receipt-v1`
