@@ -3,6 +3,7 @@ from django.urls import path
 from . import (
     bid_board_views,
     calendar_views,
+    calendar_reconciliation_views,
     capital_dashboard_views,
     catalog_api_views,
     ordering_views,
@@ -32,6 +33,7 @@ urlpatterns = [
     path("calendar/research-queue/worker/", research_queue_views.research_queue_worker, name="research_queue_worker"),
     path("calendar/usd-prices/", calendar_views.auction_calendar_usd_prices, name="auction_calendar_usd_prices"),
     path("calendar/sync/", calendar_views.sync_auction_calendar, name="auction_calendar_sync"),
+    path("calendar/reconciliation/", calendar_reconciliation_views.calendar_reconciliation, name="calendar_reconciliation"),
     path("calendar/watchlist/", watchlist_shared_views.shared_artist_watchlist, name="shared_artist_watchlist"),
     path("calendar/inventory/", calendar_views.auction_calendar_inventory, name="auction_calendar_inventory"),
     path(

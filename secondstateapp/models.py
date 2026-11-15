@@ -257,6 +257,15 @@ class AuctionLotSupersessionReceipt(models.Model):
         constraints = [models.UniqueConstraint(fields=("operation", "lot"), name="unique_calendar_supersession_receipt")]
 
 
+class AuctionLotReconciliation(models.Model):
+    """Idempotent reviewed API operation and its durable reversible receipt."""
+
+    operation = models.CharField(max_length=76, unique=True)
+    request_hash = models.CharField(max_length=64)
+    receipt = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class AuctionMaxBidAnalysis(models.Model):
     """Normalized Artprice comparables and maximum-bid calculations for one lot."""
 

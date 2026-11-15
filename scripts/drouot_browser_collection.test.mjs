@@ -1,7 +1,7 @@
 "use strict";
 import test from "node:test";
 import assert from "node:assert/strict";
-import createCollector, { searchSpec, requestMatches, publicPayload } from "./drouot_browser_collection.mjs";
+import createCollector, { searchSpec, pageMatches, requestMatches, publicPayload } from "./drouot_browser_collection.mjs";
 
 const entry = (artist) => ({ artist, source_url: "https://drouot.com/en/c/50/lithographs?query=" + encodeURIComponent(artist) });
 const ALICE = entry("Alice Example"), BOB = entry("Bob Example");
@@ -21,7 +21,7 @@ function payload(total, page, options = {}) {
 
 function harness({ selected = [ALICE], total = 1, totalByPage = {}, wrongDOM = false, badScope = false,
   delayedFinish = false, failMetadata = false, sameQuery = false, repeatedSecondPage = false,
-  initialPage = 1, preservePageOnQuery = false, emptyHousesForExistingQuery = false } = {}) {
+  initialPage = 1, preservePageOnQuery = false, emptyHousesForExistingQuery = false, searchId = "" } = {}) {
   const saved = new Map(), bodies = new Map(), bodyReads = [], events = [];
   let query = sameQuery ? selected[0].artist : "Existing artist", page = initialPage, input = "", sequence = 0,
     houseOpen = false, pendingFinish = null, bodyAttemptedBeforeFinish = false;
@@ -73,7 +73,8 @@ function harness({ selected = [ALICE], total = 1, totalByPage = {}, wrongDOM = f
     },
   };
   const pageURL = () => "https://drouot.com/en/c/50/lithographs"
-    + (query ? "?query=" + encodeURIComponent(query) + (page > 1 ? "&page=" + page : "") : "");
+    + (query ? "?query=" + encodeURIComponent(query) + (page > 1 ? "&page=" + page : "")
+      + (searchId ? "&searchId=" + searchId : "") : "");
   const tab = {
     url: async () => pageURL(),
     goto: async (url) => {
@@ -133,6 +134,17 @@ test("public payload removes account fields recursively and rejects repeated IDs
   assert.throws(() => publicPayload(truncated, 1), /Truncated/);
   const repeated = payload(2, 1); repeated.lots[1].id = repeated.lots[0].id;
   assert.throws(() => publicPayload(repeated, 1), /duplicate/);
+});
+
+test("UI search tracking permits unchanged scope but is excluded from saved public capture", async () => {
+  const spec = searchSpec(ALICE);
+  assert(pageMatches(ALICE.source_url + "&searchId=7708229940692502522", spec, 1));
+  for (const suffix of ["&searchId=invalid", "&searchId=1&searchId=2", "&searchId=1&auctioneer=11"])
+    assert.equal(pageMatches(ALICE.source_url + suffix, spec, 1), false);
+  const x = harness({ searchId: "7708229940692502522" });
+  await x.collector.initialize(); await x.collector.collectSearch(ALICE);
+  assert.equal(x.read("capture.json").searches[0].pages[0].page_url, ALICE.source_url.replaceAll("%20", "+"));
+  assert(!JSON.stringify(x.read("capture.json")).includes("searchId"));
 });
 
 test("only a genuine zero-result first page permits the live lots:null response", () => {

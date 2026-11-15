@@ -39,9 +39,11 @@ export function pageMatches(value, spec, page) {
   const keys = [...url.searchParams.keys()];
   return url.origin === "https://drouot.com" && url.pathname === "/en/c/50/lithographs"
     && !url.username && !url.password && !url.hash
-    && keys.every((key) => ["query", "page"].includes(key))
+    && keys.every((key) => ["query", "page", "searchId"].includes(key))
     && url.searchParams.getAll("query").length === 1 && url.searchParams.get("query") === spec.query
     && url.searchParams.getAll("page").length <= 1
+    && url.searchParams.getAll("searchId").length <= 1
+    && (!url.searchParams.has("searchId") || /^[0-9]+$/.test(url.searchParams.get("searchId")))
     && (page === 1 ? [null, "1"].includes(url.searchParams.get("page")) : url.searchParams.get("page") === String(page));
 }
 
@@ -254,7 +256,11 @@ export default ({ fs, runDir, tab, cdp, selected, startDate, endDate,
       visible = await readVisible();
       if (pageMatches(visible.page_url, spec, page) && visible.total_results === envelope.payload.numFound
           && sameIDs(wanted, visible.cards.map((card) => card.id))) {
-        return { page_url: visible.page_url, captured_at: envelope.captured_at,
+        // The UI now adds a per-search tracking identifier. Validate its shape
+        // above, then retain only the public query/page locator in the capture.
+        const publicPage = new URL(visible.page_url);
+        publicPage.searchParams.delete("searchId");
+        return { page_url: publicPage.href, captured_at: envelope.captured_at,
           page, total_pages: Math.max(1, Math.ceil(envelope.payload.numFound / PAGE_SIZE)),
           total_results: envelope.payload.numFound,
           request_url: envelope.request_url, status: envelope.status,
