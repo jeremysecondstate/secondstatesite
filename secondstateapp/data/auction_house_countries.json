@@ -1384,6 +1384,14 @@
       "evidence_url": "https://www.marionantiqueauctions.com/auction/winter-classic/",
       "evidence": "Official December 5, 2026 Winter Classic sale lists viewings at 13 Atlantis Drive, Marion, Massachusetts; the auction house contact lists the same venue, Marion, MA 02738.",
       "verified_at": "2026-11-15"
+    },
+    {
+      "name": "A.B.Levy’s Palm Beach",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://ablevys.com/auctions",
+      "evidence": "Official auction page lists the December 3, 2026 Palm Beach Estates sale at 2 PM ET and in-person auctions at 5200 South Dixie Highway, West Palm Beach, Florida 33405. The exact imported house label is corroborated by Invaluable's auction-house listing: https://www.invaluable.com/auction-house/a-b-levys-pigr60dax8",
+      "verified_at": "2026-11-15"
     }
   ]
 }
