@@ -1,0 +1,591 @@
+{
+  "version": 1,
+  "reviewed_at": "2026-11-15T03:35:01.056944+00:00",
+  "purpose": "Candidate discovery and reuse of verified house identity. Each new underlying sale and individual lot still requires current corroboration. Historical sale correspondences below are scoped to their exact catalogue URLs; they do not prove future sale or lot identity. Preserve provider postal and timestamp discrepancies.",
+  "house_alias_count": 14,
+  "sale_scope_count": 18,
+  "provenance_root": "C:/dev/secondstatesite/private_data/secondstate-lot-updater/20261115T030840Z/production-audit",
+  "evidence_files": [
+    "alias-house-review.json",
+    "alias-house-source-ui.json",
+    "alias-setdart-house-profile.json"
+  ],
+  "scopes": [
+    {
+      "scope_index": 0,
+      "house_names": [
+        "Millon & Associes",
+        "Millon"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/1TUFRE5L5Z",
+      "drouot_catalog_url": "https://drouot.com/en/v/187595",
+      "invaluable_sale_title": "Editions: Prints, Illustrated Books & Multiples",
+      "drouot_sale_title": "Publications: prints, artist''s books, and multiples",
+      "invaluable_visible_date": "November 23, 1:00 AM PST",
+      "drouot_visible_date": "Monday, November 23",
+      "shared_physical_address": "3 rue Rossini, 75009 Paris, France",
+      "notes": "Sale titles are English translations of Editions: Prints, Illustrated Books & Multiples.",
+      "observed_at": "2026-11-15T03:31:00.300Z",
+      "representative_invaluable_source_lot_id": "207348724",
+      "representative_drouot_source_lot_id": "35768318",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/zao-wou-ki-1920-2013-dapres-vie-marine-2018-207-c-b262db4d22",
+        "https://drouot.com/en/l/35768318-zao-wou-ki-1920-2013-after-vie-marine-2018-set-of-four"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-23T09:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-23T09:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 1,
+      "house_names": [
+        "Setdart Auction House",
+        "Setdart.com"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/L5RJMQ2EZ7",
+      "drouot_catalog_url": "https://drouot.com/en/v/187795",
+      "invaluable_sale_title": "26th November - Contemporary Art",
+      "drouot_sale_title": "26th November - Contemporary Art",
+      "invaluable_visible_date": "November 26, 5:00 AM PST",
+      "drouot_visible_date": "Thursday, November 26",
+      "shared_physical_address": "Plaça de Sant Gregori Taumaturg 5, 08021 Barcelona, Spain (house profiles)",
+      "notes": "Drouot lot page lists website venue www.setdart.com; supplemental public house profiles show the exact same Barcelona street address.",
+      "observed_at": "2026-11-15T03:31:01.637Z",
+      "representative_invaluable_source_lot_id": "207408505",
+      "representative_drouot_source_lot_id": "35822374",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/zao-wou-ki-beijing-1920-nyon-switzerland-2013-composition-1994-color-etching-and-aquatint-on-china-paper-mounted-on-bfk-rives-vellum-signed-dated-and-numbered-iii-xxv-in-pencil-4-c-7a4b09eb14",
+        "https://drouot.com/en/l/35822374-zao-wou-ki-beijing-1920-nyon-switzerland-2013-composition"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-26T13:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-26T13:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": "alias-setdart-house-profile.json"
+    },
+    {
+      "scope_index": 2,
+      "house_names": [
+        "Widder Auctions",
+        "Widder Auktionen"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/R47X6T31BC",
+      "drouot_catalog_url": "https://drouot.com/en/v/186902",
+      "invaluable_sale_title": "Masterpieces",
+      "drouot_sale_title": "Masterpieces",
+      "invaluable_visible_date": "November 26, 6:00 AM PST",
+      "drouot_visible_date": "Thursday, November 26",
+      "shared_physical_address": "Johannesgasse 9-13, 1010 Vienna, Austria",
+      "notes": "Same explicit sale title, date and physical address on both providers.",
+      "observed_at": "2026-11-15T03:31:08.979Z",
+      "representative_invaluable_source_lot_id": "207037249",
+      "representative_drouot_source_lot_id": "35538515",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/wifredo-lam-sagua-la-grande-1902-1982-paris-527-c-c1b70be681",
+        "https://drouot.com/en/l/35538515-wifredo-lam-sagua-la-grande-1902-1982-paris-acide-doux-1973"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-26T14:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-26T14:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 3,
+      "house_names": [
+        "Auktionshaus Eppli",
+        "Eppli Auktionshaus"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/CRDAY1HD9Y",
+      "drouot_catalog_url": "https://drouot.com/en/v/187580",
+      "invaluable_sale_title": "Contemporary Art and Design - All prices include the buyer's premium!",
+      "drouot_sale_title": "Contemporary Art and Design - All prices include the buyer's premium!",
+      "invaluable_visible_date": "November 28, 2:00 AM PST",
+      "drouot_visible_date": "Saturday, November 28",
+      "shared_physical_address": "Sporerstrasse 8, 70173 Stuttgart, Germany",
+      "notes": "Captured Drouot time 11:00 corresponds to CET; Invaluable 02:00 PST. Same explicit sale date and title; normalized source event timestamps are recorded below.",
+      "observed_at": "2026-11-15T03:31:10.499Z",
+      "representative_invaluable_source_lot_id": "207337239",
+      "representative_drouot_source_lot_id": "35761079",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/dali-salvador-19041989-le-cavalier-cosmique-1982-1818-c-6a8afd6a87",
+        "https://drouot.com/en/l/35761079-dali-salvador-1904-1989-le-cavalier-cosmique-1982-signed-by"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-28T10:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-28T10:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 4,
+      "house_names": [
+        "Maison Jules Veilinghuis",
+        "Auctionhouse Maison Jules"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/87HXOHZ3MM",
+      "drouot_catalog_url": "https://drouot.com/en/v/187986",
+      "invaluable_sale_title": "Fine arts & antiques day 1: paintings, sculptures, furniture & antiques",
+      "drouot_sale_title": "Fine Arts & Antiques Day 1: Paintings, Sculptures, Furniture, and Antiques",
+      "invaluable_visible_date": "November 28, 2:00 AM PST",
+      "drouot_visible_date": "Saturday, November 28",
+      "shared_physical_address": "Heilig-Kruisplein 10, 9040 Gent, Belgium",
+      "notes": "Day 1 only; distinct from Maison Jules Day 3.",
+      "observed_at": "2026-11-15T03:31:12.069Z",
+      "representative_invaluable_source_lot_id": "207474598",
+      "representative_drouot_source_lot_id": "35889901",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/henry-moore-1898-1986-lithograph-printed-in-5-colors-girl-ii-1974-from-the-10-nudes-album-numbered-7-50-signed-and-printed-at-curwen-studio-publisher-henry-moore-much-hadham-131-c-9400831617",
+        "https://drouot.com/en/l/35889901-henry-moore-1898-1986-5-color-lithograph-girl-ii-1974-from"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-28T10:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-28T10:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 5,
+      "house_names": [
+        "Maison Jules Veilinghuis",
+        "Auctionhouse Maison Jules"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/JVPWY3GNG6",
+      "drouot_catalog_url": "https://drouot.com/en/v/187988",
+      "invaluable_sale_title": "Fine arts & antiques day 3: Modern & contemporary art",
+      "drouot_sale_title": "Fine Arts & Antiques Day 3: Modern & Contemporary Art",
+      "invaluable_visible_date": "November 30, 8:00 AM PST",
+      "drouot_visible_date": "Monday, November 30",
+      "shared_physical_address": "Heilig-Kruisplein 10, 9040 Gent, Belgium",
+      "notes": "Day 3 only; distinct from Maison Jules Day 1.",
+      "observed_at": "2026-11-15T03:31:13.457Z",
+      "representative_invaluable_source_lot_id": "207475880",
+      "representative_drouot_source_lot_id": "35891718",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/victor-vasarely-1906-1997-screen-print-on-arches-zebra-vellum-paper-green-striped-background-original-edition-1970s-signed-in-the-plate-1105-c-0a367388e9",
+        "https://drouot.com/en/l/35891718-victor-vasarely-1906-1997-screen-print-on-arches-zebra"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-30T16:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-30T16:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 6,
+      "house_names": [
+        "Auction House im Kinsky",
+        "Im Kinsky"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/UHWM1Z3RZM",
+      "drouot_catalog_url": "https://drouot.com/en/v/188253",
+      "invaluable_sale_title": "Contemporary Art",
+      "drouot_sale_title": "Contemporary Art",
+      "invaluable_visible_date": "December 02, 2026, 04:00 PM CET",
+      "drouot_visible_date": "Wednesday, December 2",
+      "shared_physical_address": "Palais Kinsky, Freyung 4, 1010 Vienna, Austria",
+      "notes": "Invaluable explicitly labels 16:00 CET; Drouot displays 07:00 browser-local PST.",
+      "observed_at": "2026-11-15T03:31:19.007Z",
+      "representative_invaluable_source_lot_id": "207567582",
+      "representative_drouot_source_lot_id": "35988680",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/alex-katz-gray-dress-laura-433-c-25231a7f57",
+        "https://drouot.com/en/l/35988680-alex-katz-gray-dress-laura-1992-colour-serigraph-on-laid"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-12-02T15:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-12-02T15:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 7,
+      "house_names": [
+        "Van Ham Kunstauktionen",
+        "Van Ham"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/AT4BDK62QW",
+      "drouot_catalog_url": "https://drouot.com/en/v/187445",
+      "invaluable_sale_title": "Modern | Post War | Contemporary | Evening Sale",
+      "drouot_sale_title": "Evening Sale | Modern | Postwar | Contemporary",
+      "invaluable_visible_date": "December 2, 9:00 AM PST",
+      "drouot_visible_date": "Wednesday, December 2",
+      "shared_physical_address": "Hitzelerstrasse 2, 50968 Cologne, Germany",
+      "notes": "Evening sale only; distinct from next-day day sale.",
+      "observed_at": "2026-11-15T03:31:20.612Z",
+      "representative_invaluable_source_lot_id": "207455504",
+      "representative_drouot_source_lot_id": "35864100",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/warhol-andy-beethoven-29-c-2f53d63a0c",
+        "https://drouot.com/en/l/35864100-warhol-andy-1928-pittsburgh-pa-usa-1987-new-york-title"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-12-02T17:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-12-02T17:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 8,
+      "house_names": [
+        "Van Ham Kunstauktionen",
+        "Van Ham"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/4UK5JZU3JC",
+      "drouot_catalog_url": "https://drouot.com/en/v/187447",
+      "invaluable_sale_title": "Modern | Post War | Contemporary | Daysale",
+      "drouot_sale_title": "DaySale | Modern | Postwar | Contemporary",
+      "invaluable_visible_date": "December 3, 2:00 AM PST",
+      "drouot_visible_date": "Thursday, December 3",
+      "shared_physical_address": "Hitzelerstrasse 2, 50968 Cologne, Germany",
+      "notes": "Day sale only. Captured Drouot 11:00 corresponds to CET and Invaluable 02:00 PST.",
+      "observed_at": "2026-11-15T03:31:22.196Z",
+      "representative_invaluable_source_lot_id": "207455870",
+      "representative_drouot_source_lot_id": "35864572",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/lichtenstein-roy-art-critic-682-c-61ee39a60d",
+        "https://drouot.com/en/l/35864572-lichtenstein-roy-1923-new-york-1997-new-york-title-art"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-12-03T10:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-12-03T10:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 9,
+      "house_names": [
+        "Scheublein Art & Auktionen",
+        "Scheublein Art und Auktionen KG"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/2Y5C32GP5Y",
+      "drouot_catalog_url": "https://drouot.com/en/v/187798",
+      "invaluable_sale_title": "Auktion 74 - December, 3rd 2026",
+      "drouot_sale_title": "Art Auction 74",
+      "invaluable_visible_date": "December 3, 3:00 AM PST",
+      "drouot_visible_date": "Thursday, December 3",
+      "shared_physical_address": "Waltherstrasse 23, Munich, Germany",
+      "notes": "Both explicitly identify auction 74 on December 3 and the same street/city. Postal codes differ: Invaluable 80337, Drouot 80333. Discrepancy preserved; street/name/sale identity remains corroborated.",
+      "observed_at": "2026-11-15T03:31:23.719Z",
+      "representative_invaluable_source_lot_id": "207493177",
+      "representative_drouot_source_lot_id": "35974919",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/dali-salvador-der-zahnarzt-aus-die-professionen-farbserigraphie-458-c-d5e89a7763",
+        "https://drouot.com/en/l/35974919-dali-salvador-1904-figueres-1989-ibid-the-dentist-from-the"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-12-03T11:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-12-03T11:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": "alias-scheublein-house-profile.json"
+    },
+    {
+      "scope_index": 10,
+      "house_names": [
+        "Hargesheimer Kunstauktionen Düsseldorf",
+        "Hargesheimer"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/QM8NI4W8TB",
+      "drouot_catalog_url": "https://drouot.com/en/v/188166",
+      "invaluable_sale_title": "163: MODERN & CONTEMPORARY ART | DESIGN",
+      "drouot_sale_title": "163: Modern & Contemporary Art | Design",
+      "invaluable_visible_date": "December 4, 1:00 AM PST",
+      "drouot_visible_date": "Friday, December 4",
+      "shared_physical_address": "Friedrich-Ebert-Strasse 11, 40210 Düsseldorf, Germany (Drouot 11+12)",
+      "notes": "Drouot address extends building number 11 to 11+12. Sale 163 and date match. Covers Hargesheimer extra lots 343-347 as a sale scope; individual work/edition review is separate.",
+      "observed_at": "2026-11-15T03:31:33.021Z",
+      "representative_invaluable_source_lot_id": "207551836",
+      "representative_drouot_source_lot_id": "35948095",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/victor-vasarely-teke-1978-116-c-61ab740235",
+        "https://drouot.com/en/l/35948095-victor-vasarely-1906-pecs-hungary-1997-paris-teke-1978-color"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-12-04T09:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-12-04T09:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 11,
+      "house_names": [
+        "Kunstauktionshaus Schloss Ahlden",
+        "Schloss Ahlden"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/MJSD5OGW4S",
+      "drouot_catalog_url": "https://drouot.com/en/v/188155",
+      "invaluable_sale_title": "INTERNATIONAL FINE ART AUCTION SALE NO 198 - PART III",
+      "drouot_sale_title": "International Fine Art Auction No. 198 - PART III",
+      "invaluable_visible_date": "December 6, 1:00 AM PST",
+      "drouot_visible_date": "Sunday, December 6",
+      "shared_physical_address": "Grosse Strasse 1, Ahlden, Germany",
+      "notes": "Invaluable address text contains both 29693 and D-29691; Drouot 29693. Same Grosse Strasse 1 and sale 198 Part III. Drouot captured 10:00 corresponds to CET; Invaluable 01:00 PST.",
+      "observed_at": "2026-11-15T03:31:34.604Z",
+      "representative_invaluable_source_lot_id": "207553559",
+      "representative_drouot_source_lot_id": "35944490",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/richard-estes-1935-c-39f82e4675",
+        "https://drouot.com/en/l/35944490-richard-estes-b-1932-kewanee-illinois-urban-landscapes-no-2"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-12-06T09:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-12-06T09:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 12,
+      "house_names": [
+        "Bassenge Auctions",
+        "Bassenge"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/6P554QRZHG",
+      "drouot_catalog_url": "https://drouot.com/en/v/187483",
+      "invaluable_sale_title": "15th to 19th Century Prints",
+      "drouot_sale_title": "Printed Art from the 15th to the 19th Century",
+      "invaluable_visible_date": "November 25, 1:00 AM PST",
+      "drouot_visible_date": "Wednesday, November 25",
+      "shared_physical_address": "Erdener Strasse 5A, 14193 Berlin, Germany",
+      "notes": "15th-19th century prints sale only; separate from Bassenge Modern I and II.",
+      "observed_at": "2026-11-15T03:31:44.587Z",
+      "representative_invaluable_source_lot_id": "207293886",
+      "representative_drouot_source_lot_id": "35740643",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/rembrandt-harmensz-van-rijn-schule-rembrandts-mutter-mit-dunklen-handschuhen-5610-c-b42f5a7609",
+        "https://drouot.com/en/l/35740643-rembrandt-harmensz-van-rijn-school-school-rembrandts-mother"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-25T09:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-25T09:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 13,
+      "house_names": [
+        "Casa d'aste Minghini",
+        "Casa d'aste Minghini srl"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/1JWCNSR6R4",
+      "drouot_catalog_url": "https://drouot.com/en/v/187439",
+      "invaluable_sale_title": "Casa d'aste Minghini - ASTA 24 - TRE SESSIONI - MULTIPLI - OPERE UNICHE - MIRABILIA",
+      "drouot_sale_title": "Minghini Auction House Auction No. 24: Modern and Contemporary Art - Session 1 - MULTIPLES (lots 1–200)",
+      "invaluable_visible_date": "November 26, 1:00 AM PST",
+      "drouot_visible_date": "Thursday, November 26",
+      "shared_physical_address": "Viale Roiti 6, 44011 Argenta, Italy",
+      "notes": "Invaluable combined sale title is auction 24 with three sessions; Drouot explicitly labels auction 24 Session 1 Multiples, lots 1-200. This evidence applies only to supplied candidates in that session.",
+      "observed_at": "2026-11-15T03:31:45.994Z",
+      "representative_invaluable_source_lot_id": "207493468",
+      "representative_drouot_source_lot_id": "35727508",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/joan-miro-serie-mallorca-19-c-7c928ab3d6",
+        "https://drouot.com/en/l/35727508-joan-miro-c-by-siae-barcelona-1893-palma-de-mallorca-1983"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-26T09:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-26T09:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 14,
+      "house_names": [
+        "Bassenge Auctions",
+        "Bassenge"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/RCGGGIKVHV",
+      "drouot_catalog_url": "https://drouot.com/en/v/187487",
+      "invaluable_sale_title": "Modern to Contemporary Art - Part I",
+      "drouot_sale_title": "Modern and Contemporary Art I",
+      "invaluable_visible_date": "November 27, 7:00 AM PST",
+      "drouot_visible_date": "Friday, November 27",
+      "shared_physical_address": "Erdener Strasse 5A, 14193 Berlin, Germany",
+      "notes": "Modern and Contemporary Part I only. Drouot captured 16:00 corresponds to CET; Invaluable 07:00 PST.",
+      "observed_at": "2026-11-15T03:31:47.405Z",
+      "representative_invaluable_source_lot_id": "207337949",
+      "representative_drouot_source_lot_id": "35762194",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/dine-jim-shellac-on-a-hand-7304-c-7d24928844",
+        "https://drouot.com/en/l/35762194-dine-jim-shellac-on-a-hand-etching-drypoint-and-color"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-27T15:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-27T15:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 15,
+      "house_names": [
+        "Peege Auktionshaus",
+        "Auktionshaus Peege"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/0QJY0823C5",
+      "drouot_catalog_url": "https://drouot.com/en/v/187352",
+      "invaluable_sale_title": "Auction 185 - Day 3",
+      "drouot_sale_title": "Auction 185 - Day 3",
+      "invaluable_visible_date": "November 27, 7:00 AM PST",
+      "drouot_visible_date": "Friday, November 27",
+      "shared_physical_address": "Dreikönigstrasse 43, 79102 Freiburg, Germany",
+      "notes": "Same explicit sale title, date and physical address on both providers.",
+      "observed_at": "2026-11-15T03:33:04.433Z",
+      "representative_invaluable_source_lot_id": "207315325",
+      "representative_drouot_source_lot_id": "35721567",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/alechinsky-pierre-1240-c-e05f82d7fa",
+        "https://drouot.com/en/l/35721567-alechinsky-pierre-1927-saint-gilles-belgium-based-in-paris"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-27T15:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-27T15:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 16,
+      "house_names": [
+        "Auktionshaus Blank",
+        "Auktionshaus Blank GmbH"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/7Q0LLQ4II1",
+      "drouot_catalog_url": "https://drouot.com/en/v/187664",
+      "invaluable_sale_title": "194. Christmas auction",
+      "drouot_sale_title": "194th Christmas Auction",
+      "invaluable_visible_date": "November 28, 1:00 AM PST",
+      "drouot_visible_date": "Saturday, November 28",
+      "shared_physical_address": "Friedrich-Ebert-Strasse 2, 61118 Bad Vilbel, Germany",
+      "notes": "Same explicit sale title, date and physical address on both providers.",
+      "observed_at": "2026-11-15T03:33:06.253Z",
+      "representative_invaluable_source_lot_id": "207374628",
+      "representative_drouot_source_lot_id": "35796541",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/francis-sam-1923-1994-ohne-titel-aus-michel-waldberg-poemes-dans-le-cie-1135-c-176905ba28",
+        "https://drouot.com/en/l/35796541-francis-sam-1923-1994-untitled-from-michel-waldberg-poemes"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-28T09:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-28T09:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    },
+    {
+      "scope_index": 17,
+      "house_names": [
+        "Bassenge Auctions",
+        "Bassenge"
+      ],
+      "same_house_confirmed": true,
+      "same_sale_confirmed": true,
+      "invaluable_catalog_url": "https://www.invaluable.com/catalog/WODM614NX6",
+      "drouot_catalog_url": "https://drouot.com/en/v/187493",
+      "invaluable_sale_title": "Modern Art II, Post War & Contemporary Art II",
+      "drouot_sale_title": "Modern and Contemporary Art II",
+      "invaluable_visible_date": "November 28, 2:00 AM PST",
+      "drouot_visible_date": "Saturday, November 28",
+      "shared_physical_address": "Erdener Strasse 5A, 14193 Berlin, Germany",
+      "notes": "Modern and Contemporary Part II only; separate from Bassenge Part I.",
+      "observed_at": "2026-11-15T03:33:07.764Z",
+      "representative_invaluable_source_lot_id": "207341810",
+      "representative_drouot_source_lot_id": "35776927",
+      "representative_lot_urls": [
+        "https://www.invaluable.com/auction-lot/tapies-antoni-suite-63-x-90-blatt-7-8364-c-9c2a5b6f1e",
+        "https://drouot.com/en/l/35776927-tapies-antoni-suite-63-x-90-sheet-7-color-lithograph-on-bfk"
+      ],
+      "candidate_invaluable_event_times": [
+        "2026-11-28T10:00:00+00:00"
+      ],
+      "candidate_drouot_event_times": [
+        "2026-11-28T10:00:00+00:00"
+      ],
+      "evidence_file": "alias-house-source-ui.json",
+      "supplemental_evidence_file": null
+    }
+  ]
+}
