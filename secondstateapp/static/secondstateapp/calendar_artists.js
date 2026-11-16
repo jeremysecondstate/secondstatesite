@@ -36,7 +36,8 @@
   const lotArrivalDetails = (lot) => {
     if (!lot || lot.is_all_day) return null;
     const time = knownInstant(lot.event_at);
-    const match = /^(\d+)[a-z]*$/i.exec(String(lot.lot_number ?? "").trim());
+    // A verified display suffix must not change the existing source-number estimate.
+    const match = /^(\d+)[a-z]*$/i.exec(String(lot.arrival_lot_number ?? lot.lot_number ?? "").trim());
     const number = match ? Number(match[1]) : null;
     if (time === null || !Number.isSafeInteger(number) || number <= 0) return null;
     if (lot.arrival_schedule != null) {
@@ -95,7 +96,7 @@
       if (!groups.has(key)) groups.set(key, {
         key, name, sortKey: String(lot.artist_sort_key || name), count: 0,
         earliestTime: null, timeLabel: "Time TBA",
-        arrivalTime: null, arrivalLotNumber: null, arrivalHouse: "", arrivalStartTime: null,
+        arrivalTime: null, arrivalLotNumber: null, arrivalDisplayLotNumber: null, arrivalHouse: "", arrivalStartTime: null,
         arrivalKind: "", arrivalSourceUrl: "", arrivalMinutes: null,
       });
       const group = groups.get(key);
@@ -115,6 +116,7 @@
         group.arrivalStartTime = start;
         group.arrivalTime = null;
         group.arrivalLotNumber = null;
+        group.arrivalDisplayLotNumber = null;
         group.arrivalHouse = "";
         group.arrivalKind = "";
         group.arrivalSourceUrl = "";
@@ -126,6 +128,7 @@
           || (details.time === group.arrivalTime && number < group.arrivalLotNumber))) {
         group.arrivalTime = details.time;
         group.arrivalLotNumber = number;
+        group.arrivalDisplayLotNumber = lot.arrival_lot_number != null ? lot.lot_number : number;
         group.arrivalHouse = lot.auction_house || "";
         group.arrivalKind = details.kind;
         group.arrivalSourceUrl = details.sourceUrl;

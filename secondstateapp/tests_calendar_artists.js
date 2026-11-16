@@ -403,6 +403,23 @@ test("per-lot arrival uses each lot's own listed time and numeric or suffixed lo
   assert.equal(CalendarArtists.estimateLotArrival({event_at: "2026-11-04T17:00:00+02:00", lot_number: "39"}), Date.parse("2026-11-04T15:39:00Z"));
 });
 
+test("verified display-number correction preserves the source-number arrival estimate", () => {
+  const lot = Object.freeze({artist: "Léger, Fernand", auction_house: "Quai des Enchères",
+    event_at: "2026-11-20T13:30:00Z", lot_number: "97-1", arrival_lot_number: "97"});
+  const details = CalendarArtists.lotArrivalDetails(lot);
+  assert.equal(details.minutes, 97);
+  assert.equal(details.time, Date.parse("2026-11-20T15:07:00Z"));
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), "7:07 AM");
+  const [artist] = CalendarArtists.summarize([lot]);
+  assert.equal(artist.arrivalMinutes, 97);
+  assert.equal(artist.arrivalLotNumber, 97);
+  assert.equal(artist.arrivalDisplayLotNumber, "97-1");
+  assert.equal(lot.lot_number, "97-1");
+  for (const arrival_lot_number of [undefined, null, "97-1", "97-98"]) {
+    assert.equal(CalendarArtists.estimateLotArrival({...lot, arrival_lot_number}), null);
+  }
+});
+
 test("per-lot arrival requires a known explicit-zone time and never invents all-day timing", () => {
   for (const event_at of [undefined, null, "", " ", "invalid", "2026-11-04", "2026-11-04T13:00:00", "2026-11-04 13:00:00Z", "2026-11-04T25:00:00Z", "2026-02-30T13:00:00Z", "2026-02-29T13:00:00Z"]) {
     const lot = {event_at, lot_number: "39"};

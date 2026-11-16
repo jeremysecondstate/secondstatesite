@@ -3869,12 +3869,12 @@
         : `Assumes the listed auction time is the start, plus ${artist.arrivalMinutes} minutes after subtracting the known starting number.`;
       card.appendChild(arrival);
       if (artist.arrivalTime !== null) {
-        appendText(card, "span", "day-gallery-artist-lot", [`Lot ${artist.arrivalLotNumber}`, artist.arrivalHouse].filter(Boolean).join(" · "));
+        appendText(card, "span", "day-gallery-artist-lot", [`Lot ${artist.arrivalDisplayLotNumber ?? artist.arrivalLotNumber}`, artist.arrivalHouse].filter(Boolean).join(" · "));
       }
       card.setAttribute("aria-description", [
         `Listed auction: ${artist.earliestTime === null ? "Time TBA" : artist.timeLabel}.`,
         `${publishedClosing ? "Lot closes" : artist.arrivalKind === "published_timetable" ? "House timetable" : "Estimated lot arrival"}: ${artist.arrivalTime === null ? "Unavailable" : window.CalendarArtists.formatArrival(artist, galleryArtists.dataset.timeZone)}.`,
-        artist.arrivalTime === null ? "" : `Lot ${artist.arrivalLotNumber}, ${artist.arrivalHouse}.`,
+        artist.arrivalTime === null ? "" : `Lot ${artist.arrivalDisplayLotNumber ?? artist.arrivalLotNumber}, ${artist.arrivalHouse}.`,
       ].filter(Boolean).join(" "));
       item.appendChild(card);
       galleryArtistList.appendChild(item);

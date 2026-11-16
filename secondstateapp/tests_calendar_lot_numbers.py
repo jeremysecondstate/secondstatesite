@@ -75,7 +75,9 @@ class CalendarLotNumberPayloadTests(TestCase):
                 lots = {lot["id"]: lot for lot in response.context["calendar_data"]["2026-11-20"]}
                 self.assertEqual(set(lots), {leger.pk, miro.pk})
                 self.assertEqual(lots[leger.pk]["lot_number"], "97-1")
+                self.assertEqual(lots[leger.pk]["arrival_lot_number"], "97")
                 self.assertEqual(lots[miro.pk]["lot_number"], "97")
+                self.assertNotIn("arrival_lot_number", lots[miro.pk])
                 self.assertFalse(lots[leger.pk]["oliver_house"])
         for lot in (leger, miro):
             lot.refresh_from_db()

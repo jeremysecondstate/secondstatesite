@@ -266,6 +266,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
     arrival_estimate = sale_arrival_estimate(lot)
     numbering_baseline = sale_numbering_baseline(lot)
     geography = sale_geography(lot)
+    display_lot_number = calendar_lot_number(lot)
     return {
         "id": lot.pk,
         **({"numbering_baseline": numbering_baseline} if numbering_baseline is not None else {}),
@@ -280,7 +281,8 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "oliver_house": bool(canonical_oliver_house),
         "oliver_house_name": canonical_oliver_house,
         "sale_title": clean_display_text(lot.sale_title),
-        "lot_number": calendar_lot_number(lot),
+        "lot_number": display_lot_number,
+        **({"arrival_lot_number": lot.lot_number} if display_lot_number != lot.lot_number else {}),
         "medium": clean_display_text(lot.medium),
         "location": clean_display_text(lot.location),
         "sale_region": geography["region"],
