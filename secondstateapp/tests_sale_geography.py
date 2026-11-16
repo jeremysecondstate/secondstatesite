@@ -76,6 +76,21 @@ class SaleGeographyTests(SimpleTestCase):
         self.assert_country("US", auction_house="Dennis Auction Service", location="Online only")
         self.assert_country("GB", auction_house="Britannica Auctions", location="online")
 
+    def test_wilsons_fine_art_uses_verified_local_house_without_overriding_source(self):
+        for source_lot_id, number in (("207602069", "1022"), ("207602701", "1032")):
+            with self.subTest(source_lot_id=source_lot_id):
+                lot = self.lot(
+                    auction_house="Wilson's Fine Art", source="Invaluable",
+                    source_lot_id=source_lot_id, lot_number=number, sale_url="",
+                    event_at=datetime(2026, 12, 6, 17, tzinfo=timezone.utc),
+                )
+                before = deepcopy(vars(lot))
+                self.assertEqual(sale_geography(lot), {"region": "us", "country_code": "US"})
+                self.assertEqual(vars(lot), before)
+        self.assert_country("", auction_house="Wilson's Fine Art affiliate")
+        self.assert_country("", auction_house="Wilson's Fine Art", location="Unconfirmed venue")
+        self.assert_country("GB", auction_house="Wilson's Fine Art", location="London, UK")
+
     def test_provider_title_and_links_do_not_establish_country(self):
         lot = self.lot(currency="USD", source="Invaluable", title="New York / American artist",
                        lot_url="https://www.example.us/item", sale_url="https://drouot.com/en/v/123")

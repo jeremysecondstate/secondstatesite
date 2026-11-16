@@ -1392,6 +1392,14 @@
       "evidence_url": "https://ablevys.com/auctions",
       "evidence": "Official auction page lists the December 3, 2026 Palm Beach Estates sale at 2 PM ET and in-person auctions at 5200 South Dixie Highway, West Palm Beach, Florida 33405. The exact imported house label is corroborated by Invaluable's auction-house listing: https://www.invaluable.com/auction-house/a-b-levys-pigr60dax8",
       "verified_at": "2026-11-15"
+    },
+    {
+      "name": "Wilson's Fine Art",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.liveauctioneers.com/auctioneer/10614/wilson-s-fine-art/",
+      "evidence": "Exact auction-house profile identifies Wilson's Fine Art at 740 4th Street North #171, St. Petersburg, Florida 33701, USA. The official site describes Tampa Bay and Florida Gulf Coast auction operations, and https://wilsonsfineart.com/current-auction links this provider profile and the exact Invaluable profile https://www.invaluable.com/auction-house/wilsons-fine-art-xqqvns0p0v. No affiliated or similarly named auction houses are included.",
+      "verified_at": "2026-11-16"
     }
   ]
 }
