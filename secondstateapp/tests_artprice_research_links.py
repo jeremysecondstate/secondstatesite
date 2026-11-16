@@ -85,22 +85,34 @@ class CalendarArtpriceResearchLinkTests(TestCase):
         lot.refresh_from_db()
         self.assertEqual(lot.artprice_url, "")
 
-    def test_generated_search_keeps_saved_lot_and_bookmark_urls(self):
-        artist_url = "https://www.artprice.com/artist/28011/antoni-tapies/lots/pasts?keyword=old"
-        saved_lot_url = "https://www.artprice.com/lots/12345/a-saved-result"
+    def test_artist_hyperlink_uses_print_history_without_rewriting_saved_urls(self):
+        artist_base = "https://www.artprice.com/artist/28011/antoni-tapies"
+        expected_artist_url = artist_base + "/lots/pasts?idcategory=2&p=1&sort=datesale_desc"
+        saved_lot_url = artist_base + "/lots/pasts?keyword=saved-work&idcategory=2&p=3"
         artist = AuctionWatchArtist.objects.create(
-            name="Antoni Tàpies", normalized_name="antoni tapies", artprice_url=artist_url,
+            name="Antoni Tàpies", normalized_name="antoni tapies", artprice_url=artist_base,
         )
         lot = watch_lot(watchlist_artist=artist, artist="Antoni Tàpies", artist_watchlist_name="Antoni Tàpies", artprice_url=saved_lot_url)
 
-        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        for ending in (
+            "", "/", "/lots/pasts", "/lots/pasts?idcategory[]=2",
+            "/lots/pasts?keyword=old&idcategory=1&p=3&sort=price_desc#results",
+            "/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+        ):
+            with self.subTest(ending=ending):
+                artist.artprice_url = artist_base + ending
+                artist.save(update_fields=("artprice_url",))
 
-        detail = response.context["calendar_data"]["2026-07-25"][0]
-        self.assertEqual(detail["artprice_url"], saved_lot_url)
-        self.assertEqual(detail["artist_artprice_url"], artist_url)
-        self.assertEqual(detail["artprice_search_scope"], "artist")
-        query = parse_qs(urlsplit(detail["artprice_search_url"]).query)
-        self.assertEqual(query["idartist"], ["28011"])
-        self.assertEqual(query["keyword"], ["Jeune-fille-aux-papillons"])
-        lot.refresh_from_db()
-        self.assertEqual(lot.artprice_url, saved_lot_url)
+                response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+
+                detail = response.context["calendar_data"]["2026-07-25"][0]
+                self.assertEqual(detail["artprice_url"], saved_lot_url)
+                self.assertEqual(detail["artist_artprice_url"], expected_artist_url)
+                self.assertEqual(detail["artprice_search_scope"], "artist")
+                query = parse_qs(urlsplit(detail["artprice_search_url"]).query)
+                self.assertEqual(query["idartist"], ["28011"])
+                self.assertEqual(query["keyword"], ["Jeune-fille-aux-papillons"])
+                lot.refresh_from_db()
+                artist.refresh_from_db()
+                self.assertEqual(lot.artprice_url, saved_lot_url)
+                self.assertEqual(artist.artprice_url, artist_base + ending)

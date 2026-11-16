@@ -273,7 +273,7 @@ class CalendarAttributionPayloadTests(SimpleTestCase):
                     self.assertEqual(payload["attribution_label"], expected)
                     self.assertEqual(payload["artist_source"], watchlist_name)
                     self.assertEqual(payload["artist"], artist_display_name(watchlist_name))
-                    self.assertEqual(payload["artist_artprice_url"], artist_url)
+                    self.assertEqual(payload["artist_artprice_url"], artist_url + "&p=1&sort=datesale_desc")
                     self.assertEqual(payload["artprice_url"], saved_work_url)
                     self.assertEqual(payload["id"], index)
                     self.assertTrue(payload["won_by_us"])
@@ -293,7 +293,10 @@ class CalendarAttributionPayloadTests(SimpleTestCase):
                 patch("secondstateapp.calendar_views.artist_research_urls", return_value=("", "")):
             payload = _lot_json(lot, ZoneInfo("America/Los_Angeles"))
         self.assertEqual(payload["attribution_label"], "Attributed to")
-        self.assertEqual(payload["artist_artprice_url"], chosen_url)
+        self.assertEqual(
+            payload["artist_artprice_url"],
+            "https://www.artprice.com/artist/19928/joan-miro/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+        )
         self.assertEqual(payload["artist_source"], "Joan Miró")
         self.assertEqual(lot.artist, "Attribué à Joan Miró")
         self.assertEqual(artist.artprice_url, chosen_url)

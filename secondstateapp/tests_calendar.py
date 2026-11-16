@@ -755,7 +755,7 @@ class AuctionCalendarViewTests(TestCase):
         selected_day = {lot["id"]: lot for lot in rendered_days["2026-07-25"]}
         self.assertEqual(set(selected_day), {linked_lot.pk, second_house_lot.pk})
         self.assertEqual(selected_day[linked_lot.pk]["auction_house"], "Heritage Auctions")
-        self.assertEqual(selected_day[linked_lot.pk]["artist_artprice_url"], artist_url)
+        self.assertEqual(selected_day[linked_lot.pk]["artist_artprice_url"], artist_url + "&p=1&sort=datesale_desc")
         self.assertEqual(selected_day[linked_lot.pk]["images"], [image_url])
         self.assertEqual(selected_day[second_house_lot.pk]["auction_house"], "Chiswick Auctions")
         self.assertIn("/artist/13619/david-hockney/", selected_day[second_house_lot.pk]["artist_artprice_url"])
@@ -3002,7 +3002,7 @@ class CalendarSyncApiTests(TestCase):
         self.assertEqual(first_detail["time"], "9:00 AM")
         self.assertEqual(first_detail["url"], payload["lots"][0]["lot_url"])
         self.assertEqual(first_detail["images"], [payload["lots"][0]["image_url"]])
-        self.assertEqual(first_detail["artist_artprice_url"], artprice_url)
+        self.assertEqual(first_detail["artist_artprice_url"], artprice_url + "&p=1&sort=datesale_desc")
         day = next(
             day for week in calendar.context["weeks"] for day in week
             if day["iso"] == "2026-10-22"

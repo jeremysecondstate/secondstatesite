@@ -178,6 +178,32 @@ class ManualQueueTests(unittest.TestCase):
                 db.execute("INSERT INTO thread_items VALUES (?,?,?,?,?,?)",
                            (ident, turn, str(uuid4()), "userMessage", timestamp + offset, raw))
 
+    def test_pinned_queue_command_survives_same_turn_migration_and_progress_messages(self):
+        reply = {"questionItemId": '["request_user_input_async","call_migration",0]',
+                 "question": "The queue has 10 lots, but its ownership records came from the “old PC” PC and "
+                             "that chat history is missing here. Is the old PC’s Codex history still available, or "
+                             "was the completed LiveArt chat deleted? The research guide requires verifying the "
+                             "prior run and its agents have ended before starting another run.",
+                 "answer": "Moved PCs; history wasn’t copied"}
+        tagged = "<send_user_message_question_reply>" + json.dumps([reply]) + "</send_user_message_question_reply>"
+        override = ("Plus the history doesn't matter because the only thing that matters are the lots in the queue. "
+                    "Stop with this red tape and get to work. You are wasting my Usage")
+        ident, original = self.human()
+        self.same_turn_messages(ident, original, [tagged, override, "Status?", "Thanks, dude!"])
+        with self.assertRaises(lifecycle.LifecycleError):
+            lifecycle.manual_authorization(self.config, ident)
+        proof = lifecycle.manual_authorization(self.config, ident, original)
+        self.assertEqual(proof["item_id"], original)
+        lifecycle.stored_manual_authorization(self.config, ident, original, proof["turn_id"])
+
+    def test_pinned_queue_command_does_not_override_later_stop_or_scope_change(self):
+        for followup in ("Stop", "Please pause for now", "Change the selection", "Research everything in the catalog"):
+            with self.subTest(followup=followup):
+                ident, original = self.human()
+                self.same_turn_messages(ident, original, ["Status?", followup])
+                with self.assertRaises(lifecycle.LifecycleError):
+                    lifecycle.manual_authorization(self.config, ident, original)
+
     def missing_records_reply(self, **overrides):
         reply = {
             "questionItemId": '["request_user_input_async","call_synthetic",0]',
@@ -242,7 +268,7 @@ class ManualQueueTests(unittest.TestCase):
             "answer": "I deleted the completed chat",
         }]) + "</send_user_message_question_reply>"
 
-    def deleted_finished_predecessor(self):
+    def deleted_finished_predecessor(self, followups=None):
         prior, _ = self.human()
         queue.start(self.config, self.api, prior)
         for item in self.api.run["items"]:
@@ -257,7 +283,7 @@ class ManualQueueTests(unittest.TestCase):
                 db.execute(f"DELETE FROM {table} WHERE thread_id=?", (prior,))
         (self.f.folder / (prior + ".jsonl")).unlink()
         current, original = self.human()
-        self.same_turn_messages(current, original, [self.deleted_chat_reply()])
+        self.same_turn_messages(current, original, [self.deleted_chat_reply()] if followups is None else followups)
         self.api.calls.clear()
         return prior, current, original
 
@@ -280,6 +306,55 @@ class ManualQueueTests(unittest.TestCase):
         self.assertEqual(receipt["original_registry_record"]["status"], "finished")
         self.assertEqual(receipt["confirmation"]["reply"]["answer"], "I deleted the completed chat")
         self.assertEqual([action for action, _ in self.api.calls], ["status", "start"])
+
+    def migrated_chat_followups(self):
+        move = "<send_user_message_question_reply>" + json.dumps([{
+            "questionItemId": '["request_user_input_async","call_move",0]',
+            "question": ("The queue has 10 lots, but its ownership records came from the “old PC” PC and that chat history is missing here. "
+                         "Is the old PC’s Codex history still available, or was the completed LiveArt chat deleted? "
+                         "The research guide requires verifying the prior run and its agents have ended before starting another run."),
+            "answer": "Moved PCs; history wasn’t copied",
+        }]) + "</send_user_message_question_reply>"
+        override = ("Plus the history doesn't matter because the only thing that matters are the lots in the queue. "
+                    "Stop with this red tape and get to work. You are wasting my Usage")
+        return [move, override, "Thanks!"]
+
+    def test_completed_migration_verifies_and_preserves_predecessor_before_new_snapshot(self):
+        prior, current, original = self.deleted_finished_predecessor(self.migrated_chat_followups())
+        old_pointer = copy.deepcopy(queue.pointer(self.config)["current"])
+        old_record = copy.deepcopy(lifecycle.registry(self.config)["runs"][prior])
+
+        def new_snapshot(action, payload):
+            if action == "start":
+                self.assertEqual(self.api.run["status"], "completed")
+                self.api.run = None
+
+        self.api.before = new_snapshot
+        result = queue.start(self.config, self.api, current, original, reconcile_migrated_owner=True)
+        self.assertEqual(result["status"], "ready")
+        saved = queue.pointer(self.config)
+        self.assertEqual(saved["history"][-1], old_pointer)
+        self.assertEqual(saved["current"]["authorization_item_id"], original)
+        record = lifecycle.registry(self.config)["runs"][prior]
+        receipt = lifecycle.read_json(record["migrated_owner_reconciliation"]["path"])
+        self.assertEqual(receipt["original_registry_record"], old_record)
+        self.assertEqual(receipt["confirmation"]["move"]["reply"]["answer"], "Moved PCs; history wasn’t copied")
+        self.assertEqual([action for action, _ in self.api.calls], ["status", "start"])
+
+    def test_completed_migration_stays_closed_for_unsettled_operations_and_active_descendants(self):
+        _, current, original = self.deleted_finished_predecessor(self.migrated_chat_followups())
+        before = (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes())
+        self.api.run["items"][0]["operations"].append({"operation_id": str(uuid4()), "status": "intent"})
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "unsettled operations"):
+            queue.start(self.config, self.api, current, original, reconcile_migrated_owner=True)
+        self.assertEqual([action for action, _ in self.api.calls], ["status"])
+        self.assertEqual(before, (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes()))
+        self.api.calls.clear()
+        self.f.add_thread(parent=current, status="inProgress")
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "active or uncertain"):
+            queue.start(self.config, self.api, current, original, reconcile_migrated_owner=True)
+        self.assertFalse(self.api.calls)
+        self.assertEqual(before, (self.config.registry.read_bytes(), queue.pointer_path(self.config).read_bytes()))
 
     def test_deleted_owner_recovery_rejects_unfinished_tampered_and_guarded_local_state(self):
         prior, current, _ = self.deleted_finished_predecessor()
@@ -485,11 +560,17 @@ class ManualQueueTests(unittest.TestCase):
     def test_skill_attachment_cannot_hide_other_prose_paths_or_agent_origin(self):
         skill = str(Path.home() / ".codex/skills/liveart-research/SKILL.md")
         attachment = f"[$liveart-research](<{skill}>)&#x20;\n\n"
+        bare_attachment = f"[$liveart-research]({skill}).\n\n"
         command = "Process my LiveArt queue."
         for text, kind in (
             (attachment + command, "agentMessage"),
             (attachment.replace("$liveart-research", "$other") + command, "userMessage"),
             (attachment.replace("SKILL.md", "other.md") + command, "userMessage"),
+            (bare_attachment.replace("SKILL.md", "other.md") + command, "userMessage"),
+            (bare_attachment.replace(".codex", ".different") + command, "userMessage"),
+            (bare_attachment.replace(").", ">).") + command, "userMessage"),
+            (bare_attachment.replace(").", "). Extra text.") + command, "userMessage"),
+            (bare_attachment + command + " Also do something else.", "userMessage"),
             (attachment + attachment + command, "userMessage"),
             ("Here is a quote:\n" + attachment + command, "userMessage"),
             (attachment + "> " + command, "userMessage"),
@@ -500,6 +581,17 @@ class ManualQueueTests(unittest.TestCase):
                 with self.assertRaises(lifecycle.LifecycleError):
                     queue.start(self.config, self.api, ident, item)
         self.assertEqual(self.api.calls, [])
+
+    def test_bare_windows_skill_attachment_with_period_authorizes_queue_start(self):
+        skill = r"C:\Users\7970X\\.codex\skills\liveart-research\SKILL.md"
+        text = f"[$liveart-research]({skill}).\n\nProcess my LiveArt queue.\n"
+        ident, item = self.human(text=text)
+        with mock.patch.object(Path, "home", return_value=Path("C:/Users/7970X")):
+            result = queue.start(self.config, self.api, ident, item)
+            self.assertEqual(result["status"], "ready")
+            saved = queue.pointer(self.config)["current"]
+            self.assertEqual(saved["authorization_item_id"], item)
+            lifecycle.stored_manual_authorization(self.config, ident, item, saved["authorization_turn_id"])
 
     def test_spaced_skill_attachment_preserves_exact_current_human_authorization(self):
         skill = str(Path.home() / ".codex/skills/liveart-research/SKILL.md")

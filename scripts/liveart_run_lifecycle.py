@@ -759,10 +759,13 @@ def manual_message_text(raw):
         # command. Recognize only our actual skill, leaving all other prose and
         # attachments subject to the existing exact command check.
         attachment = re.match(
-            r"\A[ \t]*\[\$liveart-research\]\(<([^<>\r\n]+)>\)[ \t]*(?:&#x20;)?[ \t]*\r?\n", text)
+            r"\A[ \t]*\[\$liveart-research\]\((?:<([^<>\r\n]+)>|([^<>()\r\n]+))\)\.?"
+            r"[ \t]*(?:&#x20;)?[ \t]*\r?\n", text)
         skill = str(Path.home() / ".codex/skills/liveart-research/SKILL.md")
-        if attachment and ntpath.normcase(ntpath.normpath(attachment[1])) == ntpath.normcase(ntpath.normpath(skill)):
-            text = text[attachment.end():]
+        if attachment:
+            attached_path = attachment[1] or attachment[2]
+            if ntpath.normcase(ntpath.normpath(attached_path)) == ntpath.normcase(ntpath.normpath(skill)):
+                text = text[attachment.end():]
         return " ".join(text.split()).casefold().rstrip(".! ")
     except (ValueError, KeyError, TypeError):
         raise LifecycleError("The human authorization message cannot be verified.") from None
@@ -960,7 +963,9 @@ def is_stop_message(text):
 def is_queue_acknowledgment(text):
     """Recognize only short encouragement, never an additional instruction."""
     words = " ".join(re.sub(r"[.!?,]+", " ", text).split())
-    return bool(re.fullmatch(r"(?:here (?:you|ya) go(?: buddy)?|you got this(?: little guy)?(?: go)*|sure thing(?: little dude)?)", words))
+    return bool(re.fullmatch(
+        r"(?:here (?:you|ya) go(?: buddy)?|you got this(?: little guy)?(?: go)*|sure thing(?: little dude)?|thanks(?: dude)?)",
+        words))
 
 
 def is_missing_records_reply(raw):
@@ -983,6 +988,65 @@ def is_missing_records_reply(raw):
                 and reply.get("answer") == "Do the damn job!")
     except (ValueError, KeyError, TypeError):
         return False
+
+
+def moved_pc_history_reply(raw):
+    """Read the structured answer about missing history after moving PCs."""
+    try:
+        message = json.loads(raw)
+        content = message["content"]
+        if message.get("type") != "userMessage" or len(content) != 1:
+            return None
+        tagged = re.fullmatch(
+            r"\s*<send_user_message_question_reply>\s*(.*?)\s*</send_user_message_question_reply>\s*",
+            content[0]["text"], re.DOTALL)
+        replies = json.loads(tagged[1]) if tagged else None
+        if not isinstance(replies, list) or len(replies) != 1 or not isinstance(replies[0], dict):
+            return None
+        reply = replies[0]
+        if set(reply) != {"questionItemId", "question", "answer"}:
+            return None
+        if reply["answer"].casefold().replace("’", "'").rstrip(".") != "moved pcs; history wasn't copied":
+            return None
+        question = reply["question"].replace("’", "'").replace("“", '"').replace("”", '"')
+        if not re.fullmatch(
+                r'The queue has \d+ lots, but its ownership records came from the "[^"\r\n]+" PC and that '
+                r"chat history is missing here\. Is the old PC's Codex history still available, or was the "
+                r"completed LiveArt chat deleted\? The research guide requires verifying the prior run and "
+                r"its agents have ended before starting another run\.", question):
+            return None
+        question_id = json.loads(reply["questionItemId"])
+        if (not isinstance(question_id, list) or len(question_id) != 3
+                or question_id[0] != "request_user_input_async" or not isinstance(question_id[1], str)
+                or not re.fullmatch(r"call_[A-Za-z0-9]+", question_id[1])
+                or type(question_id[2]) is not int or question_id[2] != 0):
+            return None
+        return reply
+    except (AttributeError, ValueError, KeyError, TypeError):
+        return None
+
+
+def is_migrated_owner_override(text):
+    return text.replace("’", "'") == (
+        "plus the history doesn't matter because the only thing that matters are the lots in the queue. "
+        "stop with this red tape and get to work. you are wasting my usage")
+
+
+def pinned_current_queue_command(items, item_id):
+    """Keep an explicitly pinned command through recognized same-turn steering."""
+    index = next((i for i, item in enumerate(items) if item["item_id"] == item_id), None)
+    if index is None:
+        return None
+    item = items[index]
+    if manual_message_text(item["item_json"]) not in {"process my liveart queue", "please process my liveart queue"}:
+        return None
+    for later in items[:index]:
+        raw = later["item_json"]
+        text = manual_message_text(raw)
+        if not (is_queue_acknowledgment(text) or text in {"status?", "any update?", "what's the status?"}
+                or is_migrated_owner_override(text) or moved_pc_history_reply(raw) is not None):
+            return None
+    return item
 
 
 def same_turn_queue_continuation(items):
@@ -1090,6 +1154,8 @@ def manual_authorization(config, ident, authorization_item_id=None, *, command="
                      not is_queue_acknowledgment(manual_message_text(candidate["item_json"]))), None)
         if command == "queue":
             item = same_turn_queue_continuation(items) or item
+            if authorization_item_id is not None and (item is None or item["item_id"] != authorization_item_id):
+                item = pinned_current_queue_command(items, authorization_item_id)
         if (item is None or authorization_item_id is not None and item["item_id"] != authorization_item_id
                 or type(item["created_at_ms"]) is not int
                 or type(turn["started_at"]) is not int
@@ -1124,34 +1190,58 @@ def deleted_owner_confirmation(config, ident, proof):
     raise LifecycleError("An actual same-turn confirmation that the completed chat was deleted is required.")
 
 
-def inspect_deleted_completed_owner(config, previous, ident, proof, receipt):
-    """Narrow completed/deleted recovery; missing unfinished history remains closed.
+def migrated_owner_confirmation(config, ident, proof):
+    """Require the actual PC-move reply and later instruction from the original queue turn."""
+    if manual_authorization(config, ident, proof["item_id"]) != proof:
+        raise LifecycleError("The current queue authorization changed.")
+    with database(config.history_db) as history:
+        rows = history.execute(
+            "SELECT item_id,created_at_ms,item_json FROM thread_items WHERE thread_id=? AND turn_id=? "
+            "AND item_type='userMessage' AND created_at_ms>? ORDER BY created_at_ms, rowid",
+            (ident, proof["turn_id"], proof["created_at_ms"])).fetchall()
+    move = None
+    for row in rows:
+        reply = moved_pc_history_reply(row["item_json"])
+        if reply is not None:
+            move = {"item_id": thread_uuid(row["item_id"]), "created_at_ms": row["created_at_ms"], "reply": reply}
+        elif (move is not None and row["created_at_ms"] > move["created_at_ms"]
+              and is_migrated_owner_override(manual_message_text(row["item_json"]))):
+            return {"thread_id": ident, "turn_id": proof["turn_id"], "move": move,
+                    "override": {"item_id": thread_uuid(row["item_id"]), "created_at_ms": row["created_at_ms"],
+                                 "text": json.loads(row["item_json"])["content"][0]["text"]}}
+    raise LifecycleError("The same-turn PC move and instruction to proceed without the old history could not be verified.")
+
+
+def inspect_completed_missing_owner(config, previous, ident, proof, receipt, *, migrated=False):
+    """Narrow completed-owner recovery; missing unfinished history remains closed.
 
     The queue client supplies a fresh server-verified receipt. Revalidate local
-    completion, actual human provenance and absence while holding lifecycle lock.
+    completion, actual human provenance and surviving execution records under lock.
     This path never repairs or resumes an unfinished predecessor.
     """
+    mode = "migrated" if migrated else "deleted"
+    confirm = migrated_owner_confirmation if migrated else deleted_owner_confirmation
     path = Path(receipt["path"]).resolve()
     if not path.is_relative_to(config.business_control.parent.resolve()):
-        raise LifecycleError("Deleted-owner receipt must be inside the business-control directory.")
+        raise LifecycleError("Owner verification receipt must be inside the business-control directory.")
     if hashlib.sha256(path.read_bytes()).hexdigest() != receipt["sha256"]:
-        raise LifecycleError("Deleted-owner verification receipt changed.")
+        raise LifecycleError("Owner verification receipt changed.")
     evidence = read_json(path)
     data = registry(config)
     record = data["runs"].get(previous, {})
     pointer_path = config.path.parent / "manual-queue.json"
     pointer = read_json(pointer_path, max_bytes=MAX_QUEUE_POINTER_BYTES).get("current", {})
     digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
-    if (evidence.get("schema_version") != 1 or evidence.get("kind") != "deleted_completed_owner"
+    if (evidence.get("schema_version") != 1 or evidence.get("kind") != f"{mode}_completed_owner"
             or evidence.get("actor_thread_id") != ident or evidence.get("previous_thread_id") != previous
             or data["active_thread_id"] != previous or record.get("status") != "finished"
             or record.get("manual_queue") is not True or pointer.get("finished") is not True
             or pointer.get("owner_thread_id") != previous or pointer.get("run", {}).get("status") != "completed"
             or evidence.get("registry_record_sha256") != digest(record)
             or evidence.get("pointer_current_sha256") != digest(pointer)
-            or evidence.get("confirmation") != deleted_owner_confirmation(config, ident, proof)
+            or evidence.get("confirmation") != confirm(config, ident, proof)
             or evidence.get("authorization") != proof or not business_clear(config)):
-        raise LifecycleError("Deleted-owner recovery requires unchanged, completed, fully accounted records.")
+        raise LifecycleError("Owner recovery requires unchanged, completed, fully accounted records.")
     with database(config.state_db) as state, database(config.history_db) as history:
         columns = {row[1] for row in state.execute("PRAGMA table_info(threads)")}
         # Codex can retain parent provenance on a child even when its edge was
@@ -1249,8 +1339,12 @@ def activate_follow_on(config, ident, proof, verification_path):
               authorization_item_id=proof["item_id"])
 
 
-def start_manual(config, ident, authorization_item_id=None, *, deleted_owner_receipt=None):
+def start_manual(config, ident, authorization_item_id=None, *, deleted_owner_receipt=None, migrated_owner_receipt=None):
     """Acquire existing conservative guards for one finite, human selected queue."""
+    if deleted_owner_receipt is not None and migrated_owner_receipt is not None:
+        raise LifecycleError("Choose only one completed predecessor reconciliation mode.")
+    migrated = migrated_owner_receipt is not None
+    receipt = migrated_owner_receipt if migrated else deleted_owner_receipt
     ident = thread_uuid(ident)
     with file_lock(config.lock):
         proof = manual_authorization(config, ident, authorization_item_id)
@@ -1274,10 +1368,10 @@ def start_manual(config, ident, authorization_item_id=None, *, deleted_owner_rec
         recovery_only = False
         if previous:
             try:
-                if deleted_owner_receipt is None:
+                if receipt is None:
                     inspect_prior_owner(config, previous)
                 else:
-                    inspect_deleted_completed_owner(config, previous, ident, proof, deleted_owner_receipt)
+                    inspect_completed_missing_owner(config, previous, ident, proof, receipt, migrated=migrated)
             except LifecycleError:
                 return {"status": "busy", "thread_id": ident, "work_allowed": False}
             recovery_only = not business_clear(config)
@@ -1290,11 +1384,12 @@ def start_manual(config, ident, authorization_item_id=None, *, deleted_owner_rec
         if current["signature"] != again["signature"]:
             raise LifecycleError("Run or descendant state changed during manual startup.")
         if previous:
-            if deleted_owner_receipt is None:
+            if receipt is None:
                 inspect_prior_owner(config, previous)
             else:
-                reconciliation = inspect_deleted_completed_owner(config, previous, ident, proof, deleted_owner_receipt)
-                data["runs"][previous]["deleted_owner_reconciliation"] = reconciliation
+                reconciliation = inspect_completed_missing_owner(config, previous, ident, proof, receipt, migrated=migrated)
+                mode = "migrated" if migrated else "deleted"
+                data["runs"][previous][f"{mode}_owner_reconciliation"] = reconciliation
             data["runs"][previous]["status"] = "reconciled_terminal"
             data["runs"][previous]["reconciled_at_ms"] = now_ms()
         prior_record = data["runs"].get(ident)

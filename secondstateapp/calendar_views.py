@@ -254,6 +254,13 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
             artist_artprice_url = _validated_artist_artprice_url(lot.watchlist_artist.artprice_url)
         except ValueError:
             pass
+    if artist_artprice_url:
+        # Saved artist links can predate the current print-history filters.
+        artist_url = urlparse(artist_artprice_url)
+        artist_artprice_url = artist_url._replace(
+            path="/".join(artist_url.path.split("/")[:4]) + "/lots/pasts",
+            params="", query="idcategory=2&p=1&sort=datesale_desc", fragment="",
+        ).geturl()
     arrival_schedule = published_lot_arrival(lot)
     arrival_estimate = sale_arrival_estimate(lot)
     numbering_baseline = sale_numbering_baseline(lot)

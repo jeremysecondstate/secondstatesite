@@ -230,7 +230,10 @@ class HeritageArtistNameLinkTests(SimpleTestCase):
         lot._state.fields_cache["bid_board_analysis"] = None
         with patch("django.db.backends.utils.CursorWrapper.execute", side_effect=AssertionError("Unexpected database query")):
             payload = _lot_json(lot, ZoneInfo("America/Los_Angeles"))
-        self.assertEqual(payload["artist_artprice_url"], chosen_url)
+        self.assertEqual(
+            payload["artist_artprice_url"],
+            "https://www.artprice.com/artist/163223/ann-hamilton/lots/pasts?idcategory=2&p=1&sort=datesale_desc",
+        )
         self.assertEqual(artist.artprice_url, chosen_url)
         self.assertTrue(artist._state.adding)
         self.assertTrue(lot._state.adding)

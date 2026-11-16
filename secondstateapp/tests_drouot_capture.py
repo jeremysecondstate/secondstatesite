@@ -91,6 +91,26 @@ class DrouotCaptureTests(TestCase):
             plain + '\n"From the Basilica"\nTwo engravings enhanced with watercolor')
         self.assertEqual(result.lots[0].artist, "Giovanni Battista Piranesi")
 
+    def test_inline_dated_alias_keeps_explicit_after_credit_separate_from_work(self):
+        prefix = "PIRANESI, Giovanni Battista, known as PIRANÈSE (1720–1778)"
+        work = "Two engravings. *Carceri*. 67 x 52 cm. (damage) Mounting strips"
+        for dash in ("—", "–", "-"):
+            with self.subTest(dash=dash):
+                description = prefix + " " + dash + " after. " + work
+                result = self._validate_named_source("Giovanni Battista Piranesi", description, description)
+                self.assertEqual(len(result.lots), 1)
+                lot = result.lots[0]
+                self.assertEqual(lot.artist, "PIRANESI, Giovanni Battista, known as PIRANÈSE, after")
+                self.assertEqual(lot.title, lot.artist + " — " + work.replace("*", ""))
+                self.assertEqual(result.attribution_notes[0]["source_artist_credit"], lot.artist)
+        for suffix in (" — After the Rain. Two engravings", ". After the Rain. Two engravings"):
+            description = prefix + suffix
+            result = self._validate_named_source("Giovanni Battista Piranesi", description, description)
+            self.assertEqual(result.lots[0].artist, "Giovanni Battista Piranesi")
+            self.assertIn("After the Rain", result.lots[0].title)
+        description = "Another Artist, known as PIRANÈSE (1720–1778) — after. " + work
+        self.assertEqual(self._validate_named_source("Giovanni Battista Piranesi", description, description).lots, [])
+
     def test_goya_complete_source_name_matches_only_its_primary_credit(self):
         heading = "Francisco José de Goya y Lucientes"
         result = self._validate_named_source("Francisco de Goya", heading,
@@ -291,6 +311,29 @@ class DrouotCaptureTests(TestCase):
         self.assertEqual(self._validate_named_source("Yozo Hamaguchi", heading, heading + "\nPoster. Unknown technique.").lots, [])
         self.assertEqual(self._validate_named_source("Leonor Fini", "Leonor Fini",
             'Leonor Fini\nPoster titled "Print: Female Nude". Unknown technique.').lots, [])
+
+    def test_ceramic_objects_do_not_qualify_from_generic_print_label(self):
+        heading = "ZAO Wou-Ki."
+        description = (heading + '\n“The Orchid” Plate. 1986. Ceramic print, 25 cm in diameter. '
+                       'Produced by Ateliers de Segnies, created to mark the 20th anniversary of BSN '
+                       '(Boussois-Souchon-Neuvese, later the Danone Group).')
+        for material in ("Ceramic", "Porcelain", "Earthenware", "Stoneware"):
+            with self.subTest(material=material):
+                for work in (description.replace("Ceramic", material),
+                             heading + f'\nPlate. Print on {material.lower()}, 25 cm in diameter.'):
+                    result = self._validate_named_source("Zao Wou-Ki", heading, work)
+                    self.assertEqual(result.lots, [])
+                    self.assertIn("No explicit print technique", result.rejected_lots[0]["reason"])
+        for work, medium in (
+            ('“The Orchid”\nOriginal lithograph on paper after a ceramic plate, 25 x 30 cm.', "lithograph"),
+            ('“Ceramic print”\nOriginal print on paper, signed.', "print"),
+            ('Geometric Dove (Black)\nDigital print on ceramic\nOn ceramic, 15 x 15 cm\n'
+             'Limited edition of 225 copies\nLaser-signed and numbered', "print"),
+        ):
+            with self.subTest(work=work):
+                result = self._validate_named_source("Zao Wou-Ki", heading, heading + "\n" + work)
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].medium, medium)
 
     def test_xylography_and_bullet_print_dimensions_require_offered_work_context(self):
         heading = "DURER Albrecht (1471-1528)"
@@ -1226,6 +1269,30 @@ class DrouotCaptureTests(TestCase):
                 self.assertEqual(len(observed), 1)
                 self.assertEqual(observed[0].title, expected_title)
                 self.assertEqual(bool(result.attribution_notes), qualified)
+
+    def test_unclosed_lifespan_heading_retains_inline_title_before_technique(self):
+        for prefix in ("PABLO PICASSO", "After PABLO PICASSO"):
+            for lifespan in ("(SPANISH 1881-1973", "(SPANISH 1881-1973)"):
+                with self.subTest(prefix=prefix, lifespan=lifespan):
+                    heading = prefix + " " + lifespan + " LA CALIFORNIA"
+                    description = (heading + " \ncollotype, signed in the plate, suite: La Californie, "
+                                   "French vintage frame, 38cm x 26cm. (Subject to ARR – see Buyers Conditions)")
+                    result = self._validate_named_source("Pablo Picasso", heading, description)
+                    self.assertEqual(len(result.lots), 1)
+                    lot = result.lots[0]
+                    self.assertEqual(lot.title, (prefix + " — " if prefix.startswith("After") else "") + "LA CALIFORNIA")
+                    self.assertEqual(lot.medium, "collotype")
+                    self.assertEqual(bool(result.attribution_notes), prefix.startswith("After"))
+
+    def test_unclosed_biography_without_heading_and_technique_boundary_is_not_title(self):
+        credit = "PABLO PICASSO (SPANISH 1881-1973"
+        for heading, first in (("PABLO PICASSO", credit + " BORN IN MALAGA"),
+                               (credit + " BORN IN MALAGA", credit + " BORN IN MALAGA")):
+            with self.subTest(heading=heading):
+                result = self._validate_named_source("Pablo Picasso", heading,
+                    first + "\nLA CALIFORNIA\ncollotype, signed in the plate")
+                self.assertEqual(len(result.lots), 1)
+                self.assertEqual(result.lots[0].title, "LA CALIFORNIA")
 
     def test_known_as_credit_line_does_not_replace_following_work_title(self):
         for alias_credit in ("known as MIRO THE GIANT (1893)", "also known as MIRO THE GIANT (1893)"):

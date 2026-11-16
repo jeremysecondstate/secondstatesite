@@ -17,6 +17,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.forms.models import model_to_dict
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from .models import AuctionBidBoardAnalysis, AuctionWatchLot, LiveArtResaleAnalysis
 from .research_queue_models import ResearchQueueItem, ResearchQueueOperation, ResearchQueueRun, ResearchQueueRunItem, ResearchQueueState
@@ -204,6 +205,69 @@ def run_json(run):
             "completed_at": run.completed_at.isoformat() if run.completed_at else None,
             "block_reason": run.block_reason, "recovery_log": run.recovery_log,
             "completion_audit": run.completion_audit, "items": items}
+
+
+def _reopen_shared_tool_block(run, payload):
+    recovery_id = str(_uuid(payload.get("recovery_id"), "recovery_id"))
+    item_id, source_proof, block = (payload.get(key) for key in ("item_id", "source_proof", "previous_block"))
+    request = {"item_id": item_id, "source_proof": source_proof, "previous_block": block}
+    for entry in run.recovery_log:
+        if entry.get("event") == "reopen_shared_block" and entry.get("recovery_id") == recovery_id:
+            if entry.get("request") != request:
+                raise QueueError("The original shared-block recovery receipt cannot be rewritten.")
+            return {"run": run_json(run)}
+    if (run.status != "blocked" or run.completed_at is not None or run.completion_audit
+            or any(entry.get("event") == "stop" for entry in run.recovery_log)):
+        raise QueueError("Only an unfinished tool-blocked pass without a user stop can reopen.")
+    if (not isinstance(block, dict) or block.get("shared_block") is not True
+            or not isinstance(block.get("source_proof"), dict)
+            or block["source_proof"].get("kind") != "tool_restriction"
+            or block.get("reason") != run.block_reason):
+        raise QueueError("The original shared tool restriction receipt is required.")
+    if (ResearchQueueRun.objects.filter(status="running").exists()
+            or ResearchQueueOperation.objects.filter(settled_at__isnull=True).exists()):
+        raise QueueError("Another running pass or unsettled operation prevents reopening.")
+
+    items = list(run.items.select_related("queue_item"))
+    previous_items = run_json(run)["items"]
+    original_claim = next((item for item in items if item.pk == item_id and item.claimed_at is not None), None)
+    if (original_claim is None or any(
+            item.status != "needs_attention" or item.disposition or item.outcome != block
+            or item.completed_at is None or (item.claimed_at is not None and item.pk != item_id)
+            or not item.queue_item.selected or item.queue_item.generation != item.queue_generation
+            or item.queue_item.status != "needs_attention" or item.queue_item.latest_result != block
+            for item in items)
+            or any(item["operations"] or item["saved_revisions"] or item["current_saved_proof"]
+                   for item in previous_items)):
+        raise QueueError("The frozen items no longer match the untouched shared tool block.")
+
+    if not isinstance(source_proof, dict) or set(source_proof) != {"kind", "observed_at", "observed_result", "dossier_url"}:
+        raise QueueError("Visible browser restoration proof is required.", 400)
+    if (source_proof["kind"] != "tool_access_restored"
+            or source_proof["dossier_url"] != original_claim.lot_snapshot.get("dossier_url")
+            or not isinstance(source_proof["observed_result"], str) or not source_proof["observed_result"].strip()):
+        raise QueueError("Restoration proof must identify the original claimed lot's visible dossier.", 400)
+    try:
+        observed_at = parse_datetime(source_proof["observed_at"])
+    except (TypeError, ValueError):
+        observed_at = None
+    if (observed_at is None or timezone.is_naive(observed_at)
+            or not max(item.completed_at for item in items) < observed_at <= timezone.now()):
+        raise QueueError("Browser restoration must have been observed after the shared block.", 400)
+
+    receipt_fields = ("id", "status", "disposition", "reason", "claimed_at", "completed_at", "outcome", "saved_revisions")
+    run.recovery_log = [*run.recovery_log, {"event": "reopen_shared_block", "recovery_id": recovery_id,
+                       "request": request, "blocked_items": [{key: item[key] for key in receipt_fields}
+                                                             for item in previous_items],
+                       "at": timezone.now().isoformat()}]
+    run.status, run.block_reason = "running", ""
+    run.save(update_fields=["status", "block_reason", "recovery_log"])
+    for item in items:
+        item.status = "researching" if item.pk == item_id else "queued"
+        item.reason, item.completed_at, item.outcome = "", None, {}
+        item.save(update_fields=["status", "reason", "completed_at", "outcome"])
+        _update_current(item, status=item.status, latest_result={})
+    return {"run": run_json(run)}
 
 
 def get_run(run_id):
@@ -419,6 +483,8 @@ def worker_action(payload):
             run.owner_token, run.thread_id = new_owner, str(payload.get("thread_id", run.thread_id))[:100]
             run.save(update_fields=["owner_token", "thread_id", "recovery_log"])
             return {"run": run_json(run)}
+        if action == "reopen_shared_block":
+            return _reopen_shared_tool_block(run, payload)
         if action == "stop":
             receipt = {"reason": payload.get("reason"), "reopening_condition": payload.get("reopening_condition"), "source_proof": payload.get("source_proof")}
             if any(not isinstance(receipt[key], str) or not receipt[key].strip() for key in ("reason", "reopening_condition")) or not isinstance(receipt["source_proof"], dict) or not receipt["source_proof"]:

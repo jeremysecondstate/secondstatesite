@@ -284,6 +284,16 @@ def _following_qualifier(value: str) -> tuple[str, str]:
     return "", value
 
 
+def _inline_alias_qualifier(value: str):
+    """Recognize an explicit dated alias, dash, attribution and work boundary."""
+    return re.match(
+        r"^[\s,;:.]*(?P<alias>(?:also\s+)?known\s+as\s+[^.;:()\r\n]+?)\s*"
+        r"\([^)]*\d{4}[^)]*\)\s*[\u2013\u2014-]\s*"
+        r"(?P<qualifier>after|attributed(?:\s+to)?)\s*\.\s*(?P<work>.*)$",
+        value, re.IGNORECASE,
+    )
+
+
 def _separate_line_qualifier(credit: str, following: str, aliases: Iterable[str]) -> tuple[str, str]:
     """An explicit After: label can follow an otherwise bare artist/date line."""
     end = _credit_prefix_end(credit, aliases)
@@ -355,6 +365,20 @@ def _title(description: str, heading: str, aliases: Iterable[str]) -> str:
         end = None if separate else _credit_prefix_end(line, aliases)
         if end is not None:
             value = line[end:].strip(" *_\t.,:;-")
+            inline_alias = _inline_alias_qualifier(value)
+            if inline_alias:
+                value = inline_alias.group("work")
+            # A source can omit ')' after nationality/lifespan and leave the
+            # work on the same heading. Require that exact visible heading
+            # and a following technique line before recovering its title.
+            if index == 0 and line == heading.strip(" *_\t") and len(lines) > 1 and _PRINT_MEDIUM.match(lines[1]):
+                unclosed_lifespan = re.fullmatch(
+                    r"\((?:Spanish|French|British|American|German|Italian|Japanese)\s+"
+                    r"[0-9]{4}\s*[-\u2013\u2014]\s*[0-9]{4}\s+(?P<work>[^()\r\n]+)",
+                    value, re.IGNORECASE,
+                )
+                if unclosed_lifespan:
+                    value = unclosed_lifespan.group("work").strip()
             # Birth/death locations and source attribution can follow the name;
             # remove them only in this leading credit span, never from the work.
             while value:
@@ -497,6 +521,9 @@ def _qualified_source_credit(heading: str, description: str, aliases: Iterable[s
         # The matched name/qualifier span is the source credit. Everything
         # after it may be a long work description, certificate or dimensions.
         name = " ".join(credit[:name_end].split()).strip(" .,;:-")
+        inline_alias = _inline_alias_qualifier(credit[name_end:])
+        if inline_alias:
+            return name + ", " + inline_alias.group("alias").strip() + ", " + inline_alias.group("qualifier")
         alias_qualifier = re.fullmatch(
             r"[\s,;:.]*(?P<alias>(?:also\s+)?known\s+as\s+[^.;\n]+)\.\s*"
             r"(?P<qualifier>from|after|attributed(?:\s+to)?)\.?\s*",
@@ -625,6 +652,16 @@ def _print_technique(description: str, aliases: Iterable[str] = ()):
                 positive = _PRINT_MEDIUM.match(work, start)
         if positive.group().casefold() in {"print", "prints"}:
             before, after = work[:positive.start()], work[positive.end():]
+            # A ceramic edition can be translated as a "ceramic print";
+            # that generic noun does not identify a printmaking technique.
+            # A named process such as digital print on ceramic still qualifies,
+            # as do actual lithographs after ceramic plates.
+            ceramic_material = r"(?:ceramic|porcelain|earthenware|stoneware)"
+            named_print_process = re.search(r"\b(?:digital|pigment|ink[ -]?jet)\s+$", before, re.IGNORECASE)
+            if not named_print_process and (
+                    re.search(r"\b" + ceramic_material + r"\s+$", before, re.IGNORECASE)
+                    or re.match(r"\s+(?:on|in)\s+" + ceramic_material + r"\b", after, re.IGNORECASE)):
+                continue
             if re.search(r"\b(?:signed|dated|monogrammed|numbered)(?:\s+and\s+(?:signed|dated|monogrammed|numbered))?\s+in\s+$",
                          before, re.IGNORECASE):
                 continue

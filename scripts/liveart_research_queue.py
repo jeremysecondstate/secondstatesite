@@ -190,10 +190,11 @@ def require_owner(config, ident, current, *, allow_settlement=False):
         raise QueueError("The current human stopped this pass; only settling known outcomes and cleanup are allowed.")
 
 
-def deleted_completed_owner_receipt(config, api, ident, authorization_item_id=None):
-    """Verify a deleted finished predecessor without executing any server mutation."""
+def completed_missing_owner_receipt(config, api, ident, authorization_item_id=None, *, migrated=False):
+    """Verify a finished predecessor without executing any server mutation."""
     proof = lifecycle.manual_authorization(config, ident, authorization_item_id)
-    confirmation = lifecycle.deleted_owner_confirmation(config, ident, proof)
+    confirm = lifecycle.migrated_owner_confirmation if migrated else lifecycle.deleted_owner_confirmation
+    confirmation = confirm(config, ident, proof)
     lifecycle.inspect_tree(config, ident, require_terminal=False, continuation=True, manual=True)
     data = pointer(config)
     current = data["current"] or {}
@@ -204,7 +205,7 @@ def deleted_completed_owner_receipt(config, api, ident, authorization_item_id=No
             or record.get("manual_queue") is not True or current.get("finished") is not True
             or current.get("owner_thread_id") != previous
             or current.get("run", {}).get("status") != "completed" or not lifecycle.business_clear(config)):
-        raise QueueError("Only a completed, fully accounted deleted predecessor can be reconciled.")
+        raise QueueError("Only a completed, fully accounted predecessor can be reconciled.")
     audit = lifecycle.queue_completion_audit(config, previous, current, record.get("completion_audit_path"))
     if (not audit["passed"] or not audit.get("audit_sha256")
             or audit["audit_sha256"] != record.get("completion_audit", {}).get("audit_sha256")):
@@ -214,17 +215,18 @@ def deleted_completed_owner_receipt(config, api, ident, authorization_item_id=No
     run = response["run"]
     if (run.get("status") != "completed" or run.get("thread_id") != previous or unsettled(run)
             or any(item.get("status") != "done" for item in run["items"])):
-        raise QueueError("Deleted-owner recovery requires a completed server run with every item Done and no unsettled operations.")
+        raise QueueError("Recovery requires a completed server run with every item Done and no unsettled operations.")
     digest = lambda value: lifecycle.hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
-    evidence = {"schema_version": 1, "kind": "deleted_completed_owner", "actor_thread_id": ident,
+    mode = "migrated" if migrated else "deleted"
+    evidence = {"schema_version": 1, "kind": f"{mode}_completed_owner", "actor_thread_id": ident,
                 "previous_thread_id": previous, "verified_at_ms": lifecycle.now_ms(), "authorization": proof,
                 "confirmation": confirmation, "registry_record_sha256": digest(record),
                 "pointer_current_sha256": digest(current), "audit_sha256": audit["audit_sha256"],
                 "original_registry_record": record, "server_run": public(run)}
-    path = config.business_control.parent / f"deleted-owner-{previous[:8]}-{uuid4()}.json"
+    path = config.business_control.parent / f"{mode}-owner-{previous[:8]}-{uuid4()}.json"
     lifecycle.atomic_json(path, evidence)
     receipt = {"path": str(path), "sha256": lifecycle.hashlib.sha256(path.read_bytes()).hexdigest()}
-    lifecycle.inspect_deleted_completed_owner(config, previous, ident, proof, receipt)
+    lifecycle.inspect_completed_missing_owner(config, previous, ident, proof, receipt, migrated=migrated)
     return receipt
 
 
@@ -262,10 +264,14 @@ def start_follow_on(config, api, ident, authorization_item_id=None):
     return start(config, api, ident, proof["item_id"])
 
 
-def start(config, api, ident, authorization_item_id=None, *, reconcile_deleted_owner=False):
-    receipt = (deleted_completed_owner_receipt(config, api, ident, authorization_item_id)
-               if reconcile_deleted_owner else None)
-    allowance = lifecycle.start_manual(config, ident, authorization_item_id, deleted_owner_receipt=receipt)
+def start(config, api, ident, authorization_item_id=None, *, reconcile_deleted_owner=False, reconcile_migrated_owner=False):
+    if reconcile_deleted_owner and reconcile_migrated_owner:
+        raise QueueError("Choose only one completed predecessor reconciliation mode.")
+    receipt = (completed_missing_owner_receipt(config, api, ident, authorization_item_id, migrated=reconcile_migrated_owner)
+               if reconcile_deleted_owner or reconcile_migrated_owner else None)
+    allowance = lifecycle.start_manual(config, ident, authorization_item_id,
+                                       deleted_owner_receipt=receipt if reconcile_deleted_owner else None,
+                                       migrated_owner_receipt=receipt if reconcile_migrated_owner else None)
     if not allowance.get("work_allowed") or allowance.get("recovery_only"):
         return allowance
     with lifecycle.file_lock(config.path.parent / "manual-queue.lock"):
@@ -563,8 +569,11 @@ def main(argv=None):
         if action in {"start", "start-follow-on", "resume"}:
             command.add_argument("--authorization-item-id")
         if action == "start":
-            command.add_argument("--reconcile-deleted-owner", action="store_true",
-                                 help="Verify a human-confirmed deleted completed predecessor before a new snapshot.")
+            mode = command.add_mutually_exclusive_group()
+            mode.add_argument("--reconcile-deleted-owner", action="store_true",
+                              help="Verify a human-confirmed deleted completed predecessor before a new snapshot.")
+            mode.add_argument("--reconcile-migrated-owner", action="store_true",
+                              help="Reconcile a completed predecessor after a verified PC move and explicit instruction to proceed without old history.")
         if action in {"intent", "settle", "outcome", "block", "amend", "reconcile"}:
             command.add_argument("--payload", required=True, type=Path)
         if action == "reconcile":
@@ -585,7 +594,8 @@ def main(argv=None):
                 result = resume(config, api, ident, args.authorization_item_id, args.audit)
             else:
                 result = start(config, api, ident, args.authorization_item_id,
-                               reconcile_deleted_owner=args.reconcile_deleted_owner)
+                               reconcile_deleted_owner=args.reconcile_deleted_owner,
+                               reconcile_migrated_owner=args.reconcile_migrated_owner)
         elif args.action == "reconcile":
             result = reconcile(config, api, ident, lifecycle.read_json(args.payload), args.receipt)
         elif args.action == "stop":
