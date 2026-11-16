@@ -48,6 +48,7 @@ from .auction_email import (
 )
 from .bid_board_snapshot import saved_board_summary
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
+from .calendar_lot_numbers import calendar_lot_number
 from .calendar_sales import verified_sale
 from .calendar_images import (
     is_saved_calendar_image_url,
@@ -279,7 +280,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "oliver_house": bool(canonical_oliver_house),
         "oliver_house_name": canonical_oliver_house,
         "sale_title": clean_display_text(lot.sale_title),
-        "lot_number": lot.lot_number,
+        "lot_number": calendar_lot_number(lot),
         "medium": clean_display_text(lot.medium),
         "location": clean_display_text(lot.location),
         "sale_region": geography["region"],
@@ -376,7 +377,7 @@ def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, resear
             "title": clean_display_text(child.title, strip_lot_markers=True) or "Untitled lot",
             "artist": artist_display_name(_artist_label(child)),
             "auction_house": clean_display_text(child.auction_house or child.source or "Auction"),
-            "lot_number": child.lot_number,
+            "lot_number": calendar_lot_number(child),
             "saved_bid_board": saved_board_summary(getattr(child, "bid_board_analysis", None)),
             "saved_bid_board_url": reverse("auction_lot_saved_bid_board", args=(child.pk,)),
             "bid_board_email_url": reverse("auction_lot_bid_board_email", args=(child.pk,)),
