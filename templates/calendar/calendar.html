@@ -3612,10 +3612,10 @@
     return [image, fallback];
   };
 
-  const galleryResearchUrl = (lot) => {
+  const galleryResearchUrl = (lot, {look = researchLook} = {}) => {
     const url = new URL(window.location.pathname, window.location.origin);
     url.search = new URLSearchParams({
-      view: "research", day: selectedDay, lot: String(lot.id), look: researchLook,
+      view: "research", day: selectedDay, lot: String(lot.id), look,
     }).toString();
     if (inOliverScope()) url.searchParams.set("scope", "oliver");
     if (galleryHideAttributed) url.searchParams.set("hide_attributed", "1");
@@ -3631,11 +3631,17 @@
     links.className = "lot-retained-work";
     retained.forEach((work) => {
       const details = [work.saved_bid_board ? "Bid Board" : "", work.email_tray_selected ? "Email Tray" : "", work.research_queue_selected ? "Research Queue" : ""].filter(Boolean);
-      const link = externalLink(work.research_url, "lot-retained-link", `${work.source} saved work${details.length ? ` · ${details.join(" / ")}` : ""} ↗`);
+      const link = retainedResearchLink(work.id, "lot-retained-link", `${work.source} saved work${details.length ? ` · ${details.join(" / ")}` : ""} ↗`);
       link.setAttribute("aria-label", `Open saved ${work.source} work for ${lot.title} (opens in a new tab)`);
       links.appendChild(link);
     });
     target.appendChild(links);
+  };
+
+  const retainedResearchLink = (lotId, className, label) => {
+    const link = externalLink(galleryResearchUrl({id: lotId}, {look: "workbench"}), className, label);
+    link.dataset.retainedResearchLotId = String(lotId);
+    return link;
   };
 
   // Weak references let detached Archive cards stay current without retaining old galleries.
@@ -3655,7 +3661,7 @@
       if (window.SavedBidBoard) window.SavedBidBoard.mountSummary(savedBoard, {lot: work, csrfToken});
       view.summaries.set(String(work.id), savedBoard);
       if (String(work.id) !== String(group.id)) {
-        const provenance = externalLink(work.research_url, "lot-board-provenance", `Saved with ${work.source} ↗`);
+        const provenance = retainedResearchLink(work.id, "lot-board-provenance", `Saved with ${work.source} ↗`);
         provenance.setAttribute("aria-label", `Open saved ${work.source} work for ${lot.title} (opens in a new tab)`);
         savedBoard.appendChild(provenance);
       }
@@ -4301,6 +4307,10 @@
     researchPrevious.disabled = researchIndex === 0;
     researchNext.disabled = researchIndex === lots.length - 1;
     renderResearchRail();
+    // Cached research cards can be reopened from either owner's Calendar.
+    researchLotCache.get(String(lot.id))?.querySelectorAll(".lot-retained-link, .lot-board-provenance, .lot-canonical-link").forEach((link) => {
+      link.href = galleryResearchUrl({id: link.dataset.retainedResearchLotId}, {look: "workbench"});
+    });
     const key = `${selectedDay}:${lot.id}`;
     if (researchRenderedKey === key) { activateArchiveStage(); return; }
     researchRenderedKey = key;
@@ -4324,7 +4334,7 @@
       appendText(overview, "p", "lot-facts", `Saved work from the previous ${lot.retained_listing.source} listing. Original source details and saved choices are retained.`);
       const replacement = document.createElement("div");
       replacement.className = "lot-browser-action-links";
-      replacement.appendChild(externalLink(lot.retained_listing.canonical_url, "lot-auction-link", `Open current ${lot.retained_listing.canonical_house} Calendar lot ↗`));
+      replacement.appendChild(retainedResearchLink(lot.retained_listing.canonical_id, "lot-auction-link lot-canonical-link", `Open current ${lot.retained_listing.canonical_house} Calendar lot ↗`));
       if (lot.retained_listing.canonical_source_url) replacement.appendChild(externalLink(lot.retained_listing.canonical_source_url, "lot-auction-link", `View current auction lot ↗`));
       overview.appendChild(replacement);
     }

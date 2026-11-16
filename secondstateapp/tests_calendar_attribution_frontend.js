@@ -205,7 +205,7 @@ test("a canonical card exposes each retained provider's saved work without addin
   const retained = descendants(card).filter(node => node.tagName === "a" && /Saved with/.test(node.textContent));
   assert.equal(card.dataset.galleryLotId, "123");
   assert.equal(retained.length, 2);
-  assert.deepEqual(retained.map(link => link.href), source.retained_saved_work.map(work => work.research_url));
+  assert.deepEqual(retained.map(link => link.href), source.retained_saved_work.map(work => `https://secondstate.test/calendar/?lot=${work.id}`));
   assert.match(retained[0].textContent, /Saved with Drouot/);
   assert.match(retained[1].textContent, /Saved with Invaluable/);
   retained.forEach(link => { assert.equal(link.target, "_blank"); assert.equal(link.rel, "noopener noreferrer"); });

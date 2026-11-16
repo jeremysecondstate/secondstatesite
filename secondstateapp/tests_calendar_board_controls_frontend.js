@@ -97,6 +97,67 @@ function page(source, retainedResearchLot = null) {
 const summaries = root => root.querySelectorAll(".sb-catalog-summary");
 const selections = root => root.querySelectorAll(".research-queue-selection");
 
+function useResearchNavigation(context) {
+  Object.assign(context, {URL, URLSearchParams, researchScope: "", researchLook: "dossier",
+    galleryHideAttributed: false, writeGalleryOrganization() {}});
+  context.window.location = {pathname: "/calendar/", origin: "https://secondstate.art"};
+  context.run(block("  const inOliverScope =", "  // Filtering shares")
+    + block("  const galleryResearchUrl =", "  const appendRetainedSavedWork ="));
+}
+
+const ownerViews = [["calendar", ""], ["catalog", ""], ["oliver-calendar", ""], ["oliver", ""],
+  ["research", "oliver"], ["research", ""]];
+function assertResearchDestination(link, id, scope) {
+  const url = new URL(link.href);
+  assert.equal(url.origin, "https://secondstate.art");
+  assert.equal(url.pathname, "/calendar/");
+  assert.equal(url.searchParams.get("view"), "research");
+  assert.equal(url.searchParams.get("lot"), String(id));
+  assert.equal(url.searchParams.get("day"), "2026-11-04");
+  assert.equal(url.searchParams.get("look"), "workbench");
+  assert.equal(url.searchParams.get("scope"), scope || null);
+}
+
+test("retained board and research links follow the current owner after switching views", () => {
+  const saved = lot(11, {saved_bid_board: board("200")});
+  const researched = lot(12, {email_tray_selected: true});
+  const source = lot(20, {retained_saved_work: [saved, researched]});
+  const before = JSON.stringify(source), context = page(source);
+  useResearchNavigation(context);
+  for (const [view, scope] of ownerViews) {
+    context.activeView = view;
+    context.researchScope = scope;
+    const root = new Element(); context.mount(root);
+    const expectedScope = view.startsWith("oliver") ? "oliver" : scope;
+    assertResearchDestination(root.querySelector(".lot-board-provenance"), 11, expectedScope);
+    assertResearchDestination(root.querySelector(".lot-retained-link"), 12, expectedScope);
+  }
+  assert.equal(JSON.stringify(source), before, "navigation must not change saved records");
+});
+
+test("cached retained research keeps the current owner when returning to its canonical lot", () => {
+  const child = lot(11, {saved_bid_board: board("200")});
+  const other = lot(12, {email_tray_selected: true});
+  const canonical = lot(20, {retained_saved_work: [child, other]});
+  const retained = {...child, retained_listing: {canonical_id: 20, source: "Drouot", canonical_house: "Phillips",
+    canonical_url: "/calendar/?view=research&lot=20", canonical_source_url: "https://example.com/lot/20"}};
+  const before = JSON.stringify([canonical, retained]), context = page(canonical, retained);
+  useResearchNavigation(context);
+  context.activeView = "research";
+  let cached;
+  for (const scope of ["oliver", "", "oliver"]) {
+    context.researchScope = scope;
+    context.run("renderResearchWorkspace()");
+    const content = context.researchLotCache.get("11");
+    if (cached) assert.equal(content, cached, "scope changes preserve the cached research form");
+    cached = content;
+    assertResearchDestination(content.querySelector(".lot-canonical-link"), 20, scope);
+    assertResearchDestination(content.querySelector(".lot-retained-link"), 12, scope);
+    assert.equal(content.querySelectorAll(".lot-auction-link")[1].href, "https://example.com/lot/20");
+  }
+  assert.equal(JSON.stringify([canonical, retained]), before);
+});
+
 for (const surface of ["catalog", "sidebar", "browser", "archive"]) {
   test(`${surface} uses the shared saved-board controls and suppresses research selection`, () => {
     const retained = lot(11, {saved_bid_board: board("200"), source: "Invaluable"});

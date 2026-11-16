@@ -279,6 +279,7 @@ function retainedBoard(id, source, qualifyingBid) {
 
 function renderRetained(page, lot) {
   Object.assign(page.context, {retainedLot: lot, retainedRoot: page.root, csrfToken: "retained-csrf",
+    galleryResearchUrl: work => `/calendar/?view=research&lot=${work.id}`,
     appendText(parent, tag, className, textContent) {
       return parent.appendChild(Object.assign(new Element(tag), {className, textContent}));
     }});
