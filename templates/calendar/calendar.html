@@ -1266,8 +1266,11 @@
     };
     const canSelectCandidate = (candidate) => {
       const hammer = Number(candidate?.hammer_usd);
-      return candidate?.status === "sold" && Number.isFinite(hammer) && hammer > 0
-        && hammer <= 1e12 && (isArtpriceCandidate(candidate) || supportedLiveArtCategory(candidate))
+      if (candidate?.status !== "sold" || !Number.isFinite(hammer) || hammer <= 0 || hammer > 1e12) return false;
+      // Uploaded sales are chosen by the user, including sales by another artist.
+      // Old saved artist-match flags must not disable those choices.
+      if (isArtpriceCandidate(candidate)) return true;
+      return supportedLiveArtCategory(candidate)
         && (candidate.credible === true || needsManualReview(candidate));
     };
 
@@ -1285,7 +1288,7 @@
           || selectedIds.size >= 25 || selectedCount === eligible.length;
         toolbar.querySelector('[data-bulk-action="deselect"]').disabled = disabled
           || !items.some((candidate) => selectedIds.has(String(candidate.id)));
-        toolbar.querySelector(".research-candidate-bulk-note").textContent = `${selectedCount} of ${eligible.length} eligible selected · ${selectedIds.size}/25 total across sources · applies to all pages`;
+        toolbar.querySelector(".research-candidate-bulk-note").textContent = `${selectedCount} of ${eligible.length} selected · ${selectedIds.size}/25 total across sources · applies to all pages`;
       });
     };
 
@@ -1344,6 +1347,7 @@
           .flatMap((candidate) => Array.isArray(candidate.source_filenames) ? candidate.source_filenames : [candidate.source_filename])
           .filter(Boolean))];
         parts.push(`${artpriceCount} unique Artprice HTML sale${artpriceCount === 1 ? "" : "s"} ingested${filenames.length ? ` from ${filenames.join(", ")}` : " from saved files"}.`);
+        parts.push("You choose which uploaded sales to use, including sales by other artists.");
       }
       if (liveartCount) parts.push(`${liveartCount} LiveArt sale${liveartCount === 1 ? "" : "s"} retrieved ${formatAnalysisTimestamp(data?.retrieved_at || researchRetrievedAt)}.`);
       if (webCount) parts.push(`${webCount} LiveArt web sale${webCount === 1 ? "" : "s"} entered manually; no API units used to add them.`);

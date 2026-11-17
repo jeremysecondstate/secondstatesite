@@ -1164,11 +1164,11 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
         has_usd_hammer = bool(currency == "USD" and valid_hammer)
         artist = str(comparable.get("artist") or "").strip() or None
         calendar_artist = (lot.artist or lot.artist_watchlist_name or "").strip()
-        # Apply the same verified name aliases to both evidence providers.
+        # Uploaded comparables are the user's chosen evidence. Artist identity
+        # is useful review context, never an eligibility requirement.
         artist_conflict = bool(
             artist and calendar_artist and not liveart_artist_names_match(artist, calendar_artist)
         )
-        credible = bool(has_usd_hammer and not artist_conflict)
         source_url = _artprice_lot_url(comparable.get("provider_url"))
 
         medium = str(comparable.get("medium") or "").strip() or None
@@ -1208,11 +1208,12 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
         ]
         if not valid_hammer:
             missing.append("verified_hammer")
-        notes = []
+        exclusions = []
         if currency != "USD":
-            notes.append("Original currency is not USD; no verified USD hammer conversion is available")
+            exclusions.append("Original currency is not USD; no verified USD hammer conversion is available")
         if not valid_hammer:
-            notes.append("No positive numeric hammer price")
+            exclusions.append("No positive numeric hammer price")
+        notes = []
         if artist_conflict:
             notes.append("Artprice artist differs from this Calendar artist")
         if artist is None:
@@ -1247,9 +1248,10 @@ def _artprice_candidates(lot: AuctionWatchLot) -> list[dict]:
             "location": location,
             "differences": differences,
             "missing_data": missing,
-            "credible": credible,
+            "credible": has_usd_hammer,
+            "selectable": has_usd_hammer,
             "selected": False,
-            "exclusion_reasons": notes,
+            "exclusion_reasons": exclusions,
             "match_notes": notes,
             "retrieved_at": analysis.updated_at.isoformat(),
         })
@@ -1298,7 +1300,6 @@ def _selected_resale_ids(
         if (
             candidate.get("provider") == "Artprice"
             and identifier in allowed
-            and bool(str(candidate.get("artist") or "").strip())
             and identifier not in selected
             and (initialize_artprice or identifier not in previous_artprice_ids)
             and len(selected) < MAX_SELECTED_RESALE_COMPS
@@ -1317,6 +1318,9 @@ def _initialize_legacy_artprice(saved: LiveArtResaleAnalysis | None) -> bool:
         return True
     return not saved.source_summary and not any(
         str(item).startswith("artprice:") for item in saved.selected_ids
+    ) and not any(
+        isinstance(item, dict) and item.get("provider") == "Artprice"
+        for item in saved.candidates
     )
 
 

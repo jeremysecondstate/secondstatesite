@@ -301,6 +301,16 @@ def manual_review_eligible(candidate: Mapping[str, Any], calendar_lot: Any) -> b
 
 
 def resale_candidate_selectable(candidate: Mapping[str, Any]) -> bool:
+    if candidate.get("provider") == "Artprice":
+        # These records come from the user's saved HTML. Relevance and legacy
+        # artist-match flags cannot veto a valid sold USD hammer.
+        if candidate.get("status") != "sold" or _text(candidate.get("original_currency")).upper() not in {"", "USD"}:
+            return False
+        try:
+            hammer = Decimal(str(candidate.get("hammer_usd")))
+        except (InvalidOperation, TypeError, ValueError):
+            return False
+        return hammer.is_finite() and 0 < hammer <= MAX_MONEY
     if candidate.get("provider") in {"LiveArt", "Auction archive"}:
         return _sold_liveart_evidence(candidate) and (
             candidate.get("credible") is True or candidate.get("manual_selectable") is True
@@ -891,7 +901,8 @@ def build_scenarios_with_sources(
     """Calculate scenario maximum hammer bids from selected sold evidence.
 
     A selected LiveArt sale may need manual catalogue review, but still needs
-    a positive sold USD hammer and the same artist.
+    a positive sold USD hammer and the same artist. Uploaded Artprice sales
+    need a positive sold USD hammer; the user decides their relevance.
     """
 
     supplied = dict(assumptions or {})
@@ -973,8 +984,7 @@ def build_scenarios_with_sources(
             "ingested_count": source["sold_records_count"],
             "eligible_count": sum(
                 1 for candidate in candidates if candidate.get("provider") == "Artprice" and belongs(candidate)
-                and candidate.get("status") == "sold" and candidate.get("credible") is True
-                and bool(_text(candidate.get("artist")))
+                and resale_candidate_selectable(candidate)
             ),
             "selected_count": sum(1 for candidate, _hammer in artprice_sales if belongs(candidate)),
             "included_count": sum(1 for candidate in included_artprice_sales if belongs(candidate)),
@@ -990,8 +1000,7 @@ def build_scenarios_with_sources(
         ),
         "artprice_eligible_count": sum(
             1 for item in candidates
-            if item.get("provider") == "Artprice" and item.get("status") == "sold"
-            and item.get("credible") is True and bool(_text(item.get("artist")))
+            if item.get("provider") == "Artprice" and resale_candidate_selectable(item)
         ),
         "artprice_selected_count": len(artprice_sales),
         "artprice_included_count": artprice_included_count,

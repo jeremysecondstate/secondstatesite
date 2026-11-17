@@ -1932,7 +1932,7 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
         self.assertEqual(len(selected), 25)
         self.assertNotIn(artprice["id"], selected)
 
-    def test_missing_artprice_artist_requires_manual_selection(self):
+    def test_missing_artprice_artist_does_not_exclude_uploaded_sale(self):
         artprice = self.stored_artprice()
         artprice.comparables[0].pop("artist")
         artprice.save(update_fields=("comparables",))
@@ -1940,8 +1940,9 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
         preview = self.client.get(self.analysis_url).json()["analysis"]
         candidate = next(item for item in preview["candidates"] if item["provider"] == "Artprice")
         self.assertTrue(candidate["credible"])
-        self.assertEqual(preview["selected_ids"], [])
-        self.assertEqual(preview["source_summary"]["artprice_eligible_count"], 0)
+        self.assertEqual(candidate["exclusion_reasons"], [])
+        self.assertEqual(preview["selected_ids"], [candidate["id"]])
+        self.assertEqual(preview["source_summary"]["artprice_eligible_count"], 1)
         saved = self.save([candidate["id"]])
         self.assertEqual(saved.status_code, 200)
         self.assertEqual(saved.json()["analysis"]["source_summary"]["artprice_included_count"], 1)
@@ -2009,7 +2010,7 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
                             self.assertEqual(self.save([candidate["id"]]).status_code, 400)
             client_class.assert_not_called()
 
-    def test_artprice_artist_conflict_and_unsafe_link_are_review_only(self):
+    def test_artprice_artist_conflict_is_selectable_and_unsafe_link_is_omitted(self):
         artprice = self.stored_artprice()
         artprice.comparables[0]["artist"] = "Other Artist"
         artprice.comparables[0]["provider_url"] = "https://evil.example/artist/1/lot"
@@ -2023,11 +2024,13 @@ class AuctionLiveArtAnalysisViewTests(TestCase):
             item for item in response.json()["analysis"]["candidates"]
             if item["provider"] == "Artprice"
         )
-        self.assertFalse(candidate["credible"])
+        self.assertTrue(candidate["credible"])
         self.assertIsNone(candidate["source_url"])
-        self.assertIn("Artprice artist differs", " ".join(candidate["exclusion_reasons"]))
-        self.assertEqual(self.save([candidate["id"]]).status_code, 400)
-        self.assertFalse(LiveArtResaleAnalysis.objects.exists())
+        self.assertEqual(candidate["exclusion_reasons"], [])
+        saved = self.save([candidate["id"]])
+        self.assertEqual(saved.status_code, 200, saved.content)
+        self.assertEqual(saved.json()["analysis"]["source_summary"]["artprice_included_count"], 1)
+        self.assertEqual(LiveArtResaleAnalysis.objects.get(lot=self.lot).selected_ids, [candidate["id"]])
 
     def test_replacing_artprice_html_removes_stale_selected_comp(self):
         artprice = self.stored_artprice()

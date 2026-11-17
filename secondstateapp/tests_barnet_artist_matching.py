@@ -1,4 +1,4 @@
-"""Verified Barnet aliases keep saved sales usable without broad fuzzy matching."""
+"""Artist identity aliases stay strict while uploaded Artprice choices stay usable."""
 
 import json
 from copy import deepcopy
@@ -105,9 +105,9 @@ class BarnetSavedArtpriceTests(TestCase):
             self.assertEqual(candidate["exclusion_reasons"], [])
             self.assertEqual(candidate["hammer_usd"], hammer)
         other = candidates_by_id[self.other_id]
-        self.assertFalse(other["credible"])
+        self.assertTrue(other["credible"])
         self.assertEqual(other["hammer_usd"], "900.00")
-        self.assertIn("Artprice artist differs", " ".join(other["exclusion_reasons"]))
+        self.assertEqual(other["exclusion_reasons"], [])
 
     def test_saved_exclusions_rehydrate_without_changing_choices_or_source(self):
         preview = self.preview()
@@ -167,11 +167,16 @@ class BarnetSavedArtpriceTests(TestCase):
         self.assertEqual(AuctionBidBoardAnalysis.objects.filter(pk=saved.pk).values().get(), saved_before)
         self.assert_source_unchanged()
 
-    def test_other_artist_cannot_be_selected_for_the_board(self):
+    def test_other_artist_can_be_selected_for_the_board(self):
         self.assert_barnet_candidates_eligible(self.preview()["candidates"])
 
         response = self.save_board([self.other_id])
 
-        self.assertEqual(response.status_code, 400, response.content)
-        self.assertFalse(AuctionBidBoardAnalysis.objects.filter(lot=self.lot).exists())
+        self.assertEqual(response.status_code, 200, response.content)
+        board = AuctionBidBoardAnalysis.objects.get(lot=self.lot)
+        self.assertEqual(board.selected_ids, [self.other_id])
+        selected = board.evidence_snapshot["selected_records"]
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(selected[0]["artist"], "Will A Barnet")
+        self.assertEqual(selected[0]["hammer_usd"], "900.00")
         self.assert_source_unchanged()
