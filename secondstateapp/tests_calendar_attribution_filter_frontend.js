@@ -595,6 +595,25 @@ for (const view of ["catalog", "oliver"]) {
     }
   });
 
+  test(`${view} waits for the complete day before resolving an Unconfirmed filter`, () => {
+    for (const saleRegion of ["unknown", "outside_us"]) {
+      const lots = [lot(1, {sale_region: "us"}), lot(2, {sale_region: saleRegion})];
+      const p = page(lots, view);
+      // A large Calendar day defers its details. The user can open either
+      // Catalog while that request is still pending, with dayCounts available.
+      delete p.data[day];
+      p.run('galleryOrganization.region = "unknown"');
+      p.render();
+      assert.equal(p.run("galleryOrganization.region"), "unknown");
+      assert.deepEqual(p.visible(), []);
+
+      p.data[day] = lots;
+      p.render();
+      assert.equal(p.run("galleryOrganization.region"), saleRegion === "unknown" ? "unknown" : "");
+      assert.deepEqual(p.visible().map(entry => entry.id), saleRegion === "unknown" ? [2] : [1, 2]);
+    }
+  });
+
   test(`${view} keeps Unconfirmed selected when other filters temporarily hide its lots`, () => {
     const p = page([lot(1, {sale_region: "us", email_tray_selected: true}),
       lot(2, {sale_region: "unknown", attribution_label: "After"})], view);

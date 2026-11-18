@@ -3461,8 +3461,10 @@
 
   const renderGalleryFilters = () => {
     // Old links may still request Unconfirmed after all sale locations have
-    // been resolved. Judge the entire scoped day, not the other active filters.
-    if (galleryOrganization.region === "unknown" && !dayLots().some((lot) => galleryLotRegion(lot) === "unknown")) {
+    // been resolved. Wait for the full day before judging its scoped records;
+    // a deferred day currently has no rows, even when its locations are unknown.
+    if (galleryOrganization.region === "unknown" && Object.hasOwn(data, selectedDay)
+        && !dayLots().some((lot) => galleryLotRegion(lot) === "unknown")) {
       galleryOrganization.region = "";
       galleryVisibleCount = 24;
       updateCalendarLocation();
