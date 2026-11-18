@@ -1400,6 +1400,54 @@
       "evidence_url": "https://www.liveauctioneers.com/auctioneer/10614/wilson-s-fine-art/",
       "evidence": "Exact auction-house profile identifies Wilson's Fine Art at 740 4th Street North #171, St. Petersburg, Florida 33701, USA. The official site describes Tampa Bay and Florida Gulf Coast auction operations, and https://wilsonsfineart.com/current-auction links this provider profile and the exact Invaluable profile https://www.invaluable.com/auction-house/wilsons-fine-art-xqqvns0p0v. No affiliated or similarly named auction houses are included.",
       "verified_at": "2026-11-16"
+    },
+    {
+      "name": "Schultz Auctioneers",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://schultzauctioneers.net/november2026auction/",
+      "evidence": "Official November 27–29, 2026 auction announcement specifies the auction facility at 11177 Main Street, Clarence, New York 14031; the house's contact page confirms the same address. Its other advertised on-site sales are in New York.",
+      "verified_at": "2026-11-18"
+    },
+    {
+      "name": "Grant Zahajko Auctions, LLC",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.gzauctions.com/",
+      "evidence": "Official site identifies its auction and event location at 510 Morgan Street, Davenport, Washington 99122. The exact provider profile https://www.liveauctioneers.com/auctioneer/5755/grant-zahajko-auctions-llc/ lists auctions in Davenport, Washington, Mesquite, Nevada, and Fort Collins, Colorado, all in the US.",
+      "verified_at": "2026-11-18"
+    },
+    {
+      "name": "Main Auction Galleries",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.mainauctiongalleries.com/auction-catalog/form-function-20th-century-art-design_ICV4Q3XKJI",
+      "evidence": "Official December 6, 2026 Form & Function: 20th-Century Art & Design catalog specifies Cincinnati, Ohio, US. The house's official site identifies its gallery at 137 West 4th Street, Cincinnati, Ohio 45202; its published auction calendar consistently uses Cincinnati.",
+      "verified_at": "2026-11-18"
+    },
+    {
+      "name": "Millea Bros Ltd",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.milleabros.com/faq/",
+      "evidence": "Official FAQ identifies the auction gallery at 607 Myrtle Avenue, Boonton, New Jersey, and explains that Select live auctions take place in its showroom, with ABC online auctions and collection using the same gallery. Exact Invaluable profile https://www.invaluable.com/auction-house/millea-bros-ltd-djm08nrysy confirms Boonton, NJ, US.",
+      "verified_at": "2026-11-18"
+    },
+    {
+      "name": "Ahlers & Ogletree Inc.",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.aandoauctions.com/contact-ahlers-ogletree-atlanta-auction-house/",
+      "evidence": "Official auction-gallery contact and auction-day information identify 1788 Ellsworth Industrial Boulevard NW, Atlanta, Georgia 30318. Its current auction calendar advertises December 10–11, 2026 Fine Jewelry & Modernism; the exact Invaluable house profile corroborates Atlanta, GA, US.",
+      "verified_at": "2026-11-18"
+    },
+    {
+      "name": "Jackson's International",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://jacksonsauction.com/events/",
+      "evidence": "Official December 15–16, 2026 Winter World Treasures Auction is at the main gallery in Cedar Falls, Iowa. The same official schedule locates its other auctions there, and https://jacksonsauction.com/contact/ gives 2229 Lincoln Street, Cedar Falls, Iowa 50613 USA. This exact house name is distinct from Jacksons Auction & Real Estate Company.",
+      "verified_at": "2026-11-18"
     }
   ]
 }
