@@ -38,4 +38,19 @@ def calendar_lot_number(lot):
         and _drouot_identity(lot.lot_url, "l", "36007953")
     ):
         return "97-1"
+    # The house's December 12 sale publishes The Lion, edition 115/195,
+    # as 601-1; the separate Pantagruel's Humorous Dreams remains lot 601.
+    # https://www.interencheres.com/art-decoration/tableaux-anciens-et-modernes-estampes-sculptures-et-tapis-693682/lot-89946549.html
+    # https://www.interencheres.com/art-decoration/tableaux-anciens-et-modernes-estampes-sculptures-et-tapis-693682/lot-89946548.html
+    if (
+        lot.source.casefold() == "drouot"
+        and lot.source_lot_id == "36035570"
+        and lot.auction_house == "Les Andelys Enchères"
+        and number == "601"
+        and isinstance(event_at, datetime) and event_at.tzinfo is not None
+        and event_at.astimezone(ZoneInfo("Europe/Paris")).date() == date(2026, 12, 12)
+        and _drouot_identity(lot.sale_url, "v", "188346")
+        and _drouot_identity(lot.lot_url, "l", "36035570")
+    ):
+        return "601-1"
     return number

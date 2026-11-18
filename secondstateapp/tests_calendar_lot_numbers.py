@@ -22,6 +22,17 @@ def leger_values(**changes):
     }
 
 
+def dali_values(**changes):
+    return {
+        "source": "Drouot", "source_lot_id": "36035570",
+        "auction_house": "Les Andelys Enchères", "lot_number": "601",
+        "event_at": datetime(2026, 12, 12, 12, tzinfo=timezone.utc),
+        "sale_url": "https://drouot.com/en/v/188346",
+        "lot_url": "https://drouot.com/en/l/36035570-salvador-dali-1904-1989-the-lion-signed-and-numbered-115-195",
+        **changes,
+    }
+
+
 class CalendarLotNumberTests(SimpleTestCase):
     def test_verified_suffix_is_display_only(self):
         lot = SimpleNamespace(**leger_values())
@@ -56,6 +67,35 @@ class CalendarLotNumberTests(SimpleTestCase):
         lot.event_at = datetime(2026, 11, 20, 23, 30, tzinfo=timezone.utc)
         self.assertEqual(calendar_lot_number(lot), "97")
 
+    def test_lion_suffix_preserves_raw_number_and_uses_the_bound_paris_sale_date(self):
+        lot = SimpleNamespace(**dali_values())
+        before = vars(lot).copy()
+        self.assertEqual(calendar_lot_number(lot), "601-1")
+        self.assertEqual(vars(lot), before)
+        lot.event_at = datetime(2026, 12, 11, 23, 30, tzinfo=timezone.utc)
+        lot.sale_url = "https://drouot.com/fr/v/188346-tableaux/"
+        lot.lot_url = "https://drouot.com/fr/l/36035570"
+        self.assertEqual(calendar_lot_number(lot), "601-1")
+        lot.event_at = datetime(2026, 12, 12, 23, 30, tzinfo=timezone.utc)
+        self.assertEqual(calendar_lot_number(lot), "601")
+
+    def test_lion_correction_rejects_companion_and_changed_sale_identities(self):
+        cases = (
+            {"source_lot_id": "36035569", "lot_url": "https://drouot.com/en/l/36035569-salvador-dali"},
+            {"source": "Invaluable"}, {"auction_house": "Another house"},
+            {"lot_number": "602"}, {"lot_number": "601-1"}, {"lot_number": "601-2"},
+            {"event_at": datetime(2026, 12, 13, 12, tzinfo=timezone.utc)},
+            {"event_at": datetime(2026, 12, 12, 12)}, {"event_at": None},
+            {"sale_url": "https://drouot.com/en/v/188347"}, {"sale_url": ""},
+            {"sale_url": "https://drouot.com/en/v/1883460"},
+            {"lot_url": "https://drouot.com/en/l/36035569-salvador-dali"},
+            {"lot_url": "https://drouot.com.example/en/l/36035570"},
+        )
+        for changes in cases:
+            with self.subTest(changes=changes):
+                lot = SimpleNamespace(**dali_values(**changes))
+                self.assertEqual(calendar_lot_number(lot), lot.lot_number)
+
 
 @override_settings(CALENDAR_TIME_ZONE="America/Los_Angeles")
 class CalendarLotNumberPayloadTests(TestCase):
@@ -80,6 +120,35 @@ class CalendarLotNumberPayloadTests(TestCase):
                 self.assertNotIn("arrival_lot_number", lots[miro.pk])
                 self.assertFalse(lots[leger.pk]["oliver_house"])
         for lot in (leger, miro):
+            lot.refresh_from_db()
+            self.assertEqual(AuctionWatchLot.objects.filter(pk=lot.pk).values().get(), before[lot.pk])
+            self.assertEqual(fingerprint(lot), fingerprints[lot.pk])
+
+    def test_lion_and_pantagruel_remain_distinct_in_shared_view_payloads(self):
+        self.client.force_login(get_user_model().objects.create_user("dali-number-admin", is_staff=True))
+        lion = watch_lot(**dali_values(), artist="Salvador Dalí", artist_watchlist_name="Salvador Dalí",
+                         title="The Lion. Signed and numbered 115/195 lithograph on watermarked paper. 75 x 54 cm")
+        pantagruel = watch_lot(**dali_values(
+            source_lot_id="36035569",
+            lot_url="https://drouot.com/en/l/36035569-salvador-dali-1904-1989-pantagruels-humorous-dreams-1973",
+        ), artist="Salvador Dalí", artist_watchlist_name="Salvador Dalí",
+            title="Pantagruel’s Humorous Dreams, 1973. Lithograph on Japanese paper, artist’s proof marked EA. 76 x 54 cm")
+        before = {lot.pk: AuctionWatchLot.objects.filter(pk=lot.pk).values().get() for lot in (lion, pantagruel)}
+        fingerprints = {lot.pk: fingerprint(lot) for lot in (lion, pantagruel)}
+        for view in ("calendar", "catalog", "oliver-calendar", "oliver", "research"):
+            with self.subTest(view=view):
+                response = self.client.get(reverse("auction_calendar"), {
+                    "month": "2026-12", "day": "2026-12-12", "view": view, "lot": lion.pk,
+                })
+                self.assertEqual(response.status_code, 200)
+                lots = {lot["id"]: lot for lot in response.context["calendar_data"]["2026-12-12"]}
+                self.assertEqual(set(lots), {lion.pk, pantagruel.pk})
+                self.assertEqual(lots[lion.pk]["lot_number"], "601-1")
+                self.assertEqual(lots[lion.pk]["arrival_lot_number"], "601")
+                self.assertEqual(lots[pantagruel.pk]["lot_number"], "601")
+                self.assertNotIn("arrival_lot_number", lots[pantagruel.pk])
+                self.assertFalse(lots[lion.pk]["oliver_house"])
+        for lot in (lion, pantagruel):
             lot.refresh_from_db()
             self.assertEqual(AuctionWatchLot.objects.filter(pk=lot.pk).values().get(), before[lot.pk])
             self.assertEqual(fingerprint(lot), fingerprints[lot.pk])
