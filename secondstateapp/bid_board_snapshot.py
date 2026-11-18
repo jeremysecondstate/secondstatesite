@@ -1,8 +1,20 @@
 """Read saved Bid Boards without refreshing evidence or recalculating bids."""
 
 from copy import deepcopy
+from datetime import date
+from zoneinfo import ZoneInfo
+
+from django.conf import settings
+from django.utils import timezone
 
 from .bid_board import CASE_LABELS
+
+
+MAX_BID_FIRST_SALE_DAY = date(2026, 11, 18)
+
+
+def uses_max_bid_label(event_at):
+    return bool(event_at and timezone.localdate(event_at, ZoneInfo(settings.CALENDAR_TIME_ZONE)) >= MAX_BID_FIRST_SALE_DAY)
 
 
 def saved_board_summary(record):
@@ -16,6 +28,7 @@ def saved_board_summary(record):
         {},
     )
     return {
+        "max_bid_label": uses_max_bid_label(record.lot.event_at),
         "selected_bid": analysis.get("selected_bid"),
         "selected_case": case,
         "selected_case_label": CASE_LABELS.get(case, case),

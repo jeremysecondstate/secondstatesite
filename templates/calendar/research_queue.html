@@ -74,6 +74,7 @@
               </dl>
               <div class="research-queue-item-links">
                 <a href="{{ item.dossier_url }}">Open dossier ↗</a>
+                <a href="{% url 'auction_lot_resale_report' item.lot_id %}">Resale research ↗</a>
                 {% if item.research_url %}<a href="{{ item.research_url }}">Saved research ↗</a>{% endif %}
                 {% if item.board_url %}<a href="{{ item.board_url }}">Saved Bid Board ↗</a>{% endif %}
                 {% if item.lot.lot_url or item.lot.sale_url %}<a href="{% firstof item.lot.lot_url item.lot.sale_url %}" target="_blank" rel="noopener noreferrer">Auction lot ↗</a>{% endif %}

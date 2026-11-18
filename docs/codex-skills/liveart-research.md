@@ -1,6 +1,6 @@
 ---
 name: liveart-research
-description: "Research the current lots in SecondState's LiveArt Queue, including multi-work lots and unidentified pieces, and save comparable sales and Bid Boards. Invoking this skill or asking to process the queue starts research immediately."
+description: "Research the current lots in SecondState's LiveArt Queue, including multi-work lots and unidentified pieces. Save comparable sales, Bid Boards, resale-house forecasts and seasonal consignment proposal entries. Invoking this skill or asking to process the queue starts research immediately."
 ---
 
 # LiveArt Research
@@ -24,7 +24,24 @@ Use the live queue and research UI directly. Do not launch the legacy queue runn
 3. Research signed-in LiveArt and original auction records found through substantive web searches. Artist bookmarks are in `C:/dev/secondstatesite/docs/artist-links.html`, folder `LIVEART`. Reuse relevant evidence already saved on this lot. Use a targeted **Find LiveArt sales** query when useful; use **Add a sale from LiveArt web** for eligible supplemental sales or when API allowance is exhausted. Do not use Artprice or repeat a paid query whose result is still uncertain.
 4. Select defensible comparable sales, preferring the same work and edition. Check actual sold status, price basis and product identity; exclude estimates, asking prices, unsold records, premium-inclusive totals and unrelated products. Establish whether each price bought a single work or an entire group. Deduplicate sales and select at most **25 per lot**, including all components. Manual LiveArt entry requires source-displayed **USD hammer** and a supported category: **Prints & Multiples** or **Drawings / Works on paper**. Do not invent or relabel evidence to fit the form.
 5. **Save selected evidence**, then build and **Save Bid Board** using the rules below. Reload to confirm the current lot's evidence and Board actually saved. Keep deliberate user choices and email settings intact. No separate receipt, screenshot, audit or bookkeeping package is required.
-6. Continue through the selected lots. Report saved research/Board links, chosen bid and ceiling, and any actual unavailable valuation or blocker concisely. Do not call unfinished research complete or describe a queue status change that did not occur.
+6. Open **Resale research** for the same lot in the queue or Gallery Dossier. Save the destination report and seasonal proposal entries described below. For a skipped lot or unsupported valuation, record the specific limitation under **Limited evidence**. A lot can have a supported resale destination even if its current purchase price exceeds the Bid Board ceiling.
+7. Continue through the selected lots. Report links to the saved Board, resale report and relevant proposal catalogs, the chosen bid, MAX BID and any actual limitation. Group proposal links by house and season across the run.
+
+## Research the resale destinations
+
+Assess the international market for the work. Choose three to five auction houses where a specific department, auction series or specialist sale has demonstrated demand for the artist, work, medium and price level. Oliver’s source-house list has no bearing on these choices.
+
+For each destination, save the house name, department or likely sale, a tight **gross resale hammer range in USD**, the reason this work fits there, and the evidence for the lower and upper ends. Cite the actual lot or house sale record with the work, date, sold status, currency, amount and price basis when published. Explain edition, impression quality, condition, size, timing or provenance adjustments that affect the forecast. Record the rate and date for any currency conversion. An estimate or premium-inclusive result can document house fit if labeled accordingly. Base the forecast on defensible hammer evidence, including a comparable at another house when appropriate. Use **Limited evidence** and explain any shortfall when fewer than three houses or a tight range can be justified.
+
+Identify the resale unit explicitly. For an intact suite, quote the suite. For separate works, document the component ranges and how they contribute to the house’s lot-level forecast. Keep the Working case, selected bid and MAX BID on the single acquisition Board. A destination forecast does not replace the Working resale assumption.
+
+## Prepare the seasonal house proposals
+
+For every supported house, prepare a recipient-ready entry in the **Resale report** editor for the next appropriate spring or fall sale. Winter preparation targets spring sales, and summer preparation targets fall sales. Confirm actual department timing and deadlines where available. Identify the intended year. A work can appear in multiple house catalogs with a different emphasis and estimate for each recipient. A watched work can have a draft before acquisition.
+
+For each entry, use an accurate object photograph, artist and attribution, title, year if known, medium and support, labeled dimensions, and relevant signature, edition, condition, provenance or literature. Write a short original catalog paragraph for that house and a supported estimate. Keep acquisition bids, margins, competing houses and internal research in the staff report. Use a stable work key for each independent component and its own photograph. Grouped items offered intact use one entry and one whole-group estimate. Distinguish missing facts from verified details.
+
+Reuse or update existing house/season entries for that work, preserving staff selections and other seasonal drafts. Reload the report and open each resulting proposal to verify the selection, photograph, estimate, catalog text and aggregate range. The staff workspace groups entries from all researched lots into one catalog per house and sale season and provides the printable proposal PDF. Delivery to an auction house is a separate staff action.
 
 ## Bid Board rules
 

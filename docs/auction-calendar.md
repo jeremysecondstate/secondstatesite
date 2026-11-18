@@ -130,7 +130,9 @@ Ceilings search only available bids, snap down and verify that both minimum net 
 
 Migration `0028_auction_bid_board_analysis` adds per-lot saved assumptions, selections, result and evidence snapshots with staff attribution. Existing source and Email Tray records remain intact.
 
-After **Save Bid Board**, the lot's Gallery Catalog card shows **Qualifying Bid: $N** for the saved selected case, with **See Bid Board** and the email checkbox below it. Case details, the selected bid, profit, and return remain in the saved-board dialog. A calculated case with no acceptable bid shows **No qualifying bid**; incomplete assumptions show **Unavailable**. Unsaved research edits do not change this catalog summary.
+After **Save Bid Board**, the catalog card shows the saved case's highest supported hammer. The label is **MAX BID** for Calendar sale dates from November 18, 2026 and **Qualifying Bid** for earlier dates. **See Bid Board** opens the chosen bid, costs, profit and return. A bid step capped by known tiers retains its coverage note. The card distinguishes a bid that fails the minimums from unavailable valuation.
+
+In Jeremy’s and Oliver’s catalogs, **Bid Research** shows researched lots with their MAX BID and the estimated USD resale hammer range for each recommended house. Select a house for its rationale and linked auction records. Staff can add or update the report and house-specific seasonal proposal entries from the **Gallery Dossier** or **LiveArt Queue**. Opening **Consignment proposals** groups saved entries by house and sale season. The same work can appear in several catalogs, each with its own selection, copy and estimate.
 
 **See Bid Board** opens a dialog containing the saved selected cash flows, case ceilings, captured grid page, costs, rules, and comparable sales. `GET /calendar/lots/<id>/bid-board/saved/` reads the persisted snapshot without refreshing sources or recalculating the analysis. The dialog supports Escape, backdrop dismissal, and returning keyboard focus to its launch button. Calendar links with `view=catalog&saved_bid_board=<id>` and the lot's `month`/`day` open that saved board directly after staff sign-in.
 
@@ -299,7 +301,7 @@ Removing obsolete Render variables before the code deployment is safe for the ne
 6. Review ordering, grouping, Unicode text, estimates, local time, and both saved links.
 7. With sending disabled, confirm the warning appears and the preview remains usable.
 8. After OAuth configuration, send a small batch to Jeremy and confirm the provider message ID, sending staff account, and sent time are stored.
-9. Confirm the sent lots are unchecked and the calendar panel shows the last successful email.
+9. Confirm the sent lots are unchecked and the **Email Tray** link beside **View day as** opens the review page with the last successful email.
 10. Select a date with several lots, open **Browse all N lots**, and verify the image/fallback, counter, wraparound arrows, Left/Right, Home/End, Escape, and mobile layout.
 
 ## Automated verification

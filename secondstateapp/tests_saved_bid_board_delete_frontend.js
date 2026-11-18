@@ -187,7 +187,8 @@ test("deleted board does not return from an older in-flight viewer request", asy
 
 test("an empty summary cannot send a delete request", async () => {
   const p = environment(), view = p.mount({...makeLot(), saved_bid_board: null});
-  assert.equal(view.root.hidden, true); await view.remove.dispatch("click");
+  assert.equal(view.root.hidden, true);
+  assert.equal(view.remove, null);
   assert.equal(p.requests.length, 0);
 });
 

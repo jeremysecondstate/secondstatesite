@@ -46,7 +46,7 @@ from .auction_email import (
     send_auction_email,
     validate_sending_configuration,
 )
-from .bid_board_snapshot import saved_board_summary
+from .bid_board_snapshot import saved_board_summary, uses_max_bid_label
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
 from .calendar_lot_numbers import calendar_lot_number
 from .calendar_sales import verified_sale
@@ -64,6 +64,7 @@ from .liveart_search import PRINTS_AND_MULTIPLES_CATEGORY_ID, PRINTS_AND_MULTIPL
 from .lot_presentation import artist_attribution_label, artist_display_name, artist_sort_key, clean_display_text
 from .oliver_houses import is_oliver_house, oliver_house_name, oliver_house_names
 from .research_queue import selected_queue_state
+from .resale_research import resale_summary
 from .sale_geography import sale_geography
 from .models import (
     AuctionEmailBatch,
@@ -315,6 +316,9 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "liveart_research_url": reverse("auction_lot_liveart_research", args=(lot.pk,)),
         "liveart_analysis_url": reverse("auction_lot_liveart_analysis", args=(lot.pk,)),
         "bid_board_url": reverse("auction_lot_bid_board", args=(lot.pk,)),
+        "max_bid_label": uses_max_bid_label(lot.event_at),
+        "resale_research": resale_summary(lot),
+        "resale_report_url": reverse("auction_lot_resale_report", args=(lot.pk,)),
         "saved_bid_board": saved_board_summary(getattr(lot, "bid_board_analysis", None)),
         "saved_bid_board_url": reverse("auction_lot_saved_bid_board", args=(lot.pk,)),
         "bid_board_email_url": reverse("auction_lot_bid_board_email", args=(lot.pk,)),
@@ -360,11 +364,11 @@ def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, resear
     if not visible:
         return None
     saved_children = AuctionWatchLot.objects.filter(superseded_by_id__in=visible).filter(
-        Q(max_bid_analysis__isnull=False) | Q(liveart_resale_analysis__isnull=False)
+        Q(max_bid_analysis__isnull=False) | Q(liveart_resale_analysis__isnull=False) | Q(resale_research__isnull=False)
         | Q(bid_board_analysis__isnull=False) | Q(email_batch_items__isnull=False)
         | Q(research_queue_item__isnull=False) | Q(research_run_items__isnull=False)
         | ~Q(artprice_url="") | Q(won_by_us=True) | Q(sold_price__isnull=False)
-    ).select_related("watchlist_artist", "bid_board_analysis").defer(
+    ).select_related("watchlist_artist", "bid_board_analysis", "resale_research").defer(
         "bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids",
     ).distinct().order_by("source", "id")
     requested_id = request.GET.get("lot", "")
@@ -380,6 +384,9 @@ def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, resear
             "artist": artist_display_name(_artist_label(child)),
             "auction_house": clean_display_text(child.auction_house or child.source or "Auction"),
             "lot_number": calendar_lot_number(child),
+            "max_bid_label": uses_max_bid_label(child.event_at),
+            "resale_research": resale_summary(child),
+            "resale_report_url": reverse("auction_lot_resale_report", args=(child.pk,)),
             "saved_bid_board": saved_board_summary(getattr(child, "bid_board_analysis", None)),
             "saved_bid_board_url": reverse("auction_lot_saved_bid_board", args=(child.pk,)),
             "bid_board_email_url": reverse("auction_lot_bid_board_email", args=(child.pk,)),
@@ -470,7 +477,7 @@ def auction_calendar(request):
 
     month_lots = list(
         AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=range_start, event_at__lt=range_end)
-        .select_related("watchlist_artist", "bid_board_analysis")
+        .select_related("watchlist_artist", "bid_board_analysis", "resale_research")
         .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
         .order_by("event_at", "auction_house", "artist", "id")
     )
@@ -572,7 +579,7 @@ def auction_calendar(request):
         day_start, day_end = _utc_bounds(local_day, local_day + timedelta(days=1), zone)
         day_lots = list(
             AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=day_start, event_at__lt=day_end)
-            .select_related("watchlist_artist", "bid_board_analysis")
+            .select_related("watchlist_artist", "bid_board_analysis", "resale_research")
             .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
             .order_by("event_at", "auction_house", "artist", "id")
         )
@@ -624,12 +631,6 @@ def auction_calendar(request):
     else:
         initial_oliver_day = initial_day
 
-    last_sent_batch = (
-        AuctionEmailBatch.objects.filter(status=AuctionEmailBatch.Status.SENT, is_active=False)
-        .select_related("requested_by")
-        .order_by("-sent_at", "-id")
-        .first()
-    )
     email_recipients = _email_recipient_choices(active_email_batch)
 
     context = {
@@ -654,9 +655,7 @@ def auction_calendar(request):
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),
         "research_queue_count": len(research_queue_state),
-        "email_recipient_names": ", ".join(choice["name"] for choice in email_recipients),
         "email_recipient_choices": email_recipients,
-        "email_last_sent_batch": last_sent_batch,
         "email_configuration_warnings": configuration_warnings(),
     }
     return render(request, "calendar/calendar.html", context)
@@ -2128,6 +2127,9 @@ def review_auction_email_tray(request):
             "batch": batch,
             "items": items,
             "composition": composition,
+            "email_last_sent_batch": AuctionEmailBatch.objects.filter(status=AuctionEmailBatch.Status.SENT, is_active=False)
+                .select_related("requested_by").order_by("-sent_at", "-id").first(),
+            "calendar_timezone": settings.CALENDAR_TIME_ZONE,
             "recipient_choices": choices,
             "configuration_warnings": configuration_warnings(),
             "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),

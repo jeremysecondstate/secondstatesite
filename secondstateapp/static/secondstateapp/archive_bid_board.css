@@ -23,6 +23,68 @@
 /* The gallery keeps the saved decision visible; drafts stay in Research. */
 .sb-catalog-summary{margin:0 0 14px;padding:13px 14px;border:1px solid rgba(217,184,120,.3);background:rgba(217,184,120,.065);color:#f2efe7;overflow-wrap:anywhere}
 .sb-catalog-summary[hidden]{display:none!important}
+.sb-max-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-block: 1px solid var(--calendar-line, #c9c2b3);
+}
+.sb-max-label, .sb-resale-heading strong {
+  font: 600 10px/1.45 Arial, sans-serif;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.sb-max-value {
+  color: var(--calendar-gold, #735334);
+  font: 400 25px/1.15 Georgia, serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.sb-resale-venues { margin-top: 12px; }
+.sb-resale-heading, .sb-venue-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3px 10px;
+}
+.sb-resale-heading { flex-wrap: wrap; }
+.sb-resale-heading span, .sb-resale-empty, .sb-tier-note { color: inherit; opacity: .8; font-size: 11px; }
+.sb-resale-empty, .sb-resale-unit, .sb-tier-note { margin: 5px 0 0; }
+.sb-resale-unit { font-size: 11px; opacity: .8; }
+.sb-venue-list { padding: 0; margin: 4px 0 0; list-style: none; }
+.sb-venue-row { padding: 4px 0; color: inherit; font-size: 13px; line-height: 1.4; text-decoration: none; }
+.sb-venue-row:hover { text-decoration: underline; text-underline-offset: 3px; }
+.sb-venue-price { min-width: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.sb-report-link {
+  display: inline-block;
+  padding: 5px 8px;
+  border: 1px solid currentColor;
+  color: var(--calendar-gold, #735334);
+  font-size: 12px;
+  text-decoration: none;
+}
+.sb-report-link:hover { text-decoration: underline; }
+.day-gallery-work:has(.bid-research-dossier) .sb-catalog-summary {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.day-gallery-work:has(.bid-research-dossier) .sb-catalog-actions {
+  border-top: 1px solid var(--calendar-line);
+  padding-top: 8px;
+  gap: 3px 12px;
+}
+.research-lot-overview .sb-catalog-summary {
+  background: #eee9df;
+  border-color: #c9c2b3;
+  color: #252a26;
+}
+.research-lot-overview .sb-max-value { color: #463522; }
+.research-lot-overview .sb-delete-button { color: #8b4335; }
+.sb-saved-selection .sb-report-link { margin-top: 9px; }
+.sb-venue-row:focus-visible, .sb-report-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .sb-qualifying-bid{display:block;color:var(--calendar-gold,#d9b878);font-size:16px;line-height:1.4;font-weight:600;font-variant-numeric:tabular-nums}
 .sb-catalog-actions{display:flex;align-items:center;flex-wrap:wrap;gap:4px 18px;margin-top:8px}
 .sb-view-button,.sb-delete-button{display:inline-flex;align-items:center;min-height:36px;padding:6px 0;background:none;border:0;color:var(--calendar-gold,#d9b878);font:inherit;font-size:12px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}

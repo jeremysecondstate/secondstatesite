@@ -269,6 +269,8 @@ def _snapshot_email_bid_board(record, sale_date, zone) -> dict:
     detail = summary.get("detail") or {}
     assumptions = snapshot["assumptions"]
     selected_case = summary.get("selected_case")
+    max_bid_label = summary["max_bid_label"]
+    ceiling_label = "MAX BID" if max_bid_label else "qualifying bid ceiling"
     qualification = (
         "Meets both minimums" if summary.get("qualifies") is True
         else "Does not meet both minimums" if summary.get("qualifies") is False
@@ -302,7 +304,7 @@ def _snapshot_email_bid_board(record, sale_date, zone) -> dict:
                 else "No qualifying bid"
             ),
             "basis": case.get("basis", ""),
-            "bid_label": "highest supported bid" if ceiling.get("coverage_limited") else "qualifying bid ceiling",
+            "bid_label": "highest supported bid" if ceiling.get("coverage_limited") else ceiling_label,
             "coverage_note": "Known increment range ends here; higher bids are unverified." if ceiling.get("coverage_limited") else "",
         })
     rows = []
@@ -334,13 +336,20 @@ def _snapshot_email_bid_board(record, sale_date, zone) -> dict:
     if assumptions.get("increment_mode") == "fixed":
         costs.append({"label": "Bid increment", "value": _board_amount(assumptions.get("fixed_increment"))})
     pagination = analysis.get("pagination") or {}
+    if max_bid_label:
+        qualifying_label = "MAX BID at known tier limit" if summary.get("qualifying_coverage_limited") else "MAX BID"
+        cases_heading = "Resale cases and MAX BID"
+    else:
+        qualifying_label = "Highest supported qualifying bid" if summary.get("qualifying_coverage_limited") else "Qualifying bid ceiling"
+        cases_heading = "Resale cases and supported qualifying bids" if any(item.get("coverage_limited") for item in shortlist.values()) else "Resale cases and qualifying bid ceilings"
     snapshot["email"] = {
         "saved_label": timezone.localtime(record.updated_at, zone).strftime("%b %d, %Y at %I:%M %p %Z"),
         "selected_bid": _board_amount(summary.get("selected_bid")),
         "selected_case": summary.get("selected_case_label", "Working"),
         "qualification": qualification,
-        "qualifying_label": "Highest supported qualifying bid" if summary.get("qualifying_coverage_limited") else "Qualifying bid ceiling",
-        "cases_heading": "Resale cases and supported qualifying bids" if any(item.get("coverage_limited") for item in shortlist.values()) else "Resale cases and qualifying bid ceilings",
+        "qualifying_label": qualifying_label,
+        "ceiling_heading": "MAX BID" if max_bid_label else "Qualifying bid",
+        "cases_heading": cases_heading,
         "qualifying_bid": (
             _board_amount(summary.get("qualifying_bid")) if summary.get("qualifying_bid") is not None
             else "Qualification unavailable" if summary.get("qualifies") is None

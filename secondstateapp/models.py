@@ -373,6 +373,53 @@ class AuctionBidBoardAnalysis(models.Model):
         ordering = ["-updated_at", "-id"]
 
 
+class LotResaleResearch(models.Model):
+    """Staff placement research, independent of the saved acquisition decision."""
+
+    lot = models.OneToOneField(AuctionWatchLot, on_delete=models.CASCADE, related_name="resale_research")
+    status = models.CharField(max_length=12, choices=[("ready", "Ready"), ("limited", "Limited evidence")])
+    summary = models.TextField()
+    resale_unit = models.CharField(max_length=200)
+    venues = models.JSONField(default=list)
+    version = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="+")
+
+
+class HouseProposalEntry(models.Model):
+    """One resale unit in one recipient's seasonal selection."""
+
+    lot = models.ForeignKey(AuctionWatchLot, on_delete=models.CASCADE, related_name="proposal_entries")
+    work_key = models.CharField(max_length=80, default="lot")
+    house = models.CharField(max_length=255)
+    house_key = models.SlugField(max_length=255, allow_unicode=True)
+    season = models.CharField(max_length=8, choices=[("spring", "Spring"), ("fall", "Fall")])
+    year = models.PositiveSmallIntegerField()
+    sort_order = models.PositiveIntegerField(default=0)
+    artist = models.CharField(max_length=255)
+    title = models.CharField(max_length=500)
+    year_text = models.CharField(max_length=80, blank=True)
+    medium = models.CharField(max_length=500, blank=True)
+    dimensions = models.CharField(max_length=500, blank=True)
+    edition = models.CharField(max_length=500, blank=True)
+    object_notes = models.TextField(blank=True)
+    description = models.TextField()
+    provenance = models.TextField(blank=True)
+    literature = models.TextField(blank=True)
+    condition = models.TextField(blank=True)
+    image_url = models.CharField(max_length=2000, blank=True)
+    estimate_currency = models.CharField(max_length=3, default="USD")
+    estimate_low = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    estimate_high = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        ordering = ["sort_order", "artist", "title", "pk"]
+        constraints = [models.UniqueConstraint(
+            fields=["lot", "work_key", "house_key", "season", "year"], name="unique_house_season_work",
+        )]
+        indexes = [models.Index(fields=["season", "year", "house_key"], name="proposal_season_house")]
+
+
 class AuctionReminderDelivery(models.Model):
     """Idempotency and delivery audit record for one daily reminder digest."""
 

@@ -2,9 +2,9 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=catalog-counts-20261112">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=bid-research-20261118">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
-  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=finite-tier-notes-20261027">
+  <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=bid-research-20261118">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/research_queue.css' %}?v=queue-20261027">
 {% endblock %}
@@ -38,55 +38,6 @@
     <p>Save lots across dates, then tell the LiveArt Worker: “Process my LiveArt queue”.</p>
   </nav>
 
-  <section class="email-tray-card" aria-labelledby="email-tray-title">
-    <div class="email-tray-heading">
-      <div>
-        <p class="calendar-kicker">Email Tray</p>
-        <h2 id="email-tray-title">
-          <span class="email-tray-count" data-email-tray-count>{{ email_selected_count }}</span>
-          selected <span data-email-tray-lot-label>lot{{ email_selected_count|pluralize }}</span>
-        </h2>
-        <p>Select lots with saved Artprice links, then review one consolidated message before sending.</p>
-      </div>
-      <a class="email-tray-button" href="{% url 'auction_email_tray' %}">Review &amp; Send</a>
-    </div>
-
-    <div class="email-tray-meta">
-      <div>
-        <span>Selected</span>
-        <strong><span data-email-tray-count>{{ email_selected_count }}</span> <span data-email-tray-lot-label>lot{{ email_selected_count|pluralize }}</span></strong>
-      </div>
-      <div>
-        <span>Recipients</span>
-        <strong>{{ email_recipient_names }}</strong>
-      </div>
-      <div>
-        <span>Last successful email</span>
-        <strong>
-          {% if email_last_sent_batch %}
-            {{ email_last_sent_batch.sent_at|date:"M j, Y g:i A" }}
-            {% if email_last_sent_batch.requested_by %}
-              by {% firstof email_last_sent_batch.requested_by.get_full_name email_last_sent_batch.requested_by.username %}
-            {% endif %}
-          {% else %}
-            Not sent yet
-          {% endif %}
-        </strong>
-      </div>
-    </div>
-
-    {% if email_configuration_warnings %}
-      <div class="email-tray-warning" role="status">
-        <strong>Gmail delivery is not ready.</strong>
-        Configure the sender, fixed recipients, Google OAuth credentials, and sending switch. Preview and tray management remain available.
-      </div>
-    {% endif %}
-    {% if email_batch.status == "failed" and email_batch.failure_summary %}
-      <p class="email-tray-failure">Last attempt failed: {{ email_batch.failure_summary }}</p>
-    {% elif email_batch.status == "sending" %}
-      <p class="email-tray-sending">This tray is currently being sent and cannot be changed.</p>
-    {% endif %}
-  </section>
 
   <div class="calendar-view-switch" role="group" aria-label="Auction calendar view">
     <span>View day as</span>
@@ -95,6 +46,7 @@
     <button id="research-view-toggle" type="button" aria-controls="day-research-workspace" aria-pressed="false">Archive Research</button>
     <button id="oliver-calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="false">Oliver’s Calendar</button>
     <button id="oliver-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Oliver’s Catalog</button>
+    <a class="calendar-tray-link" href="{% url 'auction_email_tray' %}">Email Tray · <span data-email-tray-count>{{ email_selected_count }}</span></a>
   </div>
 
   <div id="calendar-currency-status" class="calendar-currency-status" role="status" hidden>
@@ -332,6 +284,7 @@
     <div class="day-gallery-count" aria-live="polite">
       <div class="day-gallery-result-heading">
         <span id="day-gallery-description" tabindex="-1">A catalog across auction houses</span>
+        <a class="bid-research-proposals" href="{% url 'calendar_consignment_proposals' %}">Proposal catalogs →</a>
         <button id="day-gallery-artist-clear" type="button" hidden>All artists</button>
       </div>
     </div>
@@ -478,7 +431,7 @@
 {{ retained_research_lot|json_script:"auction-calendar-retained-research" }}
 {{ oliver_house_names|json_script:"oliver-house-names" }}
 <script src="{% static 'secondstateapp/archive_bid_board.js' %}?v=archive-fx-evidence-20261028"></script>
-<script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=archive-fx-evidence-20261028"></script>
+<script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=bid-research-20261118"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=artist-labels-20261108"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
@@ -3410,8 +3363,9 @@
   const galleryHouseName = (lot) => activeView === "oliver"
     ? (lot.oliver_house_name || lot.auction_house) : lot.auction_house;
 
-  const lotHasQualifyingBid = (lot) => hasQualifyingBid(lot.saved_bid_board)
-    || Boolean(lot.retained_saved_work?.some((work) => hasQualifyingBid(work.saved_bid_board)));
+  // Keep the existing "qualifying" deep links working when opening Bid Research.
+  const lotHasBidResearch = (lot) => Boolean(lot.resale_research || hasQualifyingBid(lot.saved_bid_board)
+    || lot.retained_saved_work?.some((work) => work.resale_research || hasQualifyingBid(work.saved_bid_board)));
 
   const matchesGalleryAttribution = (lot) => !galleryHideAttributed
     || !["After", "Attributed to"].includes(lot.attribution_label);
@@ -3421,7 +3375,7 @@
   const galleryBrowsableLots = () => dayLots().filter((lot) => matchesGalleryAttribution(lot) && matchesGalleryRegion(lot));
   const matchesGallerySelection = (lot) => {
     if (galleryOrganization.house && galleryHouseName(lot) !== galleryOrganization.house) return false;
-    if (galleryFilter === "qualifying") return lotHasQualifyingBid(lot);
+    if (galleryFilter === "qualifying") return lotHasBidResearch(lot);
     if (galleryFilter === "tray") return Boolean(lot.email_tray_selected || lot.retained_saved_work?.some((work) => work.email_tray_selected));
     if (galleryFilter === "bidboards") return Boolean(lot.saved_bid_board || lot.retained_saved_work?.some((work) => work.saved_bid_board));
     if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
@@ -3536,7 +3490,7 @@
     const houseCounts = new Map(activeView === "oliver" ? oliverHouseNames.map((name) => [name, 0]) : []);
     const countedLots = lots.filter((lot) => !galleryOrganization.house || galleryHouseName(lot) === galleryOrganization.house);
     const houseLots = lots.filter((lot) => {
-      if (galleryFilter === "qualifying") return lotHasQualifyingBid(lot);
+      if (galleryFilter === "qualifying") return lotHasBidResearch(lot);
       if (galleryFilter === "bidboards") return Boolean(lot.saved_bid_board || lot.retained_saved_work?.some((work) => work.saved_bid_board));
       if (galleryFilter === "tray") return Boolean(lot.email_tray_selected || lot.retained_saved_work?.some((work) => work.email_tray_selected));
       if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
@@ -3550,12 +3504,12 @@
     galleryHousesSummary.textContent = `${houseCounts.size} house${houseCounts.size === 1 ? "" : "s"}`
       + (activeView === "oliver" ? ` · ${Array.from(houseCounts.values()).filter((count) => count > 0).length} with lots` : "")
       + (galleryOrganization.house ? ` · Selected house: ${galleryOrganization.house}` : "")
-      + (galleryFilter.startsWith("house:") ? ` · Selected: ${galleryFilter.slice(6)}` : galleryFilter === "tray" ? " · Email Tray selected" : galleryFilter === "qualifying" ? " · Qualifying bids selected" : galleryFilter === "bidboards" ? " · Bid Boards selected" : galleryOrganization.house ? "" : " · All houses selected");
+      + (galleryFilter.startsWith("house:") ? ` · Selected: ${galleryFilter.slice(6)}` : galleryFilter === "tray" ? " · Email Tray selected" : galleryFilter === "qualifying" ? " · Bid Research selected" : galleryFilter === "bidboards" ? " · Bid Boards selected" : galleryOrganization.house ? "" : " · All houses selected");
     const choices = [
       {key: "all", label: "All lots", count: countedLots.length},
       {key: "tray", label: "Email Tray", count: countedLots.filter((lot) => lot.email_tray_selected || lot.retained_saved_work?.some((work) => work.email_tray_selected)).length},
       {key: "bidboards", label: "Bid Boards", count: countedLots.filter((lot) => lot.saved_bid_board || lot.retained_saved_work?.some((work) => work.saved_bid_board)).length},
-      {key: "qualifying", label: "Qualifying bids", count: countedLots.filter(lotHasQualifyingBid).length},
+      {key: "qualifying", label: "Bid Research", count: countedLots.filter(lotHasBidResearch).length},
       {key: "house:", label: "All auction houses", count: houseLots.length},
       ...Array.from(houseCounts, ([house, count]) => ({key: `house:${house}`, label: house, count})),
     ];
@@ -3660,9 +3614,9 @@
     const restoreFocus = root.contains(focusOrigin);
     root.replaceChildren();
     view.summaries = new Map();
-    boards.forEach((work) => {
+    owners.filter((work) => work.saved_bid_board || work.resale_research).forEach((work) => {
       const savedBoard = document.createElement("div");
-      if (window.SavedBidBoard) window.SavedBidBoard.mountSummary(savedBoard, {lot: work, csrfToken});
+      if (window.SavedBidBoard) window.SavedBidBoard.mountSummary(savedBoard, {lot: work, csrfToken, getOliverScope: () => inOliverScope()});
       view.summaries.set(String(work.id), savedBoard);
       if (String(work.id) !== String(group.id)) {
         const provenance = retainedResearchLink(work.id, "lot-board-provenance", `Saved with ${work.source} ↗`);
@@ -3673,7 +3627,7 @@
     });
     if (!boards.length && window.ResearchQueue) root.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
     // Keep the original sources and any other saved work reachable after deleting a board.
-    const otherWork = (group.retained_saved_work || []).filter((work) => !work.saved_bid_board);
+    const otherWork = (group.retained_saved_work || []).filter((work) => !work.saved_bid_board && !work.resale_research);
     appendRetainedSavedWork(root, {...group, retained_saved_work: otherWork});
     if (restoreFocus) root.querySelector("input, button, a")?.focus({preventScroll: true});
   };
@@ -3702,17 +3656,18 @@
     });
   };
 
-  const galleryCard = (lot, index) => {
+  const galleryCard = (lot, index, bidResearch = false) => {
     const card = document.createElement("article");
     card.dataset.galleryLotId = String(lot.id);
     card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}${lot.attribution_label ? " has-attribution" : ""}`;
     const visual = document.createElement("div");
     visual.className = "day-gallery-visual";
-    const researchUrl = galleryResearchUrl(lot);
+    const researchUrl = bidResearch ? galleryResearchUrl(lot, {look: "dossier"}) : galleryResearchUrl(lot);
     const researchLabel = `Open research workspace for ${lot.title}${lot.artist ? ` by ${lot.artist}` : ""} (opens in a new tab)`;
     const open = externalLink(researchUrl, "day-gallery-open", "");
     open.setAttribute("aria-label", researchLabel);
     open.append(...galleryImage(lot));
+    if (bidResearch) appendText(open, "span", "bid-research-dossier", "Gallery Dossier ↗");
     visual.appendChild(open);
     appendText(visual, "span", "day-gallery-lot-number", lot.lot_number ? `LOT ${lot.lot_number}` : "WATCHED LOT");
     const emailButton = document.createElement("button");
@@ -3789,7 +3744,7 @@
         appendText(galleryGrid, "h3", "day-gallery-house-heading", `${house} · ${groupCounts.get(house)} lot${groupCounts.get(house) === 1 ? "" : "s"}`);
         previousHouse = house;
       }
-      galleryGrid.appendChild(galleryCard(lot, index));
+      galleryGrid.appendChild(galleryCard(lot, index, galleryFilter === "qualifying"));
     });
     if (!lots.length) {
       appendText(galleryGrid, "p", "day-gallery-empty", galleryOrganization.region
@@ -3800,7 +3755,7 @@
         ? "No lots match these filters. Try showing After & Attributed works or changing the selected filter."
         : galleryFilter === "tray"
         ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Research, then add it to the tray."
-        : galleryFilter === "qualifying" ? "No saved Bid Boards have a qualifying bid in this catalog on this date. Choose Bid Boards to see all saved results."
+        : galleryFilter === "qualifying" ? "No lots on this date have a saved bid ceiling or resale report. Choose Bid Boards to see all saved boards."
         : galleryFilter === "bidboards" ? "No lots have a saved Bid Board in this catalog on this date."
         : galleryFilter.startsWith("house:") ? `No lots from ${galleryFilter.slice(6)} on this date.`
         : activeView === "oliver" ? "No lots from Oliver’s auction houses on this date. Choose another watched day or switch to Jeremy’s Catalog."
@@ -3813,7 +3768,7 @@
     galleryDescription.textContent = artistSelected ? `${selectedArtist?.name || "Artist"} · lots this day` : galleryFilter === "all"
       ? (activeView === "oliver" ? "A catalog from Oliver’s auction houses" : "A catalog across auction houses")
       : galleryFilter === "tray" ? "Lots selected for the next email"
-      : galleryFilter === "qualifying" ? "Saved Bid Boards with a qualifying bid"
+      : galleryFilter === "qualifying" ? "Bid Research"
       : galleryFilter === "bidboards" ? "Saved Bid Boards · qualifying, no qualifying bid, and unavailable results" : galleryFilter.slice(6);
     if (galleryOrganization.house) galleryDescription.textContent += ` · ${galleryOrganization.house}`;
     if (galleryOrganization.region) galleryDescription.textContent += ` · ${galleryRegionLabel()}`;
@@ -4315,6 +4270,9 @@
     researchLotCache.get(String(lot.id))?.querySelectorAll(".lot-retained-link, .lot-board-provenance, .lot-canonical-link").forEach((link) => {
       link.href = galleryResearchUrl({id: link.dataset.retainedResearchLotId}, {look: "workbench"});
     });
+    researchLotCache.get(String(lot.id))?.querySelectorAll("[data-resale-href]").forEach((link) => {
+      window.SavedBidBoard.setReportScope(link, inOliverScope());
+    });
     const key = `${selectedDay}:${lot.id}`;
     if (researchRenderedKey === key) { activateArchiveStage(); return; }
     researchRenderedKey = key;
@@ -4363,6 +4321,13 @@
       actionLinks.appendChild(artistLink);
     }
     if (lot.artprice_url) actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
+    if (!lot.resale_research && !lot.retained_saved_work?.some((work) => work.resale_research) && lot.resale_report_url) {
+      const addResearch = document.createElement("a");
+      addResearch.dataset.resaleHref = lot.resale_report_url + "#edit-report";
+      window.SavedBidBoard.setReportScope(addResearch, inOliverScope());
+      addResearch.textContent = "Add resale research";
+      actionLinks.appendChild(addResearch);
+    }
     overview.appendChild(actionLinks);
     appendLotControls(overview, lot);
     content.appendChild(overview);
@@ -4965,7 +4930,7 @@
   if (requestedSavedBoard && window.SavedBidBoard) {
     const savedLot = dayLots().flatMap((lot) => [lot, ...(lot.retained_saved_work || [])])
       .find((lot) => String(lot.id) === requestedSavedBoard);
-    if (savedLot?.saved_bid_board) window.SavedBidBoard.open(savedLot, {csrfToken});
+    if (savedLot?.saved_bid_board) window.SavedBidBoard.open(savedLot, {csrfToken, oliver: inOliverScope()});
   }
 })();
 </script>

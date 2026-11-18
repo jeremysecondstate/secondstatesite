@@ -1179,22 +1179,23 @@ test("retained saved-board updates keep full summaries and count each canonical 
 });
 
 for (const view of ["catalog", "oliver"]) {
-  test(`${view} Qualifying bids chip counts the full scope, preserves sort and paginates before research indices`, () => {
+  test(`${view} Bid Research includes resale reports and bid ceilings, preserves sort and paginates before research indices`, () => {
     const lots = Array.from({length: 90}, (_, index) => lot(index + 1,
       index % 3 ? "Phillips" : "Other", index % 3 !== 0, {
         estimate_low: String(100 - index), artist: index % 2 ? "Artist A" : "Artist B",
         saved_bid_board: index % 5 === 0 ? null : {qualifying_bid: String(500 + index), qualifies: false, include_in_email: index % 2 === 0},
+        resale_research: index % 10 === 0 ? {venues: [], report_url: "/calendar/lots/example/resale-report/"} : null,
         email_tray_selected: index % 7 === 0,
       }));
     const before = JSON.stringify(lots);
     const context = page({[dayA]: lots}, view);
-    const matching = lots.filter(item => item.saved_bid_board && (view !== "oliver" || item.oliver_house)).reverse();
+    const matching = lots.filter(item => (item.saved_bid_board || item.resale_research) && (view !== "oliver" || item.oliver_house)).reverse();
     const filter = key => context.galleryFilters.children.find(button => button.dataset.galleryFilter === key);
     context.galleryCatalog.querySelectorAll = () => [...context.galleryFilters.children, ...context.galleryHouseFilters.children];
     context.gallerySort.value = "price_asc";
     context.run('chooseGalleryArtist("artist a")');
     context.galleryVisibleCount = 72;
-    assert.equal(filter("qualifying").children[0].textContent, "Qualifying bids");
+    assert.equal(filter("qualifying").children[0].textContent, "Bid Research");
     assert.equal(filter("qualifying").children[1].textContent, String(matching.length));
     assert.equal(filter("qualifying").getAttribute("aria-pressed"), "false");
     filter("qualifying").click();
@@ -1247,7 +1248,7 @@ for (const view of ["catalog", "oliver"]) {
     assert.equal(context.galleryResults.textContent, "Matching filters: 0 of 1 day lots · 0 cards shown");
     assert.match(context.galleryGrid.children[0].textContent, /After & Attributed/);
     context.galleryAttributionToggle.click();
-    assert.match(context.galleryGrid.children[0].textContent, /qualifying bid/i);
+    assert.match(context.galleryGrid.children[0].textContent, /saved bid ceiling or resale report/i);
     assert.equal(context.galleryMore.hidden, true);
     assert.equal(new URL(context.window.location.href).searchParams.get("filter"), "qualifying");
     context.galleryFilters.children.find(button => button.dataset.galleryFilter === "bidboards").click();

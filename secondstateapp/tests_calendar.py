@@ -1115,13 +1115,16 @@ class AuctionCalendarViewTests(TestCase):
         response = self.client.get(reverse("auction_calendar"), {"month": "not-a-month"})
         self.assertEqual(response.status_code, 200)
 
-    def test_calendar_renders_the_shared_email_tray_panel(self):
+    def test_calendar_links_to_the_shared_email_tray_review(self):
         self.client.force_login(self.staff)
         response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
         self.assertContains(response, "Email Tray")
-        self.assertContains(response, "Review &amp; Send")
-        self.assertContains(response, "Gmail delivery is not ready")
+        self.assertContains(response, f'class="calendar-tray-link" href="{reverse("auction_email_tray")}"')
+        self.assertNotContains(response, '<section class="email-tray-card"')
         self.assertEqual(response.context["email_selected_count"], 0)
+        tray = self.client.get(reverse("auction_email_tray"))
+        self.assertContains(tray, "Review &amp; Send")
+        self.assertContains(tray, "Gmail delivery is not ready")
 
     def test_email_tray_pages_and_endpoints_are_staff_only(self):
         lot = watch_lot(artprice_url="https://www.artprice.com/artist/1/example/lots/pasts")
@@ -3341,7 +3344,9 @@ class AuctionEmailBatchTests(TestCase):
 
         calendar = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
         self.assertEqual(calendar.context["email_selected_count"], 0)
-        self.assertEqual(calendar.context["email_last_sent_batch"], batch)
+        tray = self.client.get(reverse("auction_email_tray"))
+        self.assertEqual(tray.context["email_last_sent_batch"], batch)
+        self.assertContains(tray, "Last successful email")
 
     @patch("secondstateapp.calendar_views.send_auction_email", return_value="gmail-scoped-123")
     def test_catalog_send_archives_only_displayed_day_and_preserves_other_selections(self, sender):

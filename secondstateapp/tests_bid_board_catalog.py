@@ -114,6 +114,23 @@ class SavedBidBoardCatalogTests(TestCase):
         self.assertEqual(summary["selected_bid"], "1200.00")
         self.assertEqual(summary["selected_case"], "conservative")
 
+    @override_settings(CALENDAR_TIME_ZONE="America/Los_Angeles")
+    def test_max_bid_label_follows_the_calendar_sale_day_and_preserves_saved_hammers(self):
+        self.save_board()
+        self.lot.refresh_from_db()
+        for minute, hour, expected in ((59, 7, False), (0, 8, True)):
+            with self.subTest(hour=hour):
+                self.lot.event_at = datetime(2026, 11, 18, hour, minute, tzinfo=datetime_timezone.utc)
+                self.lot.is_all_day = True
+                self.lot.save(update_fields=["event_at", "is_all_day"])
+                lot = _lot_json(self.lot, ZoneInfo("America/Los_Angeles"))
+                board = self.client.get(self.saved_url).json()["board"]["summary"]
+                self.assertIs(lot["max_bid_label"], expected)
+                self.assertIs(board["max_bid_label"], expected)
+                self.assertEqual((board["selected_bid"], board["qualifying_bid"]), ("1400.00", "1800.00"))
+                self.assertEqual(lot["resale_report_url"], reverse("auction_lot_resale_report", args=(self.lot.pk,)))
+                self.assertIsNone(lot["resale_research"])
+
     def test_legacy_three_case_snapshot_stays_frozen_until_explicit_resave(self):
         record = self.save_board()
         original_keys = {"conservative", "working", "optimistic"}
@@ -407,7 +424,7 @@ class SavedBidBoardCatalogTests(TestCase):
     def test_catalog_serialization_is_compact_and_uses_prefetched_record(self):
         record = self.save_board()
         no_board = self.create_lot("without-board")
-        lots = list(AuctionWatchLot.objects.select_related("watchlist_artist", "bid_board_analysis").order_by("pk"))
+        lots = list(AuctionWatchLot.objects.select_related("watchlist_artist", "bid_board_analysis", "resale_research").order_by("pk"))
         with self.assertNumQueries(0):
             data = [_lot_json(lot, ZoneInfo("UTC")) for lot in lots]
         with_board = next(item for item in data if item["id"] == self.lot.pk)

@@ -149,6 +149,26 @@ test("saved catalog summary identifies a coverage-capped qualifying bid", () => 
   assert.doesNotMatch(root.textContent, /At known tier limit/);
 });
 
+test("MAX BID and researched house ranges stay distinct and open the corresponding report entries", () => {
+  const {root, context} = environment({});
+  const report = {report_url: "/calendar/lots/1/resale-report/", venues: [
+    {house: "First house", low_usd: "1000.00", high_usd: "1200.00"},
+    {house: "Second house", low_usd: "900", high_usd: "1100"},
+  ]};
+  const lot = {id: 1, title: "Print", max_bid_label: true, resale_research: report};
+  context.window.SavedBidBoard.mountSummary(root, {lot});
+  assert.match(root.textContent, /MAX BID No saved board/);
+  assert.doesNotMatch(root.textContent, /Delete Bid Board/);
+  assert.deepEqual(root.querySelectorAll(".sb-venue-row").map(node => node.href), [report.report_url + "#venue-1", report.report_url + "#venue-2"]);
+  assert.match(root.textContent, /First house \$1,000–\$1,200/);
+  assert.equal(root.querySelector(".sb-report-link").href, report.report_url);
+  lot.saved_bid_board = {qualifying_bid: "275.50", selected_bid: "150", qualifying_coverage_limited: true};
+  root.updateSavedBoard(lot.saved_bid_board);
+  assert.match(root.textContent, /MAX BID \$275\.50/);
+  assert.match(root.textContent, /At known tier limit/);
+  assert.doesNotMatch(root.textContent, /Qualifying Bid:/);
+});
+
 test("saved viewer preserves finite coverage and supported-bid labels", async () => {
   const data = board();
   const summary = {qualifying_bid: "300.00", qualifying_coverage_limited: true, selected_case: "working", selected_bid: "300.00", qualifies: true, detail};
@@ -278,7 +298,7 @@ function retainedBoard(id, source, qualifyingBid) {
 }
 
 function renderRetained(page, lot) {
-  Object.assign(page.context, {retainedLot: lot, retainedRoot: page.root, csrfToken: "retained-csrf",
+  Object.assign(page.context, {retainedLot: lot, retainedRoot: page.root, csrfToken: "retained-csrf", inOliverScope: () => false,
     galleryResearchUrl: work => `/calendar/?view=research&lot=${work.id}`,
     appendText(parent, tag, className, textContent) {
       return parent.appendChild(Object.assign(new Element(tag), {className, textContent}));
@@ -328,12 +348,13 @@ test("a saved-board deep link restores a retained snapshot with its original own
   const retained = retainedBoard(11, "Invaluable", "500.00");
   const opened = [];
   const context = vm.createContext({
-    initialParams: new URLSearchParams("saved_bid_board=11"), csrfToken: "test-csrf",
+    initialParams: new URLSearchParams("saved_bid_board=11"), csrfToken: "test-csrf", inOliverScope: () => true,
     dayLots: () => [{id: 123, retained_saved_work: [retained]}],
     window: {SavedBidBoard: {open: (lot, options) => opened.push({lot, options})}},
   });
   vm.runInContext(calendarBlock("  const requestedSavedBoard =", "\n})();"), context);
   assert.equal(opened.length, 1);
   assert.equal(opened[0].lot, retained);
+  assert.equal(opened[0].options.oliver, true);
   assert.equal(opened[0].lot.saved_bid_board_url, "/calendar/lots/11/saved-bid-board/");
 });

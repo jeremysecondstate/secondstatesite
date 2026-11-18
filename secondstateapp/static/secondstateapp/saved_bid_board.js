@@ -10,6 +10,63 @@
   const pct = value => {const match = value == null || value === "" ? null : /^(-?)(\d+)(?:\.(\d{1,3}))?$/.exec(String(value)); return match ? `${match[1]}${grouped(match[2])}${match[3]?.replace(/0+$/, "") ? `.${match[3].replace(/0+$/, "")}` : ""}%` : "Unavailable";};
   const el = (tag, text, className) => {const node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node;};
   const qualification = summary => summary.qualifies === true ? "Meets both minimums" : summary.qualifies === false ? "Below saved minimums" : "Qualification unavailable";
+  const usesMaxBid = (lot, summary = lot.saved_bid_board) => Boolean(lot.max_bid_label ?? summary?.max_bid_label);
+  const compactMoney = value => money(value).replace(/\.00$/, "");
+
+  function ceilingLine(lot, summary) {
+    const line = el("div", null, "sb-ceiling-line");
+    if (!usesMaxBid(lot, summary)) {
+      const value = summary?.qualifying_bid != null ? money(summary.qualifying_bid)
+        : summary?.qualifies == null ? "Unavailable" : "No qualifying bid";
+      line.append(el("strong", `Qualifying Bid: ${value}`, "sb-qualifying-bid"));
+      return line;
+    }
+    const value = summary?.qualifying_bid != null ? compactMoney(summary.qualifying_bid)
+      : !summary ? "No saved board" : summary.qualifies == null ? "Unavailable" : "No bid meets minimums";
+    line.classList.add("sb-max-line");
+    line.append(el("span", "MAX BID", "sb-max-label"), el("strong", value, "sb-max-value"));
+    return line;
+  }
+
+  function setReportScope(link, oliver) {
+    const [path, fragment] = link.dataset.resaleHref.split("#");
+    link.href = path + (oliver ? "?scope=oliver" : "") + (fragment ? "#" + fragment : "");
+  }
+
+  function resaleVenues(lot, oliver) {
+    const research = lot.resale_research;
+    const section = el("section", null, "sb-resale-venues");
+    const heading = el("div", null, "sb-resale-heading");
+    heading.append(el("strong", "Resale houses"));
+    if (research?.venues?.length) heading.append(el("span", "Est. USD hammer"));
+    section.append(heading);
+    if (!research?.venues?.length) {
+      section.append(el("p", research ? "House estimates unavailable." : "No resale report yet.", "sb-resale-empty"));
+      return section;
+    }
+    const list = el("ul", null, "sb-venue-list");
+    research.venues.forEach((venue, index) => {
+      const item = el("li"), row = el("a", null, "sb-venue-row");
+      row.dataset.resaleHref = research.report_url + "#venue-" + (index + 1);
+      setReportScope(row, oliver);
+      const range = venue.low_usd != null && venue.high_usd != null
+        ? `${compactMoney(venue.low_usd)}–${compactMoney(venue.high_usd)}` : "Unavailable";
+      row.append(el("span", venue.house), el("span", range, "sb-venue-price"));
+      item.append(row);
+      list.append(item);
+    });
+    section.append(list);
+    if (research.resale_unit) section.append(el("p", research.resale_unit, "sb-resale-unit"));
+    return section;
+  }
+
+  function reportLink(lot, oliver) {
+    const link = el("a", "Resale report ↗", "sb-report-link");
+    link.dataset.resaleHref = lot.resale_research.report_url;
+    setReportScope(link, oliver);
+    link.setAttribute("aria-label", `View resale report for ${lot.title}`);
+    return link;
+  }
   const pending = new Map();
   const deleting = new Set();
   const saving = new Set();
@@ -67,7 +124,7 @@
     trackBusyControl(checkbox);
     checkbox.checked = pending.get(String(lot.id)) ?? Boolean(lot.saved_bid_board?.include_in_email);
     checkbox.disabled = isBusy(lot.id);
-    label.append(checkbox, el("span", "Include Bid Board & qualifying bid in this lot’s email"));
+    label.append(checkbox, el("span", `Include Bid Board & ${usesMaxBid(lot) ? "MAX BID" : "qualifying bid"} in this lot’s email`));
     const status = el("p", "", "sb-email-status"); status.setAttribute("role", "status");
     wrap.append(label, status);
     checkbox.addEventListener("change", async () => {
@@ -151,7 +208,7 @@
   }
 
   function mountSummary(root, options) {
-    const {lot, csrfToken} = options;
+    const {lot, csrfToken, getOliverScope = () => false} = options;
     root.className = "sb-catalog-summary";
     root.dataset.savedBidBoardLotId = String(lot.id);
     const copy = el("div", null, "sb-catalog-copy"), actions = el("div", null, "sb-catalog-actions");
@@ -159,24 +216,32 @@
     button.dataset.savedBoardOpenLotId = String(lot.id);
     button.setAttribute("aria-haspopup", "dialog");
     button.setAttribute("aria-label", `See saved Bid Board for ${lot.title}`);
-    button.addEventListener("click", () => open(lot, {csrfToken}));
+    button.addEventListener("click", () => open(lot, {csrfToken, oliver: getOliverScope()}));
     const deleteButton = el("button", "Delete Bid Board", "sb-delete-button"); deleteButton.type = "button";
     deleteButton.dataset.savedBoardDeleteLotId = String(lot.id);
     trackBusyControl(deleteButton);
     deleteButton.setAttribute("aria-label", `Delete Bid Board for ${lot.title}`);
     const status = el("p", "", "sb-catalog-status"); status.setAttribute("role", "status");
     deleteButton.addEventListener("click", () => remove(lot, csrfToken, status));
-    actions.append(button, deleteButton);
-    root.append(copy, actions, status, emailControl(lot, csrfToken));
+    const email = emailControl(lot, csrfToken);
+    let hasBoard;
     root.updateSavedBoard = summary => {
       lot.saved_bid_board = summary;
-      root.hidden = !summary;
+      root.hidden = !summary && !lot.resale_research;
+      if (hasBoard !== Boolean(summary)) {
+        hasBoard = Boolean(summary);
+        actions.replaceChildren();
+        if (lot.resale_research) actions.append(reportLink(lot, getOliverScope()));
+        if (hasBoard) actions.append(button, deleteButton);
+        root.replaceChildren(copy, actions, status);
+        if (hasBoard) root.append(email);
+      }
       deleteButton.disabled = isBusy(lot.id);
       deleteButton.textContent = deleting.has(String(lot.id)) ? "Deleting…" : "Delete Bid Board";
-      if (!summary) return;
-      copy.replaceChildren(el("strong", summary.qualifying_bid == null ? (summary.qualifies == null ? "Qualifying Bid: Unavailable" : "Qualifying Bid: No qualifying bid") : `Qualifying Bid: ${money(summary.qualifying_bid)}`, "sb-qualifying-bid"));
-      if (summary.qualifying_coverage_limited) copy.append(el("small", "At known tier limit; higher bids not evaluated.", "ab-muted"));
-      root.querySelector("input").checked = pending.get(String(lot.id)) ?? Boolean(summary.include_in_email);
+      copy.replaceChildren(ceilingLine(lot, summary));
+      if (summary?.qualifying_coverage_limited) copy.append(el("small", "At known tier limit; higher bids not evaluated.", "sb-tier-note"));
+      if (usesMaxBid(lot, summary) || lot.resale_research) copy.append(resaleVenues(lot, getOliverScope()));
+      email.querySelector("input").checked = pending.get(String(lot.id)) ?? Boolean(summary?.include_in_email);
     };
     root.updateSavedBoard(lot.saved_bid_board);
   }
@@ -187,7 +252,7 @@
     return list;
   }
 
-  function renderSnapshot(root, lot, board, csrfToken) {
+  function renderSnapshot(root, lot, board, csrfToken, oliver) {
     const data = board.analysis || {}, summary = board.summary || lot.saved_bid_board || {};
     const assumptions = board.assumptions || data.assumptions || {};
     const detail = summary.detail || data.detail;
@@ -196,7 +261,8 @@
     const caseLabel = summary.selected_case_label || labelForCase(summary.selected_case || data.selected_case, caseList) || "Saved case";
     const selected = el("section", null, "sb-saved-selection");
     selected.append(el("span", "SAVED BID · USD HAMMER", "ab-overline"));
-    selected.append(el("h3", summary.qualifying_bid == null ? (summary.qualifies == null ? "Qualifying Bid: Unavailable" : "No qualifying bid") : `Qualifying Bid: ${money(summary.qualifying_bid)}`));
+    if (usesMaxBid(lot, summary)) selected.append(ceilingLine(lot, summary));
+    else selected.append(el("h3", summary.qualifying_bid == null ? (summary.qualifies == null ? "Qualifying Bid: Unavailable" : "No qualifying bid") : `Qualifying Bid: ${money(summary.qualifying_bid)}`));
     selected.append(el("p", `${caseLabel} · ${summary.qualifying_bid == null ? (data.empty_reason || (summary.qualifies == null ? "Save a starting hammer and resale case to calculate a qualifying bid." : "no available bid meets both saved minimums")) : summary.qualifying_coverage_limited ? "highest supported bid at the known tier limit; higher bids not evaluated" : "highest saved bid meeting both minimums"}`, "ab-muted"));
     if (summary.selected_bid != null) selected.append(el("p", `Selected bid: ${money(summary.selected_bid)} · ${qualification(summary)}`, "sb-saved-selected"));
     else selected.append(el("p", "No bid selected in this saved board.", "ab-muted"));
@@ -205,6 +271,7 @@
       ["Net resale proceeds", money(detail.net_resale_proceeds)], ["Selected bid · net profit / loss", money(detail.net_profit)],
       ["Return on cost", pct(detail.return_on_cost_pct)], ["Profit / gross resale", pct(detail.profit_on_gross_pct)],
     ]));
+    if (lot.resale_research) selected.append(resaleVenues(lot, oliver), reportLink(lot, oliver));
     selected.append(emailControl(lot, csrfToken));
     root.append(selected);
     const notices = [...(data.notices || []), data.evidence_notice, data.message].filter(Boolean);
@@ -287,7 +354,7 @@
     root.append(evidence);
   }
 
-  async function open(lot, {csrfToken} = {}) {
+  async function open(lot, {csrfToken, oliver = false} = {}) {
     if (activeDialog) activeDialog.close();
     const opener = document.activeElement, controller = new AbortController();
     const dialog = el("dialog", null, "sb-dialog"); activeDialog = dialog;
@@ -335,7 +402,7 @@
       const updated = payload.board.updated_at || payload.board.summary?.updated_at;
       const date = updated ? new Date(updated) : null;
       status.textContent = `Saved snapshot${date && !Number.isNaN(date.valueOf()) ? ` · ${date.toLocaleString()}` : ""}. Displays the bids, assumptions, and evidence saved with this lot.`;
-      renderSnapshot(content, lot, payload.board, csrfToken);
+      renderSnapshot(content, lot, payload.board, csrfToken, oliver);
     } catch (error) {
       if (error.name === "AbortError") return;
       status.textContent = error.message || "The saved Bid Board could not be loaded."; status.classList.add("is-error");
@@ -355,5 +422,5 @@
       if (input?.dataset.bidBoardEmailLotId === String(lotId)) input.checked = pending.get(String(lotId)) ?? Boolean(savedBoard?.include_in_email);
     }
   });
-  window.SavedBidBoard = {mountSummary, open, isBusy, beginSave, endSave, registerSaveButton};
+  window.SavedBidBoard = {mountSummary, open, isBusy, beginSave, endSave, registerSaveButton, setReportScope};
 })();

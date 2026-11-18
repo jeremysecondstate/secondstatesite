@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ lot.title|default:"Lot" }} · Resale report · SecondState{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'secondstateapp/resale_report.css' %}">{% endblock %}
+{% block main_class %}resale-shell{% endblock %}
+{% block content %}
+<article class="placement" aria-labelledby="work-title">
+  <nav class="placement-breadcrumb" aria-label="Research navigation">
+    <a href="{{ gallery_url }}">← Gallery Dossier</a>
+    <a href="{% url 'auction_research_queue' %}">LiveArt Queue</a>
+  </nav>
+  <header class="placement-heading">
+    <div><p class="placement-label">Archive research / Resale report</p>
+    <h1 id="work-title">{{ lot.title|default:"Untitled listing" }}</h1>
+    <p>{{ lot.artist }}{% if lot.medium %} · {{ lot.medium }}{% endif %}{% if lot.lot_number %} · Lot {{ lot.lot_number }}{% endif %}</p></div>
+    {% if report.version %}<a class="placement-button" href="#edit-report">Edit research</a>{% endif %}
+  </header>
+  {% if report.version %}
+    <p class="placement-summary">{% if report.status == "limited" %}<b>Limited evidence.</b> {% endif %}{{ report.summary|linebreaksbr }}</p>
+    {% if report.venues %}<div class="placement-grid">
+      <aside><h2 class="placement-label">Resale destinations</h2>
+        <nav class="venue-index" aria-label="Select a resale house">
+          {% for venue in report.venues %}<a href="#venue-{{ forloop.counter }}"><span>{{ venue.house }}</span><strong>{{ venue.display_range }}</strong></a>{% endfor %}
+        </nav>
+        <p class="placement-aside-note">Estimated USD hammer before seller’s commission and expenses.</p>
+      </aside>
+      <div class="venue-pages">
+      {% for venue in report.venues %}
+        <section class="venue-page" id="venue-{{ forloop.counter }}" aria-label="{{ venue.house }}">
+          <p class="placement-label">{{ venue.house }} / {{ venue.department }}</p>
+          <h2>{{ venue.display_range }}</h2>
+          <p class="placement-aside-note">Estimated resale hammer · {{ report.resale_unit }}</p>
+          <div><h3 class="placement-label">Why this house</h3><p>{{ venue.fit|linebreaksbr }}</p></div>
+          <div><h3 class="placement-label">How to read the range</h3><p>{{ venue.basis|linebreaksbr }}</p></div>
+          <div><h3 class="placement-label">Supporting records</h3>
+            {% for source in venue.sources %}<p class="venue-source"><a href="{{ source.url }}" target="_blank" rel="noopener noreferrer">{{ source.label }} ↗</a><br>{{ source.note|linebreaksbr }}</p>{% endfor %}
+          </div>
+          {% if venue.links %}<nav class="venue-proposals" aria-label="{{ venue.house }} proposals">{% for link in venue.links %}
+            <a class="placement-button" href="{{ link.url }}">Open {{ venue.house }} proposal · {{ link.season }} →</a>{% endfor %}
+          </nav>{% endif %}
+        </section>
+      {% endfor %}
+      </div>
+    </div>{% endif %}
+  {% endif %}
+  {% if other_proposals %}<nav class="venue-proposals" aria-label="Other saved proposal entries">
+    {% for link in other_proposals %}<a class="placement-button" href="{{ link.url }}">Open {{ link.house }} proposal · {{ link.season }} →</a>{% endfor %}
+  </nav>{% endif %}
+  <details id="edit-report" class="placement-editor" {% if not report.version %}open{% endif %}>
+    <summary>{% if report.version %}Edit resale research and proposal entries{% else %}Add resale research{% endif %}</summary>
+    <form id="placement-form" data-artist="{{ lot.artist }}" data-title="{{ lot.title }}" data-medium="{{ lot.medium }}" data-image="{{ lot.image_url }}">
+      {% csrf_token %}
+      <div class="placement-fields">
+        <label>Research status<select name="status"><option value="ready" {% if report.status == "ready" %}selected{% endif %}>Ready · 3–5 houses</option><option value="limited" {% if report.status == "limited" %}selected{% endif %}>Limited evidence</option></select></label>
+        <label>Resale unit<input name="resale_unit" value="{{ report.resale_unit }}" required maxlength="200" placeholder="e.g. One signed impression"></label>
+        <label class="wide">Research conclusion<textarea name="summary" required rows="3" maxlength="8000">{{ report.summary }}</textarea></label>
+      </div>
+      <h2>Resale destinations</h2>
+      <div id="venue-editors"></div>
+      <button type="button" id="add-venue">Add auction house</button>
+      <h2>Proposal entries</h2>
+      <p>Choose the house, sale season and individual work for each recipient’s catalog.</p>
+      <div id="proposal-editors"></div>
+      <button type="button" id="add-proposal">Add proposal entry</button>
+      <div class="placement-save"><button type="submit">Save research and proposals</button><p id="save-result" role="status" aria-live="polite"></p></div>
+      <noscript>Enable JavaScript to edit the house and proposal entries.</noscript>
+    </form>
+  </details>
+</article>
+{{ report|json_script:"placement-data" }}
+{% endblock %}
+{% block extra_js %}<script src="{% static 'secondstateapp/resale_report.js' %}" defer></script>{% endblock %}

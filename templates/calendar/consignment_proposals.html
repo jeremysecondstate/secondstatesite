@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Proposal catalogs · SecondState{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'secondstateapp/consignment_proposals.css' %}">{% endblock %}
+{% block main_class %}proposal-shell{% endblock %}
+{% block content %}
+<section class="proposals" aria-labelledby="page-title">
+  <nav class="proposal-back" aria-label="Calendar navigation">
+    <a href="{% url 'auction_calendar' %}">← Auction Calendar</a>
+    {% if entry %}<a href="{% url 'auction_lot_resale_report' entry.lot_id %}">Resale report ↗</a>{% endif %}
+  </nav>
+  <header class="proposal-heading">
+    <div><span class="proposal-label">SecondState / Consignment</span><h1 id="page-title">Proposal catalogs</h1>
+      <p>{% if spring %}Winter preparation for spring sales{% else %}Summer preparation for fall sales{% endif %}</p>
+    </div>
+    <div class="proposal-selectors">
+      <form action="{% url 'calendar_consignment_proposals' %}" method="get">
+        <label for="proposal-season">Sale season</label>
+        <div><select id="proposal-season" name="season">
+          {% for value, label in seasons %}<option value="{{ value }}"{% if value == season %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select><button type="submit">View season</button></div>
+      </form>
+      {% if house %}<form action="{% url 'calendar_consignment_proposals' %}" method="get">
+        <input type="hidden" name="season" value="{{ season }}"><label for="proposal-house">Auction house</label>
+        <div><select id="proposal-house" name="house">
+          {% for value, label in houses %}<option value="{{ value }}"{% if value == house %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select><button type="submit">View house</button></div>
+      </form>{% endif %}
+    </div>
+  </header>
+  {% if entries %}
+    {% if export_error %}<p class="proposal-warning" role="alert">{{ export_error }}</p>{% endif %}
+    <div class="proposal-grid">
+      <aside class="proposal-roster">
+        <span class="proposal-label">{{ season_label }}</span><h2>{{ house_name }}</h2>
+        <h3 class="proposal-label">Selected works · {{ entries|length }}</h3>
+        <ol class="proposal-list">
+          {% for item in entries %}
+            <li><a href="{{ item.page_url }}"{% if item.pk == entry.pk %} aria-current="page"{% endif %}>
+              {% if item.photo_url %}<img src="{{ item.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% else %}<span></span>{% endif %}
+              <span><strong>{{ item.title }}</strong><small>{{ item.artist }}</small></span>
+            </a></li>
+          {% endfor %}
+        </ol>
+        <h3 class="proposal-label">Combined estimate · USD</h3><p class="proposal-total">{{ total|default:"Estimate pending" }}</p>
+        {% if pending %}<p class="proposal-note">Draft selection · {{ pending }} work{{ pending|pluralize }} pending acquisition.</p>{% else %}<p class="proposal-note">Acquisition confirmed for all selected works.</p>{% endif %}
+        {% if incomplete %}<div class="proposal-warning"><strong>Needed for PDF export</strong><ul>{% for reason in incomplete %}<li>{{ reason }}</li>{% endfor %}</ul><p>The research worker can save a photograph from any house directly with its proposal entry.</p></div>
+        {% else %}<a class="proposal-download" href="{{ pdf_url }}">Download {% if pending %}draft {% endif %}PDF ↓</a>{% endif %}
+      </aside>
+      <section class="proposal-stage" aria-label="Recipient preview">
+        <div class="proposal-page-controls"><span>Recipient preview · US Letter</span><nav aria-label="Browse works">
+          {% if previous %}<a href="{{ previous.page_url }}" aria-label="Previous work">←</a>{% endif %}
+          <span>Work {{ position }} of {{ entries|length }}</span>
+          {% if following %}<a href="{{ following.page_url }}" aria-label="Next work">→</a>{% endif %}
+        </nav></div>
+        <article class="proposal-sheet" aria-label="Proposal entry for {{ entry.artist }}">
+          <h2>{{ entry.artist }}</h2>
+          {% if entry.photo_url %}<img class="proposal-object" src="{{ entry.photo_url }}" alt="{{ entry.title }} by {{ entry.artist }}" referrerpolicy="no-referrer">{% endif %}
+          <p><b>{{ entry.title }}</b>{% if entry.year_text %}, {{ entry.year_text }}{% endif %}
+            {% if entry.medium %}<br>{{ entry.medium }}{% endif %}
+            {% if entry.dimensions %}<br>{{ entry.dimensions }}{% endif %}
+            {% if entry.edition %}<br>{{ entry.edition }}{% endif %}</p>
+          {% if entry.object_notes %}<p>{{ entry.object_notes|linebreaksbr }}</p>{% endif %}
+          {% if entry.condition %}<p>Condition: {{ entry.condition|linebreaksbr }}</p>{% endif %}
+          {% if entry.provenance %}<p>Provenance: {{ entry.provenance|linebreaksbr }}</p>{% endif %}
+          {% if entry.literature %}<p>Literature: {{ entry.literature|linebreaksbr }}</p>{% endif %}
+          {% if entry.description %}<p>{{ entry.description|linebreaksbr }}</p>{% endif %}
+          <p>Estimate: {{ entry.estimate|default:"Pending" }}</p>
+          {% if not following %}<p class="proposal-sheet-total">Total: {{ total|default:"Pending" }}</p>{% endif %}
+        </article>
+      </section>
+    </div>
+  {% else %}
+    <div class="proposal-empty"><h2>No proposals for {{ season_label }}</h2>
+      <p>Works appear here when LiveArt research saves a house-specific proposal for this season.</p>
+      <a href="{% url 'auction_research_queue' %}">Open research queue →</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

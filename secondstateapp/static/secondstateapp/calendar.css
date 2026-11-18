@@ -2536,7 +2536,15 @@ body:has(.lot-browser[open]) {
   color: #101311;
 }
 
-.calendar-view-switch button:focus-visible,
+.calendar-tray-link {
+  align-self: center;
+  padding: 9px 12px;
+  color: var(--calendar-gold);
+  font-size: 12px;
+  text-underline-offset: 3px;
+}
+
+.calendar-view-switch :is(button, a):focus-visible,
 .day-gallery-catalog :is(button, a, select, summary):focus-visible {
   outline: 2px solid var(--calendar-gold);
   outline-offset: 3px;
@@ -3189,6 +3197,39 @@ body:has(.lot-browser[open]) {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 30px 22px;
+}
+
+.bid-research-proposals {
+  display: none;
+  color: var(--calendar-gold);
+  font-size: 13px;
+  text-underline-offset: 3px;
+}
+
+.day-gallery-catalog:has([data-gallery-filter="qualifying"][aria-pressed="true"]) .bid-research-proposals {
+  display: inline-block;
+}
+
+.bid-research-dossier {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 4px 7px;
+  background: #111713;
+  color: #f2efe7;
+  font-size: 10px;
+}
+
+.day-gallery-work:has(.bid-research-dossier) .day-gallery-visual {
+  aspect-ratio: 1.7;
+  background: #30382f;
+  border-color: #404a3f;
+}
+
+@media (min-width: 1000px) {
+  .day-gallery-grid:has(.bid-research-dossier) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .day-gallery-work {

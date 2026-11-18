@@ -35,6 +35,7 @@ python-docx
 pytweening
 pytz
 requests
+reportlab>=4.2,<5
 six
 soupsieve
 sqlparse
