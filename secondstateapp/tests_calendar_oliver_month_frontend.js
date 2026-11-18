@@ -159,7 +159,7 @@ function page(data, view = "calendar") {
     appendCurrencyPrice() {}, appendLotControls() {}, appendArtpriceEditor() {}, appendArtpriceAnalysis() {},
   });
   for (const name of ["calendarLayout", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle", "oliverCalendarViewToggle",
-    "researchViewToggle", "auctionCalendar", "calendarPageShell", "galleryCatalog", "researchWorkspace", "researchTitle",
+    "auctionCalendar", "calendarPageShell", "galleryCatalog", "researchWorkspace", "researchTitle",
     "researchBack", "researchPrevious", "researchSearch", "title", "list", "salesSection", "salesCount", "salesList",
     "lotBrowserLaunch", "researchLaunch"]) context[name] = new Element();
   const functions = ["galleryOrganization", "gallerySortOrders", "restoreGalleryOrganization", "writeGalleryOrganization", "isGalleryView", "inOliverScope", "dayLots", "renderCalendarScope", "renderDaySales", "renderSidebarLots",

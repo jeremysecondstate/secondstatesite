@@ -43,7 +43,6 @@
     <span>View day as</span>
     <button id="calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="true">Jeremy’s Calendar</button>
     <button id="catalog-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Jeremy’s Catalog</button>
-    <button id="research-view-toggle" type="button" aria-controls="day-research-workspace" aria-pressed="false">Archive Research</button>
     <button id="oliver-calendar-view-toggle" type="button" aria-controls="calendar-layout" aria-pressed="false">Oliver’s Calendar</button>
     <button id="oliver-view-toggle" type="button" aria-controls="day-gallery-catalog" aria-pressed="false">Oliver’s Catalog</button>
     <a class="calendar-tray-link" href="{% url 'auction_email_tray' %}">Email Tray · <span data-email-tray-count>{{ email_selected_count }}</span></a>
@@ -521,7 +520,6 @@
   const catalogViewToggle = document.getElementById("catalog-view-toggle");
   const oliverViewToggle = document.getElementById("oliver-view-toggle");
   const oliverCalendarViewToggle = document.getElementById("oliver-calendar-view-toggle");
-  const researchViewToggle = document.getElementById("research-view-toggle");
   const galleryCatalog = document.getElementById("day-gallery-catalog");
   const researchWorkspace = document.getElementById("day-research-workspace");
   const researchTitle = document.getElementById("research-workspace-title");
@@ -4687,7 +4685,6 @@
     catalogViewToggle.setAttribute("aria-pressed", String(activeView === "catalog"));
     oliverViewToggle.setAttribute("aria-pressed", String(activeView === "oliver"));
     oliverCalendarViewToggle.setAttribute("aria-pressed", String(activeView === "oliver-calendar"));
-    researchViewToggle.setAttribute("aria-pressed", String(activeView === "research"));
     if (isGalleryView()) renderGalleryCatalog();
     else if (activeView === "research") { renderResearchDays(); renderResearchWorkspace(); }
     else if (selectedDay) {
@@ -4708,7 +4705,6 @@
   catalogViewToggle.addEventListener("click", () => setCalendarView("catalog"));
   oliverViewToggle.addEventListener("click", () => setCalendarView("oliver"));
   oliverCalendarViewToggle.addEventListener("click", () => setCalendarView("oliver-calendar"));
-  researchViewToggle.addEventListener("click", () => openResearchWorkspace(researchIndex));
   researchBack.addEventListener("click", () => {
     if (window.history.state?.researchEntry) window.history.back();
     else {

@@ -702,9 +702,12 @@ class AuctionCalendarViewTests(TestCase):
         response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
 
         self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="research-view-toggle"')
         for element_id in (
             "calendar-view-toggle",
             "catalog-view-toggle",
+            "oliver-calendar-view-toggle",
+            "oliver-view-toggle",
             "calendar-layout",
             "day-gallery-catalog",
             "day-gallery-grid",
@@ -726,7 +729,7 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual(response.context["month_title"], "July 2026")
         self.assertEqual(response.context["calendar_data"]["2026-07-25"][0]["id"], lot.pk)
         for element_id in (
-            "research-view-toggle", "day-research-workspace", "research-lot-card",
+            "day-research-workspace", "research-lot-card",
             "research-lot-search", "research-previous", "research-next",
         ):
             with self.subTest(element_id=element_id):

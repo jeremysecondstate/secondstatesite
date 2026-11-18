@@ -473,8 +473,7 @@ test("Oliver and scoped research URLs retain their view across month links and c
 test("browser Back from Oliver research restores the artist selection and Oliver month links after popstate", () => {
   const context = page({[dayA]: [lot(1, "Other", false), lot(2, "Phillips", true)]});
   for (const name of ["calendarLayout", "researchWorkspace", "researchTitle", "auctionCalendar",
-    "calendarPageShell", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle",
-    "researchViewToggle"]) context[name] = new Element();
+    "calendarPageShell", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle"]) context[name] = new Element();
   context.dayButtons = [];
   context.researchLookButtons = [];
   context.renderResearchDays = () => {};
@@ -528,7 +527,7 @@ test("switching Oliver, research and regular Calendar reuses the same gallery an
   const context = page({[dayA]: [lot(1, "Other", false), lot(2, "Phillips", true)]}, "catalog");
   for (const name of ["calendarLayout", "researchWorkspace", "researchTitle", "researchDaySelect",
     "auctionCalendar", "calendarPageShell", "calendarViewToggle", "catalogViewToggle",
-    "oliverViewToggle", "researchViewToggle"]) context[name] = new Element();
+    "oliverViewToggle"]) context[name] = new Element();
   context.sidebarRenderedDay = "";
   context.renderGalleryCatalog = () => { context.galleryLotIds = context.ids("dayLots()"); };
   context.renderResearchWorkspace = () => { context.researchLotIds = context.ids("dayLots()"); };
@@ -567,7 +566,7 @@ test("an empty Oliver day preserves the regular Calendar's Research and Browse l
   });
   for (const name of ["title", "list", "lotBrowserLaunch", "researchLaunch", "calendarLayout",
     "researchWorkspace", "auctionCalendar", "calendarPageShell", "calendarViewToggle",
-    "catalogViewToggle", "oliverViewToggle", "researchViewToggle"]) context[name] = new Element();
+    "catalogViewToggle", "oliverViewToggle"]) context[name] = new Element();
   context.dayButtons = [];
   context.researchDaySelection = new Map();
   context.sidebarRenderedDay = "";
@@ -846,7 +845,7 @@ for (const view of ["catalog", "oliver"]) {
       lot(3, "Phillips", true, {saved_bid_board: null}),
     ]}, view);
     for (const name of ["calendarLayout", "researchWorkspace", "researchTitle", "auctionCalendar",
-      "calendarPageShell", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle", "researchViewToggle"]) context[name] = new Element();
+      "calendarPageShell", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle"]) context[name] = new Element();
     context.dayButtons = [];
     context.researchLookButtons = [];
     context.renderResearchDays = () => {};
@@ -899,7 +898,7 @@ for (const view of ["catalog", "oliver"]) {
 function houseNavigationPage(lots, view) {
   const context = page({[dayA]: lots}, view);
   for (const name of ["calendarLayout", "researchWorkspace", "researchTitle", "auctionCalendar",
-    "calendarPageShell", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle", "researchViewToggle",
+    "calendarPageShell", "calendarViewToggle", "catalogViewToggle", "oliverViewToggle",
     "galleryDate", "gallerySummary", "galleryPrevious", "galleryNext", "galleryBrowserLaunch"]) context[name] = new Element();
   context.document.getElementById("day-gallery-title").firstChild = new Element();
   context.formatCalendarDay = day => day;
