@@ -20,6 +20,11 @@ class Element {
   }
   append(...children) { children.forEach(child => {child.parentElement = this; this.children.push(child);}); }
   appendChild(child) { this.append(child); return child; }
+  remove() {
+    if (!this.parentElement) return;
+    this.parentElement.children = this.parentElement.children.filter(child => child !== this);
+    this.parentElement = null;
+  }
   replaceChildren(...children) { this.children.forEach(child => {child.parentElement = null;}); this.children = []; this.append(...children); }
   contains(node) { return this === node || this.children.some(child => child.contains(node)); }
   matches(selector) {
@@ -96,6 +101,55 @@ function page(source, retainedResearchLot = null) {
 }
 const summaries = root => root.querySelectorAll(".sb-catalog-summary");
 const selections = root => root.querySelectorAll(".research-queue-selection");
+
+test("sidebar pages append all lots in order while keeping the existing editors", () => {
+  const source = lot(1), context = page(source);
+  context.lots = Array.from({length: 50}, (_, i) => lot(i + 1));
+  context.run("renderSidebarLots(lots)");
+  const rows = () => context.list.querySelectorAll("article");
+  const first = rows()[0];
+  first.draft = "unsaved";
+  assert.equal(rows().length, 24);
+  const more = context.list.children.at(-1);
+  assert.match(more.textContent, /24 of 50/);
+  more.events.click();
+  assert.equal(rows().length, 48);
+  assert.equal(rows()[0], first);
+  assert.equal(first.draft, "unsaved");
+  assert.equal(currentDocument.activeElement, rows()[24]);
+  assert.match(more.textContent, /Show 2 more/);
+  more.events.click();
+  assert.equal(rows().length, 50);
+  assert.equal(context.list.contains(more), false);
+  assert.deepEqual(rows().map(row => row.querySelector(".lot-title").textContent), context.lots.map(item => item.title));
+});
+
+test("closed sidebar research mounts once on opening, while quick research opens immediately", () => {
+  const source = lot(4), context = page(source);
+  Object.assign(context, {
+    liveartAnalysisCache: new Map(), artpriceAnalysisCache: new Map([["4", {}]]),
+    artpriceAnalysisInstances: new Map(), liveartAnalysisInstances: new Map(),
+    registerLotInstance() {}, builds: 0, loads: 0,
+    buildArtpriceAnalysisPanel() { context.builds++; return () => context.loads++; },
+  });
+  context.run(block("  const appendArtpriceAnalysis =", "  const buildArtpriceAnalysisPanel ="));
+  context.run("appendArtpriceAnalysis(list, source)");
+  const details = context.list.children[0];
+  assert.equal(context.builds, 0);
+  assert.equal(details.querySelector(".artprice-analysis-badge").textContent, "Saved");
+  details.open = true;
+  details.events.toggle();
+  details.open = false;
+  details.events.toggle();
+  details.open = true;
+  details.events.toggle();
+  assert.equal(context.builds, 1);
+  assert.equal(context.loads, 2);
+  context.run("appendArtpriceAnalysis(list, source, {quick: true})");
+  assert.equal(context.list.children[1].open, true);
+  assert.equal(context.builds, 2);
+  assert.equal(context.loads, 3);
+});
 
 function useResearchNavigation(context) {
   Object.assign(context, {URL, URLSearchParams, researchScope: "", researchLook: "dossier",

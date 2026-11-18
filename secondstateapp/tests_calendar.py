@@ -627,6 +627,33 @@ class AuctionCalendarViewTests(TestCase):
         response = self.client.get(reverse("auction_calendar"))
         self.assertEqual(response.status_code, 302)
 
+    def test_day_detail_requires_staff_and_valid_local_date(self):
+        url = reverse("auction_calendar_day_lots")
+        self.assertEqual(self.client.get(url, {"day": "2026-07-25"}).status_code, 302)
+        self.client.force_login(self.staff)
+        for invalid in ("", "2026-7-25", "2026-02-29", "1999-12-31"):
+            self.assertEqual(self.client.get(url, {"day": invalid}).status_code, 400)
+        self.assertEqual(self.client.post(url, {"day": "2026-07-25"}).status_code, 405)
+        self.assertEqual(self.client.get(url, {"day": "2026-07-25"}).json(), {
+            "day": "2026-07-25", "lots": [], "retained_research_lot": None,
+        })
+
+    def test_month_embeds_only_selected_day_and_drilldown_preserves_lot_data(self):
+        first = watch_lot()
+        later = watch_lot(source_lot_id="later", title="Exclusive off-day title",
+                          event_at=datetime(2026, 7, 26, 0, 0, tzinfo=CALENDAR_ZONE))
+        self.client.force_login(self.staff)
+        url = reverse("auction_calendar")
+        response = self.client.get(url, {"day": "2026-07-25", "view": "catalog"})
+        self.assertEqual(set(response.context["calendar_data"]), {"2026-07-25"})
+        self.assertEqual(response.context["calendar_data"]["2026-07-25"][0]["id"], first.pk)
+        self.assertNotContains(response, "Exclusive off-day title")
+        self.assertEqual(response.context["calendar_day_counts"]["2026-07-26"], {"lots": 1, "oliver_lots": 1})
+        later_data = self.client.get(reverse("auction_calendar_day_lots"), {"day": "2026-07-26"}).json()
+        self.assertEqual([row["id"] for row in later_data["lots"]], [later.pk])
+        later_page = self.client.get(url, {"day": "2026-07-26", "view": "catalog"})
+        self.assertEqual(later_data["lots"], later_page.context["calendar_data"]["2026-07-26"])
+
     def test_calendar_groups_lots_and_exposes_details_for_staff(self):
         artprice_url = (
             "https://www.artprice.com/artist/15266/rockwell-kent/lots/pasts"
@@ -760,7 +787,9 @@ class AuctionCalendarViewTests(TestCase):
         self.assertEqual(selected_day[second_house_lot.pk]["auction_house"], "Chiswick Auctions")
         self.assertIn("/artist/13619/david-hockney/", selected_day[second_house_lot.pk]["artist_artprice_url"])
         self.assertEqual(selected_day[second_house_lot.pk]["images"], [])
-        self.assertEqual([lot["id"] for lot in rendered_days["2026-07-26"]], [next_day_lot.pk])
+        self.assertNotIn("2026-07-26", rendered_days)
+        next_day = self.client.get(reverse("auction_calendar_day_lots"), {"day": "2026-07-26"}).json()
+        self.assertEqual([lot["id"] for lot in next_day["lots"]], [next_day_lot.pk])
 
     def test_selected_day_lists_every_distinct_sale_before_lot_browser(self):
         sale_titles = [
@@ -994,7 +1023,10 @@ class AuctionCalendarViewTests(TestCase):
         ):
             response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
 
-        self.assertEqual(len(response.context["calendar_data"]["2026-08-03"]), 1003)
+        self.assertNotIn("2026-08-03", response.context["calendar_data"])
+        self.assertEqual(response.context["calendar_day_counts"]["2026-08-03"]["lots"], 1003)
+        detail = self.client.get(reverse("auction_calendar_day_lots"), {"day": "2026-08-03"})
+        self.assertEqual(len(detail.json()["lots"]), 1003)
         self.assertEqual(
             response.context["calendar_sales_data"]["2026-08-03"][0]["lot_count"],
             1002,

@@ -436,12 +436,12 @@ class SavedBidBoardCatalogTests(TestCase):
         self.assertIsNone(next(item for item in data if item["id"] == no_board.pk)["saved_bid_board"])
 
     def test_calendar_loads_saved_boards_without_one_query_per_month_lot(self):
-        self.assert_calendar_board_queries(month=10, expected_board_queries=2)
+        self.assert_calendar_board_queries(month=10)
 
     def test_calendar_loads_saved_boards_without_one_query_per_upcoming_day_lot(self):
-        self.assert_calendar_board_queries(month=11, expected_board_queries=3)
+        self.assert_calendar_board_queries(month=11)
 
-    def assert_calendar_board_queries(self, *, month, expected_board_queries):
+    def assert_calendar_board_queries(self, *, month):
         self.lot.event_at = datetime(2026, month, 15, 15, tzinfo=datetime_timezone.utc)
         self.lot.save(update_fields=["event_at"])
         self.save_board()
@@ -461,9 +461,8 @@ class SavedBidBoardCatalogTests(TestCase):
             else:
                 self.assertEqual(item["saved_bid_board"]["qualifying_bid"], "1800.00")
         board_queries = [query["sql"] for query in queries if "secondstateapp_auctionbidboardanalysis" in query["sql"]]
-        # Visible listings and retained source listings each use a bulk join;
-        # an upcoming day outside the month needs a second visible-lot query.
-        self.assertEqual(len(board_queries), expected_board_queries, board_queries)
+        # Only the requested day's visible and retained listings join saved boards.
+        self.assertEqual(len(board_queries), 2, board_queries)
         self.assertTrue(all("JOIN" in sql for sql in board_queries), board_queries)
 
         retained_records = []

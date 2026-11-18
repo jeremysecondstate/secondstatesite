@@ -95,6 +95,9 @@ function page(data, view = "oliver") {
     querySelectorAll: () => [],
   };
   const context = vm.createContext({
+    dayCounts: Object.fromEntries(Object.entries(data).map(([day, lots]) =>
+      [day, {lots: lots.length, oliver_lots: lots.filter(l => l.oliver_house === true).length}])),
+    withCalendarDay(_day, ready) { ready(); },
     data, document, oliverHouseNames, retainedResearchLot: null, refreshLotControls() {}, selectedDay: Object.keys(data)[0], activeView: view, researchScope: "",
     researchLook: "dossier", researchIndex: 0, galleryFilter: "all", galleryVisibleCount: 24,
     galleryHideAttributed: false, galleryAttributionToggle: new Element(), galleryAttributionStatus: new Element(),
@@ -330,6 +333,82 @@ test("Oliver previous and next days skip dates containing only unrelated houses"
   context.activeView = "catalog";
   assert.equal(context.run("previousGalleryDay()"), dayB);
   assert.equal(context.run("nextGalleryDay()"), dayD);
+});
+
+function dayLoaderPage() {
+  const p = page({[dayA]: [lot(1, "Phillips", true)]});
+  p.dayCounts[dayB] = {lots: 1, oliver_lots: 0};
+  p.dayCounts[dayC] = {lots: 1, oliver_lots: 1};
+  const requests = [];
+  Object.assign(p, {
+    AbortController, setTimeout, clearTimeout,
+    currencyLotsById: new Map(), savedBoardMembership: new Map(), visits: [],
+    fetch: (url, options) => new Promise((resolve) => requests.push({url, options, resolve})),
+    showDay: (day) => p.visits.push(day),
+  });
+  vm.runInContext(between("  const dayStatus =", "  const setCalendarView ="), p);
+  vm.runInContext(between("  const galleryDays =", "  const updateGalleryEmailButton ="), p);
+  return {p, requests, select: day => p.run(`selectCalendarDay("${day}")`)};
+}
+
+test("unloaded dates remain navigable and late day responses cannot replace a newer selection", async () => {
+  const {p, requests, select} = dayLoaderPage();
+  assert.equal(p.run("nextGalleryDay()"), dayC);
+  p.activeView = "catalog";
+  assert.equal(p.run("nextGalleryDay()"), dayB);
+  const older = select(dayB);
+  const newer = select(dayC);
+  assert.equal(requests[0].options.signal.aborted, true);
+  const source = lot(12, "Phillips", true, {
+    saved_bid_board: {qualifying_bid: "12"},
+    retained_saved_work: [{id: 15, saved_bid_board: {}}],
+  });
+  requests[1].resolve({ok: true, json: async () => ({day: dayC, lots: [source]})});
+  await newer;
+  requests[0].resolve({ok: true, json: async () => ({day: dayB, lots: [lot(2, "Other", false)]})});
+  await older;
+  assert.deepEqual(p.visits, [dayC]);
+  assert.equal(p.currencyLotsById.get("12"), source);
+  assert.equal(p.savedBoardMembership.get("12"), 2);
+  assert.equal(p.savedBoardMembership.get("15"), 1);
+  await select(dayC);
+  await select(dayD);
+  assert.equal(requests.length, 2, "cached dates and empty grid days require no requests");
+  assert.deepEqual(p.visits, [dayC, dayC, dayD]);
+});
+
+test("a failed or mismatched day can be retried without losing existing lot edits", async () => {
+  const {p, requests, select} = dayLoaderPage();
+  const savedLot = p.data[dayA][0];
+  savedLot.email_tray_selected = true;
+  const failed = select(dayB);
+  requests[0].resolve({ok: true, json: async () => ({day: dayC, lots: []})});
+  await failed;
+  assert.equal(p.run("dayRetry.hidden"), false);
+  assert.deepEqual(p.visits, []);
+  const retry = p.run("dayRetry.onclick()");
+  requests[1].resolve({ok: true, json: async () => ({day: dayB, lots: [lot(2, "Other", false)]})});
+  await retry;
+  assert.equal(p.run("dayStatus.hidden"), true);
+  assert.deepEqual(p.visits, [dayB]);
+  assert.equal(p.data[dayA][0], savedLot);
+  assert.equal(savedLot.email_tray_selected, true);
+});
+
+test("history can load a retained research owner without replacing its cached canonical listing", async () => {
+  const {p, requests} = dayLoaderPage();
+  const canonical = p.data[dayA][0];
+  const owner = {id: 99, retained_listing: {canonical_id: canonical.id}};
+  const loadOwner = () => p.run(`withCalendarDay("${dayA}", () => visits.push(retainedResearchLot.id), 99)`);
+  const load = loadOwner();
+  const query = new URLSearchParams(requests[0].url.split("?")[1]);
+  assert.deepEqual(Object.fromEntries(query), {day: dayA, view: "research", lot: "99"});
+  requests[0].resolve({ok: true, json: async () => ({day: dayA, lots: [{id: 1}], retained_research_lot: owner})});
+  await load;
+  await loadOwner();
+  assert.equal(requests.length, 1);
+  assert.equal(p.data[dayA][0], canonical);
+  assert.deepEqual(p.visits, [99, 99]);
 });
 
 test("Oliver artwork links keep the exact lot ID and existing research stage with scope", () => {

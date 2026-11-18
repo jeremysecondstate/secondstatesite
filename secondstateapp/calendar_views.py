@@ -11,6 +11,7 @@ from collections import defaultdict
 from copy import copy
 from datetime import date, datetime, time, timedelta, timezone as datetime_timezone
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import unquote, urlencode, urlparse
 from zoneinfo import ZoneInfo
@@ -89,6 +90,8 @@ LIVEART_ARTIST_YEAR_MARKER = re.compile(
 )
 # Heritage serves lot photographs separately from its bookmarked auction pages.
 CALENDAR_IMAGE_DOMAINS = (*DEFAULT_ALLOWED_DOMAINS, "heritagestatic.com", "goauctiondoyle.blob.core.windows.net")
+# The grid can paint without waiting for hundreds of detailed sidebar records.
+CALENDAR_INLINE_SIDEBAR_LIMIT = 100
 
 
 def _calendar_zone() -> ZoneInfo:
@@ -217,7 +220,7 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
             display_time.event_at = sale["starts_at"]
         auction_house = next((lot.auction_house for lot in sale_lots if lot.auction_house), first.source or "Auction")
         sale_title = next((lot.sale_title for lot in sale_lots if lot.sale_title), "")
-        artists = sorted({artist_display_name(_artist_label(lot)) for lot in sale_lots}, key=artist_sort_key)
+        artists = sorted({artist_display_name(name) for name in {_artist_label(lot) for lot in sale_lots}}, key=artist_sort_key)
         groups.append(
             {
                 "auction_house": clean_display_text(auction_house),
@@ -415,19 +418,51 @@ def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, resear
     return retained
 
 
+def _calendar_requested_date(day_value):
+    try:
+        if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", day_value):
+            selected_day = date.fromisoformat(day_value)
+            if 2000 <= selected_day.year <= 2100:
+                return selected_day
+    except ValueError:
+        pass
+    return None
+
+
+def _day_lot_data(request, selected_day, zone, selected_lot_ids, research_queue_state):
+    day_start, day_end = _utc_bounds(selected_day, selected_day + timedelta(days=1), zone)
+    lots = AuctionWatchLot.objects.filter(
+        superseded_by__isnull=True, event_at__gte=day_start, event_at__lt=day_end,
+    ).select_related("watchlist_artist", "bid_board_analysis", "resale_research").defer(
+        "bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids",
+    ).order_by("event_at", "auction_house", "artist", "id")
+    day = selected_day.isoformat()
+    rows = [_lot_json(lot, zone, selected_lot_ids, research_queue_state) for lot in lots]
+    calendar_data = {day: rows}
+    _attach_superseded_attribution(calendar_data)
+    retained = _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, research_queue_state, request)
+    return {"day": day, "lots": rows, "retained_research_lot": retained}
+
+
+@never_cache
+@staff_member_required
+@require_http_methods(["GET"])
+def auction_calendar_day_lots(request):
+    selected_day = _calendar_requested_date(request.GET.get("day", ""))
+    if selected_day is None:
+        return JsonResponse({"error": "Choose a valid calendar day (YYYY-MM-DD)."}, status=400)
+    selected_lot_ids = set(AuctionEmailBatchItem.objects.filter(batch__is_active=True).values_list("lot_id", flat=True))
+    return JsonResponse(_day_lot_data(request, selected_day, _calendar_zone(), selected_lot_ids, selected_queue_state()))
+
+
 @never_cache
 @staff_member_required
 @require_http_methods(["GET"])
 def auction_calendar_usd_prices(request):
     """Normalize one watched day after the Calendar's initial render."""
     day_value = request.GET.get("day", "")
-    try:
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day_value):
-            raise ValueError
-        selected_day = date.fromisoformat(day_value)
-        if not 2000 <= selected_day.year <= 2100:
-            raise ValueError
-    except ValueError:
+    selected_day = _calendar_requested_date(day_value)
+    if selected_day is None:
         return JsonResponse({"error": "Choose a valid calendar day (YYYY-MM-DD)."}, status=400)
 
     day_start, day_end = _utc_bounds(selected_day, selected_day + timedelta(days=1), _calendar_zone())
@@ -465,34 +500,45 @@ def auction_calendar(request):
     month_weeks = month_calendar.Calendar(firstweekday=0).monthdatescalendar(selected_month.year, selected_month.month)
     range_start, range_end = _utc_bounds(month_weeks[0][0], month_weeks[-1][-1] + timedelta(days=1), zone)
 
-    active_email_batch = (
-        AuctionEmailBatch.objects.filter(is_active=True)
-        .prefetch_related("items")
-        .first()
-    )
-    selected_lot_ids = {
-        item.lot_id for item in active_email_batch.items.all()
-    } if active_email_batch else set()
+    active_email_batch = AuctionEmailBatch.objects.filter(is_active=True).first()
+    selected_lot_ids = set(active_email_batch.items.values_list("lot_id", flat=True)) if active_email_batch else set()
     research_queue_state = selected_queue_state()
 
-    month_lots = list(
-        AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=range_start, event_at__lt=range_end)
-        .select_related("watchlist_artist", "bid_board_analysis", "resale_research")
-        .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
-        .order_by("event_at", "auction_house", "artist", "id")
+    # Month navigation needs sale/artist grouping and verified-sale identifiers.
+    # Fetch prices, saved research and action URLs only for the day being read.
+    summary_lots = AuctionWatchLot.objects.filter(superseded_by__isnull=True).only(
+        "id", "event_at", "is_all_day", "active", "source", "sale_url", "sale_title",
+        "auction_house", "artist", "artist_watchlist_name", "lot_url", "image_url",
+    ).order_by("event_at", "auction_house", "artist", "id")
+    month_lots = summary_lots.filter(
+        event_at__gte=range_start, event_at__lt=range_end,
     )
     lots_by_day: dict[date, list[AuctionWatchLot]] = defaultdict(list)
     for lot in month_lots:
         lots_by_day[timezone.localtime(lot.event_at, zone).date()].append(lot)
+
+    calendar_sales_data = {}
+    oliver_calendar_sales_data = {}
+    calendar_day_counts = {}
+    is_scoped_house = lru_cache(maxsize=None)(is_oliver_house)
+
+    def summarize_day(day, day_lots):
+        groups = _group_lots(day_lots, zone)
+        oliver_lots = [lot for lot in day_lots if is_scoped_house(lot.auction_house)]
+        scoped_groups = groups if len(oliver_lots) == len(day_lots) else _group_lots(oliver_lots, zone)
+        if day_lots:
+            iso = day.isoformat()
+            calendar_day_counts[iso] = {"lots": len(day_lots), "oliver_lots": len(oliver_lots)}
+            calendar_sales_data[iso] = [_sale_json(group) for group in groups]
+            oliver_calendar_sales_data[iso] = [_sale_json(group) for group in scoped_groups]
+        return groups, scoped_groups
 
     weeks = []
     for week in month_weeks:
         week_items = []
         for day in week:
             day_lots = lots_by_day.get(day, [])
-            event_groups = _group_lots(day_lots, zone)
-            oliver_day_lots = [lot for lot in day_lots if is_oliver_house(lot.auction_house)]
-            oliver_event_groups = _group_lots(oliver_day_lots, zone)
+            event_groups, oliver_event_groups = summarize_day(day, day_lots)
             week_items.append(
                 {
                     "date": day,
@@ -507,47 +553,23 @@ def auction_calendar(request):
                     "oliver_event_groups": oliver_event_groups[:3],
                     "oliver_more_count": max(0, len(oliver_event_groups) - 3),
                     "oliver_sale_count": len(oliver_event_groups),
-                    "oliver_lot_count": len(oliver_day_lots),
+                    "oliver_lot_count": sum(group["lot_count"] for group in oliver_event_groups),
                 }
             )
         weeks.append(week_items)
 
-    calendar_data = {
-        day.isoformat(): [_lot_json(lot, zone, selected_lot_ids, research_queue_state) for lot in lots]
-        for day, lots in sorted(lots_by_day.items())
-    }
-    calendar_sales_data = {
-        day.isoformat(): [_sale_json(group) for group in _group_lots(lots, zone)]
-        for day, lots in sorted(lots_by_day.items())
-    }
-    oliver_calendar_sales_data = {
-        day.isoformat(): [
-            _sale_json(group)
-            for group in _group_lots([lot for lot in lots if is_oliver_house(lot.auction_house)], zone)
-        ]
-        for day, lots in sorted(lots_by_day.items())
-    }
-
     today_start, upcoming_end = _utc_bounds(now_local.date(), now_local.date() + timedelta(days=181), zone)
-    upcoming_query = AuctionWatchLot.objects.filter(
-        superseded_by__isnull=True, active=True, event_at__gte=today_start, event_at__lt=upcoming_end,
+    upcoming_query = summary_lots.filter(
+        active=True, event_at__gte=today_start, event_at__lt=upcoming_end,
     )
-    upcoming_lots = list(
-        upcoming_query
-        .select_related("watchlist_artist")
-        .order_by("event_at", "auction_house", "artist", "id")[:1000]
-    )
+    upcoming_lots = list(upcoming_query[:1000])
     # Recognize the actual stored names before the lot cap, so a busy unrelated
     # house cannot crowd Oliver's later sales out of his upcoming list.
     oliver_upcoming_house_names = [
         name for name in upcoming_query.order_by().values_list("auction_house", flat=True).distinct()
-        if is_oliver_house(name)
+        if is_scoped_house(name)
     ]
-    oliver_upcoming_lots = list(
-        upcoming_query.filter(auction_house__in=oliver_upcoming_house_names)
-        .select_related("watchlist_artist")
-        .order_by("event_at", "auction_house", "artist", "id")[:1000]
-    )
+    oliver_upcoming_lots = list(upcoming_query.filter(auction_house__in=oliver_upcoming_house_names)[:1000])
 
     def upcoming_groups_for(lots, *, track_identity=False):
         upcoming_by_day_and_sale: dict[tuple[date, str], list[AuctionWatchLot]] = {}
@@ -573,23 +595,13 @@ def auction_calendar(request):
     upcoming_days = {group["date_iso"] for group in visible_upcoming_groups + oliver_upcoming_groups}
     complete_day_lots = {day.isoformat(): lots for day, lots in lots_by_day.items()}
     for day_iso in sorted(upcoming_days):
-        if day_iso in calendar_data:
+        if day_iso in complete_day_lots:
             continue
         local_day = date.fromisoformat(day_iso)
         day_start, day_end = _utc_bounds(local_day, local_day + timedelta(days=1), zone)
-        day_lots = list(
-            AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=day_start, event_at__lt=day_end)
-            .select_related("watchlist_artist", "bid_board_analysis", "resale_research")
-            .defer("bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids")
-            .order_by("event_at", "auction_house", "artist", "id")
-        )
+        day_lots = list(summary_lots.filter(event_at__gte=day_start, event_at__lt=day_end))
         complete_day_lots[day_iso] = day_lots
-        calendar_data[day_iso] = [_lot_json(lot, zone, selected_lot_ids, research_queue_state) for lot in day_lots]
-        calendar_sales_data[day_iso] = [_sale_json(group) for group in _group_lots(day_lots, zone)]
-        oliver_calendar_sales_data[day_iso] = [
-            _sale_json(group)
-            for group in _group_lots([lot for lot in day_lots if is_oliver_house(lot.auction_house)], zone)
-        ]
+        summarize_day(local_day, day_lots)
 
     # The capped queries choose each scope's ten sessions; complete day loads
     # supply counts and artists even if a session crossed the 1,000-lot boundary.
@@ -598,16 +610,11 @@ def auction_calendar(request):
             identity = group.pop("_calendar_sale_identity")
             sale_lots = [
                 lot for lot in complete_day_lots[group["date_iso"]]
-                if lot.active and (not oliver_only or is_oliver_house(lot.auction_house))
+                if lot.active and (not oliver_only or is_scoped_house(lot.auction_house))
                 and _sale_identity(lot) == identity
             ]
             if sale_lots:
                 group.update(_group_lots(sale_lots, zone)[0])
-
-    _attach_superseded_attribution(calendar_data)
-    retained_research_lot = _attach_retained_calendar_work(
-        calendar_data, zone, selected_lot_ids, research_queue_state, request,
-    )
 
     in_month_days = sorted(day for day in lots_by_day if selected_month <= day < following_month)
     if now_local.date() in in_month_days:
@@ -617,10 +624,10 @@ def auction_calendar(request):
     elif visible_upcoming_groups:
         initial_day = visible_upcoming_groups[0]["date_iso"]
     else:
-        initial_day = next(iter(calendar_data), "")
+        initial_day = next(iter(calendar_day_counts), "")
     oliver_in_month_days = [
         day for day in in_month_days
-        if any(is_oliver_house(lot.auction_house) for lot in lots_by_day[day])
+        if calendar_day_counts[day.isoformat()]["oliver_lots"]
     ]
     if now_local.date() in oliver_in_month_days:
         initial_oliver_day = now_local.date().isoformat()
@@ -631,6 +638,24 @@ def auction_calendar(request):
     else:
         initial_oliver_day = initial_day
 
+    view = request.GET.get("view")
+    requested_date = _calendar_requested_date(request.GET.get("day", ""))
+    if requested_date and (month_weeks[0][0] <= requested_date <= month_weeks[-1][-1]
+                           or requested_date.isoformat() in calendar_day_counts):
+        starting_day = requested_date.isoformat()
+    else:
+        starting_day = initial_oliver_day if view == "oliver-calendar" else initial_day
+    calendar_data = {}
+    retained_research_lot = None
+    if starting_day:
+        count = calendar_day_counts.get(starting_day, {}).get("lots", 0)
+        if count == 0:
+            calendar_data[starting_day] = []
+        elif view in {"catalog", "research", "oliver"} or count <= CALENDAR_INLINE_SIDEBAR_LIMIT:
+            detail = _day_lot_data(request, date.fromisoformat(starting_day), zone, selected_lot_ids, research_queue_state)
+            calendar_data[starting_day] = detail["lots"]
+            retained_research_lot = detail["retained_research_lot"]
+
     email_recipients = _email_recipient_choices(active_email_batch)
 
     context = {
@@ -640,6 +665,7 @@ def auction_calendar(request):
         "next_month": following_month.strftime("%Y-%m"),
         "weeks": weeks,
         "calendar_data": calendar_data,
+        "calendar_day_counts": calendar_day_counts,
         "calendar_sales_data": calendar_sales_data,
         "oliver_calendar_sales_data": oliver_calendar_sales_data,
         "retained_research_lot": retained_research_lot,

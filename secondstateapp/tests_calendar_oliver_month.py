@@ -148,9 +148,12 @@ class OliverMonthCalendarTests(TestCase):
                 context = self.calendar(view=view)
                 self.assertEqual(context["initial_day"], "2026-07-22")
                 self.assertEqual(context["initial_oliver_day"], "2026-07-25")
-                records = [lot for lots in context["calendar_data"].values() for lot in lots]
-                self.assertEqual({lot["id"] for lot in records}, {outsider.pk, partner.pk})
-                self.assertEqual(next(lot for lot in records if lot["id"] == outsider.pk)["auction_house"], "Another House")
+                start_day = context["initial_oliver_day"] if view == "oliver-calendar" else context["initial_day"]
+                start_lot = partner if view == "oliver-calendar" else outsider
+                self.assertEqual(list(context["calendar_data"]), [start_day])
+                self.assertEqual([lot["id"] for lot in context["calendar_data"][start_day]], [start_lot.pk])
+                self.assertEqual(context["calendar_day_counts"]["2026-07-22"], {"lots": 1, "oliver_lots": 0})
+                self.assertEqual(context["calendar_day_counts"]["2026-07-25"], {"lots": 1, "oliver_lots": 1})
 
     def test_scoped_upcoming_session_counts_use_the_complete_day_beyond_its_own_cap(self):
         event_at = datetime(2026, 8, 4, 14, tzinfo=CALENDAR_ZONE)
@@ -174,5 +177,6 @@ class OliverMonthCalendarTests(TestCase):
         self.assertEqual(group["lot_count"], 1001)
         self.assertIn("Zao", group["artists"])
         self.assertNotIn("_calendar_sale_identity", group)
-        self.assertEqual(len(context["calendar_data"]["2026-08-04"]), 1003)
+        self.assertNotIn("2026-08-04", context["calendar_data"])
+        self.assertEqual(context["calendar_day_counts"]["2026-08-04"], {"lots": 1003, "oliver_lots": 1002})
         self.assertEqual(context["oliver_calendar_sales_data"]["2026-08-04"][0]["lot_count"], 1002)

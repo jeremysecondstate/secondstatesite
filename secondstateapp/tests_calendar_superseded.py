@@ -352,6 +352,11 @@ class CalendarSupersededLotTests(TestCase):
         self.assertEqual(retained["saved_bid_board"]["selected_bid"], "1400.00")
         self.assertTrue(retained["email_tray_selected"])
         self.assertEqual([lot["id"] for lot in response.context["calendar_data"]["2026-07-25"]], [replacement.pk])
+        detail = self.client.get(reverse("auction_calendar_day_lots"), {
+            "day": "2026-07-25", "view": "research", "lot": old.pk,
+        }).json()
+        self.assertEqual(detail["retained_research_lot"], retained)
+        self.assertEqual(detail["lots"], response.context["calendar_data"]["2026-07-25"])
 
     def test_two_retained_boards_remain_separate_and_unrelated_requests_do_not_project_them(self):
         old, replacement = self.replacement_pair()

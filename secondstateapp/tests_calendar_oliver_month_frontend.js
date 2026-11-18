@@ -136,6 +136,9 @@ function page(data, view = "calendar") {
     },
   };
   const context = vm.createContext({
+    dayCounts: Object.fromEntries(Object.entries(data).map(([day, lots]) =>
+      [day, {lots: lots.length, oliver_lots: lots.filter(l => l.oliver_house === true).length}])),
+    withCalendarDay(_day, ready) { ready(); },
     data, document, URL, URLSearchParams, dayButtons, selectedDay: Object.keys(data)[0], activeView: view,
     salesData: Object.fromEntries(Object.keys(data).map(day => [day, [sale("Other house", 1), sale("Phillips", 1)]])),
     oliverSalesData: Object.fromEntries(Object.keys(data).map(day => [day, data[day].some(item => item.oliver_house === true) ? [sale("Phillips", 1)] : []])),

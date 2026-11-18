@@ -349,6 +349,7 @@ test("a saved-board deep link restores a retained snapshot with its original own
   const opened = [];
   const context = vm.createContext({
     initialParams: new URLSearchParams("saved_bid_board=11"), csrfToken: "test-csrf", inOliverScope: () => true,
+    data: {"2026-11-18": []}, startingDay: "2026-11-18", loadCurrencyPrices() {},
     dayLots: () => [{id: 123, retained_saved_work: [retained]}],
     window: {SavedBidBoard: {open: (lot, options) => opened.push({lot, options})}},
   });

@@ -49,6 +49,10 @@
     <a class="calendar-tray-link" href="{% url 'auction_email_tray' %}">Email Tray · <span data-email-tray-count>{{ email_selected_count }}</span></a>
   </div>
 
+  <div id="calendar-day-status" class="calendar-currency-status" role="status" hidden>
+    <span id="calendar-day-message"></span>
+    <button id="calendar-day-retry" type="button" hidden>Retry loading lots</button>
+  </div>
   <div id="calendar-currency-status" class="calendar-currency-status" role="status" hidden>
     <span id="calendar-currency-message"></span>
     <button id="calendar-currency-retry" type="button" hidden>Retry USD conversion</button>
@@ -426,6 +430,7 @@
 </section>
 
 {{ calendar_data|json_script:"auction-calendar-data" }}
+{{ calendar_day_counts|json_script:"auction-calendar-day-counts" }}
 {{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
 {{ oliver_calendar_sales_data|json_script:"oliver-calendar-sales-data" }}
 {{ retained_research_lot|json_script:"auction-calendar-retained-research" }}
@@ -440,9 +445,10 @@
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
+  const dayCounts = JSON.parse(document.getElementById("auction-calendar-day-counts").textContent);
   const salesData = JSON.parse(document.getElementById("auction-calendar-sales-data").textContent);
   const oliverSalesData = JSON.parse(document.getElementById("oliver-calendar-sales-data").textContent);
-  const retainedResearchLot = JSON.parse(document.getElementById("auction-calendar-retained-research").textContent) || null;
+  let retainedResearchLot = JSON.parse(document.getElementById("auction-calendar-retained-research").textContent) || null;
   let retainedResearchId = retainedResearchLot?.id || null;
   const oliverHouseNames = JSON.parse(document.getElementById("oliver-house-names").textContent);
   const hasQualifyingBid = (summary) => {
@@ -2321,10 +2327,8 @@
   };
 
   const appendArtpriceAnalysis = (item, lot, options = {}) => {
-    const idPrefix = options.idPrefix ? `${options.idPrefix}-` : "";
-    const quick = Boolean(options.quick);
     const details = document.createElement("details");
-    details.className = `artprice-analysis${quick ? " is-quick" : ""}`;
+    details.className = `artprice-analysis${options.quick ? " is-quick" : ""}`;
     details.dataset.lotId = String(lot.id);
 
     const summary = document.createElement("summary");
@@ -2335,7 +2339,39 @@
     summaryBadge.className = "artprice-analysis-badge";
     summaryBadge.hidden = true;
     summary.append(summaryLabel, summaryBadge);
+    details.appendChild(summary);
+    item.appendChild(details);
 
+    const key = String(lot.id);
+    const showCachedBadge = () => {
+      const resale = liveartAnalysisCache.get(key);
+      const sources = [artpriceAnalysisCache.get(key) && "Artprice HTML", resale && resale.saved !== false && "Resale bid"].filter(Boolean);
+      summaryBadge.hidden = !sources.length;
+      summaryBadge.textContent = sources.length ? "Saved" : "";
+      summaryBadge.title = sources.length ? `${sources.join(" and ")} analysis saved` : "";
+    };
+    let loadPanel;
+    const openPanel = () => {
+      if (!details.open) return;
+      if (!loadPanel) loadPanel = buildArtpriceAnalysisPanel(item, details, summaryBadge, lot, options);
+      loadPanel();
+    };
+    if (options.quick) {
+      details.open = true;
+      openPanel();
+    } else {
+      showCachedBadge();
+      // Keep a closed sidebar disclosure in sync with saves in the lot browser.
+      const refreshBadge = () => { if (!loadPanel) showCachedBadge(); };
+      registerLotInstance(artpriceAnalysisInstances, lot.id, details, refreshBadge);
+      registerLotInstance(liveartAnalysisInstances, lot.id, details, refreshBadge);
+    }
+    details.addEventListener("toggle", openPanel);
+  };
+
+  const buildArtpriceAnalysisPanel = (item, details, summaryBadge, lot, options) => {
+    const idPrefix = options.idPrefix ? `${options.idPrefix}-` : "";
+    const quick = Boolean(options.quick);
     const panel = document.createElement("div");
     panel.className = "artprice-analysis-panel";
 
@@ -2756,8 +2792,7 @@
       item.activateArchiveStage = activateTab;
       activateTab();
     }
-    details.append(summary, panel);
-    item.appendChild(details);
+    details.appendChild(panel);
 
     const setStatus = (message = "", tone = "") => {
       status.textContent = message;
@@ -3267,13 +3302,6 @@
       );
     });
 
-    details.addEventListener("toggle", () => {
-      if (details.open) {
-        loadAnalysis();
-        liveart.load();
-      }
-    });
-
     registerLotInstance(artpriceAnalysisInstances, lot.id, details, (analysis) => {
       loaded = true;
       applyAnalysis(analysis);
@@ -3285,11 +3313,10 @@
     } else {
       applyAnalysis(null);
     }
-    if (quick) {
-      details.open = true;
+    return () => {
       loadAnalysis();
       liveart.load();
-    }
+    };
   };
 
   const formatCalendarDay = (isoDate, options) => {
@@ -3302,15 +3329,14 @@
     return lot.images.filter((url) => typeof url === "string" && url.trim());
   };
 
-  const galleryDays = Object.keys(data)
-    .filter((day) => (data[day] || []).length)
-    .sort();
-  const previousGalleryDay = () => galleryDays.filter((day) => day < selectedDay && dayLots(day).length).pop();
-  const nextGalleryDay = () => galleryDays.find((day) => day > selectedDay && dayLots(day).length);
+  const galleryDays = Object.keys(dayCounts).filter((day) => dayCounts[day].lots).sort();
+  const scopedDayCount = (day) => dayCounts[day]?.[inOliverScope() ? "oliver_lots" : "lots"] || 0;
+  const previousGalleryDay = () => galleryDays.filter((day) => day < selectedDay && scopedDayCount(day)).pop();
+  const nextGalleryDay = () => galleryDays.find((day) => day > selectedDay && scopedDayCount(day));
 
   const renderResearchDays = () => {
     researchDaySelect.replaceChildren();
-    galleryDays.filter((day) => dayLots(day).length || day === selectedDay).forEach((day) => {
+    galleryDays.filter((day) => scopedDayCount(day) || day === selectedDay).forEach((day) => {
       const option = document.createElement("option");
       option.value = day;
       option.textContent = formatCalendarDay(day, {month: "short", day: "numeric", year: "numeric"});
@@ -4576,6 +4602,69 @@
     });
   };
 
+  // Keep the month overview usable while the requested day's detailed records load.
+  const dayStatus = document.getElementById("calendar-day-status");
+  const dayMessage = document.getElementById("calendar-day-message");
+  const dayRetry = document.getElementById("calendar-day-retry");
+  const retainedResearchById = new Map(retainedResearchLot ? [[retainedResearchLot.id, retainedResearchLot]] : []);
+  let pendingDayRequest = null;
+  const withCalendarDay = (day, onReady, researchLotId = 0) => {
+    pendingDayRequest?.abort();
+    pendingDayRequest = null;
+    dayStatus.hidden = true;
+    dayRetry.onclick = null;
+    if (!day) { onReady(); return; }
+    if (!Object.hasOwn(data, day) && !dayCounts[day]?.lots && !researchLotId) data[day] = [];
+    const cached = data[day];
+    if (cached && (!researchLotId || retainedResearchById.has(researchLotId) || cached.some((lot) => lot.id === researchLotId))) {
+      if (researchLotId) retainedResearchLot = retainedResearchById.get(researchLotId) || null;
+      onReady();
+      return;
+    }
+    const request = new AbortController();
+    pendingDayRequest = request;
+    const dayLabel = formatCalendarDay(day, {month: "long", day: "numeric", year: "numeric"});
+    dayMessage.textContent = `Loading lots for ${dayLabel}…`;
+    dayStatus.hidden = false;
+    dayRetry.hidden = true;
+    const params = new URLSearchParams({day});
+    if (researchLotId) { params.set("view", "research"); params.set("lot", String(researchLotId)); }
+    const timeout = setTimeout(() => request.abort(), 45000);
+    return fetch("{% url 'auction_calendar_day_lots' %}?" + params, {
+      credentials: "same-origin", headers: {Accept: "application/json"}, signal: request.signal,
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Calendar day unavailable");
+      const result = await response.json();
+      if (day !== result.day || !Array.isArray(result.lots)) throw new Error("Unexpected calendar day");
+      if (request !== pendingDayRequest) return;
+      if (!Object.hasOwn(data, day)) {
+        data[day] = result.lots;
+        for (const lot of result.lots) {
+          currencyLotsById.set(String(lot.id), lot);
+          for (const work of [lot, ...(lot.retained_saved_work || [])]) {
+            savedBoardMembership.set(String(work.id), savedBoardFilterMembership(work.saved_bid_board));
+          }
+        }
+      }
+      if (researchLotId) {
+        retainedResearchLot = result.retained_research_lot || null;
+        if (retainedResearchLot) retainedResearchById.set(retainedResearchLot.id, retainedResearchLot);
+      }
+    }).then(() => {
+      if (request !== pendingDayRequest) return;
+      dayStatus.hidden = true;
+      pendingDayRequest = null;
+      onReady();
+    }, () => {
+      if (request !== pendingDayRequest) return;
+      pendingDayRequest = null;
+      dayMessage.textContent = `Couldn’t load lots for ${dayLabel}.`;
+      dayRetry.hidden = false;
+      dayRetry.onclick = () => withCalendarDay(day, onReady, researchLotId);
+    }).finally(() => clearTimeout(timeout));
+  };
+  const selectCalendarDay = (day) => withCalendarDay(day, () => showDay(day));
+
   const setCalendarView = (view, {push = false} = {}) => {
     const wasOliver = inOliverScope();
     activeView = ["catalog", "oliver", "oliver-calendar", "research"].includes(view) ? view : "calendar";
@@ -4597,17 +4686,20 @@
     oliverViewToggle.setAttribute("aria-pressed", String(activeView === "oliver"));
     oliverCalendarViewToggle.setAttribute("aria-pressed", String(activeView === "oliver-calendar"));
     researchViewToggle.setAttribute("aria-pressed", String(activeView === "research"));
-    renderResearchDays();
     if (isGalleryView()) renderGalleryCatalog();
-    else if (activeView === "research") renderResearchWorkspace();
+    else if (activeView === "research") { renderResearchDays(); renderResearchWorkspace(); }
     else if (selectedDay) {
-      const lots = dayLots();
       renderDaySales(selectedDay);
-      updateSidebarLaunches(lots, formatCalendarDay(selectedDay, {weekday: "long", year: "numeric", month: "long", day: "numeric"}));
-      if (sidebarRenderedDay !== selectedDay || sidebarRenderedScope !== (inOliverScope() ? "oliver" : "all")) renderSidebarLots(lots);
+      if (Object.hasOwn(data, selectedDay)) {
+        const lots = dayLots();
+        updateSidebarLaunches(lots, formatCalendarDay(selectedDay, {weekday: "long", year: "numeric", month: "long", day: "numeric"}));
+        if (sidebarRenderedDay !== selectedDay || sidebarRenderedScope !== (inOliverScope() ? "oliver" : "all")) renderSidebarLots(lots);
+      } else {
+        list.replaceChildren();
+      }
     }
     updateCalendarLocation({push});
-    if (selectedDay) refreshCurrencyPrices(selectedDay);
+    if (selectedDay && Object.hasOwn(data, selectedDay)) refreshCurrencyPrices(selectedDay);
   };
 
   calendarViewToggle.addEventListener("click", () => setCalendarView("calendar"));
@@ -4623,36 +4715,41 @@
     }
   });
   window.addEventListener("popstate", () => {
-    restoringHistory = true;
-    try {
-      const params = new URLSearchParams(window.location.search);
-      galleryHideAttributed = params.get("hide_attributed") === "1";
-      restoreGalleryOrganization(params);
-      researchScope = params.get("scope") === "oliver" ? "oliver" : "";
-      activeView = ["catalog", "oliver", "oliver-calendar", "research"].includes(params.get("view")) ? params.get("view") : "calendar";
-      if (typeof retainedResearchId !== "undefined") retainedResearchId = retainedResearchLot?.id === Number(params.get("lot")) ? retainedResearchLot.id : null;
-      const day = params.get("day");
-      if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)
-        && (Object.hasOwn(data, day) || dayButtons.some((button) => button.dataset.calendarDay === day))
-        && day !== selectedDay) showDay(day);
-      const look = params.get("look");
-      researchLook = ["dossier", "workbench", "bidboard"].includes(look) ? look : "dossier";
-      researchWorkspace.dataset.look = researchLook;
-      researchLookButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.researchLook === researchLook)));
-      const requestedLot = Number(params.get("lot"));
-      const requestedIndex = dayLots().findIndex((lot) => lot.id === requestedLot);
-      if (requestedIndex >= 0) researchIndex = requestedIndex;
-      const view = params.get("view");
-      galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : (["tray", "bidboards", "qualifying"].includes(params.get("filter")) || params.get("filter")?.startsWith("house:")) ? params.get("filter") : "all";
-      setCalendarView(view);
-      const focusTarget = view === "research" ? researchTitle
-        : isGalleryView() ? document.getElementById("day-gallery-title")
-        : activeView === "oliver-calendar" ? oliverCalendarViewToggle : calendarViewToggle;
-      focusTarget.focus({preventScroll: true});
-    } finally {
-      restoringHistory = false;
-      updateCalendarLocation();
-    }
+    const params = new URLSearchParams(window.location.search);
+    const day = params.get("day");
+    const validDay = day && /^\d{4}-\d{2}-\d{2}$/.test(day)
+      && (Object.hasOwn(dayCounts, day) || dayButtons.some((button) => button.dataset.calendarDay === day));
+    const historyLocation = window.location.href;
+    withCalendarDay(validDay ? day : null, () => {
+      if (window.location.href !== historyLocation) return;
+      restoringHistory = true;
+      try {
+        galleryHideAttributed = params.get("hide_attributed") === "1";
+        restoreGalleryOrganization(params);
+        researchScope = params.get("scope") === "oliver" ? "oliver" : "";
+        activeView = ["catalog", "oliver", "oliver-calendar", "research"].includes(params.get("view")) ? params.get("view") : "calendar";
+        if (typeof retainedResearchId !== "undefined") retainedResearchId = retainedResearchLot?.id === Number(params.get("lot")) ? retainedResearchLot.id : null;
+        if (validDay && day !== selectedDay) showDay(day, {render: false});
+        const look = params.get("look");
+        researchLook = ["dossier", "workbench", "bidboard"].includes(look) ? look : "dossier";
+        researchWorkspace.dataset.look = researchLook;
+        researchLookButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.researchLook === researchLook)));
+        const requestedLot = Number(params.get("lot"));
+        const requestedIndex = dayLots().findIndex((lot) => lot.id === requestedLot);
+        if (requestedIndex >= 0) researchIndex = requestedIndex;
+        const view = params.get("view");
+        galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : (["tray", "bidboards", "qualifying"].includes(params.get("filter")) || params.get("filter")?.startsWith("house:")) ? params.get("filter") : "all";
+        setCalendarView(view);
+        const focusTarget = view === "research" ? researchTitle
+          : isGalleryView() ? document.getElementById("day-gallery-title")
+          : activeView === "oliver-calendar" ? oliverCalendarViewToggle : calendarViewToggle;
+        focusTarget.focus({preventScroll: true});
+      } finally {
+        restoringHistory = false;
+        updateCalendarLocation();
+      }
+      if (validDay) loadCurrencyPrices(day);
+    }, params.get("view") === "research" ? Number(params.get("lot")) : 0);
   });
   researchPrevious.addEventListener("click", () => moveResearchLot(-1));
   researchNext.addEventListener("click", () => moveResearchLot(1));
@@ -4758,11 +4855,11 @@
   });
   galleryPrevious.addEventListener("click", () => {
     const day = previousGalleryDay();
-    if (day) showDay(day);
+    if (day) selectCalendarDay(day);
   });
   galleryNext.addEventListener("click", () => {
     const day = nextGalleryDay();
-    if (day) showDay(day);
+    if (day) selectCalendarDay(day);
   });
 
   const renderDaySales = (isoDate) => {
@@ -4813,7 +4910,7 @@
       return;
     }
 
-    lots.forEach((lot) => {
+    const appendLot = (lot) => {
       const item = document.createElement("article");
       item.className = `day-lot${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}`;
       if (lot.won_by_us) appendText(item, "span", "lot-won-badge", "✓ Won by SECONDSTATE");
@@ -4837,7 +4934,32 @@
       appendArtpriceEditor(item, lot, actionLinks);
       appendArtpriceAnalysis(item, lot);
       list.appendChild(item);
+      return item;
+    };
+
+    const pageSize = 24;
+    let shown = Math.min(pageSize, lots.length);
+    lots.slice(0, shown).forEach(appendLot);
+    if (shown === lots.length) return;
+
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "lot-browser-launch";
+    const updateMore = () => {
+      more.textContent = `Show ${Math.min(pageSize, lots.length - shown)} more · ${shown} of ${lots.length} lots shown`;
+      list.appendChild(more);
+    };
+    more.addEventListener("click", () => {
+      const next = Math.min(shown + pageSize, lots.length);
+      more.remove();
+      const firstNew = appendLot(lots[shown]);
+      lots.slice(shown + 1, next).forEach(appendLot);
+      shown = next;
+      if (shown < lots.length) updateMore();
+      firstNew.tabIndex = -1;
+      firstNew.focus();
     });
+    updateMore();
   };
 
   const updateSidebarLaunches = (lots, dayLabel) => {
@@ -4851,7 +4973,7 @@
     );
   };
 
-  const showDay = (isoDate) => {
+  const showDay = (isoDate, {render = true} = {}) => {
     if (selectedDay !== isoDate) {
       if (galleryFilter !== "qualifying") galleryFilter = "all";
       galleryVisibleCount = 24;
@@ -4867,27 +4989,27 @@
     selectedDay = isoDate;
     const dayLabel = formatCalendarDay(isoDate, {weekday: "long", year: "numeric", month: "long", day: "numeric"});
     title.textContent = dayLabel;
-    renderDaySales(isoDate);
     dayButtons.forEach((button) => {
       const selected = button.dataset.calendarDay === isoDate;
       const cell = button.closest(".calendar-day");
       cell.classList.toggle("is-selected", selected);
       button.setAttribute("aria-pressed", String(selected));
     });
+    if (!render) return;
 
     // The month sidebar follows its house scope; hidden catalog launches keep the all-house day.
     const lots = activeView === "oliver-calendar" ? dayLots(isoDate) : (data[isoDate] || []);
     updateSidebarLaunches(lots, dayLabel);
     if (isGalleryView()) renderGalleryCatalog();
     else if (activeView === "research") renderResearchWorkspace();
-    else renderSidebarLots(lots);
+    else { renderDaySales(isoDate); renderSidebarLots(lots); }
     updateCalendarLocation();
     loadCurrencyPrices(isoDate);
   };
 
   document.querySelectorAll("[data-calendar-day]").forEach((button) => {
     button.addEventListener("click", () => {
-      showDay(button.dataset.calendarDay);
+      selectCalendarDay(button.dataset.calendarDay);
       sidebar.scrollTop = 0;
       if (window.matchMedia("(max-width: 1180px)").matches) {
         title.focus({preventScroll: true});
@@ -4901,14 +5023,14 @@
 
   const initialDay = "{{ initial_day|escapejs }}";
   const initialOliverDay = "{{ initial_oliver_day|escapejs }}";
-  researchDaySelect.addEventListener("change", () => showDay(researchDaySelect.value));
+  researchDaySelect.addEventListener("change", () => selectCalendarDay(researchDaySelect.value));
   const initialParams = new URLSearchParams(window.location.search);
   galleryHideAttributed = initialParams.get("hide_attributed") === "1";
   restoreGalleryOrganization(initialParams);
   const requestedView = initialParams.get("view");
   const requestedDay = initialParams.get("day");
   const validRequestedDay = requestedDay && /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
-    && (Object.hasOwn(data, requestedDay) || dayButtons.some((button) => button.dataset.calendarDay === requestedDay));
+    && (Object.hasOwn(dayCounts, requestedDay) || dayButtons.some((button) => button.dataset.calendarDay === requestedDay));
   const requestedLook = initialParams.get("look");
   researchLook = ["dossier", "workbench", "bidboard"].includes(requestedLook) ? requestedLook : "dossier";
   researchTab = researchLook === "bidboard" ? "bids" : researchLook === "workbench" ? "comps" : "sources";
@@ -4923,14 +5045,24 @@
     const matchingIndex = dayLots(startingDay).findIndex((lot) => lot.id === requestedLot);
     if (matchingIndex >= 0) researchIndex = matchingIndex;
   }
-  if (startingDay) showDay(startingDay);
+  if (startingDay) showDay(startingDay, {render: false});
   galleryFilter = initialParams.get("artist") ? `artist:${initialParams.get("artist")}` : (["tray", "bidboards", "qualifying"].includes(initialParams.get("filter")) || initialParams.get("filter")?.startsWith("house:")) ? initialParams.get("filter") : "all";
   setCalendarView(requestedView);
   const requestedSavedBoard = initialParams.get("saved_bid_board");
-  if (requestedSavedBoard && window.SavedBidBoard) {
+  const openRequestedSavedBoard = () => {
+    if (!requestedSavedBoard || !window.SavedBidBoard) return;
     const savedLot = dayLots().flatMap((lot) => [lot, ...(lot.retained_saved_work || [])])
       .find((lot) => String(lot.id) === requestedSavedBoard);
     if (savedLot?.saved_bid_board) window.SavedBidBoard.open(savedLot, {csrfToken, oliver: inOliverScope()});
+  };
+  if (startingDay && !Object.hasOwn(data, startingDay)) {
+    withCalendarDay(startingDay, () => {
+      showDay(startingDay);
+      openRequestedSavedBoard();
+    });
+  } else {
+    if (startingDay) loadCurrencyPrices(startingDay);
+    openRequestedSavedBoard();
   }
 })();
 </script>

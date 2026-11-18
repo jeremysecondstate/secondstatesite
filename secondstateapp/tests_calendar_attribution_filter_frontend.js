@@ -66,6 +66,8 @@ function page(lots, view = "catalog") {
   ];
   const context = vm.createContext({
     URL, URLSearchParams, data: {[day]: lots}, selectedDay: day, activeView: view,
+    dayCounts: {[day]: {lots: lots.length, oliver_lots: lots.filter(l => l.oliver_house === true).length}},
+    withCalendarDay(_day, ready) { ready(); },
     researchScope: "", researchIndex: 0, researchLook: "dossier", restoringHistory: false,
     galleryFilter: "all", galleryHideAttributed: false, galleryVisibleCount: 24,
     galleryArtistsDay: "", galleryArtistsExpanded: false,
