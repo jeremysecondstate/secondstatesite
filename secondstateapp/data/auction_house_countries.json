@@ -1292,10 +1292,12 @@
     {
       "name": "SebastianCharles Auctions",
       "country_code": "US",
-      "aliases": [],
+      "aliases": [
+        "Sebastian Charles Auctions"
+      ],
       "evidence_url": "https://www.sebastiancharles.com/contact",
-      "evidence": "Auction gallery at 5263 Edina Industrial Boulevard, Edina, Minnesota 55439; the December 2 sale page also specifies collection there.",
-      "verified_at": "2026-11-14"
+      "evidence": "The official gallery and December 2, 2026 sale are at 5263 Edina Industrial Boulevard, Edina, Minnesota (https://hibid.com/auction/794693/fine-art--jewelry--design-and-asian-art). The Drouot profile https://drouot.com/fr/auctioneer/2984/sebastian-charles-auctions uses the spaced house name and matches the official gallery's phone and email.",
+      "verified_at": "2026-11-19"
     },
     {
       "name": "Cordier Auctions",
