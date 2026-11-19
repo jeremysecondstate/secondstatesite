@@ -438,7 +438,7 @@
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=bid-research-20261118"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=artist-labels-20261108"></script>
-<script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=sale-images-20261022"></script>
+<script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=saved-sale-images-20261118"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-modes-20261028"></script>
 <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261027"></script>
 <script>
@@ -2429,15 +2429,15 @@
 
     const grid = document.createElement("div");
     grid.className = "artprice-analysis-grid";
-    const htmlField = addInput("artprice_html", "Saved Artprice HTML files", {
+    const htmlField = addInput("artprice_html", "Saved Artprice pages", {
       type: "file",
-      accept: ".html,.htm,text/html",
+      accept: ".html,.htm,.zip,text/html,application/zip",
       multiple: true,
       required: true,
       wide: true,
     });
     const htmlHint = document.createElement("small");
-    htmlHint.textContent = "Choose one or more related searches, or add more later. Up to 10 saved files; 5 MB each and 25 MB per upload. Overlapping sales count once.";
+    htmlHint.textContent = "To keep artwork photos, zip each saved HTML page with its matching _files folder. You can also upload HTML alone. Choose up to 10 pages, with 5 MB per HTML page and 25 MB total.";
     htmlField.appendChild(htmlHint);
     const advancedFields = [
       addInput("method", "Resale valuation method", {
@@ -3246,23 +3246,23 @@
       if (!validateAssumptions()) return;
       const files = Array.from(fields.artprice_html.files || []);
       if (!files.length) {
-        fields.artprice_html.setCustomValidity("Choose one or more saved Artprice .html or .htm files.");
+        fields.artprice_html.setCustomValidity("Choose a saved Artprice HTML page or ZIP.");
         fields.artprice_html.reportValidity();
         return;
       }
       fields.artprice_html.setCustomValidity("");
       if (files.length > 10 || files.reduce((total, file) => total + file.size, 0) > 25 * 1024 * 1024) {
-        fields.artprice_html.setCustomValidity("Choose up to 10 HTML files totaling 25 MB or less.");
+        fields.artprice_html.setCustomValidity("Choose up to 10 files totaling 25 MB or less.");
         fields.artprice_html.reportValidity();
         return;
       }
-      if (files.some((file) => file.size > 5 * 1024 * 1024)) {
+      if (files.some((file) => /\.html?$/i.test(file.name) && file.size > 5 * 1024 * 1024)) {
         fields.artprice_html.setCustomValidity("Each saved HTML file must be 5 MB or smaller.");
         fields.artprice_html.reportValidity();
         return;
       }
-      if (files.some((file) => !/\.html?$/i.test(file.name))) {
-        fields.artprice_html.setCustomValidity("Every file must end in .html or .htm.");
+      if (files.some((file) => !/\.(html?|zip)$/i.test(file.name))) {
+        fields.artprice_html.setCustomValidity("Every file must end in .html, .htm, or .zip.");
         fields.artprice_html.reportValidity();
         return;
       }

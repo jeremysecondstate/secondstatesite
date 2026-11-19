@@ -1,8 +1,13 @@
 import json
 from importlib import import_module
+from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
+from zipfile import ZipFile
 
+from PIL import Image
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
@@ -149,6 +154,48 @@ class MultipleArtpriceSourceTests(TestCase):
         # Compare every persisted field, including source IDs, original prices, and timestamps.
         self.assertEqual(without_images(AuctionMaxBidAnalysis.objects.filter(lot=self.lot).values().get()), artprice_before)
         self.assertEqual(without_images(LiveArtResaleAnalysis.objects.filter(lot=self.lot).values().get()), resale_before)
+
+    def test_companion_zip_repairs_expired_image_for_existing_selection(self):
+        remote = "https://imgprivate2.artprice.com/lots/expired/image/xl"
+        lots = [self.sale(101, 3500, imageUrl=remote), self.sale(102, 1500)]
+        tile = '<div id="lot-101"><div class="lot-img"><img src="./miro_files/xl"></div></div>'
+        html = artprice_html(lots, suffix=tile).encode("utf-8")
+        def plain_upload():
+            return SimpleUploadedFile("miro.html", html)
+
+        original = self.add(plain_upload()).json()["analysis"]
+        self.assertEqual(self.save_selection(["artprice:101"]).status_code, 200)
+        before = self.preview()
+        picture = BytesIO()
+        Image.new("RGB", (48, 32), "blue").save(picture, "JPEG")
+        bundle = BytesIO()
+        with ZipFile(bundle, "w") as archive:
+            archive.writestr("miro.html", html)
+            archive.writestr("miro_files/xl", picture.getvalue())
+        def zip_upload():
+            return SimpleUploadedFile("miro.zip", bundle.getvalue())
+
+        with TemporaryDirectory() as folder, self.settings(MEDIA_ROOT=Path(folder) / "media"):
+            with patch("secondstateapp.calendar_views.store_saved_artprice_image", side_effect=OSError):
+                self.assertEqual(self.add(zip_upload()).status_code, 503)
+                self.assertEqual(self.client.get(self.url).json()["analysis"], original)
+            result = self.add(zip_upload(), method="manual", manual_resale_value="9999").json()["analysis"]
+            self.assertEqual(result["sources"], original["sources"])
+            self.assertEqual(result["bid_rows"], original["bid_rows"])
+            refreshed = self.preview()
+            for field in ("selected_ids", "assumptions", "scenarios"):
+                self.assertEqual(refreshed[field], before[field])
+            sales = {item["provider_id"]: item for item in refreshed["candidates"]}
+            url = sales["101"]["image_url"]
+            self.assertRegex(url, r"^/calendar/artprice-images/[0-9a-f]{64}\.jpg$")
+            self.assertFalse(sales["102"].get("image_url"))
+            delivered = self.client.get(url)
+            self.assertEqual(delivered.status_code, 200)
+            with Image.open(BytesIO(b"".join(delivered.streaming_content))) as photographed:
+                self.assertEqual(photographed.size, (48, 32))
+            self.assertEqual(self.add(plain_upload()).json()["analysis"], result)
+            recalculated = self.client.post(self.url, {"action": "recalculate"}).json()["analysis"]
+            self.assertEqual(recalculated["comparables"], result["comparables"])
 
     def test_thumbnails_survive_new_sources_recalculation_and_source_removal(self):
         images = {

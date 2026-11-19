@@ -448,7 +448,18 @@ def _lot_location(lot: Mapping[str, Any]) -> str | None:
     )) or None
 
 
+def is_saved_artprice_image_url(value: Any) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"/calendar/artprice-images/[0-9a-f]{64}\.jpg", value) is not None
+
+
 def _artprice_image_url(value: Any) -> str | None:
+    """Revalidate a stored comparable's image, including private staff uploads."""
+    if is_saved_artprice_image_url(value):
+        return value
+    return _provider_image_url(value)
+
+
+def _provider_image_url(value: Any) -> str | None:
     """Allow only explicit Artprice artwork-image URLs, never local saved-page paths."""
     if not isinstance(value, str):
         return None
@@ -484,9 +495,9 @@ def _lot_image_url(lot: Mapping[str, Any]) -> str | None:
     image_urls = lot.get("imageUrls")
     if isinstance(image_urls, list):
         for value in image_urls:
-            if image_url := _artprice_image_url(value):
+            if image_url := _provider_image_url(value):
                 return image_url
-    return _artprice_image_url(lot.get("imageUrl"))
+    return _provider_image_url(lot.get("imageUrl"))
 
 
 def _require_two_decimal_places(value: Decimal, *, label: str) -> Decimal:
@@ -496,7 +507,7 @@ def _require_two_decimal_places(value: Decimal, *, label: str) -> Decimal:
     return rounded
 
 
-def _normalize_results(lots: Iterable[Mapping[str, Any]]) -> list[AuctionResult]:
+def _normalize_results(lots: Iterable[Mapping[str, Any]], *, saved_comparables: bool = False) -> list[AuctionResult]:
     results: list[AuctionResult] = []
     seen: set[tuple] = set()
 
@@ -528,7 +539,7 @@ def _normalize_results(lots: Iterable[Mapping[str, Any]]) -> list[AuctionResult]
             ),
             provider_id=provider_id,
             provider_url=_artprice_lot_url(lot.get("url")),
-            image_url=_lot_image_url(lot),
+            image_url=_artprice_image_url(lot.get("imageUrl")) if saved_comparables else _lot_image_url(lot),
             artist=_optional_lot_text(lot.get("artistOrAssociation")),
             category=_optional_lot_text(lot.get("category")),
             medium=_optional_lot_text(lot.get("technique")),
@@ -836,7 +847,7 @@ def _results_from_comparables(
                 "_source_filenames": comparable.get("source_filenames"),
             }
         )
-    return _normalize_results(lots)
+    return _normalize_results(lots, saved_comparables=True)
 
 
 def artprice_sale_identity(comparable: Mapping[str, Any]) -> tuple:
@@ -879,6 +890,8 @@ def merge_artprice_sources(sources: Iterable[Mapping[str, Any]]) -> list[dict[st
                 existing = {**comparable, "source_ids": [], "source_filenames": []}
                 merged.append(existing)
             else:
+                if is_saved_artprice_image_url(image_url) and not is_saved_artprice_image_url(existing.get("image_url")):
+                    existing["image_url"] = image_url
                 # Fill absent descriptions without replacing the first observed price.
                 for key, value in comparable.items():
                     if key not in {"source_ids", "source_filenames"} and not existing.get(key) and value:

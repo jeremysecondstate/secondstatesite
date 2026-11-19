@@ -67,11 +67,10 @@ def prepare_saved_calendar_image(value) -> bytes:
         raise ValueError("saved_image_base64 contains an invalid image") from exc
 
 
-def store_saved_calendar_image(content: bytes) -> str:
-    """Write normalized bytes atomically, with one file per content digest."""
+def store_normalized_jpeg(content: bytes, directory: Path) -> str:
+    """Write normalized bytes atomically and return the content digest."""
 
     digest = hashlib.sha256(content).hexdigest()
-    directory = Path(settings.MEDIA_ROOT) / "calendar-lots"
     directory.mkdir(parents=True, exist_ok=True)
     destination = directory / f"{digest}.jpg"
     if not destination.is_file():
@@ -86,4 +85,9 @@ def store_saved_calendar_image(content: bytes) -> str:
         finally:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
+    return digest
+
+
+def store_saved_calendar_image(content: bytes) -> str:
+    digest = store_normalized_jpeg(content, Path(settings.MEDIA_ROOT) / "calendar-lots")
     return f"/media/calendar-lots/{digest}.jpg"

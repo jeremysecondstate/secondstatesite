@@ -47,6 +47,18 @@ test("missing images create a visible placeholder without a clickable image or d
   assert.equal(find(figure, "dialog"), undefined);
 });
 
+test("saved Artprice images use one private path for the thumbnail and enlargement", () => {
+  const url = "/calendar/artprice-images/" + "01".repeat(32) + ".jpg";
+  const figure = create(document, {...record, image_url: url});
+  assert.equal(find(figure, "img").src, url);
+  find(figure, "button").dispatch("click");
+  assert.equal(find(find(figure, "dialog"), "img").src, url);
+  for (const invalid of [url + "#fragment", url + "?q", url + "\n", url.replace("01", "0X"),
+    url.replace(".jpg", ".svg"), url.replace("artprice-images/", "artprice-images/../")]) {
+    assert.equal(safeImageUrl(invalid), "");
+  }
+});
+
 test("thumbnail load failures retain the evidence placeholder and hide the enlarge control", () => {
   const figure = create(document, record);
   const button = find(figure, "button");

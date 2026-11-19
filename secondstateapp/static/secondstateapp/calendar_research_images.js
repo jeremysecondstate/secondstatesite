@@ -3,6 +3,7 @@
   "use strict";
   const safeImageUrl = (value) => {
     if (typeof value !== "string" || value.length > 4096) return "";
+    if (/^\/calendar\/artprice-images\/[0-9a-f]{64}\.jpg$/.test(value)) return value;
     try {
       const url = new URL(value);
       if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) return "";

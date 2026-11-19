@@ -7,6 +7,7 @@ from .artprice_max_bid import (
     _artprice_image_url,
     analyze_artprice_comparables,
     analyze_artprice_html,
+    is_saved_artprice_image_url,
     merge_artprice_sources,
     parse_auction_results,
 )
@@ -16,6 +17,7 @@ from .tests_artprice_react_store import react_store_html
 class ArtpriceImageTests(TestCase):
     first_image = "https://imgprivate2.artprice.com/lots/opaque-sale/first-image/xl"
     second_image = "https://imgprivate2.artprice.com/lots/opaque-sale/second-image/xl"
+    private_image = "/calendar/artprice-images/" + "01" * 32 + ".jpg"
 
     def lot(self, provider_id=101, **changes):
         return {
@@ -93,6 +95,38 @@ class ArtpriceImageTests(TestCase):
             with self.subTest(image=image):
                 updated = analyze_artprice_comparables([{**comp, "image_url": image}])
                 self.assertNotIn("image_url", updated["comparables"][0])
+
+    def test_only_stored_comparables_can_reference_valid_private_images(self):
+        html = react_store_html({"101": self.lot(imageUrls=[self.private_image], imageUrl=self.private_image)})
+        comparable = analyze_artprice_html(html)["comparables"][0]
+        self.assertNotIn("image_url", comparable)
+        self.assertTrue(is_saved_artprice_image_url(self.private_image))
+        self.assertEqual(_artprice_image_url(self.private_image), self.private_image)
+        recalculated = analyze_artprice_comparables([{**comparable, "image_url": self.private_image}])
+        self.assertEqual(recalculated["comparables"][0]["image_url"], self.private_image)
+        for invalid in (
+            self.private_image + "?file=1", self.private_image + "#view", self.private_image + "\n",
+            self.private_image.upper(), "/calendar/artprice-images/../../../file.jpg",
+            self.private_image.replace("01", "ZZ"), self.private_image.replace("/calendar/", "//calendar/"),
+        ):
+            with self.subTest(invalid=invalid):
+                self.assertIsNone(_artprice_image_url(invalid))
+
+    def test_merge_prefers_first_saved_image_over_expired_provider_link(self):
+        comparable = analyze_artprice_html(react_store_html({"101": self.lot(imageUrl=self.first_image)}))["comparables"][0]
+        sources = [
+            {"id": str(index), "filename": f"{index}.html", "currency": "USD",
+             "comparables": [{**comparable, "image_url": image_url, "hammer_price": price}]}
+            for index, image_url, price in (
+                (1, self.first_image, "1000.00"),
+                (2, self.private_image, "1500.00"),
+                (3, self.private_image.replace("01", "23"), "2000.00"),
+            )
+        ]
+        result, = merge_artprice_sources(sources)
+        self.assertEqual(result["image_url"], self.private_image)
+        self.assertEqual(result["hammer_price"], "1000.00")
+        self.assertEqual(result["source_ids"], ["1", "2", "3"])
 
     def test_duplicate_sources_fill_missing_image_and_preserve_sale_price_and_provenance(self):
         original = analyze_artprice_html(react_store_html({"101": self.lot()}))["comparables"][0]

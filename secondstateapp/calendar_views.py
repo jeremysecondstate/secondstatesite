@@ -35,8 +35,14 @@ from django.views.decorators.http import require_http_methods, require_POST
 from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
 
-from .artprice_max_bid import ArtpriceAnalysisError, _artprice_image_url, _artprice_lot_url, analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity, merge_artprice_sources
+from .artprice_image_store import saved_artprice_image_url, store_saved_artprice_image
+from .artprice_max_bid import (
+    ArtpriceAnalysisError, _artprice_image_url, _artprice_lot_url,
+    analyze_artprice_comparables, analyze_artprice_html, artprice_sale_identity,
+    is_saved_artprice_image_url, merge_artprice_sources,
+)
 from .artprice_research_links import artprice_research_links
+from .artprice_saved_page import MAX_ARTPRICE_HTML_BYTES, read_artprice_saved_page
 from .artist_research_registry import artist_liveart_url, artist_research_urls
 from .auction_email import (
     AuctionEmailConfigurationError,
@@ -79,7 +85,6 @@ from .models import (
 
 MAX_SYNC_LOTS = 1000
 MAX_SYNC_BYTES = 2_000_000
-MAX_ARTPRICE_HTML_BYTES = 5 * 1024 * 1024
 MAX_ARTPRICE_SOURCES = 10
 MAX_ARTPRICE_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_SELECTED_RESALE_COMPS = 25
@@ -910,21 +915,26 @@ def _uploaded_artprice_html(request) -> tuple[str, str]:
     if upload is None:
         raise _ArtpriceAnalysisRequestError("Choose a saved Artprice HTML file to analyze.")
 
-    filename, html_text, _size = _read_artprice_upload(upload)
+    filename, html_text, _images = _read_artprice_upload(upload)
     return filename, html_text
 
 
-def _read_artprice_upload(upload) -> tuple[str, str, int]:
+def _read_artprice_upload(upload) -> tuple[str, str, dict[str, bytes]]:
     source_filename = Path(str(upload.name or "")).name
-    if not source_filename or Path(source_filename).suffix.casefold() not in {".html", ".htm"}:
-        raise _ArtpriceAnalysisRequestError("Upload a saved Artprice page with an .html or .htm extension.")
-    if len(source_filename) > 255:
-        source_filename = source_filename[-255:]
-
-    try:
-        raw_html = upload.read(MAX_ARTPRICE_HTML_BYTES + 1)
-    except (OSError, ValueError):
-        raise _ArtpriceAnalysisRequestError("The uploaded Artprice HTML file could not be read.") from None
+    extension = Path(source_filename).suffix.casefold()
+    images = {}
+    if extension == ".zip":
+        try:
+            source_filename, raw_html, images = read_artprice_saved_page(upload)
+        except ValueError as exc:
+            raise _ArtpriceAnalysisRequestError(str(exc)) from None
+    elif extension in {".html", ".htm"}:
+        try:
+            raw_html = upload.read(MAX_ARTPRICE_HTML_BYTES + 1)
+        except (OSError, ValueError):
+            raise _ArtpriceAnalysisRequestError("The uploaded Artprice HTML file could not be read.") from None
+    else:
+        raise _ArtpriceAnalysisRequestError("Choose a saved Artprice .html, .htm, or .zip file.")
     if len(raw_html) > MAX_ARTPRICE_HTML_BYTES:
         raise _ArtpriceAnalysisRequestError(
             "The Artprice HTML file must be 5 MB or smaller.",
@@ -936,34 +946,46 @@ def _read_artprice_upload(upload) -> tuple[str, str, int]:
         raise _ArtpriceAnalysisRequestError(
             "The file does not contain Artprice preloaded or saved results data. Save the Artprice results page and try again."
         )
-    return source_filename, html_text, len(raw_html)
+    return source_filename[-255:], html_text, images
 
 
-def _uploaded_artprice_sources(request) -> list[dict]:
+def _uploaded_artprice_sources(request) -> tuple[list[dict], dict[str, bytes]]:
     uploads = request.FILES.getlist("artprice_html")
     if not uploads:
         raise _ArtpriceAnalysisRequestError("Choose saved Artprice HTML files to analyze.")
     if len(uploads) > MAX_ARTPRICE_SOURCES:
         raise _ArtpriceAnalysisRequestError("Save up to 10 Artprice HTML files per lot.")
-    total_bytes = 0
+    if sum(upload.size for upload in uploads) > MAX_ARTPRICE_UPLOAD_BYTES:
+        raise _ArtpriceAnalysisRequestError("Upload at most 25 MB of Artprice files at a time.", status=413)
     sources = []
+    pending_images = {}
+    expanded_html_bytes = 0
     for upload in uploads:
-        filename, html_text, byte_count = _read_artprice_upload(upload)
-        total_bytes += byte_count
-        if total_bytes > MAX_ARTPRICE_UPLOAD_BYTES:
+        filename, html_text, images = _read_artprice_upload(upload)
+        html_bytes = html_text.encode("utf-8")
+        expanded_html_bytes += len(html_bytes)
+        if expanded_html_bytes > MAX_ARTPRICE_UPLOAD_BYTES:
             raise _ArtpriceAnalysisRequestError("Upload at most 25 MB of Artprice HTML at a time.", status=413)
         try:
             result = analyze_artprice_html(html_text, inbound_shipping=0, target_profit=0)
         except ArtpriceAnalysisError as exc:
             raise _ArtpriceAnalysisRequestError(f"{filename}: {exc}") from None
+        for comparable in result["comparables"]:
+            content = images.get(comparable.get("provider_id"))
+            if content is not None:
+                url = saved_artprice_image_url(content)
+                comparable["image_url"] = url
+                pending_images[url] = content
+        if sum(map(len, pending_images.values())) > MAX_ARTPRICE_UPLOAD_BYTES:
+            raise _ArtpriceAnalysisRequestError("Upload at most 25 MB of saved artwork at a time.", status=413)
         sources.append({
-            "id": hashlib.sha256(html_text.encode("utf-8")).hexdigest(),
+            "id": hashlib.sha256(html_bytes).hexdigest(),
             "filename": filename,
             "currency": result["currency"],
             "comparables": result["comparables"],
             "uploaded_at": timezone.now().isoformat(),
         })
-    return sources
+    return sources, pending_images
 
 
 def _stored_artprice_sources(analysis: AuctionMaxBidAnalysis) -> list[dict]:
@@ -987,11 +1009,14 @@ def _with_artprice_images(records: list[dict], fresh_records: list[dict]) -> lis
         key(record): url for record in fresh_records
         if (url := _artprice_image_url(record.get("image_url")))
     }
-    return [
-        {**record, "image_url": images[key(record)]}
-        if not _artprice_image_url(record.get("image_url")) and key(record) in images else record
-        for record in records
-    ]
+    refreshed = []
+    for record in records:
+        image = images.get(key(record))
+        current = _artprice_image_url(record.get("image_url"))
+        if image and (not current or (is_saved_artprice_image_url(image) and not is_saved_artprice_image_url(current))):
+            record = {**record, "image_url": image}
+        refreshed.append(record)
+    return refreshed
 
 
 def _refresh_artprice_images_only(lot: AuctionWatchLot, analysis: AuctionMaxBidAnalysis, sources: list[dict]):
@@ -1417,7 +1442,7 @@ def auction_lot_artprice_analysis(request, lot_id: int):
     action = str(request.POST.get("action") or "").strip().casefold()
     try:
         if action in {"analyze", "add_sources"}:
-            uploaded_sources = _uploaded_artprice_sources(request)
+            uploaded_sources, pending_images = _uploaded_artprice_sources(request)
             with transaction.atomic():
                 # Serialize edits of this lot so simultaneous additions cannot lose a file.
                 AuctionWatchLot.objects.select_for_update().get(pk=lot.pk)
@@ -1452,6 +1477,11 @@ def auction_lot_artprice_analysis(request, lot_id: int):
                         sources=sources,
                     )
                     _refresh_saved_resale_from_artprice(lot)
+                try:
+                    for content in pending_images.values():
+                        store_saved_artprice_image(content)
+                except OSError:
+                    raise _ArtpriceAnalysisRequestError("The sale images could not be saved. Try the upload again.", status=503) from None
             return JsonResponse(
                 {
                     "ok": True,

@@ -1,6 +1,7 @@
-from django.urls import path
+from django.urls import path, re_path
 
 from . import (
+    artprice_image_store,
     bid_board_views,
     calendar_views,
     calendar_reconciliation_views,
@@ -28,6 +29,11 @@ urlpatterns = [
     path("u/<str:username>/", views.public_profile, name="public_profile"),
     path("capital-dashboard/", capital_dashboard_views.capital_dashboard, name="capital_dashboard"),
     path("calendar/", calendar_views.auction_calendar, name="auction_calendar"),
+    re_path(
+        r"^calendar/artprice-images/(?P<digest>[0-9a-f]{64})\.jpg\Z",
+        artprice_image_store.saved_artprice_image,
+        name="saved_artprice_image",
+    ),
     path("calendar/day-lots/", calendar_views.auction_calendar_day_lots, name="auction_calendar_day_lots"),
     path("calendar/lots/<int:lot_id>/resale-report/", resale_research.auction_lot_resale_report, name="auction_lot_resale_report"),
     path("calendar/proposals/", consignment_proposals.proposal_workspace, name="calendar_consignment_proposals"),
