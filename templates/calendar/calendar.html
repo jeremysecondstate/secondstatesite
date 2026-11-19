@@ -440,7 +440,7 @@
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=artist-labels-20261108"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=saved-sale-images-20261118"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-modes-20261028"></script>
-<script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261027"></script>
+<script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261118"></script>
 <script>
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
@@ -453,13 +453,29 @@
   const hasQualifyingBid = (summary) => {
     const bid = summary?.qualifying_bid;
     return (typeof bid === "number" || (typeof bid === "string" && bid.trim() !== ""))
-      && Number.isFinite(Number(bid)) && Number(bid) >= 0;
+      && Number.isFinite(Number(bid)) && Number(bid) > 0;
   };
   const savedBoardFilterMembership = (summary) => !summary ? 0 : hasQualifyingBid(summary) ? 2 : 1;
   // Board widgets update their shared lot before publishing the saved event.
   const savedBoardMembership = new Map(Object.values(data).flat()
     .flatMap((lot) => [lot, ...(lot.retained_saved_work || [])])
     .map((lot) => [String(lot.id), savedBoardFilterMembership(lot.saved_bid_board)]));
+  const refreshGalleryMembership = (focusedCardId, focusedFilter, refreshCards) => {
+    renderGalleryFilters();
+    if (refreshCards) {
+      renderGalleryCards();
+      if (focusedCardId) {
+        const card = Array.from(galleryGrid.children).find((item) => item.dataset.galleryLotId === focusedCardId);
+        const nextControl = card?.querySelector(".lot-controls")?.querySelector("input, button, a");
+        const activeFilter = Array.from(galleryFilters.children).find((item) => item.dataset.galleryFilter === galleryFilter);
+        (nextControl || activeFilter)?.focus({preventScroll: true});
+      }
+    }
+    if (focusedFilter) {
+      Array.from(galleryCatalog.querySelectorAll("[data-gallery-filter]"))
+        .find((item) => item.dataset.galleryFilter === focusedFilter)?.focus({preventScroll: true});
+    }
+  };
   window.addEventListener("archive-bid-board-saved", (event) => {
     const lotId = String(event.detail.lotId);
     const membershipChanged = savedBoardMembership.has(lotId)
@@ -478,20 +494,7 @@
     const focusedFilter = focusOrigin?.closest?.("[data-gallery-filter]")?.dataset.galleryFilter;
     refreshLotControls(lotId, focusOrigin);
     if (membershipChanged && isGalleryView()) {
-      renderGalleryFilters();
-      if (["bidboards", "qualifying"].includes(galleryFilter)) {
-        renderGalleryCards();
-        if (focusedCardId) {
-          const card = Array.from(galleryGrid.children).find((item) => item.dataset.galleryLotId === focusedCardId);
-          const nextControl = card?.querySelector(".lot-controls")?.querySelector("input, button, a");
-          const activeFilter = Array.from(galleryFilters.children).find((item) => item.dataset.galleryFilter === galleryFilter);
-          (nextControl || activeFilter)?.focus({preventScroll: true});
-        }
-      }
-      if (focusedFilter) {
-        Array.from(galleryCatalog.querySelectorAll("[data-gallery-filter]"))
-          .find((item) => item.dataset.galleryFilter === focusedFilter)?.focus({preventScroll: true});
-      }
+      refreshGalleryMembership(focusedCardId, focusedFilter, ["bidboards", "qualifying"].includes(galleryFilter));
     }
   });
   const auctionCalendar = document.querySelector(".auction-calendar");
@@ -3387,9 +3390,11 @@
   const galleryHouseName = (lot) => activeView === "oliver"
     ? (lot.oliver_house_name || lot.auction_house) : lot.auction_house;
 
-  // Keep the existing "qualifying" deep links working when opening Bid Research.
-  const lotHasBidResearch = (lot) => Boolean(lot.resale_research || hasQualifyingBid(lot.saved_bid_board)
-    || lot.retained_saved_work?.some((work) => work.resale_research || hasQualifyingBid(work.saved_bid_board)));
+  const hasSelectedOrSavedResearch = (work) => Boolean(work.research_queue_selected || work.saved_bid_board || work.resale_research);
+  const lotHasBidBoardResearch = (lot) => hasSelectedOrSavedResearch(lot)
+    || Boolean(lot.retained_saved_work?.some(hasSelectedOrSavedResearch));
+  const lotHasBidResearch = (lot) => hasQualifyingBid(lot.saved_bid_board)
+    || Boolean(lot.retained_saved_work?.some((work) => hasQualifyingBid(work.saved_bid_board)));
 
   const matchesGalleryAttribution = (lot) => !galleryHideAttributed
     || !["After", "Attributed to"].includes(lot.attribution_label);
@@ -3401,7 +3406,7 @@
     if (galleryOrganization.house && galleryHouseName(lot) !== galleryOrganization.house) return false;
     if (galleryFilter === "qualifying") return lotHasBidResearch(lot);
     if (galleryFilter === "tray") return Boolean(lot.email_tray_selected || lot.retained_saved_work?.some((work) => work.email_tray_selected));
-    if (galleryFilter === "bidboards") return Boolean(lot.saved_bid_board || lot.retained_saved_work?.some((work) => work.saved_bid_board));
+    if (galleryFilter === "bidboards") return lotHasBidBoardResearch(lot);
     if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
     return galleryFilter === "all" || galleryHouseName(lot) === galleryFilter.slice(6);
   };
@@ -3517,7 +3522,7 @@
     const countedLots = lots.filter((lot) => !galleryOrganization.house || galleryHouseName(lot) === galleryOrganization.house);
     const houseLots = lots.filter((lot) => {
       if (galleryFilter === "qualifying") return lotHasBidResearch(lot);
-      if (galleryFilter === "bidboards") return Boolean(lot.saved_bid_board || lot.retained_saved_work?.some((work) => work.saved_bid_board));
+      if (galleryFilter === "bidboards") return lotHasBidBoardResearch(lot);
       if (galleryFilter === "tray") return Boolean(lot.email_tray_selected || lot.retained_saved_work?.some((work) => work.email_tray_selected));
       if (galleryFilter.startsWith("artist:")) return window.CalendarArtists.artistKey(lot) === galleryFilter.slice(7);
       return true;
@@ -3534,7 +3539,7 @@
     const choices = [
       {key: "all", label: "All lots", count: countedLots.length},
       {key: "tray", label: "Email Tray", count: countedLots.filter((lot) => lot.email_tray_selected || lot.retained_saved_work?.some((work) => work.email_tray_selected)).length},
-      {key: "bidboards", label: "Bid Boards", count: countedLots.filter((lot) => lot.saved_bid_board || lot.retained_saved_work?.some((work) => work.saved_bid_board)).length},
+      {key: "bidboards", label: "Bid Boards", count: countedLots.filter(lotHasBidBoardResearch).length},
       {key: "qualifying", label: "Bid Research", count: countedLots.filter(lotHasBidResearch).length},
       {key: "house:", label: "All auction houses", count: houseLots.length},
       ...Array.from(houseCounts, ([house, count]) => ({key: `house:${house}`, label: house, count})),
@@ -3651,7 +3656,22 @@
       }
       root.appendChild(savedBoard);
     });
-    if (!boards.length && window.ResearchQueue) root.appendChild(window.ResearchQueue.createSelection(lot, {csrfToken}));
+    if (!boards.length && window.ResearchQueue) {
+      root.appendChild(window.ResearchQueue.createSelection(lot, {
+        csrfToken,
+        onSelectionSaved(selected) {
+          const wasMember = lotHasBidBoardResearch(group);
+          // Retained research pages carry a full lot while the catalog holds its compact summary.
+          const owner = owners.find((work) => String(work.id) === String(lot.id));
+          if (owner) owner.research_queue_selected = selected;
+          if (isGalleryView() && dayLots().includes(group) && wasMember !== lotHasBidBoardResearch(group)) {
+            const focus = document.activeElement;
+            refreshGalleryMembership(focus?.closest(".day-gallery-work")?.dataset.galleryLotId,
+              focus?.closest("[data-gallery-filter]")?.dataset.galleryFilter, galleryFilter === "bidboards");
+          }
+        },
+      }));
+    }
     // Keep the original sources and any other saved work reachable after deleting a board.
     const otherWork = (group.retained_saved_work || []).filter((work) => !work.saved_bid_board && !work.resale_research);
     appendRetainedSavedWork(root, {...group, retained_saved_work: otherWork});
@@ -3781,8 +3801,8 @@
         ? "No lots match these filters. Try showing After & Attributed works or changing the selected filter."
         : galleryFilter === "tray"
         ? "No lots from this day are in the Email Tray yet. Save a lot’s Artprice link in Research, then add it to the tray."
-        : galleryFilter === "qualifying" ? "No lots on this date have a saved bid ceiling or resale report. Choose Bid Boards to see all saved boards."
-        : galleryFilter === "bidboards" ? "No lots have a saved Bid Board in this catalog on this date."
+        : galleryFilter === "qualifying" ? "No lots on this date have a positive Max Bid. See all selected lots in Bid Boards."
+        : galleryFilter === "bidboards" ? "No lots on this date have been selected for research or have saved research."
         : galleryFilter.startsWith("house:") ? `No lots from ${galleryFilter.slice(6)} on this date.`
         : activeView === "oliver" ? "No lots from Oliver’s auction houses on this date. Choose another watched day or switch to Jeremy’s Catalog."
         : "No watched lots match this view.");
@@ -3794,8 +3814,8 @@
     galleryDescription.textContent = artistSelected ? `${selectedArtist?.name || "Artist"} · lots this day` : galleryFilter === "all"
       ? (activeView === "oliver" ? "A catalog from Oliver’s auction houses" : "A catalog across auction houses")
       : galleryFilter === "tray" ? "Lots selected for the next email"
-      : galleryFilter === "qualifying" ? "Bid Research"
-      : galleryFilter === "bidboards" ? "Saved Bid Boards · qualifying, no qualifying bid, and unavailable results" : galleryFilter.slice(6);
+      : galleryFilter === "qualifying" ? "Lots with a saved Max Bid"
+      : galleryFilter === "bidboards" ? "Lots selected for research or with saved research" : galleryFilter.slice(6);
     if (galleryOrganization.house) galleryDescription.textContent += ` · ${galleryOrganization.house}`;
     if (galleryOrganization.region) galleryDescription.textContent += ` · ${galleryRegionLabel()}`;
     const shownCount = Math.min(galleryVisibleCount, lots.length);

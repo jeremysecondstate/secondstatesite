@@ -85,6 +85,7 @@ function page(source, retainedResearchLot = null) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, "static/secondstateapp/research_queue.js"), "utf8"), context);
   vm.runInContext(block("  const hasQualifyingBid =", "  const auctionCalendar =")
     + block("  const externalLink =", "  const formatAnalysisMoney =")
+    + block("  const hasSelectedOrSavedResearch =", "  const matchesGalleryAttribution =")
     + block("  const appendRetainedSavedWork =", "  const renderGalleryCards =")
     + block("  const renderSidebarLots =", "  const updateSidebarLaunches =")
     + block("  const renderLotBrowser =", "  const moveLotBrowser =")
@@ -101,6 +102,48 @@ function page(source, retainedResearchLot = null) {
 }
 const summaries = root => root.querySelectorAll(".sb-catalog-summary");
 const selections = root => root.querySelectorAll(".research-queue-selection");
+
+test("queue selections refresh Bid Boards counts and return focus to the tab when a card leaves", async () => {
+  const source = lot(20), context = page(source);
+  context.window.fetch = async (_, {body}) => ({ok: true, json: async () => ({ok: true, selected: JSON.parse(body).selected})});
+  const card = context.run("galleryCard(source, 0)"); context.galleryGrid.append(card);
+  const checkbox = selections(card)[0].querySelector("input");
+  checkbox.checked = true;
+  checkbox.focus();
+  await checkbox.events.change();
+  assert.equal(context.filterRefreshes, 1);
+  assert.equal(context.cardRefreshes, 0, "adding from All lots preserves the visible card");
+  assert.equal(context.document.activeElement, checkbox);
+  assert.equal(source.research_queue_selected, true);
+
+  context.galleryFilter = "bidboards";
+  context.refreshCards = () => context.galleryGrid.replaceChildren();
+  checkbox.checked = false;
+  await checkbox.events.change();
+  assert.equal(context.filterRefreshes, 2);
+  assert.equal(context.cardRefreshes, 1);
+  assert.equal(context.document.activeElement, context.galleryFilters.children[0]);
+  assert.equal(context.document.activeElement.dataset.galleryFilter, "bidboards");
+  assert.equal(source.research_queue_selected, false);
+});
+
+test("saving a retained listing's selection updates its canonical catalog membership", async () => {
+  const child = lot(11);
+  const canonical = lot(20, {retained_saved_work: [child]});
+  const retained = {...child, retained_listing: {canonical_id: 20}};
+  const context = page(canonical, retained);
+  context.activeView = "research";
+  context.window.fetch = async () => ({ok: true, json: async () => ({ok: true, selected: true})});
+  const root = new Element(); context.mount(root, retained);
+  const checkbox = selections(root)[0].querySelector("input");
+  checkbox.checked = true;
+  await checkbox.events.change();
+  assert.equal(retained.research_queue_selected, true);
+  assert.equal(child.research_queue_selected, true);
+  assert.equal(canonical.research_queue_selected, false);
+  assert.equal(context.run("lotHasBidBoardResearch(source)"), true);
+  assert.equal(context.filterRefreshes, 0);
+});
 
 test("sidebar pages append all lots in order while keeping the existing editors", () => {
   const source = lot(1), context = page(source);

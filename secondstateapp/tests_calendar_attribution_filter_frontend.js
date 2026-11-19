@@ -364,7 +364,7 @@ test("only explicit retained research replaces its canonical slot and preserves 
   assert.deepEqual(lots.map(source => source.id), [1, 2]);
 });
 
-test("qualifying bids use the saved ceiling, independently of the selected bid outcome", () => {
+test("qualifying bids use a positive saved ceiling, independently of the selected bid outcome", () => {
   const amounts = ["1542.61", 250, "0.00", 0, null, undefined, "", "  ", "NaN", "Infinity", Infinity, -1, "-0.01", true, {}, []];
   const lots = amounts.map((qualifying_bid, index) => lot(index + 1, {
     saved_bid_board: {qualifying_bid, qualifies: index >= 4, selected_bid: "9000.00", include_in_email: index % 2 === 0},
@@ -375,12 +375,42 @@ test("qualifying bids use the saved ceiling, independently of the selected bid o
   assert.equal(p.galleryFilter, "all", "qualified-only browsing is opt-in");
   assert.equal(p.visible().length, lots.length);
   p.galleryFilter = "qualifying";
-  assert.deepEqual(p.visible(), [{id: 1, index: 0}, {id: 2, index: 1}, {id: 3, index: 2}, {id: 4, index: 3}]);
+  assert.deepEqual(p.visible(), [{id: 1, index: 0}, {id: 2, index: 1}]);
   p.render();
   const button = p.galleryFilters.children.find(button => button.dataset.galleryFilter === "qualifying");
-  assert.equal(button.children[1].textContent, "4");
+  assert.equal(button.children[1].textContent, "2");
   assert.equal(button.attributes["aria-pressed"], "true");
   assert.equal(JSON.stringify(lots), before, "filtering must not recalculate or change saved selections");
+});
+
+test("Bid Boards includes queued and researched lots while Bid Research only shows saved Max Bids", () => {
+  const report = {report_url: "/resale-report/"};
+  const p = page([
+    lot(1, {sale_region: "us", research_queue_selected: true}),
+    lot(2, {sale_region: "us", resale_research: report}),
+    lot(3, {sale_region: "us", resale_research: report, saved_bid_board: {qualifying_bid: null}}),
+    lot(4, {sale_region: "outside_us", research_queue_selected: true, saved_bid_board: {qualifying_bid: "300.00"}}),
+    lot(5, {sale_region: "outside_us", retained_saved_work: [{id: 50, research_queue_selected: true}]}),
+    lot(6, {sale_region: "outside_us", retained_saved_work: [{id: 60, resale_research: report}]}),
+    lot(7, {sale_region: "us", saved_bid_board: {qualifying_bid: null}, retained_saved_work: [
+      {id: 70, resale_research: report}, {id: 71, saved_bid_board: {qualifying_bid: "125"}},
+    ]}),
+    lot(8, {email_tray_selected: true}),
+  ]);
+  p.render();
+  const tab = key => p.galleryFilters.children.find(button => button.dataset.galleryFilter === key);
+  assert.equal(tab("bidboards").children[1].textContent, "7");
+  assert.equal(tab("qualifying").children[1].textContent, "2");
+  tab("bidboards").events.click();
+  assert.deepEqual(p.visible().map(item => item.id), [1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(regionCounts(p), {"": "7", us: "4", outside_us: "3"});
+  tab("qualifying").events.click();
+  assert.deepEqual(p.visible().map(item => item.id), [4, 7]);
+  assert.deepEqual(regionCounts(p), {"": "2", us: "1", outside_us: "1"});
+  selectRegion(p, "us");
+  assert.deepEqual(p.visible().map(item => item.id), [7]);
+  assert.equal(tab("bidboards").children[1].textContent, "4");
+  assert.equal(tab("qualifying").children[1].textContent, "1");
 });
 
 for (const view of ["catalog", "oliver"]) {
@@ -437,7 +467,7 @@ const organizedLots = () => [
   lot(1, {auction_house: "Z House", oliver_house: false, artist_sort_key: "a", lot_number: "1", event_at: `${day}T00:00:00Z`, estimate_low: "1", saved_bid_board: {qualifying_bid: "100"}}),
   lot(2, {artist_sort_key: "z", lot_number: "100", event_at: `${day}T18:00:00Z`, estimate_low: "900", saved_bid_board: {qualifying_bid: "300", qualifies: false}}),
   lot(3, {auction_house: "Bonhams", artist_sort_key: "a", lot_number: "2", event_at: `${day}T15:00:00Z`, estimate_low: "90", retained_saved_work: [{id: 30, saved_bid_board: {qualifying_bid: "400"}, saved_bid_board_url: "/original/30/"}]}),
-  lot(4, {artist_sort_key: "m", lot_number: "10A", event_at: null, estimate_low: null, saved_bid_board: {qualifying_bid: "0"}}),
+  lot(4, {artist_sort_key: "m", lot_number: "10A", event_at: null, estimate_low: null, saved_bid_board: {qualifying_bid: "50"}}),
   lot(5, {artist_sort_key: "a", lot_number: "3", event_at: `${day}T15:00:00Z`, estimate_low: "100", attribution_label: "After", saved_bid_board: {qualifying_bid: "500"}}),
   lot(6, {auction_house: "Bonhams", saved_bid_board: {qualifying_bid: null, qualifies: true}}),
   lot(7),
@@ -556,7 +586,7 @@ test("grouped qualifying results sort the complete set before pagination and pre
 
 const regionalLots = () => [
   lot(1, {sale_region: "us", attribution_label: "After", won_by_us: true, email_tray_selected: true, saved_bid_board: {qualifying_bid: "100"}}),
-  lot(2, {sale_region: "us", email_tray_selected: true, saved_bid_board: {qualifying_bid: "0"}}),
+  lot(2, {sale_region: "us", email_tray_selected: true, saved_bid_board: {qualifying_bid: "50"}}),
   lot(3, {sale_region: "outside_us", auction_house: "Bonhams", email_tray_selected: true,
     retained_saved_work: [{id: 30, saved_bid_board: {qualifying_bid: "250"}, email_tray_selected: true, saved_bid_board_url: "/saved/30/"}]}),
   lot(4, {sale_region: "outside_us", attribution_label: "Attributed to"}),

@@ -796,7 +796,7 @@ for (const view of ["catalog", "oliver"]) {
     assert.equal(context.galleryArtistClear.hidden, true);
     assert.equal(artistButton(context, "Max, Peter").getAttribute("aria-pressed"), "false");
     assert.equal(context.gallerySendLaunch.hidden, true);
-    assert.match(context.galleryDescription.textContent, /qualifying, no qualifying bid, and unavailable/);
+    assert.match(context.galleryDescription.textContent, /research/i);
     assert.deepEqual(context.galleryGrid.children.map(card => card.id), matching.slice(0, 24).map(item => item.id));
     assert.equal(context.galleryMore.hidden, false);
     context.galleryVisibleCount += 48;
@@ -832,7 +832,7 @@ test("Bid Boards preserves an empty filter through full catalog refresh and neve
   assert.equal(button.children[1].textContent, "0");
   assert.equal(button.getAttribute("aria-pressed"), "true");
   assert.equal(context.galleryGrid.children.length, 1);
-  assert.match(context.galleryGrid.children[0].textContent, /No lots have a saved Bid Board.*this date/);
+  assert.match(context.galleryGrid.children[0].textContent, /selected for research/i);
   assert.equal(context.galleryResults.textContent, "Matching filters: 0 of 2 day lots · 0 cards shown");
   assert.equal(context.galleryMore.hidden, true);
 });
@@ -1257,7 +1257,7 @@ test("retained saved-board updates keep full summaries and count each canonical 
 });
 
 for (const view of ["catalog", "oliver"]) {
-  test(`${view} Bid Research includes resale reports and bid ceilings, preserves sort and paginates before research indices`, () => {
+  test(`${view} Bid Research requires a saved Max Bid, preserves sort and paginates before research indices`, () => {
     const lots = Array.from({length: 90}, (_, index) => lot(index + 1,
       index % 3 ? "Phillips" : "Other", index % 3 !== 0, {
         estimate_low: String(100 - index), artist: index % 2 ? "Artist A" : "Artist B",
@@ -1267,7 +1267,7 @@ for (const view of ["catalog", "oliver"]) {
       }));
     const before = JSON.stringify(lots);
     const context = page({[dayA]: lots}, view);
-    const matching = lots.filter(item => (item.saved_bid_board || item.resale_research) && (view !== "oliver" || item.oliver_house)).reverse();
+    const matching = lots.filter(item => item.saved_bid_board && (view !== "oliver" || item.oliver_house)).reverse();
     const filter = key => context.galleryFilters.children.find(button => button.dataset.galleryFilter === key);
     context.galleryCatalog.querySelectorAll = () => [...context.galleryFilters.children, ...context.galleryHouseFilters.children];
     context.gallerySort.value = "price_asc";
@@ -1326,7 +1326,7 @@ for (const view of ["catalog", "oliver"]) {
     assert.equal(context.galleryResults.textContent, "Matching filters: 0 of 1 day lots · 0 cards shown");
     assert.match(context.galleryGrid.children[0].textContent, /After & Attributed/);
     context.galleryAttributionToggle.click();
-    assert.match(context.galleryGrid.children[0].textContent, /saved bid ceiling or resale report/i);
+    assert.match(context.galleryGrid.children[0].textContent, /Max Bid/i);
     assert.equal(context.galleryMore.hidden, true);
     assert.equal(new URL(context.window.location.href).searchParams.get("filter"), "qualifying");
     context.galleryFilters.children.find(button => button.dataset.galleryFilter === "bidboards").click();

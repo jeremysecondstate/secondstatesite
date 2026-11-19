@@ -72,6 +72,7 @@
       pending.add(key);
       // aria-disabled blocks duplicate changes without moving keyboard focus.
       synchronize(key, previous, true, "Saving selection…", false);
+      let saved;
       try {
         // Preserve click order and prevent an older count response overwriting a newer one.
         const result = requestTail.then(async () => {
@@ -86,15 +87,22 @@
           if (!response.ok || !payload.ok) throw new Error(payload.error || "The queue could not be updated. Please try again.");
           const saved = typeof payload.selected === "boolean" ? payload.selected : payload.item?.selected;
           if (typeof saved !== "boolean") throw new Error("The queue response was incomplete. Reload the page to check your selection.");
-          synchronize(key, saved, false, saved ? "In LiveArt Queue · selection saved" : "Removed from LiveArt Queue", false);
           updateCount(document, payload.queue_count ?? payload.selected_count);
+          return saved;
         });
         requestTail = result.catch(() => {});
-        await result;
+        saved = await result;
       } catch (error) {
         synchronize(key, previous, false, error instanceof Error ? error.message : "The queue could not be updated. Please try again.", true);
+        return;
       } finally {
         pending.delete(key);
+      }
+      // Let the calendar compare membership before updating the shared lot and its controls.
+      try {
+        options.onSelectionSaved?.(saved);
+      } finally {
+        synchronize(key, saved, false, saved ? "In LiveArt Queue · selection saved" : "Removed from LiveArt Queue", false);
       }
     });
     return wrapper;
