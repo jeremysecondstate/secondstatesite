@@ -519,6 +519,24 @@
       "evidence_url": "https://www.invaluable.com/auction-lot/alex-katz-b-1927-kym-1-30-x-95-5-8-in-76-3-x-242-7-cm-executed-in-1989-242-c-95658fb889",
       "evidence": "Live rendered Invaluable auctioneer listing verified November 13, 2026: 111 West 57th Street, New York, NY 10019, United States; sale timestamp 2026-11-19T19:00:00Z. Country fallback is restricted to the observed source IDs, lot numbers and URLs in this catalog group, never all Bonhams sales on that date.",
       "verified_at": "2026-11-13"
+    },
+    {
+      "auction_house": "Barry S. Slosberg Inc",
+      "source": "Invaluable",
+      "date": "2026-12-01",
+      "country_code": "US",
+      "sale_urls": [
+        "https://www.invaluable.com/catalog/W3QXFD77DH"
+      ],
+      "lots": {
+        "207652434": {
+          "lot_number": "5106",
+          "lot_url": "https://www.invaluable.com/auction-lot/louis-icart-engraving-5106-c-8f0b995c21"
+        }
+      },
+      "evidence_url": "https://www.invaluable.com/auction-lot/louis-icart-engraving-5106-c-8f0b995c21",
+      "evidence": "The auction details for Louis Icart Engraving, lot 5106 in catalog W3QXFD77DH, place the December 1, 2026 sale at 10 a.m. Eastern at 3455 Edgemont Street, Philadelphia, Pennsylvania, United States.",
+      "verified_at": "2026-11-18"
     }
   ]
 }
