@@ -537,6 +537,21 @@
       "evidence_url": "https://www.invaluable.com/auction-lot/louis-icart-engraving-5106-c-8f0b995c21",
       "evidence": "The auction details for Louis Icart Engraving, lot 5106 in catalog W3QXFD77DH, place the December 1, 2026 sale at 10 a.m. Eastern at 3455 Edgemont Street, Philadelphia, Pennsylvania, United States.",
       "verified_at": "2026-11-18"
+    },
+    {
+      "auction_house": "Sofe Design Auctions",
+      "source": "Invaluable",
+      "date": "2026-12-19",
+      "country_code": "US",
+      "lots": {
+        "207714012": {
+          "lot_number": "12020",
+          "lot_url": "https://www.invaluable.com/auction-lot/original-engraving-in-black-ink-on-japon-paper-petites-nus-by-salvador-dali-1904-1989-12020-c-c785b75663"
+        }
+      },
+      "evidence_url": "https://bid.sofedesignauctions.com/auctions/4-NQ5QTP/antique-arms-armor-fine-art-dec-19-2026",
+      "evidence": "Sofe's December 19 catalog lists Salvador Dali's Petites Nus as lot 12020 and gives the live auction venue as 2550 E. Trinity Mills Rd., Suite 110, Carrollton, Texas. The scheduled start is 16:00 UTC.",
+      "verified_at": "2026-11-19"
     }
   ]
 }
