@@ -18,7 +18,7 @@ from catalogapp.watchlist_sync import CalendarSyncError, _validated_base_url
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    pending = commands.add_parser("pending", help="Get earliest due lots and a count of remaining work.")
+    pending = commands.add_parser("pending", help="Get current and future Calendar lots in auction order.")
     pending.add_argument("--limit", type=int, default=50, help="Number of lots to return (1–200).")
     inspect = commands.add_parser("inspect", help="Read current catalog facts and saved assessments by ID.")
     inspect.add_argument("--ids", required=True, help="Up to 200 comma-separated Calendar IDs.")
@@ -51,7 +51,8 @@ def main():
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        fields = ("pending_count", "eligible_count", "upcoming_pending_count", "archive_pending_count", "reviews")
+        fields = ("pending_count", "eligible_count", "upcoming_pending_count", "archive_pending_count",
+                  "oldest_pending_day", "oldest_pending_day_count", "reviews")
         summary = {key: payload[key] for key in fields if key in payload}
         print(json.dumps({"output": str(args.output), "rows": len(payload.get("lots", [])), **summary}))
     else:

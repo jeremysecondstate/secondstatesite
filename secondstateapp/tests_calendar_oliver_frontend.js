@@ -95,6 +95,7 @@ function page(data, view = "oliver") {
     querySelectorAll: () => [],
   };
   const context = vm.createContext({
+    marketReviewStart: "2026-11-20",
     dayCounts: Object.fromEntries(Object.entries(data).map(([day, lots]) =>
       [day, {lots: lots.length, oliver_lots: lots.filter(l => l.oliver_house === true).length}])),
     withCalendarDay(_day, ready) { ready(); },

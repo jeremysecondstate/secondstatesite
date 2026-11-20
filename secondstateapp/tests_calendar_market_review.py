@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -19,8 +19,9 @@ KEY = "test-market-review-key"
 class CalendarMarketReviewTests(TestCase):
     def setUp(self):
         self.endpoint = reverse("calendar_market_review")
-        self.today = timezone.localdate(timezone=CALENDAR_ZONE)
+        self.today = date(2026, 11, 20)
         self.start = datetime.combine(self.today, time.min, tzinfo=CALENDAR_ZONE)
+        self.clock = self.enterContext(patch("django.utils.timezone.now", return_value=self.start + timedelta(hours=12)))
         self.lot = watch_lot(source="Whyte's", source_lot_id="ie-1", event_at=self.start,
                              location="Dublin, Ireland", artist="Rufino Tamayo", artist_watchlist_name="Rufino Tamayo")
 
@@ -63,27 +64,53 @@ class CalendarMarketReviewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("no-store", response.headers["Cache-Control"])
         page = response.json()
-        self.assertEqual((page["pending_count"], page["eligible_count"]), (3, 3))
-        self.assertEqual((page["upcoming_pending_count"], page["archive_pending_count"]), (2, 1))
+        self.assertEqual((page["pending_count"], page["eligible_count"]), (2, 2))
+        self.assertEqual((page["upcoming_pending_count"], page["archive_pending_count"]), (2, 0))
+        self.assertEqual((page["oldest_pending_day"], page["oldest_pending_day_count"]), (self.today.isoformat(), 1))
         self.assertEqual([row["id"] for row in page["lots"]], [self.lot.pk])
         self.assertEqual((page["lots"][0]["source"], page["lots"][0]["sale_country"]), ("Whyte's", "IE"))
         self.assertEqual(self.post(self.plan(status="clear")).status_code, 200)
         self.assertEqual([row["id"] for row in self.get(limit=1).json()["lots"]], [inactive.pk])
         self.assertIsNone(self.day_row()["market_mismatch"])
+        self.assertEqual(self.day_row()["market_review_status"], "clear")
 
-    def test_archive_backfill_uses_spare_slots_newest_first_ahead_of_uncertain_retries(self):
-        last_week = watch_lot(source_lot_id="past-week", event_at=self.start - timedelta(days=7), is_all_day=True)
-        last_year = watch_lot(source_lot_id="past-year", event_at=self.start - timedelta(days=360))
-        yesterday = watch_lot(source_lot_id="yesterday", event_at=self.start - timedelta(seconds=1))
-        self.assertEqual(self.post(self.plan(lot=yesterday, status="uncertain")).status_code, 200)
-        AuctionLotMarketReview.objects.filter(lot=yesterday).update(reviewed_at=timezone.now() - timedelta(days=8))
-        page = self.get(limit=3).json()
-        self.assertEqual((page["upcoming_pending_count"], page["archive_pending_count"]), (1, 3))
-        self.assertEqual([row["id"] for row in page["lots"]], [self.lot.pk, last_week.pk, last_year.pk])
-        self.assertEqual(self.post(self.plan(lot=last_week)).status_code, 200)
+    def test_launch_floor_and_rolling_local_midnight_keep_prior_findings_inspectable(self):
+        prelaunch = watch_lot(source_lot_id="prelaunch", event_at=self.start - timedelta(seconds=1), is_all_day=True)
+        next_day = watch_lot(source_lot_id="next-day", event_at=self.start + timedelta(days=1))
+        self.clock.return_value = self.start - timedelta(seconds=1)
+        self.assertEqual([row["id"] for row in self.get().json()["lots"]], [self.lot.pk, next_day.pk])
+        self.assertEqual(self.post(self.plan(prelaunch)).status_code, 409)
+        self.clock.return_value = self.start + timedelta(days=1, seconds=-1)
+        self.assertEqual(self.post(self.plan()).status_code, 200)
         self.login_staff()
-        response = self.client.get(reverse("auction_calendar_day_lots"), {"day": (self.today-timedelta(days=7)).isoformat()})
-        self.assertEqual(response.json()["lots"][0]["market_mismatch"]["sale_market"], "Regional Irish art auctions")
+        saved = self.day_row()["market_mismatch"]
+        self.assertEqual(saved["sale_market"], "Regional Irish art auctions")
+        self.clock.return_value = self.start + timedelta(days=1)
+        page = self.get(limit=200).json()
+        self.assertEqual((page["pending_count"], page["eligible_count"]), (1, 1))
+        self.assertEqual(page["lots"][0]["id"], next_day.pk)
+        past = self.get(ids=str(self.lot.pk)).json()["lots"][0]
+        self.assertFalse(past["eligible"])
+        self.assertTrue(past["review"]["current"])
+        self.assertEqual(self.post(self.plan(status="clear")).status_code, 409)
+        self.assertEqual(self.day_row()["market_mismatch"], saved)
+        catalog = self.client.get(reverse("auction_calendar"), {"day": self.today.isoformat(), "view": "catalog"})
+        self.assertEqual(catalog.context["market_review_start"], self.today.isoformat())
+        self.assertEqual(catalog.context["calendar_data"][self.today.isoformat()][0]["market_mismatch"], saved)
+        self.assertEqual(catalog.context["calendar_data"][self.today.isoformat()][0]["market_review_status"], "mismatch")
+
+    def test_counts_full_earliest_day_including_changed_rows_even_if_page_is_smaller(self):
+        tomorrow = watch_lot(source_lot_id="tomorrow", event_at=self.start + timedelta(days=1))
+        later_today = watch_lot(source_lot_id="later-today", event_at=self.start + timedelta(hours=23))
+        watch_lot(source_lot_id="prior-day", event_at=self.start - timedelta(hours=1))
+        self.assertEqual(self.post(self.plan(lot=self.lot, status="clear")).status_code, 200)
+        AuctionWatchLot.objects.filter(pk=self.lot.pk).update(title="Changed edition")
+        first = self.get(limit=1).json()
+        self.assertEqual((first["oldest_pending_day"], first["oldest_pending_day_count"]), (self.today.isoformat(), 2))
+        self.assertEqual([row["id"] for row in self.get().json()["lots"]], [self.lot.pk, later_today.pk, tomorrow.pk])
+        self.assertEqual(self.post(*(self.plan(lot=lot, status="clear") for lot in (self.lot, later_today, tomorrow))).status_code, 200)
+        done = self.get().json()
+        self.assertEqual((done["oldest_pending_day"], done["oldest_pending_day_count"], done["pending_count"]), (None, 0, 0))
 
     def test_review_displays_evidence_only_while_catalog_facts_match(self):
         self.login_staff()
@@ -99,6 +126,7 @@ class CalendarMarketReviewTests(TestCase):
         self.assertEqual(self.day_row()["market_mismatch"], summary)
         AuctionWatchLot.objects.filter(pk=self.lot.pk).update(location="London, UK")
         self.assertIsNone(self.day_row()["market_mismatch"])
+        self.assertEqual(self.day_row()["market_review_status"], "unreviewed")
         changed = self.get().json()["lots"][0]
         self.assertNotEqual(changed["fingerprint"], plan["fingerprint"])
         self.assertEqual(changed["revision"], 1)
@@ -118,9 +146,11 @@ class CalendarMarketReviewTests(TestCase):
         self.assertIsNone(self.day_row()["market_mismatch"])
 
     def test_uncertainty_waits_one_week_and_equivalent_retry_preserves_review_date(self):
+        self.login_staff()
         plan = self.plan(status="uncertain")
         first = self.post(plan)
         self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(self.day_row()["market_review_status"], "uncertain")
         self.assertFalse(self.get().json()["lots"])
         old = timezone.now() - timedelta(days=8)
         AuctionLotMarketReview.objects.filter(lot=self.lot).update(reviewed_at=old)

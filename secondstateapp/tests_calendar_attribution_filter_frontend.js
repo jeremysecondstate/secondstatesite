@@ -50,7 +50,7 @@ class Element {
   querySelectorAll() { return []; }
 }
 
-const day = "2026-11-18";
+const day = "2026-11-20";
 const lot = (id, overrides = {}) => ({
   id, artist: `Artist ${id}`, artist_sort_key: `artist ${id}`, title: `Work ${id}`,
   auction_house: "Phillips", oliver_house: true, currency: "USD", attribution_label: "",
@@ -65,7 +65,7 @@ function page(lots, view = "catalog") {
     {href: "https://secondstate.art/calendar/?month=2026-12&day=2026-12-01&view=catalog&hide_attributed=1"},
   ];
   const context = vm.createContext({
-    URL, URLSearchParams, data: {[day]: lots}, selectedDay: day, activeView: view,
+    URL, URLSearchParams, data: {[day]: lots}, selectedDay: day, activeView: view, marketReviewStart: "2026-11-20",
     dayCounts: {[day]: {lots: lots.length, oliver_lots: lots.filter(l => l.oliver_house === true).length}},
     withCalendarDay(_day, ready) { ready(); },
     researchScope: "", researchIndex: 0, researchLook: "dossier", restoringHistory: false,
@@ -124,8 +124,9 @@ test("the market mismatch shortcut opens the complete flagged set for each calen
     lot(1, {sale_region: "us"}),
     lot(2, {sale_region: "outside_us", attribution_label: "After", market_mismatch: {}}),
     lot(3, {sale_region: "us", oliver_house: false, market_mismatch: {}}),
+    lot(4, {sale_region: "unknown", market_mismatch: {}}),
   ];
-  for (const [monthView, catalogView, flagged] of [["calendar", "catalog", [2, 3]], ["oliver-calendar", "oliver", [2]]]) {
+  for (const [monthView, catalogView, flagged] of [["calendar", "catalog", [2, 3, 4]], ["oliver-calendar", "oliver", [2, 4]]]) {
     const p = page(lots, monthView);
     const button = id => p.document.getElementById(id);
     const launch = button("day-market-mismatches-launch");
@@ -136,9 +137,9 @@ test("the market mismatch shortcut opens the complete flagged set for each calen
     p.setCalendarView = view => { p.activeView = view; p.render(); p.run("updateCalendarLocation()"); };
     p.run(declaration("showDayMarketMismatches") + declaration("updateSidebarLaunches"));
     p.run(between('  document.getElementById("day-market-mismatches-launch").addEventListener', '  researchBack.addEventListener'));
-    p.run('updateSidebarLaunches(dayLots(), "November 18")');
+    p.run('updateSidebarLaunches(dayLots(), "November 20")');
     assert.equal(launch.hidden, false);
-    assert.equal(launch.textContent, flagged.length === 1 ? "View 1 market mismatch" : "View 2 market mismatches");
+    assert.equal(launch.textContent, `View ${flagged.length} market mismatches`);
     p.galleryFilter = "tray";
     p.galleryHideAttributed = true;
     p.run('galleryOrganization.region = "us"; galleryOrganization.house = "Bonhams"');
@@ -149,7 +150,7 @@ test("the market mismatch shortcut opens the complete flagged set for each calen
     assert.deepEqual(p.visible().map(row => row.id), flagged);
     assert.equal(button("day-gallery-market-mismatch-count").textContent, String(flagged.length));
     assert.equal(new URL(p.window.history.url).searchParams.get("market_mismatches"), "1");
-    assert.equal(p.galleryResults.textContent, `Matching filters: ${flagged.length} of ${catalogView === "oliver" ? 2 : 3} day lots · ${flagged.length} card${flagged.length === 1 ? "" : "s"} shown`);
+    assert.equal(p.galleryResults.textContent, `Matching filters: ${flagged.length} of ${catalogView === "oliver" ? 3 : 4} day lots · ${flagged.length} cards shown`);
     selectRegion(p, "us");
     assert.deepEqual(p.visible().map(row => row.id), catalogView === "oliver" ? [] : [3]);
     assert.equal(button("day-gallery-market-mismatch-count").textContent, String(flagged.length));
@@ -162,20 +163,53 @@ test("the market mismatch shortcut opens the complete flagged set for each calen
   }
 });
 
-test("empty and deferred days hide the mismatch button and preserve a deep link until the day is loaded", () => {
+test("deferred dates and zero results keep the control and deep link with an accurate review count", () => {
   const p = page([lot(1)]);
   const toggle = p.document.getElementById("day-gallery-market-mismatches");
   p.run('restoreGalleryOrganization(new URLSearchParams("market_mismatches=1"))');
   delete p.data[day];
   p.render();
-  assert.equal(toggle.hidden, true);
+  assert.equal(toggle.hidden, false);
+  const count = p.document.getElementById("day-gallery-market-mismatch-count");
+  const status = p.document.getElementById("day-gallery-market-review-status");
+  assert.equal(count.textContent, "…");
+  assert.match(status.textContent, /when the lots load/);
   assert.equal(p.run("galleryOrganization.marketMismatches"), true);
-  p.data[day] = [lot(1, {market_mismatch: null})];
+  p.data[day] = [lot(1, {market_review_status: "unreviewed"}), lot(2, {market_review_status: "clear"}),
+    lot(3, {market_review_status: "uncertain"})];
   p.render();
-  assert.equal(p.run("galleryOrganization.marketMismatches"), false);
-  assert.equal(toggle.hidden, true);
-  assert.deepEqual(p.visible().map(row => row.id), [1]);
-  assert.equal(new URL(p.window.history.url).searchParams.has("market_mismatches"), false);
+  assert.equal(p.run("galleryOrganization.marketMismatches"), true);
+  assert.equal(toggle.hidden, false);
+  assert.equal(count.textContent, "0");
+  assert.match(status.textContent, /2 of 3 lots reviewed · 1 inconclusive/);
+  assert.deepEqual(p.visible().map(row => row.id), []);
+  p.data[day] = [];
+  p.render();
+  assert.equal(toggle.hidden, false);
+  assert.equal(status.textContent, "No lots in this day’s catalog.");
+  p.run("updateCalendarLocation()");
+  assert.equal(new URL(p.window.history.url).searchParams.get("market_mismatches"), "1");
+});
+
+test("pre-launch dates show a saved flag while launch and later dates always offer the shortcut in both views", () => {
+  const p = page([]);
+  p.lotBrowserLaunch = new Element();
+  p.researchLaunch = new Element();
+  p.run(declaration("updateSidebarLaunches"));
+  const launch = p.document.getElementById("day-market-mismatches-launch");
+  const toggle = p.document.getElementById("day-gallery-market-mismatches");
+  const status = p.document.getElementById("day-market-review-status");
+  for (const [date, lots, visible] of [
+    ["2026-11-19", [lot(1)], false], ["2026-11-19", [lot(1, {market_mismatch: {}})], true],
+    [day, [], true], ["2026-11-21", [lot(2, {market_review_status: "clear"})], true],
+  ]) {
+    p.selectedDay = date;
+    p.data[date] = lots;
+    p.run("renderGalleryFilters(); updateSidebarLaunches(dayLots(), selectedDay)");
+    assert.equal(launch.hidden, !visible);
+    assert.equal(toggle.hidden, !visible);
+    if (visible) assert.equal(status.textContent, p.document.getElementById("day-gallery-market-review-status").textContent);
+  }
 });
 
 test("the toggle hides only the authoritative After and Attributed to labels", () => {

@@ -17,9 +17,9 @@ $worker = 'C:\dev\secondstatesite\scripts\calendar_market_review.py'
 & $python $worker pending --limit 50
 ```
 
-Follow the queue across all sale locations and Calendar scopes. It prioritizes sales from today onward in Los Angeles time, then works backward through earlier days. It covers dated, non-superseded Calendar lots and picks up changed catalog facts. `upcoming_pending_count` and `archive_pending_count` give the remaining work in each group. The same eligible lot has one shared assessment wherever it appears.
+Start with November 20, 2026. On each run, review lots dated today in America/Los_Angeles first, then move forward in sale order. Include every dated, non-superseded Calendar lot at U.S., international and unconfirmed sale locations, across every source and house. Read the worker queue independently of anyone’s selected Catalog view or sale-location filter. The same lot has one shared assessment wherever it appears. The worker also picks up changed catalog facts.
 
-Read the entire batch. Research groups with the same sale or artist together where their evidence applies, but make a decision for each lot. Work in successive batches while time permits. Save completed assessments as you go so the next run advances. Unexamined lots stay in the queue.
+Read the entire batch. Complete the earliest due day before advancing to a later day. Research groups with the same sale or artist together where their evidence applies, but make a decision for each lot. Work in successive batches and save completed assessments as you go so the next run advances. Use `oldest_pending_day`, `oldest_pending_day_count` and `pending_count` to check where coverage resumes.
 
 ## Decide whether the market fits
 
@@ -44,4 +44,4 @@ Prepare a temporary UTF-8 JSON file with a top-level `reviews` array. Each entry
 
 Set `$reviewFile` to the JSON path and `$reviewedIds` to the comma-separated Calendar IDs in the batch. Verify each saved assessment is current and the status matches. Each write is atomic. If a batch conflicts, inspect its IDs, set aside ineligible lots, and reevaluate changed facts or newer assessments before submitting the outstanding decisions. After an interrupted write, inspect first. An identical replay preserves an already accepted review.
 
-Continue with the next due batch. A current review persists across runs. At the end, report verified counts for flagged, clear and uncertain lots and any remaining upcoming or historical backlog. For new flags, give the day, artist, house and a short market explanation. Limit persistent changes to market assessments.
+Continue with the next due batch. A saved assessment remains available on its sale day after the auction. At the end, report verified counts for flagged, clear and uncertain lots, the earliest date still due, and its remaining lot count. For new flags, give the day, artist, house and a short market explanation. Limit persistent changes to market assessments.

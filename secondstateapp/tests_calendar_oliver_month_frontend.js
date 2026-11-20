@@ -139,7 +139,7 @@ function page(data, view = "calendar") {
     dayCounts: Object.fromEntries(Object.entries(data).map(([day, lots]) =>
       [day, {lots: lots.length, oliver_lots: lots.filter(l => l.oliver_house === true).length}])),
     withCalendarDay(_day, ready) { ready(); },
-    data, document, URL, URLSearchParams, dayButtons, selectedDay: Object.keys(data)[0], activeView: view,
+    data, document, URL, URLSearchParams, dayButtons, selectedDay: Object.keys(data)[0], activeView: view, marketReviewStart: "2026-11-20",
     salesData: Object.fromEntries(Object.keys(data).map(day => [day, [sale("Other house", 1), sale("Phillips", 1)]])),
     oliverSalesData: Object.fromEntries(Object.keys(data).map(day => [day, data[day].some(item => item.oliver_house === true) ? [sale("Phillips", 1)] : []])),
     researchScope: "", researchIndex: 0, researchLook: "dossier", researchRenderedKey: "",
@@ -163,7 +163,7 @@ function page(data, view = "calendar") {
     "researchBack", "researchPrevious", "researchSearch", "title", "list", "salesSection", "salesCount", "salesList",
     "lotBrowserLaunch", "researchLaunch"]) context[name] = new Element();
   const functions = ["galleryOrganization", "gallerySortOrders", "restoreGalleryOrganization", "writeGalleryOrganization", "isGalleryView", "inOliverScope", "dayLots", "renderCalendarScope", "renderDaySales", "renderSidebarLots",
-    "updateSidebarLaunches", "showDay", "setCalendarView", "updateCalendarLocation", "openResearchWorkspace"];
+    "dayMarketSummary", "updateSidebarLaunches", "showDay", "setCalendarView", "updateCalendarLocation", "openResearchWorkspace"];
   vm.runInContext(functions.map(declaration).join("\n"), context);
   vm.runInContext(between('  researchBack.addEventListener("click"', '  researchPrevious.addEventListener("click"'), context);
   context.run = expression => vm.runInContext(expression, context);

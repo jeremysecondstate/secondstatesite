@@ -1,5 +1,6 @@
-"""Review the full dated Calendar, prioritizing upcoming lots before the archive."""
+"""Review current and future Calendar lots in auction order."""
 
+from collections import Counter
 from datetime import datetime, time, timedelta
 from itertools import islice
 import json
@@ -15,7 +16,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from .calendar_market_review import CATALOG_FIELDS, review_fingerprint
+from .calendar_market_review import CATALOG_FIELDS, FIRST_REVIEW_DAY, review_fingerprint
 from .calendar_views import _artist_label, _attach_superseded_attribution, _calendar_zone, _sync_authorized
 from .lot_presentation import artist_attribution_label
 from .models import AuctionLotMarketReview, AuctionWatchLot
@@ -28,13 +29,14 @@ RETRY_UNCERTAIN = timedelta(days=7)
 validate_web_url = URLValidator(schemes=["http", "https"])
 
 
-def _today_start():
+def _review_start():
     zone = _calendar_zone()
-    return datetime.combine(timezone.localdate(timezone=zone), time.min, tzinfo=zone)
+    first_day = max(FIRST_REVIEW_DAY, timezone.localdate(timezone=zone))
+    return datetime.combine(first_day, time.min, tzinfo=zone)
 
 
 def _eligible_lots():
-    return AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__isnull=False)
+    return AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=_review_start())
 
 
 def _projections(lots):
@@ -69,10 +71,11 @@ def _ids(raw):
 def _inspect(raw_ids):
     lots = list(AuctionWatchLot.objects.select_related("market_review").filter(pk__in=_ids(raw_ids)).order_by("pk"))
     rows = _projections(lots)
+    start = _review_start()
     for lot, row in zip(lots, rows):
         review = getattr(lot, "market_review", None)
         row.update(
-            eligible=bool(lot.superseded_by_id is None and lot.event_at),
+            eligible=bool(lot.superseded_by_id is None and lot.event_at and lot.event_at >= start),
             revision=review.revision if review else 0, review=None,
         )
         if review:
@@ -84,8 +87,13 @@ def _inspect(raw_ids):
     return {"lots": rows}
 
 
-def _scan_scope(lots, limit, retry_before, *, archive):
-    ordered = lots.order_by("-event_at" if archive else "event_at", "pk")
+def _pending(raw_limit):
+    limit = int(raw_limit)
+    if not 1 <= limit <= MAX_BATCH:
+        raise ValueError(f"limit must be between 1 and {MAX_BATCH}.")
+    zone = _calendar_zone()
+    retry_before = timezone.now() - RETRY_UNCERTAIN
+    ordered = _eligible_lots().order_by("event_at", "pk")
     unreviewed = ordered.filter(market_review__isnull=True)
     pending_count = eligible_count = unreviewed.count()
     pending = _projections(list(unreviewed[:limit]))
@@ -97,49 +105,34 @@ def _scan_scope(lots, limit, retry_before, *, archive):
         *CATALOG_FIELDS, "active", "sold_price", "sold_currency",
         "market_review__fingerprint", "market_review__status", "market_review__reviewed_at", "market_review__revision",
     ).iterator(chunk_size=500)
-    changed, retries = [], []
+    due = []
+    due_by_day = Counter()
     while batch := list(islice(reviewed, 500)):
         eligible_count += len(batch)
         for lot, row in zip(batch, _projections(batch)):
             review = lot.market_review
-            if review.fingerprint != row["fingerprint"]:
-                bucket = changed
-            elif review.status == AuctionLotMarketReview.Status.UNCERTAIN and review.reviewed_at <= retry_before:
-                bucket = retries
-            else:
+            if (review.fingerprint == row["fingerprint"]
+                    and (review.status != AuctionLotMarketReview.Status.UNCERTAIN or review.reviewed_at > retry_before)):
                 continue
             pending_count += 1
-            if len(bucket) < limit:
+            due_by_day[row["event_at"].astimezone(zone).date()] += 1
+            if len(due) < limit:
                 row["revision"] = review.revision
-                bucket.append(row)
-    pending.extend(changed)
-    if archive:
-        pending.sort(key=lambda row: (-row["event_at"].timestamp(), row["id"]))
-        # Backfill new and changed catalog facts before revisiting unresolved historical sales.
-        pending.extend(retries)
-    else:
-        pending.extend(retries)
-        pending.sort(key=lambda row: (row["event_at"], row["id"]))
-    return pending[:limit], pending_count, eligible_count
-
-
-def _pending(raw_limit):
-    limit = int(raw_limit)
-    if not 1 <= limit <= MAX_BATCH:
-        raise ValueError(f"limit must be between 1 and {MAX_BATCH}.")
-    today = _today_start()
-    retry_before = timezone.now() - RETRY_UNCERTAIN
-    eligible = _eligible_lots()
-    upcoming, upcoming_pending, upcoming_count = _scan_scope(
-        eligible.filter(event_at__gte=today), limit, retry_before, archive=False,
-    )
-    archive, archive_pending, archive_count = _scan_scope(
-        eligible.filter(event_at__lt=today), limit - len(upcoming), retry_before, archive=True,
-    )
+                due.append(row)
+    pending.extend(due)
+    pending.sort(key=lambda row: (row["event_at"], row["id"]))
+    first_day = None
+    first_day_count = 0
+    if pending:
+        first_day = pending[0]["event_at"].astimezone(zone).date()
+        start = datetime.combine(first_day, time.min, tzinfo=zone)
+        first_day_count = due_by_day[first_day] + unreviewed.filter(
+            event_at__gte=start, event_at__lt=start + timedelta(days=1),
+        ).count()
     return {
-        "lots": upcoming + archive, "pending_count": upcoming_pending + archive_pending,
-        "eligible_count": upcoming_count + archive_count,
-        "upcoming_pending_count": upcoming_pending, "archive_pending_count": archive_pending,
+        "lots": pending[:limit], "pending_count": pending_count, "eligible_count": eligible_count,
+        "oldest_pending_day": first_day, "oldest_pending_day_count": first_day_count,
+        "upcoming_pending_count": pending_count, "archive_pending_count": 0,
     }
 
 
@@ -212,7 +205,7 @@ def _apply(plan):
     # An outer join to the optional review cannot be locked on PostgreSQL.
     lots = list(_eligible_lots().select_for_update().filter(pk__in=plan).order_by("pk"))
     if len(lots) != len(plan):
-        raise ValueError("One or more lots left the dated Calendar. Read the lots again.")
+        raise ValueError("One or more lots fall outside the current Calendar review window. Read the lots again.")
     saved = AuctionLotMarketReview.objects.in_bulk(plan, field_name="lot_id")
     results = []
     for lot, row in zip(lots, _projections(lots)):

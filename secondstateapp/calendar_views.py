@@ -56,7 +56,7 @@ from .auction_email import (
 from .bid_board_snapshot import saved_board_summary, uses_max_bid_label
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
 from .calendar_lot_numbers import calendar_lot_number
-from .calendar_market_review import mismatch_summary
+from .calendar_market_review import FIRST_REVIEW_DAY, market_review_fields
 from .calendar_sales import verified_sale
 from .calendar_images import (
     is_saved_calendar_image_url,
@@ -447,7 +447,7 @@ def _day_lot_data(request, selected_day, zone, selected_lot_ids, research_queue_
     calendar_data = {day: rows}
     _attach_superseded_attribution(calendar_data)
     for lot, row in zip(lots, rows):
-        row["market_mismatch"] = mismatch_summary(lot, row)
+        row.update(market_review_fields(lot, row))
     retained = _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, research_queue_state, request)
     return {"day": day, "lots": rows, "retained_research_lot": retained}
 
@@ -683,6 +683,7 @@ def auction_calendar(request):
         "oliver_upcoming_groups": oliver_upcoming_groups,
         "timezone_label": settings.CALENDAR_TIME_ZONE.replace("_", " "),
         "calendar_timezone": str(zone),
+        "market_review_start": FIRST_REVIEW_DAY.isoformat(),
         "oliver_house_count": len(oliver_house_names()),
         "oliver_house_names": list(oliver_house_names()),
         "synced_lot_count": AuctionWatchLot.objects.filter(superseded_by__isnull=True).count(),

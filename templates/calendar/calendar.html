@@ -12,7 +12,7 @@
 {% block main_class %}calendar-page-shell{% endblock %}
 
 {% block content %}
-<section class="auction-calendar" aria-labelledby="calendar-title">
+<section class="auction-calendar" aria-labelledby="calendar-title" data-market-review-start="{{ market_review_start }}">
   {% if messages %}
     <div class="calendar-alerts" aria-live="polite">
       {% for message in messages %}
@@ -146,7 +146,8 @@
           <button id="day-research-launch" class="lot-browser-launch" type="button" hidden>
             Open research workspace
           </button>
-          <button id="day-market-mismatches-launch" class="lot-browser-launch" type="button" aria-controls="day-gallery-catalog" hidden>View market mismatches</button>
+          <button id="day-market-mismatches-launch" class="lot-browser-launch" type="button" aria-controls="day-gallery-catalog" aria-describedby="day-market-review-status" hidden>View market mismatches</button>
+          <p id="day-market-review-status" class="day-gallery-filter-note" role="status" hidden></p>
           <span id="calendar-csrf-token" data-token="{{ csrf_token }}" hidden></span>
           <div id="selected-day-lots" class="selected-day-lots">
             <p class="sidebar-empty">Select a calendar day to see its lots.</p>
@@ -244,7 +245,7 @@
       <div class="day-gallery-location-tools">
         <span id="day-gallery-location-label" class="day-gallery-location-label">Sale location</span>
         <div id="day-gallery-region-filters" class="day-gallery-region-filters" role="group" aria-labelledby="day-gallery-location-label" aria-describedby="day-gallery-location-status" title="Counts reflect the active lot filters."></div>
-        <button id="day-gallery-market-mismatches" class="day-gallery-filter" type="button" aria-pressed="false" aria-controls="day-gallery-grid day-gallery-artists day-gallery-house-filters" title="Show every flagged lot in this day’s catalog and clear other lot filters." hidden>
+        <button id="day-gallery-market-mismatches" class="day-gallery-filter" type="button" aria-pressed="false" aria-controls="day-gallery-grid day-gallery-artists day-gallery-house-filters" aria-describedby="day-gallery-market-review-status" title="Show every flagged lot in this day’s catalog and clear other lot filters." hidden>
           <span class="day-gallery-filter-name">Market mismatches</span>
           <span id="day-gallery-market-mismatch-count" class="day-gallery-filter-count"></span>
         </button>
@@ -252,6 +253,7 @@
       <div class="day-gallery-filter-summary">
         <p id="day-gallery-results" class="day-gallery-results" role="status">Matching filters: 0 of 0 day lots · 0 cards shown</p>
         <p id="day-gallery-attribution-status" class="day-gallery-filter-note" role="status" hidden></p>
+        <p id="day-gallery-market-review-status" class="day-gallery-filter-note" role="status" hidden></p>
       </div>
       <p id="day-gallery-location-status" class="day-gallery-location-status" role="status" hidden></p>
     </div>
@@ -503,6 +505,7 @@
     }
   });
   const auctionCalendar = document.querySelector(".auction-calendar");
+  const marketReviewStart = auctionCalendar.dataset.marketReviewStart;
   const calendarPageShell = document.querySelector(".calendar-page-shell");
   const title = document.getElementById("selected-day-title");
   const selectedDayCard = document.querySelector(".selected-day-card");
@@ -3487,18 +3490,28 @@
     return filtered;
   };
 
+  const dayMarketSummary = (lots) => {
+    const flagged = lots.filter((lot) => lot.market_mismatch).length;
+    const visible = Boolean(selectedDay && (selectedDay >= marketReviewStart || flagged || galleryOrganization.marketMismatches));
+    if (!Object.hasOwn(data, selectedDay)) return {visible, count: null, status: "Market review counts will appear when the lots load."};
+    if (!lots.length) return {visible, count: 0, status: "No lots in this day’s catalog."};
+    const uncertain = lots.filter((lot) => lot.market_review_status === "uncertain").length;
+    const reviewed = flagged + uncertain + lots.filter((lot) => lot.market_review_status === "clear").length;
+    let status = `Market review · ${reviewed} of ${lots.length} lot${lots.length === 1 ? "" : "s"} reviewed`;
+    if (uncertain) status += ` · ${uncertain} inconclusive`;
+    return {visible, count: flagged, status};
+  };
+
   const renderGalleryFilters = () => {
     const scopedLots = dayLots();
-    const mismatchCount = scopedLots.filter((lot) => lot.market_mismatch).length;
+    const market = dayMarketSummary(scopedLots);
     const mismatchToggle = document.getElementById("day-gallery-market-mismatches");
-    mismatchToggle.hidden = !mismatchCount;
-    if (galleryOrganization.marketMismatches && !mismatchCount && Object.hasOwn(data, selectedDay)) {
-      galleryOrganization.marketMismatches = false;
-      galleryVisibleCount = 24;
-      updateCalendarLocation();
-    }
+    mismatchToggle.hidden = !market.visible;
     mismatchToggle.setAttribute("aria-pressed", String(galleryOrganization.marketMismatches));
-    document.getElementById("day-gallery-market-mismatch-count").textContent = String(mismatchCount);
+    document.getElementById("day-gallery-market-mismatch-count").textContent = market.count === null ? "…" : String(market.count);
+    const marketStatus = document.getElementById("day-gallery-market-review-status");
+    marketStatus.hidden = !market.visible;
+    marketStatus.textContent = market.status;
     // Old links may still request Unconfirmed after all sale locations have
     // been resolved. Wait for the full day before judging its scoped records;
     // a deferred day currently has no rows, even when its locations are unknown.
@@ -3832,7 +3845,7 @@
     });
     if (!lots.length) {
       appendText(galleryGrid, "p", "day-gallery-empty", galleryOrganization.marketMismatches
-        ? "No flagged lots match these filters. Turn off Market mismatches or change another filter."
+        ? (Object.hasOwn(data, selectedDay) ? "No flagged lots match these filters." : "Waiting for this day’s lots to load.")
         : galleryOrganization.region
         ? "No lots match this sale location and the selected filters. Choose All locations or change another filter."
         : galleryOrganization.house
@@ -3860,7 +3873,8 @@
     if (galleryOrganization.region) galleryDescription.textContent += ` · ${galleryRegionLabel()}`;
     if (galleryOrganization.marketMismatches) galleryDescription.textContent += " · Market mismatches";
     const shownCount = Math.min(galleryVisibleCount, lots.length);
-    galleryResults.textContent = `Matching filters: ${lots.length} of ${dayLots().length} day lots · ${shownCount} card${shownCount === 1 ? "" : "s"} shown`;
+    galleryResults.textContent = galleryOrganization.marketMismatches && !Object.hasOwn(data, selectedDay)
+      ? "" : `Matching filters: ${lots.length} of ${dayLots().length} day lots · ${shownCount} card${shownCount === 1 ? "" : "s"} shown`;
     galleryMore.hidden = galleryVisibleCount >= lots.length;
     galleryMore.textContent = `Show ${Math.min(24, Math.max(0, lots.length - galleryVisibleCount))} more lots`;
   };
@@ -4764,9 +4778,9 @@
     else if (activeView === "research") { renderResearchDays(); renderResearchWorkspace(); }
     else if (selectedDay) {
       renderDaySales(selectedDay);
+      const lots = dayLots();
+      updateSidebarLaunches(lots, formatCalendarDay(selectedDay, {weekday: "long", year: "numeric", month: "long", day: "numeric"}));
       if (Object.hasOwn(data, selectedDay)) {
-        const lots = dayLots();
-        updateSidebarLaunches(lots, formatCalendarDay(selectedDay, {weekday: "long", year: "numeric", month: "long", day: "numeric"}));
         if (sidebarRenderedDay !== selectedDay || sidebarRenderedScope !== (inOliverScope() ? "oliver" : "all")) renderSidebarLots(lots);
       } else {
         list.replaceChildren();
@@ -5048,10 +5062,14 @@
   };
 
   const updateSidebarLaunches = (lots, dayLabel) => {
-    const mismatchCount = lots.filter((lot) => lot.market_mismatch).length;
+    const market = dayMarketSummary(lots);
     const mismatchLaunch = document.getElementById("day-market-mismatches-launch");
-    mismatchLaunch.hidden = !mismatchCount;
-    mismatchLaunch.textContent = `View ${mismatchCount} market mismatch${mismatchCount === 1 ? "" : "es"}`;
+    mismatchLaunch.hidden = !market.visible;
+    mismatchLaunch.textContent = market.count === null ? "View market mismatches · …"
+      : `View ${market.count} market mismatch${market.count === 1 ? "" : "es"}`;
+    const marketStatus = document.getElementById("day-market-review-status");
+    marketStatus.hidden = !market.visible;
+    marketStatus.textContent = market.status;
     lotBrowserLaunch.hidden = !lots.length;
     researchLaunch.hidden = !lots.length;
     researchLaunch.textContent = lots.length === 1 ? "Research this lot" : `Research ${lots.length} lots in full view`;

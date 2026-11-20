@@ -1,4 +1,4 @@
 interface:
   display_name: "SecondState Market Mismatch"
   short_description: "Find Calendar lots offered outside their usual market"
-  default_prompt: "Use $secondstate-market-mismatch to review SecondState Calendar lots for market mismatches, starting with upcoming sales."
+  default_prompt: "Use $secondstate-market-mismatch to review all sale locations on today’s SecondState Calendar, then move forward in sale order."
