@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=bid-research-20261118">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=market-mismatches-20261119">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=bid-research-20261118">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
@@ -146,6 +146,7 @@
           <button id="day-research-launch" class="lot-browser-launch" type="button" hidden>
             Open research workspace
           </button>
+          <button id="day-market-mismatches-launch" class="lot-browser-launch" type="button" aria-controls="day-gallery-catalog" hidden>View market mismatches</button>
           <span id="calendar-csrf-token" data-token="{{ csrf_token }}" hidden></span>
           <div id="selected-day-lots" class="selected-day-lots">
             <p class="sidebar-empty">Select a calendar day to see its lots.</p>
@@ -243,6 +244,10 @@
       <div class="day-gallery-location-tools">
         <span id="day-gallery-location-label" class="day-gallery-location-label">Sale location</span>
         <div id="day-gallery-region-filters" class="day-gallery-region-filters" role="group" aria-labelledby="day-gallery-location-label" aria-describedby="day-gallery-location-status" title="Counts reflect the active lot filters."></div>
+        <button id="day-gallery-market-mismatches" class="day-gallery-filter" type="button" aria-pressed="false" aria-controls="day-gallery-grid day-gallery-artists day-gallery-house-filters" title="Show every flagged lot in this day’s catalog and clear other lot filters." hidden>
+          <span class="day-gallery-filter-name">Market mismatches</span>
+          <span id="day-gallery-market-mismatch-count" class="day-gallery-filter-count"></span>
+        </button>
       </div>
       <div class="day-gallery-filter-summary">
         <p id="day-gallery-results" class="day-gallery-results" role="status">Matching filters: 0 of 0 day lots · 0 cards shown</p>
@@ -779,6 +784,24 @@
     link.rel = "noopener noreferrer";
     link.textContent = label;
     return link;
+  };
+
+  const appendMarketMismatch = (parent, finding) => {
+    const details = document.createElement("details");
+    details.className = "lot-market-mismatch";
+    appendText(details, "summary", "", "Market mismatch");
+    appendText(details, "p", "", `Sale market · ${finding.sale_market}`);
+    appendText(details, "p", "", `Stronger market · ${finding.stronger_market}`);
+    appendText(details, "p", "", finding.reason);
+    const sources = document.createElement("ul");
+    for (const source of finding.sources) {
+      if (!/^https?:\/\//i.test(source.url)) continue;
+      const item = document.createElement("li");
+      item.appendChild(externalLink(source.url, "lot-auction-link", source.label));
+      sources.appendChild(item);
+    }
+    if (sources.children.length) details.appendChild(sources);
+    parent.appendChild(details);
   };
 
   const appendArtistLabel = (item, lot) => {
@@ -3364,16 +3387,17 @@
     return window.CalendarCurrency.sortPrice(lot);
   };
 
-  const galleryOrganization = {house: "", group: "", region: ""};
+  const galleryOrganization = {house: "", group: "", region: "", marketMismatches: false};
   const gallerySortOrders = ["catalog", "lot_asc", "lot_desc", "artist", "artist_desc", "house", "time_asc", "time_desc", "arrival_asc", "arrival_desc", "price_asc", "price_desc"];
   const restoreGalleryOrganization = (params) => {
     galleryOrganization.house = params.get("house") || (params.get("filter")?.startsWith("house:") ? params.get("filter").slice(6) : "");
     galleryOrganization.group = params.get("group") === "house" ? "house" : "";
     galleryOrganization.region = ["us", "outside_us", "unknown"].includes(params.get("sale_region")) ? params.get("sale_region") : "";
+    galleryOrganization.marketMismatches = params.get("market_mismatches") === "1";
     gallerySort.value = gallerySortOrders.includes(params.get("sort")) ? params.get("sort") : "catalog";
   };
   const writeGalleryOrganization = (url) => {
-    [["house", galleryOrganization.house], ["group", galleryOrganization.group], ["sale_region", galleryOrganization.region], ["sort", gallerySort.value === "catalog" ? "" : gallerySort.value]].forEach(([key, value]) => {
+    [["house", galleryOrganization.house], ["group", galleryOrganization.group], ["sale_region", galleryOrganization.region], ["market_mismatches", galleryOrganization.marketMismatches ? "1" : ""], ["sort", gallerySort.value === "catalog" ? "" : gallerySort.value]].forEach(([key, value]) => {
       if (value) url.searchParams.set(key, value);
       else url.searchParams.delete(key);
     });
@@ -3400,8 +3424,9 @@
     || !["After", "Attributed to"].includes(lot.attribution_label);
   const galleryLotRegion = (lot) => ["us", "outside_us"].includes(lot.sale_region) ? lot.sale_region : "unknown";
   const matchesGalleryRegion = (lot) => !galleryOrganization.region || galleryLotRegion(lot) === galleryOrganization.region;
+  const matchesGalleryMarket = (lot) => !galleryOrganization.marketMismatches || Boolean(lot.market_mismatch);
   const galleryRegionLabel = () => ({us: "U.S. sales", outside_us: "Outside the U.S.", unknown: "Unconfirmed location"})[galleryOrganization.region] || "All locations";
-  const galleryBrowsableLots = () => dayLots().filter((lot) => matchesGalleryAttribution(lot) && matchesGalleryRegion(lot));
+  const galleryBrowsableLots = () => dayLots().filter((lot) => matchesGalleryMarket(lot) && matchesGalleryAttribution(lot) && matchesGalleryRegion(lot));
   const matchesGallerySelection = (lot) => {
     if (galleryOrganization.house && galleryHouseName(lot) !== galleryOrganization.house) return false;
     if (galleryFilter === "qualifying") return lotHasBidResearch(lot);
@@ -3413,7 +3438,7 @@
 
   const visibleGalleryLots = () => {
     const lots = dayLots().map((lot, index) => ({lot, index}));
-    const filtered = lots.filter(({lot}) => matchesGalleryAttribution(lot) && matchesGalleryRegion(lot) && matchesGallerySelection(lot));
+    const filtered = lots.filter(({lot}) => matchesGalleryMarket(lot) && matchesGalleryAttribution(lot) && matchesGalleryRegion(lot) && matchesGallerySelection(lot));
     if (gallerySort.value === "artist" || gallerySort.value === "artist_desc") {
       const direction = gallerySort.value === "artist" ? 1 : -1;
       filtered.sort((a, b) => direction * galleryArtistKey(a.lot).localeCompare(galleryArtistKey(b.lot), "en", {sensitivity: "base"}) || a.index - b.index);
@@ -3463,6 +3488,17 @@
   };
 
   const renderGalleryFilters = () => {
+    const scopedLots = dayLots();
+    const mismatchCount = scopedLots.filter((lot) => lot.market_mismatch).length;
+    const mismatchToggle = document.getElementById("day-gallery-market-mismatches");
+    mismatchToggle.hidden = !mismatchCount;
+    if (galleryOrganization.marketMismatches && !mismatchCount && Object.hasOwn(data, selectedDay)) {
+      galleryOrganization.marketMismatches = false;
+      galleryVisibleCount = 24;
+      updateCalendarLocation();
+    }
+    mismatchToggle.setAttribute("aria-pressed", String(galleryOrganization.marketMismatches));
+    document.getElementById("day-gallery-market-mismatch-count").textContent = String(mismatchCount);
     // Old links may still request Unconfirmed after all sale locations have
     // been resolved. Wait for the full day before judging its scoped records;
     // a deferred day currently has no rows, even when its locations are unknown.
@@ -3474,12 +3510,13 @@
     }
     const lots = galleryBrowsableLots();
     galleryGroup.value = galleryOrganization.group;
-    const hiddenCount = dayLots().filter((lot) => !matchesGalleryAttribution(lot)).length;
-    const hiddenRegionCount = dayLots().filter(matchesGalleryRegion).length - lots.length;
+    const marketLots = scopedLots.filter(matchesGalleryMarket);
+    const hiddenCount = marketLots.filter((lot) => !matchesGalleryAttribution(lot)).length;
+    const hiddenRegionCount = marketLots.filter(matchesGalleryRegion).length - lots.length;
     const regionControls = document.getElementById("day-gallery-region-filters");
     const focusedRegion = document.activeElement?.closest?.("[data-sale-region]")?.dataset.saleRegion;
     const locationStatus = document.getElementById("day-gallery-location-status");
-    const regionLots = dayLots().filter((lot) => matchesGalleryAttribution(lot) && matchesGallerySelection(lot));
+    const regionLots = marketLots.filter((lot) => matchesGalleryAttribution(lot) && matchesGallerySelection(lot));
     const unknownCount = regionLots.filter((lot) => galleryLotRegion(lot) === "unknown").length;
     locationStatus.hidden = !unknownCount;
     locationStatus.textContent = unknownCount
@@ -3746,6 +3783,7 @@
     caption.appendChild(arrivalLabel);
     appendCurrencyPrice(caption, lot, "estimate", "day-gallery-estimate");
     appendCurrencyPrice(caption, lot, "bid", "day-gallery-bid");
+    if (lot.market_mismatch) appendMarketMismatch(caption, lot.market_mismatch);
     appendLotControls(caption, lot);
     const actions = document.createElement("div");
     actions.className = "day-gallery-actions";
@@ -3793,7 +3831,9 @@
       galleryGrid.appendChild(galleryCard(lot, index, galleryFilter === "qualifying"));
     });
     if (!lots.length) {
-      appendText(galleryGrid, "p", "day-gallery-empty", galleryOrganization.region
+      appendText(galleryGrid, "p", "day-gallery-empty", galleryOrganization.marketMismatches
+        ? "No flagged lots match these filters. Turn off Market mismatches or change another filter."
+        : galleryOrganization.region
         ? "No lots match this sale location and the selected filters. Choose All locations or change another filter."
         : galleryOrganization.house
         ? `No lots match these filters at ${galleryOrganization.house}. Choose All auction houses or change the selected filter.`
@@ -3818,6 +3858,7 @@
       : galleryFilter === "bidboards" ? "Lots selected for research or with saved research" : galleryFilter.slice(6);
     if (galleryOrganization.house) galleryDescription.textContent += ` · ${galleryOrganization.house}`;
     if (galleryOrganization.region) galleryDescription.textContent += ` · ${galleryRegionLabel()}`;
+    if (galleryOrganization.marketMismatches) galleryDescription.textContent += " · Market mismatches";
     const shownCount = Math.min(galleryVisibleCount, lots.length);
     galleryResults.textContent = `Matching filters: ${lots.length} of ${dayLots().length} day lots · ${shownCount} card${shownCount === 1 ? "" : "s"} shown`;
     galleryMore.hidden = galleryVisibleCount >= lots.length;
@@ -3906,8 +3947,6 @@
   const renderGalleryCatalog = () => {
     document.getElementById("day-gallery-title").firstChild.textContent = activeView === "oliver" ? "Oliver’s Catalog" : "Jeremy’s Catalog";
     document.getElementById("day-gallery-scope").hidden = activeView !== "oliver";
-    document.getElementById("day-gallery-artists-scope").textContent = activeView === "oliver"
-      ? "Full-day counts across Oliver’s houses." : "Full-day counts across all houses.";
     const lots = dayLots();
     galleryDate.textContent = selectedDay
       ? `Auction Calendar / ${formatCalendarDay(selectedDay, {weekday: "long", year: "numeric", month: "long", day: "numeric"})}`
@@ -3932,6 +3971,9 @@
       galleryFilter = artistKey ? `artist:${artistKey}` : "all";
     }
     renderGalleryFilters();
+    const artistCountScope = galleryOrganization.marketMismatches ? "Flagged lots" : "Full-day counts";
+    document.getElementById("day-gallery-artists-scope").textContent = activeView === "oliver"
+      ? `${artistCountScope} across Oliver’s houses.` : `${artistCountScope} across all houses.`;
     renderGalleryArtists();
     renderGalleryCards();
   };
@@ -4358,6 +4400,7 @@
     appendCurrencyPrice(overview, lot, "estimate", "lot-facts");
     if (lot.location) appendText(overview, "p", "lot-location", `Location: ${lot.location}`);
     appendCurrencyPrice(overview, lot, "bid", "lot-bid");
+    if (lot.market_mismatch) appendMarketMismatch(overview, lot.market_mismatch);
     const actionLinks = document.createElement("div");
     actionLinks.className = "lot-browser-action-links";
     if (lot.url) actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "Open auction lot ↗"));
@@ -4446,6 +4489,7 @@
     appendCurrencyPrice(copy, lot, "estimate", "lot-facts");
     appendText(copy, "p", "lot-location", lot.location ? `Location: ${lot.location}` : "");
     appendCurrencyPrice(copy, lot, "bid", "lot-bid");
+    if (lot.market_mismatch) appendMarketMismatch(copy, lot.market_mismatch);
 
     const actionLinks = document.createElement("div");
     actionLinks.className = "lot-browser-action-links";
@@ -4685,6 +4729,17 @@
   };
   const selectCalendarDay = (day) => withCalendarDay(day, () => showDay(day));
 
+  const showDayMarketMismatches = () => {
+    galleryOrganization.marketMismatches = true;
+    galleryOrganization.region = "";
+    galleryOrganization.house = "";
+    galleryFilter = "all";
+    galleryHideAttributed = false;
+    galleryVisibleCount = 24;
+    setCalendarView(inOliverScope() ? "oliver" : "catalog");
+    document.getElementById("day-gallery-market-mismatches").focus();
+  };
+
   const setCalendarView = (view, {push = false} = {}) => {
     const wasOliver = inOliverScope();
     activeView = ["catalog", "oliver", "oliver-calendar", "research"].includes(view) ? view : "calendar";
@@ -4725,6 +4780,17 @@
   catalogViewToggle.addEventListener("click", () => setCalendarView("catalog"));
   oliverViewToggle.addEventListener("click", () => setCalendarView("oliver"));
   oliverCalendarViewToggle.addEventListener("click", () => setCalendarView("oliver-calendar"));
+  document.getElementById("day-market-mismatches-launch").addEventListener("click", showDayMarketMismatches);
+  document.getElementById("day-gallery-market-mismatches").addEventListener("click", () => {
+    if (!galleryOrganization.marketMismatches) {
+      showDayMarketMismatches();
+      return;
+    }
+    galleryOrganization.marketMismatches = false;
+    galleryVisibleCount = 24;
+    renderGalleryCatalog();
+    updateCalendarLocation();
+  });
   researchBack.addEventListener("click", () => {
     if (window.history.state?.researchEntry) window.history.back();
     else {
@@ -4939,6 +5005,7 @@
       appendText(item, "p", "lot-facts", facts.join(" · "));
       appendCurrencyPrice(item, lot, "estimate", "lot-facts");
       appendCurrencyPrice(item, lot, "bid", "lot-bid");
+      if (lot.market_mismatch) appendMarketMismatch(item, lot.market_mismatch);
       const actionLinks = document.createElement("div");
       actionLinks.className = "lot-action-links";
       if (lot.url) {
@@ -4981,6 +5048,10 @@
   };
 
   const updateSidebarLaunches = (lots, dayLabel) => {
+    const mismatchCount = lots.filter((lot) => lot.market_mismatch).length;
+    const mismatchLaunch = document.getElementById("day-market-mismatches-launch");
+    mismatchLaunch.hidden = !mismatchCount;
+    mismatchLaunch.textContent = `View ${mismatchCount} market mismatch${mismatchCount === 1 ? "" : "es"}`;
     lotBrowserLaunch.hidden = !lots.length;
     researchLaunch.hidden = !lots.length;
     researchLaunch.textContent = lots.length === 1 ? "Research this lot" : `Research ${lots.length} lots in full view`;

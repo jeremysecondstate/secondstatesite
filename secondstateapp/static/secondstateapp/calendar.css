@@ -2956,6 +2956,35 @@ body:has(.lot-browser[open]) {
   white-space: nowrap;
 }
 
+#day-gallery-market-mismatches {
+  min-height: 38px;
+  padding: 7px 10px;
+}
+
+.lot-market-mismatch {
+  grid-column: 1 / -1;
+  margin: 10px 0;
+  padding: 7px 10px;
+  border-left: 2px solid var(--calendar-gold);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.lot-market-mismatch summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lot-market-mismatch p,
+.lot-market-mismatch ul {
+  margin: 6px 0 0;
+}
+
+.lot-market-mismatch ul {
+  padding-left: 18px;
+}
+
 .day-gallery-filter-summary {
   display: grid;
   gap: 3px;

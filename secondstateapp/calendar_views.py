@@ -56,6 +56,7 @@ from .auction_email import (
 from .bid_board_snapshot import saved_board_summary, uses_max_bid_label
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
 from .calendar_lot_numbers import calendar_lot_number
+from .calendar_market_review import mismatch_summary
 from .calendar_sales import verified_sale
 from .calendar_images import (
     is_saved_calendar_image_url,
@@ -438,13 +439,15 @@ def _day_lot_data(request, selected_day, zone, selected_lot_ids, research_queue_
     day_start, day_end = _utc_bounds(selected_day, selected_day + timedelta(days=1), zone)
     lots = AuctionWatchLot.objects.filter(
         superseded_by__isnull=True, event_at__gte=day_start, event_at__lt=day_end,
-    ).select_related("watchlist_artist", "bid_board_analysis", "resale_research").defer(
+    ).select_related("watchlist_artist", "bid_board_analysis", "resale_research", "market_review").defer(
         "bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids",
     ).order_by("event_at", "auction_house", "artist", "id")
     day = selected_day.isoformat()
     rows = [_lot_json(lot, zone, selected_lot_ids, research_queue_state) for lot in lots]
     calendar_data = {day: rows}
     _attach_superseded_attribution(calendar_data)
+    for lot, row in zip(lots, rows):
+        row["market_mismatch"] = mismatch_summary(lot, row)
     retained = _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, research_queue_state, request)
     return {"day": day, "lots": rows, "retained_research_lot": retained}
 

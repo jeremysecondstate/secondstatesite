@@ -266,6 +266,25 @@ class AuctionLotReconciliation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class AuctionLotMarketReview(models.Model):
+    """Evidence and disposition for one version of a Calendar lot's catalog facts."""
+
+    class Status(models.TextChoices):
+        MISMATCH = "mismatch", "Market mismatch"
+        CLEAR = "clear", "No mismatch found"
+        UNCERTAIN = "uncertain", "Insufficient evidence"
+
+    lot = models.OneToOneField(AuctionWatchLot, on_delete=models.CASCADE, related_name="market_review")
+    fingerprint = models.CharField(max_length=64)
+    revision = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=12, choices=Status.choices)
+    reason = models.TextField()
+    sale_market = models.CharField(max_length=200, blank=True)
+    stronger_market = models.CharField(max_length=200, blank=True)
+    sources = models.JSONField(default=list)
+    reviewed_at = models.DateTimeField(auto_now=True)
+
+
 class AuctionMaxBidAnalysis(models.Model):
     """Normalized Artprice comparables and maximum-bid calculations for one lot."""
 

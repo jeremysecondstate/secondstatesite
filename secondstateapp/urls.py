@@ -4,6 +4,7 @@ from . import (
     artprice_image_store,
     bid_board_views,
     calendar_views,
+    calendar_market_review_views,
     calendar_reconciliation_views,
     capital_dashboard_views,
     catalog_api_views,
@@ -46,6 +47,7 @@ urlpatterns = [
     path("calendar/usd-prices/", calendar_views.auction_calendar_usd_prices, name="auction_calendar_usd_prices"),
     path("calendar/sync/", calendar_views.sync_auction_calendar, name="auction_calendar_sync"),
     path("calendar/reconciliation/", calendar_reconciliation_views.calendar_reconciliation, name="calendar_reconciliation"),
+    path("calendar/market-review/", calendar_market_review_views.calendar_market_review, name="calendar_market_review"),
     path("calendar/watchlist/", watchlist_shared_views.shared_artist_watchlist, name="shared_artist_watchlist"),
     path("calendar/inventory/", calendar_views.auction_calendar_inventory, name="auction_calendar_inventory"),
     path(

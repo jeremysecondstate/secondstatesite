@@ -70,6 +70,24 @@ function lot(overrides = {}) {
   };
 }
 
+test("market mismatch details explain the finding and link its evidence on the flagged lot", () => {
+  const finding = {sale_market: "Regional Irish sale", stronger_market: "Mexican modern prints",
+    reason: "Comparable prints recur in dedicated sales.", sources: [
+      {label: "Sale catalog", url: "https://auction.example/lot/2"},
+      {label: "Comparable print", url: "https://market.example/sale/12"},
+      {label: "Invalid URL", url: "javascript:example()"},
+    ]};
+  const render = renderer();
+  const card = render.galleryCard(lot({market_mismatch: finding}), 0);
+  const [details] = withClass(card, "lot-market-mismatch");
+  assert.equal(details.tagName, "details");
+  assert.equal(details.children[0].textContent, "Market mismatch");
+  for (const value of [finding.sale_market, finding.stronger_market, finding.reason]) assert.ok(details.textContent.includes(value));
+  const links = descendants(details).filter(node => node.tagName === "a");
+  assert.deepEqual(links.map(node => [node.textContent, node.href]), finding.sources.slice(0, 2).map(source => [source.label, source.url]));
+  assert.equal(withClass(render.galleryCard(lot(), 0), "lot-market-mismatch").length, 0);
+});
+
 test("every catalog lot exposes an estimated arrival separately from the listed time without requiring a board", () => {
   for (const saved_bid_board of [null, {qualifying_bid: "300"}, {qualifying_bid: null}]) {
     const source = lot({event_at: "2026-11-04T13:00:00Z", time: "5:00 AM", lot_number: "39", saved_bid_board});
