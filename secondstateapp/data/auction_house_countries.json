@@ -1458,6 +1458,22 @@
       "evidence_url": "https://www.simpsongalleries.com/auction-catalog/winter-auction_EFURDZI7JH",
       "evidence": "The official December 5, 2026 Winter Auction catalog lists Houston, Texas, US. The house identifies its auction salesroom at 6116 Skyline Drive, Suite 1, Houston, Texas 77057 on https://www.simpsongalleries.com/contact/our-location/.",
       "verified_at": "2026-11-18"
+    },
+    {
+      "name": "Rivich Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://chicago.hibid.com/auction/796369/the-collection-of-elizabeth-ernst",
+      "evidence": "Rivich lists its December 13 Elizabeth Ernst auction at 415 N. Sangamon Street in Chicago, Illinois. The house identifies its two venues in Chicago and Harbert, Michigan, at https://rivichauction.com/.",
+      "verified_at": "2026-11-20"
+    },
+    {
+      "name": "Sofe Design Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://sofedesignauctions.com/bidding.php",
+      "evidence": "Sofe identifies its in-person auction gallery in Carrollton, Texas, and lists sales in Texas and Colorado. Its December 19 catalog at https://bid.sofedesignauctions.com/auctions/4-NQ5QTP/antique-arms-armor-fine-art-dec-19-2026 places the sale at the Carrollton gallery.",
+      "verified_at": "2026-11-20"
     }
   ]
 }
