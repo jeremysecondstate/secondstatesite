@@ -591,6 +591,20 @@ const zwaanSession = (start = "18:00", first = 6800, last = 7015) => ({
   source_url: "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf",
 });
 
+test("Clars 4180 uses catalog order and the Friday pace range in cards, artist summaries and sorting", () => {
+  const estimate = {kind: "published_pace_range", session_start_at: "2026-11-20T17:30:00Z",
+    first_lot: 4000, last_lot: 4673, preceding_lots: 187, min_lots_per_hour: 80, max_lots_per_hour: 120,
+    source_url: "https://clars.com/resources/first-time-bidders/"};
+  const lot = {artist: "John Sloan", lot_number: "4180", event_at: estimate.session_start_at, arrival_estimate: estimate};
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), "11:04 AM–11:50 AM");
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/New_York"), "2:04 PM–2:50 PM");
+  assert.equal(CalendarArtists.estimateLotArrival(lot), Date.parse("2026-11-20T19:22:12Z"));
+  assert.equal(CalendarArtists.formatArrival(CalendarArtists.summarize([lot])[0], "America/Los_Angeles"), "11:04 AM–11:50 AM");
+  const first = {...lot, lot_number: "4000", arrival_estimate: {...estimate, preceding_lots: 0}};
+  assert.equal(CalendarArtists.formatLotArrival(first, "America/Los_Angeles"), "9:30 AM");
+  assert.equal(CalendarArtists.estimateLotArrival({...lot, arrival_estimate: {...estimate, preceding_lots: -1}}), null);
+});
+
 test("Zuniga 6816 arrives November 12 using the 6800 evening session instead of November 16", () => {
   const lot = Object.freeze({artist: "Zúñiga, Francisco", auction_house: "Veilinggebouw de Zwaan",
     event_at: "2026-11-12T09:00:00Z", time: "1:00 AM", lot_number: "6816",

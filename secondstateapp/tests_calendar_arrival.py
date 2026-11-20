@@ -57,6 +57,31 @@ def dumouchelles_lot(**changes):
     ) | changes))
 
 
+class ClarsNovemberGalleryTests(SimpleTestCase):
+    def lot(self, number, **changes):
+        return source_lot(**(dict(source="Invaluable", auction_house="Clars Auctions",
+            event_at=datetime(2026, 11, 20, 17, 30, tzinfo=timezone.utc),
+            sale_url="", lot_number=number) | changes))
+
+    def test_catalog_order_includes_lettered_lots_and_skips_omitted_numbers(self):
+        for number, preceding in (("4000", 0), ("4008A", 9), ("4180", 187),
+                                  ("4207", 214), ("4207A", 215), ("4207B", 216),
+                                  ("4212", 221), ("4673", 673)):
+            with self.subTest(number=number):
+                estimate = sale_arrival_estimate(self.lot(number))
+                self.assertEqual(estimate["preceding_lots"], preceding)
+                self.assertEqual(estimate["session_start_at"], "2026-11-20T17:30:00+00:00")
+                self.assertEqual((estimate["min_lots_per_hour"], estimate["max_lots_per_hour"]), (80, 120))
+
+    def test_baseline_and_pace_belong_only_to_this_session_and_catalog(self):
+        for number in ("3999", "4674", "4302", "4008B", "4180A", "4207C"):
+            self.assertIsNone(sale_arrival_estimate(self.lot(number)))
+        for changes in ({"auction_house": "Another House"}, {"is_all_day": True},
+                        {"sale_title": "November Warehouse Auction"},
+                        {"event_at": datetime(2026, 11, 21, 17, 30, tzinfo=timezone.utc)}):
+            self.assertIsNone(sale_arrival_estimate(self.lot("4180", **changes)))
+
+
 class DuMouchellesNumberingBaselineTests(SimpleTestCase):
     def test_this_sale_uses_the_user_supplied_1000_baseline_without_changing_source_time(self):
         for number in ("1000", "1172", "1173", " 01172A "):

@@ -61,6 +61,19 @@
       const estimate = lot.arrival_estimate;
       const start = knownInstant(estimate.session_start_at);
       const kind = estimate.kind ?? "published_pace";
+      if (kind === "published_pace_range") {
+        const {first_lot: first, last_lot: last, preceding_lots: preceding,
+          min_lots_per_hour: slow, max_lots_per_hour: fast} = estimate;
+        if (estimate.source_url !== "https://clars.com/resources/first-time-bidders/"
+          || start === null || first !== 4000 || last !== 4673 || number < first || number > last
+          || !Number.isSafeInteger(preceding) || preceding < 0 || preceding >= 674
+          || slow !== 80 || fast !== 120) return null;
+        const minutes = preceding * 60 / ((slow + fast) / 2);
+        return {number, time: start + minutes * 60000, startTime: start, kind,
+          sourceUrl: estimate.source_url, firstLot: first, lastLot: last, minutes,
+          arrivalWindow: [fast, slow].map(pace => start + Math.round(preceding * 60 / pace) * 60000),
+          paceLabel: `${slow}–${fast} lots per hour`};
+      }
       const verifiedBasis = kind === "published_pace"
         ? estimate.source_url === "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"
           || (estimate.source_url === "https://historia.de/en/auction/182-auction/" && estimate.lots_per_hour === 80)
@@ -134,6 +147,8 @@
         group.arrivalSourceUrl = details.sourceUrl;
         group.arrivalMinutes = details.minutes;
         group.arrivalLotsPerHour = details.lotsPerHour;
+        group.arrivalWindow = details.arrivalWindow;
+        group.arrivalPaceLabel = details.paceLabel;
         group.arrivalFirstLot = details.firstLot;
         group.arrivalLastLot = details.lastLot;
       }
@@ -160,11 +175,13 @@
   const formatArrival = (artist, timeZone) => {
     if (artist.arrivalTime == null || !Number.isFinite(artist.arrivalTime)) return "Unavailable";
     const dateFormat = new Intl.DateTimeFormat("en-US", {timeZone, year: "numeric", month: "2-digit", day: "2-digit"});
-    const crossesDay = dateFormat.format(artist.earliestTime) !== dateFormat.format(artist.arrivalTime);
-    return new Intl.DateTimeFormat("en-US", {
+    const times = artist.arrivalWindow || [artist.arrivalTime];
+    const crossesDay = times.some(at => dateFormat.format(artist.earliestTime) !== dateFormat.format(at));
+    const clock = new Intl.DateTimeFormat("en-US", {
       timeZone, hour: "numeric", minute: "2-digit", hour12: true,
       ...(crossesDay ? {month: "short", day: "numeric"} : {}),
-    }).format(artist.arrivalTime);
+    });
+    return [...new Set(times.map(at => clock.format(at)))].join("–");
   };
 
   const estimateLotArrival = (lot) => lotArrivalDetails(lot)?.time ?? null;
@@ -175,7 +192,8 @@
   const formatLotArrival = (lot, timeZone) => {
     const details = lotArrivalDetails(lot);
     if (details === null) return "Unavailable";
-    return formatArrival({earliestTime: details.startTime, arrivalTime: details.time}, timeZone);
+    return formatArrival({earliestTime: details.startTime, arrivalTime: details.time,
+      arrivalWindow: details.arrivalWindow}, timeZone);
   };
 
   return {artistKey, resolveArtistKey, summarize, sorted, formatArrival, estimateLotArrival, formatLotArrival, lotArrivalDetails, arrivalLabel};

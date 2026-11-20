@@ -36,6 +36,15 @@ TIMETABLE_URL = "https://www.dobiaschofsky.com/g246.html"
 HERITAGE_8256_URL = "https://fineart.ha.com/c/auction-home.zx?saleNo=8256"
 ZWAAN_117_TIMETABLE_URL = "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf"
 HISTORIA_182_TIMETABLE_URL = "https://historia.de/en/auction/182-auction/"
+CLARS_FRIDAY_PACE_URL = "https://clars.com/resources/first-time-bidders/"
+# The 674 lots in Clars catalog 1-DMJYO5 run from 4000 through 4673.
+# https://live.clars.com/auctions/1-DMJYO5/november-gallery-auction-featuring-important-works-of-fine-art
+_CLARS_NOV20_START = datetime(2026, 11, 20, 17, 30, tzinfo=timezone.utc)
+_CLARS_NOV20_SKIPPED = (4302, 4419, 4502, 4503, 4514, 4559, 4572, 4608, 4625, 4642, 4665, 4670)
+_CLARS_NOV20_INSERTS = {
+    4008: "A", 4029: "A", 4110: "A", 4141: "A", 4147: "A", 4151: "A",
+    4163: "A", 4207: "AB", 4376: "A", 4400: "A", 4413: "A",
+}
 # DuMouchelles, November 13, 2026, catalog ZEHO4544S4. Jeremy supplied
 # the numbering baseline 1000. These identities were matched to the catalog
 # on November 12 so retained observations without sale_url get the same ETA.
@@ -271,8 +280,44 @@ def sale_numbering_baseline(lot):
     return 1000 if matches else None
 
 
+def _clars_nov20_estimate(lot):
+    # Retained artist-bookmark lots often omit sale title and URL. The house
+    # lists a single gallery session at this exact instant, separate from
+    # Saturday's warehouse auction, which starts its own numbering.
+    if lot.is_all_day or lot.event_at != _CLARS_NOV20_START:
+        return None
+    if lot.auction_house.strip().casefold() not in {"clars auctions", "clars auction gallery"}:
+        return None
+    sale_title = (getattr(lot, "sale_title", "") or "").strip().casefold()
+    if sale_title and sale_title != "november gallery auction featuring important works of fine art":
+        return None
+    match = re.fullmatch(r"(\d+)([A-Z]?)", str(lot.lot_number).strip().upper())
+    if not match:
+        return None
+    number, suffix = int(match[1]), match[2]
+    if not 4000 <= number <= 4673 or number in _CLARS_NOV20_SKIPPED:
+        return None
+    extensions = _CLARS_NOV20_INSERTS.get(number, "")
+    if suffix and suffix not in extensions:
+        return None
+    preceding = number - 4000 - sum(n < number for n in _CLARS_NOV20_SKIPPED)
+    preceding += sum(len(letters) for n, letters in _CLARS_NOV20_INSERTS.items() if n < number)
+    if suffix:
+        preceding += 1 + extensions.index(suffix)
+    return {
+        "kind": "published_pace_range",
+        "session_start_at": _CLARS_NOV20_START.isoformat(),
+        "first_lot": 4000, "last_lot": 4673, "preceding_lots": preceding,
+        "min_lots_per_hour": 80, "max_lots_per_hour": 120,
+        "source_url": CLARS_FRIDAY_PACE_URL,
+    }
+
+
 def sale_arrival_estimate(lot):
     """Supply verified sale start/pace without replacing the source's timestamp."""
+    clars = _clars_nov20_estimate(lot)
+    if clars:
+        return clars
     zwaan = _zwaan_session_estimate(lot)
     if zwaan:
         return zwaan
