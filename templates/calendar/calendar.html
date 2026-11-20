@@ -793,8 +793,8 @@
     const details = document.createElement("details");
     details.className = "lot-market-mismatch";
     appendText(details, "summary", "", "Market mismatch");
-    appendText(details, "p", "", `Sale market · ${finding.sale_market}`);
-    appendText(details, "p", "", `Stronger market · ${finding.stronger_market}`);
+    appendText(details, "p", "", `Offered in · ${finding.sale_market}`);
+    appendText(details, "p", "", `Market connection · ${finding.stronger_market}`);
     appendText(details, "p", "", finding.reason);
     const sources = document.createElement("ul");
     for (const source of finding.sources) {
