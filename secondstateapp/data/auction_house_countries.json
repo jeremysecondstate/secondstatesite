@@ -1474,6 +1474,30 @@
       "evidence_url": "https://sofedesignauctions.com/bidding.php",
       "evidence": "Sofe identifies its in-person auction gallery in Carrollton, Texas, and lists sales in Texas and Colorado. Its December 19 catalog at https://bid.sofedesignauctions.com/auctions/4-NQ5QTP/antique-arms-armor-fine-art-dec-19-2026 places the sale at the Carrollton gallery.",
       "verified_at": "2026-11-20"
+    },
+    {
+      "name": "Bill Hood & Sons Arts & Antiques Auctions",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.hoodauction.com/event/december-1st-jewelry-art-antiques/",
+      "evidence": "Bill Hood lists its December 1, 2026 jewelry, art and antiques sale on its own calendar. Its auctioneer profile lists this sale and past auctions in Delray Beach, Florida, and gives the gallery address as 2885 South Congress Avenue: https://www.liveauctioneers.com/auctioneer/361/bill-hood-and-sons-art-and-antique-auctions/.",
+      "verified_at": "2026-11-20"
+    },
+    {
+      "name": "MBA Seattle Auction LLC",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://mbaauction.com/auctions.html",
+      "evidence": "Mroczek Brothers lists its December 3, 2026 Holiday Modernism, Fine Arts and Luxuries auction at 717 South 3rd Street, Renton, Washington. The provider lists the same gallery as MBA Seattle Auction LLC at https://www.invaluable.com/auction-house/mba-seattle-auction-llc-ncvwu7s8u7.",
+      "verified_at": "2026-11-20"
+    },
+    {
+      "name": "Circle Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.estatesales.net/MO/Kansas-City/64105/5122110",
+      "evidence": "Circle Auction lists its December 5, 2026 Jewelry, Fine Art, and Historical Collectibles sale in Kansas City, Missouri. The house identifies Kansas City as the location for its online auctions at https://circle-auction.com/upcoming-kansas-city-auctions-near-me/.",
+      "verified_at": "2026-11-20"
     }
   ]
 }
