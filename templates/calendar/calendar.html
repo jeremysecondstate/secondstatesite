@@ -801,6 +801,9 @@
       if (!/^https?:\/\//i.test(source.url)) continue;
       const item = document.createElement("li");
       item.appendChild(externalLink(source.url, "lot-auction-link", source.label));
+      if (source.artist_signature) {
+        appendText(item, "p", "", `Artist’s hand signature · ${source.artist_signature.artist} · ${source.artist_signature.observation}`);
+      }
       sources.appendChild(item);
     }
     if (sources.children.length) details.appendChild(sources);

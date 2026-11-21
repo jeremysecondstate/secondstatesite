@@ -1,7 +1,7 @@
 """Review current and future Calendar lots in auction order."""
 
 from collections import Counter
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from itertools import islice
 import json
 import re
@@ -16,7 +16,10 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from .calendar_market_review import CATALOG_FIELDS, FIRST_REVIEW_DAY, review_fingerprint
+from .calendar_market_review import (
+    CATALOG_FIELDS, FIRST_REVIEW_DAY, RECHECK_START_DAY, has_artist_signature,
+    review_fingerprint, review_is_current, signature_required,
+)
 from .calendar_views import _artist_label, _attach_superseded_attribution, _calendar_zone, _sync_authorized
 from .lot_presentation import artist_attribution_label
 from .models import AuctionLotMarketReview, AuctionWatchLot
@@ -26,7 +29,6 @@ from .sale_geography import sale_geography
 MAX_BATCH = 200
 MAX_BYTES = 1_000_000
 RETRY_UNCERTAIN = timedelta(days=7)
-RECHECK_START_DAY = date(2026, 11, 21)
 validate_web_url = URLValidator(schemes=["http", "https"])
 
 
@@ -95,7 +97,7 @@ def _inspect(raw_ids, recheck_from=None):
         )
         if review:
             row["review"] = {
-                "current": review.fingerprint == row["fingerprint"], "status": review.status,
+                "current": review_is_current(lot, review, row["fingerprint"]), "status": review.status,
                 "reason": review.reason, "sale_market": review.sale_market, "stronger_market": review.stronger_market,
                 "sources": review.sources, "reviewed_at": review.reviewed_at,
             }
@@ -115,10 +117,11 @@ def _pending(raw_limit):
     for row in pending:
         row["revision"] = 0
     # Re-evaluate fingerprints on reviewed rows, even if other, unrelated source
-    # observations have changed. Read the review stamp without its long evidence.
+    # observations have changed. Legacy flags also need signature evidence.
     reviewed = ordered.filter(market_review__isnull=False).select_related("market_review").only(
         *CATALOG_FIELDS, "active", "sold_price", "sold_currency",
         "market_review__fingerprint", "market_review__status", "market_review__reviewed_at", "market_review__revision",
+        "market_review__sources",
     ).iterator(chunk_size=500)
     due = []
     due_by_day = Counter()
@@ -126,7 +129,7 @@ def _pending(raw_limit):
         eligible_count += len(batch)
         for lot, row in zip(batch, _projections(batch)):
             review = lot.market_review
-            if (review.fingerprint == row["fingerprint"]
+            if (review_is_current(lot, review, row["fingerprint"])
                     and (review.status != AuctionLotMarketReview.Status.UNCERTAIN or review.reviewed_at > retry_before)):
                 continue
             pending_count += 1
@@ -162,7 +165,8 @@ def _sources(entries):
         raise ValueError("Provide up to 10 source links.")
     sources, urls = [], set()
     for source in entries:
-        if not isinstance(source, dict) or set(source) != {"label", "url"}:
+        if (not isinstance(source, dict) or not {"label", "url"} <= set(source)
+                or set(source) - {"label", "url", "artist_signature"}):
             raise ValueError("Every source needs a label and a web URL.")
         label = _string(source["label"], "source label", 300)
         url = _string(source["url"], "source URL", 2000)
@@ -174,7 +178,16 @@ def _sources(entries):
         identity = (parsed.hostname, parsed.port, parsed.path.rstrip("/"), parsed.query)
         if parsed.username is not None or parsed.password is not None or identity in urls:
             raise ValueError("Source URLs must be distinct web links without credentials.")
-        sources.append({"label": label, "url": url})
+        item = {"label": label, "url": url}
+        if "artist_signature" in source:
+            signature = source["artist_signature"]
+            if not isinstance(signature, dict) or set(signature) != {"artist", "observation"}:
+                raise ValueError("Signature evidence needs the artist and the observation on this lot.")
+            item["artist_signature"] = {
+                "artist": _string(signature["artist"], "signing artist", 250),
+                "observation": _string(signature["observation"], "artist hand-signature observation", 1000),
+            }
+        sources.append(item)
         urls.add(identity)
     return sources
 
@@ -225,6 +238,9 @@ def _apply(plan, recheck_from=None):
     results = []
     for lot, row in zip(lots, _projections(lots)):
         expected_revision, evidence = plan[lot.pk]
+        if (evidence["status"] == AuctionLotMarketReview.Status.MISMATCH and signature_required(lot)
+                and not has_artist_signature(evidence["sources"])):
+            raise ValueError(f"Lot {lot.pk} requires cited evidence of the artist’s hand signature on the offered object.")
         if row["fingerprint"] != evidence["fingerprint"]:
             raise ValueError(f"Lot {lot.pk} catalog facts changed. Read the lot again.")
         record = saved.get(lot.pk)

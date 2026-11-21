@@ -36,6 +36,7 @@ class CalendarMarketReviewTests(TestCase):
             result.update(sale_market="Regional Irish art auctions", stronger_market="New York Latin American prints",
                           sources=[{"label": "Current catalog", "url": "https://example.com/catalog/1"},
                                    {"label": "Auction results", "url": "https://example.com/results/5"}])
+            result["sources"][0]["artist_signature"] = {"artist": "Test artist", "observation": "Signed in pencil at lower right."}
         return result
 
     def post(self, *reviews):
@@ -74,6 +75,30 @@ class CalendarMarketReviewTests(TestCase):
         self.assertEqual(self.get(ids=str(first.pk)).json()["lots"][0]["review"]["status"], "clear")
         excluded = self.client.post(path, {"reviews": [self.plan()]}, content_type="application/json", HTTP_X_API_KEY=KEY)
         self.assertEqual(excluded.status_code, 409)
+
+    def test_signature_evidence_controls_calendar_visibility_and_reopens_legacy_flags(self):
+        self.login_staff()
+        self.lot.event_at = self.start + timedelta(days=1)
+        self.lot.save(update_fields=["event_at"])
+        day = self.lot.event_at.date().isoformat()
+        def finding():
+            return self.client.get(reverse("auction_calendar_day_lots"), {"day": day}).json()["lots"][0]
+        plan = self.plan()
+        del plan["sources"][0]["artist_signature"]
+        self.assertEqual(self.post(plan).status_code, 409)
+        plan["sources"][0]["artist_signature"] = {"artist": "Rufino Tamayo", "observation": " "}
+        self.assertEqual(self.post(plan).status_code, 400)
+        plan["sources"][0]["artist_signature"]["observation"] = "Lot photograph shows the artist’s pencil signature in the margin."
+        self.assertEqual(self.post(plan).status_code, 200)
+        self.assertEqual(finding()["market_mismatch"]["sources"], plan["sources"])
+        del plan["sources"][0]["artist_signature"]
+        AuctionLotMarketReview.objects.filter(lot=self.lot).update(sources=plan["sources"])
+        self.assertIsNone(finding()["market_mismatch"])
+        self.assertEqual(finding()["market_review_status"], "unreviewed")
+        self.assertFalse(self.get(ids=str(self.lot.pk)).json()["lots"][0]["review"]["current"])
+        self.assertEqual([lot["id"] for lot in self.get().json()["lots"]], [self.lot.pk])
+        self.assertEqual(self.post(self.plan(status="clear")).status_code, 200)
+        self.assertEqual(finding()["market_review_status"], "clear")
 
     def test_api_requires_key_and_prioritizes_upcoming_lots_from_all_sources(self):
         self.login_staff()

@@ -9,6 +9,8 @@ Review the lots in the live SecondState Auction Calendar. Flag a lot worth a clo
 
 A mismatch is about where a work meets its natural audience. Ask which audience has a particular reason to recognize or seek this work, how that follows from the art, and why the actual selling location stands out in comparison. The artist’s regional identity or broader practice can supply the connection on its own, including for an untitled work. A subject, a documented signer, a team or a local community can also identify the audience. Compare regions within countries as well as across borders and allow several natural markets. Check whether meaningful ties to the selling region make the supposed contrast ordinary. A foreign city on a label or an exhibition poster starts this inquiry. Online artist and medium searches cut across sale titles and formats.
 
+**Every mismatch also requires the artist’s own hand signature on the physical work offered.** Verify the handwriting or autograph from the lot photograph and catalogue, including the reverse or colophon when relevant. Pencil, charcoal, ink, marker, or another personally applied signature can qualify. A signature reproduced in the plate, block, cast, screen, or image, a facsimile, estate stamp, numbering or certificate alone does not qualify. A sitter’s or another person’s signature can contribute a geographic connection only once the artist’s own hand signature is established. For an intact book or portfolio, name the signed colophon or title page; a detached sheet cannot inherit that signature. In a group, identify the qualifying signed work. Clear pieces established as unsigned or bearing only mechanical signatures. Use uncertain when the lot otherwise qualifies and the artist’s hand signature remains unresolved after investigation.
+
 ## Work from the live queue
 
 Run from `C:\dev\secondstatesite` using the project's Python environment and existing Calendar credentials. The worker reads and writes the live Calendar's market reviews.
@@ -39,6 +41,8 @@ Save `mismatch` when either basis applies. Write the card in one or two plain-la
 ## Save and verify
 
 Prepare a temporary UTF-8 JSON file with a top-level `reviews` array. Each entry needs its numeric `id`, the exact `fingerprint` and numeric `revision` returned by the market-review worker, plus its `status` and factual `reason`. For a mismatch, put the verified sale location in `sale_market`. Put the place connected to the work or the evidenced stronger collecting market in `stronger_market`. Supply at least two distinct public `sources` shaped as `{"label":"Source name","url":"https://…"}`. Cite the actual lot or auction and a source documenting the cultural connection or the comparative collecting evidence. The API accepts up to 200 reviews at once.
+
+On the source that establishes the artist’s hand signature, add `"artist_signature":{"artist":"Signing artist","observation":"What the photograph or catalogue establishes about the artist’s autograph on this object."}`. Include the medium and position when documented. The Calendar displays this evidence with the flag. From November 21 onward it withholds older flags lacking this evidence and returns them for investigation.
 
 ```powershell
 & $python $worker apply $reviewFile
