@@ -38,6 +38,16 @@ class VerifiedTimedSaleGroupingTests(SimpleTestCase):
     def lot(self, identity="first", **changes):
         return AuctionWatchLot(**alyes_values(identity, **changes))
 
+    def test_combined_mallet_catalog_lists_both_represented_sessions_in_pacific_time(self):
+        fields = dict(source="Drouot", sale_url="https://drouot.com/en/v/188574", auction_house="Mallet Auction")
+        early = self.lot("early", **fields, lot_number="1019", event_at=datetime(2026, 12, 10, 3, tzinfo=timezone.utc))
+        late = self.lot("late", **fields, lot_number="62", event_at=datetime(2026, 12, 10, 6, tzinfo=timezone.utc))
+        group, = _group_lots([late, early], CALENDAR_ZONE)
+        self.assertEqual(group["time_label"], "7:00 PM and 10:00 PM")
+        self.assertEqual(group["sort_at"], early.event_at)
+        self.assertEqual(group["lot_count"], 2)
+        self.assertEqual(_group_lots([late], CALENDAR_ZONE)[0]["time_label"], "10:00 PM")
+
     def test_staggered_closings_across_utc_midnight_form_one_sale_at_its_published_start(self):
         first = self.lot()
         last = self.lot("last", event_at=LAST_CLOSE)

@@ -5,6 +5,8 @@ from datetime import date, datetime, timezone
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
+from .calendar_sessions_2026 import SESSION_TIMES, corrected_session_time, drouot_url_matches
+
 
 # Invaluable search captures for all 196 watched lots in catalog 821739
 # agree on dateTimeUTCUnix=1794164400 (2026-11-08 19:00 UTC). Their
@@ -16,19 +18,8 @@ _ALYES_START = datetime(2026, 11, 8, 19, tzinfo=timezone.utc)
 _ALYES_IMAGE = re.compile(r"/housePhotos/Alyes/39/821739/H21147-[A-Za-z0-9_-]+\.jpg")
 
 
-def drouot_url_matches(url, kind, identity):
-    try:
-        parsed = urlsplit(url or "")
-    except ValueError:
-        return False
-    return (
-        parsed.scheme == "https"
-        and parsed.netloc in {"drouot.com", "www.drouot.com"}
-        and re.fullmatch(r"/[a-z]{2}/" + kind + "/" + identity + r"(?:-[^/]+)?/?", parsed.path) is not None
-    )
-
-
-def calendar_event_at(event_at, *, source, auction_house, sale_url, is_all_day):
+def calendar_event_at(event_at, *, source, auction_house, sale_url, is_all_day, source_lot_id="", lot_number="",
+                      lot_url="", image_url=""):
     # Drouot catalog 188631 supplied 03:00 CET. Templum publishes 15:00
     # in Barcelona for this live sale, also confirmed by the Invaluable lots.
     # https://templumauctions.com/auction/312-gran-subasta-de-es/
@@ -40,7 +31,29 @@ def calendar_event_at(event_at, *, source, auction_house, sale_url, is_all_day):
         and drouot_url_matches(sale_url, "v", "188631")
     ):
         return datetime(2026, 12, 3, 14, tzinfo=timezone.utc)
-    return event_at
+    return corrected_session_time(
+        event_at, source=source, auction_house=auction_house, sale_url=sale_url,
+        is_all_day=is_all_day, source_lot_id=source_lot_id, lot_number=lot_number,
+        lot_url=lot_url, image_url=image_url,
+    )
+
+
+def combined_catalog_starts(lots):
+    """Return both represented starts when one Drouot catalog covers two sessions."""
+    first = lots[0]
+    if first.source != "Drouot" or not first.sale_url or len(lots) < 2:
+        return ()
+    for rule in SESSION_TIMES:
+        if rule.reported_by != "Drouot" or rule.lot_numbers is None or rule.house != first.auction_house:
+            continue
+        if not drouot_url_matches(first.sale_url, "v", rule.drouot_catalog):
+            continue
+        if any(lot.is_all_day or lot.source != first.source or lot.auction_house != rule.house for lot in lots):
+            return ()
+        by_time = {lot.event_at: lot for lot in lots}
+        if by_time.keys() == {rule.reported, rule.published}:
+            return tuple(by_time[start] for start in sorted(by_time))
+    return ()
 
 
 def verified_sale(lot):

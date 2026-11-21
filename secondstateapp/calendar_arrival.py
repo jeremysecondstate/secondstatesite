@@ -6,6 +6,8 @@ from datetime import date, datetime, timezone
 from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
+from .calendar_sessions_2026 import NUMBERED_SESSIONS, drouot_url_matches, invaluable_image_catalog_matches
+
 
 # Verified sale 609 selection, captured November 11, 2026. Each pair binds
 # the source lot number to its stable public SHARE LINK item identity.
@@ -251,7 +253,22 @@ def _historia_session_estimate(lot):
 def sale_numbering_baseline(lot):
     """Apply an explicit sale baseline without changing saved source fields."""
     event = lot.event_at
-    if lot.source != "Invaluable" or lot.is_all_day or not event or event.utcoffset() is None:
+    if lot.is_all_day or not event or event.utcoffset() is None:
+        return None
+    session = NUMBERED_SESSIONS.get((lot.auction_house, event))
+    if session is not None:
+        number = str(lot.lot_number)
+        if not re.fullmatch(r"[0-9]+", number) or int(number) not in session.lot_numbers:
+            return None
+        if lot.source == "Drouot" and drouot_url_matches(lot.sale_url, "v", session.drouot_catalog):
+            return session.lot_numbers.start
+        if lot.source == "Invaluable" and invaluable_image_catalog_matches(
+            sale_url=lot.sale_url, lot_url=lot.lot_url, image_url=lot.image_url,
+            lot_number=number, catalog_path=session.invaluable_catalog_path,
+        ):
+            return session.lot_numbers.start
+        return None
+    if lot.source != "Invaluable":
         return None
     if event.astimezone(ZoneInfo("America/New_York")).date() != date(2026, 11, 13):
         return None

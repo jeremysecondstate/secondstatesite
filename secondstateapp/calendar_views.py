@@ -57,7 +57,7 @@ from .bid_board_snapshot import saved_board_summary, uses_max_bid_label
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
 from .calendar_lot_numbers import calendar_lot_number
 from .calendar_market_review import FIRST_REVIEW_DAY, market_review_fields
-from .calendar_sales import calendar_event_at, verified_sale
+from .calendar_sales import calendar_event_at, combined_catalog_starts, verified_sale
 from .calendar_images import (
     is_saved_calendar_image_url,
     prepare_saved_calendar_image,
@@ -224,6 +224,7 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
         if sale:
             display_time = copy(first)
             display_time.event_at = sale["starts_at"]
+        starts = combined_catalog_starts(sale_lots) or (display_time,)
         auction_house = next((lot.auction_house for lot in sale_lots if lot.auction_house), first.source or "Auction")
         sale_title = next((lot.sale_title for lot in sale_lots if lot.sale_title), "")
         artists = sorted({artist_display_name(name) for name in {_artist_label(lot) for lot in sale_lots}}, key=artist_sort_key)
@@ -234,11 +235,11 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
                 "lot_count": len(sale_lots),
                 "artists": "; ".join(artists[:3]),
                 "additional_artists": max(0, len(artists) - 3),
-                "time_label": _time_label(display_time, zone),
+                "time_label": " and ".join(_time_label(start, zone) for start in starts),
                 "url": first.sale_url or first.lot_url,
                 "sale_url": first.sale_url,
                 "ended": all(not lot.active for lot in sale_lots),
-                "sort_at": display_time.event_at,
+                "sort_at": starts[0].event_at,
             }
         )
     return sorted(groups, key=lambda item: (item["sort_at"], item["auction_house"]))
@@ -2686,6 +2687,9 @@ def sync_auction_calendar(request):
             is_all_day = bool(record.get("is_all_day")) or is_all_day
             auction_house = _text(record.get("auction_house"), 255)
             sale_url = _url(record.get("sale_url"))
+            lot_number = _text(record.get("lot_number"), 80)
+            lot_url = _url(record.get("lot_url"))
+            image_url = _calendar_image_url(record.get("image_url"))
             first_seen_at, _ = _source_datetime(record.get("first_seen_at"), zone)
             last_seen_at, _ = _source_datetime(record.get("last_seen_at"), zone)
             source_status = _text(record.get("status") or "unchanged", 24).lower()
@@ -2698,10 +2702,11 @@ def sync_auction_calendar(request):
                 "medium": _text(record.get("medium"), 500),
                 "auction_house": auction_house,
                 "sale_title": _text(record.get("sale_title"), 500),
-                "lot_number": _text(record.get("lot_number"), 80),
+                "lot_number": lot_number,
                 "location": _text(record.get("location"), 255),
                 "event_at": calendar_event_at(
                     event_at, source=source, auction_house=auction_house, sale_url=sale_url, is_all_day=is_all_day,
+                    lot_number=lot_number, source_lot_id=source_lot_id, lot_url=lot_url, image_url=image_url,
                 ),
                 "is_all_day": is_all_day,
                 "estimate_low": _decimal(record.get("estimate_low")),
@@ -2709,9 +2714,9 @@ def sync_auction_calendar(request):
                 "currency": _text(record.get("currency"), 8).upper(),
                 "current_bid": _decimal(record.get("current_bid")),
                 "bid_count": _nonnegative_integer(record.get("bid_count")),
-                "lot_url": _url(record.get("lot_url")),
+                "lot_url": lot_url,
                 "sale_url": sale_url,
-                "image_url": _calendar_image_url(record.get("image_url")),
+                "image_url": image_url,
                 "source_status": source_status,
                 "active": active,
                 "source_first_seen_at": first_seen_at,

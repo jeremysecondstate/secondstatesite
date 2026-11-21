@@ -145,6 +145,47 @@ class DuMouchellesNumberingBaselineTests(SimpleTestCase):
                 self.assertIsNone(sale_numbering_baseline(dumouchelles_lot(sale_url="", **changes)))
 
 
+class PublishedSessionNumberingTests(SimpleTestCase):
+    def test_each_provider_uses_the_first_lot_of_the_known_session(self):
+        sessions = (
+            ("Kruso Art", "2026-11-25T15:00:00Z", 201, 278, "188068", "ArtRite/41/822741"),
+            ("Karl & Faber", "2026-12-04T10:00:00Z", 600, 734, "187125", "Karl-Faber/34/821434"),
+            ("Karl & Faber", "2026-12-04T13:00:00Z", 800, 879, "188024", "Karl-Faber/35/821435"),
+            ("Lempertz", "2026-12-05T10:00:00Z", 100, 317, "187112", "Lempertz/82/821482"),
+            ("Lempertz", "2026-12-05T13:00:00Z", 400, 585, "187112", "Lempertz/83/821483"),
+            ("Mallet Auction", "2026-12-10T03:00:00Z", 1001, 1091, "188574", "malletauctionjapan/47/823047"),
+        )
+        for house, start, first, last, catalog, image_path in sessions:
+            for number in (first - 1, first, last, last + 1):
+                for source in ("Invaluable", "Drouot"):
+                    with self.subTest(house=house, start=start, number=number, source=source):
+                        lot = source_lot(
+                            source=source, auction_house=house, event_at=datetime.fromisoformat(start),
+                            lot_number=str(number), sale_url=f"https://drouot.com/en/v/{catalog}" if source == "Drouot" else "",
+                            image_url=f"https://image.invaluable.com/housePhotos/{image_path}/H1234-Test.jpg",
+                            lot_url=f"https://www.invaluable.com/auction-lot/catalogue-{number}-c-6bc3fc5b32",
+                        )
+                        self.assertEqual(sale_numbering_baseline(lot), first if first <= number <= last else None)
+
+    def test_session_and_both_provider_identities_must_match(self):
+        lot = dict(
+            source="Invaluable", auction_house="Lempertz", event_at=datetime.fromisoformat("2026-12-05T13:00:00Z"),
+            sale_url="", lot_number="437", lot_url="https://www.invaluable.com/auction-lot/ada-in-hat-437-c-fc59eadf7f",
+            image_url="https://image.invaluable.com/housePhotos/Lempertz/83/821483/H0684-Test.jpg",
+        )
+        for changes in (
+            {"is_all_day": True}, {"source": "Other"}, {"auction_house": "Lempertz affiliate"},
+            {"event_at": datetime.fromisoformat("2026-12-05T10:00:00Z")}, {"lot_number": "437-1"},
+            {"lot_url": lot["lot_url"].replace("-437-", "-438-")}, {"lot_url": "https://[invalid"},
+            {"image_url": lot["image_url"].replace("821483", "821482")},
+            {"image_url": lot["image_url"].replace("image.invaluable.com", "other.example")},
+            {"sale_url": "https://www.invaluable.com/catalog/OTHER"},
+            {"source": "Drouot", "sale_url": "https://drouot.com/en/v/187111"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertIsNone(sale_numbering_baseline(source_lot(**(lot | changes))))
+
+
 class HistoriaSessionArrivalTests(SimpleTestCase):
     def test_current_lot_uses_afternoon_session_and_published_typical_pace(self):
         lot = historia_lot()
