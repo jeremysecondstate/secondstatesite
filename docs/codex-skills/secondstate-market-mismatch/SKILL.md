@@ -7,6 +7,8 @@ description: "Flag SecondState Auction Calendar lots offered far from a place ce
 
 Review the lots in the live SecondState Auction Calendar. Flag a lot worth a closer look when its auction venue contrasts with a documented cultural or geographic connection, or when comparable works demonstrably attract stronger collector interest elsewhere. Either finding is sufficient. The Calendar's day filter shows findings saved with `mismatch` status.
 
+A mismatch is about where a work meets its natural audience. Ask which audience has a particular reason to recognize or seek this work, how that follows from the art, and why the actual selling location stands out in comparison. The artist’s regional identity or broader practice can supply the connection on its own, including for an untitled work. A subject, a documented signer, a team or a local community can also identify the audience. Compare regions within countries as well as across borders and allow several natural markets. Check whether meaningful ties to the selling region make the supposed contrast ordinary. A foreign city on a label or an exhibition poster starts this inquiry. Online artist and medium searches cut across sale titles and formats.
+
 ## Work from the live queue
 
 Run from `C:\dev\secondstatesite` using the project's Python environment and existing Calendar credentials. The worker reads and writes the live Calendar's market reviews.
