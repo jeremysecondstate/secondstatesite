@@ -57,7 +57,7 @@ from .bid_board_snapshot import saved_board_summary, uses_max_bid_label
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
 from .calendar_lot_numbers import calendar_lot_number
 from .calendar_market_review import FIRST_REVIEW_DAY, market_review_fields
-from .calendar_sales import verified_sale
+from .calendar_sales import calendar_event_at, verified_sale
 from .calendar_images import (
     is_saved_calendar_image_url,
     prepare_saved_calendar_image,
@@ -2683,6 +2683,9 @@ def sync_auction_calendar(request):
             source_lot_id = _text(record.get("source_lot_id"), 255) or _fallback_lot_id(record)
             event_value = record.get("end_at") or record.get("start_at") or record.get("event_at")
             event_at, is_all_day = _source_datetime(event_value, zone)
+            is_all_day = bool(record.get("is_all_day")) or is_all_day
+            auction_house = _text(record.get("auction_house"), 255)
+            sale_url = _url(record.get("sale_url"))
             first_seen_at, _ = _source_datetime(record.get("first_seen_at"), zone)
             last_seen_at, _ = _source_datetime(record.get("last_seen_at"), zone)
             source_status = _text(record.get("status") or "unchanged", 24).lower()
@@ -2693,19 +2696,21 @@ def sync_auction_calendar(request):
                 "artist_watchlist_name": _text(record.get("artist_watchlist_name"), 255),
                 "title": _text(record.get("title"), 500),
                 "medium": _text(record.get("medium"), 500),
-                "auction_house": _text(record.get("auction_house"), 255),
+                "auction_house": auction_house,
                 "sale_title": _text(record.get("sale_title"), 500),
                 "lot_number": _text(record.get("lot_number"), 80),
                 "location": _text(record.get("location"), 255),
-                "event_at": event_at,
-                "is_all_day": bool(record.get("is_all_day", is_all_day)) or is_all_day,
+                "event_at": calendar_event_at(
+                    event_at, source=source, auction_house=auction_house, sale_url=sale_url, is_all_day=is_all_day,
+                ),
+                "is_all_day": is_all_day,
                 "estimate_low": _decimal(record.get("estimate_low")),
                 "estimate_high": _decimal(record.get("estimate_high")),
                 "currency": _text(record.get("currency"), 8).upper(),
                 "current_bid": _decimal(record.get("current_bid")),
                 "bid_count": _nonnegative_integer(record.get("bid_count")),
                 "lot_url": _url(record.get("lot_url")),
-                "sale_url": _url(record.get("sale_url")),
+                "sale_url": sale_url,
                 "image_url": _calendar_image_url(record.get("image_url")),
                 "source_status": source_status,
                 "active": active,

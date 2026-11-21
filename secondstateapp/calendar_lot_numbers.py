@@ -1,21 +1,9 @@
 """Verified Calendar display numbers without changing imported lot identities."""
 
 from datetime import date, datetime
-import re
-from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
-
-def _drouot_identity(url, kind, identity):
-    try:
-        parsed = urlsplit(url or "")
-    except ValueError:
-        return False
-    return (
-        parsed.scheme == "https"
-        and parsed.netloc in {"drouot.com", "www.drouot.com"}
-        and re.fullmatch(r"/[a-z]{2}/" + kind + "/" + identity + r"(?:-[^/]+)?/?", parsed.path) is not None
-    )
+from .calendar_sales import drouot_url_matches
 
 
 def calendar_lot_number(lot):
@@ -34,8 +22,8 @@ def calendar_lot_number(lot):
         and number == "97"
         and isinstance(event_at, datetime) and event_at.tzinfo is not None
         and event_at.astimezone(ZoneInfo("Europe/Paris")).date() == date(2026, 11, 20)
-        and _drouot_identity(lot.sale_url, "v", "187811")
-        and _drouot_identity(lot.lot_url, "l", "36007953")
+        and drouot_url_matches(lot.sale_url, "v", "187811")
+        and drouot_url_matches(lot.lot_url, "l", "36007953")
     ):
         return "97-1"
     # The house's December 12 sale publishes The Lion, edition 115/195,
@@ -49,8 +37,8 @@ def calendar_lot_number(lot):
         and number == "601"
         and isinstance(event_at, datetime) and event_at.tzinfo is not None
         and event_at.astimezone(ZoneInfo("Europe/Paris")).date() == date(2026, 12, 12)
-        and _drouot_identity(lot.sale_url, "v", "188346")
-        and _drouot_identity(lot.lot_url, "l", "36035570")
+        and drouot_url_matches(lot.sale_url, "v", "188346")
+        and drouot_url_matches(lot.lot_url, "l", "36035570")
     ):
         return "601-1"
     return number

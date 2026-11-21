@@ -1,4 +1,4 @@
-"""Verified sale metadata for Calendar display; imported lots stay unchanged."""
+"""Verified sale times and catalog identities for the Calendar."""
 
 import re
 from datetime import date, datetime, timezone
@@ -14,6 +14,33 @@ from zoneinfo import ZoneInfo
 # that arbitrary same-house lots or reused photographs belong to one sale.
 _ALYES_START = datetime(2026, 11, 8, 19, tzinfo=timezone.utc)
 _ALYES_IMAGE = re.compile(r"/housePhotos/Alyes/39/821739/H21147-[A-Za-z0-9_-]+\.jpg")
+
+
+def drouot_url_matches(url, kind, identity):
+    try:
+        parsed = urlsplit(url or "")
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and parsed.netloc in {"drouot.com", "www.drouot.com"}
+        and re.fullmatch(r"/[a-z]{2}/" + kind + "/" + identity + r"(?:-[^/]+)?/?", parsed.path) is not None
+    )
+
+
+def calendar_event_at(event_at, *, source, auction_house, sale_url, is_all_day):
+    # Drouot catalog 188631 supplied 03:00 CET. Templum publishes 15:00
+    # in Barcelona for this live sale, also confirmed by the Invaluable lots.
+    # https://templumauctions.com/auction/312-gran-subasta-de-es/
+    if (
+        event_at == datetime(2026, 12, 3, 2, tzinfo=timezone.utc)
+        and not is_all_day
+        and source == "Drouot"
+        and auction_house == "Templum Fine art Auction"
+        and drouot_url_matches(sale_url, "v", "188631")
+    ):
+        return datetime(2026, 12, 3, 14, tzinfo=timezone.utc)
+    return event_at
 
 
 def verified_sale(lot):
