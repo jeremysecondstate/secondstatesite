@@ -24,6 +24,8 @@ def main():
     inspect.add_argument("--ids", required=True, help="Up to 200 comma-separated Calendar IDs.")
     apply = commands.add_parser("apply", help="Atomically record a batch of assessed lots.")
     apply.add_argument("file", type=Path, help="UTF-8 JSON file containing a reviews array.")
+    for command in (inspect, apply):
+        command.add_argument("--recheck-from", choices=["2026-11-21"], help="Include completed sales in the full recheck.")
     for command in (pending, inspect, apply):
         command.add_argument("--output", type=Path, help="Write the response as UTF-8 JSON.")
     args = parser.parse_args()
@@ -36,9 +38,12 @@ def main():
     options = {"headers": {"X-API-KEY": key, "Accept": "application/json"}, "timeout": (10, 90), "allow_redirects": False}
     if args.command == "apply":
         plan = json.loads(args.file.read_text(encoding="utf-8-sig"))
-        response = requests.post(endpoint, json=plan, **options)
+        params = {"recheck_from": args.recheck_from} if args.recheck_from else {}
+        response = requests.post(endpoint, params=params, json=plan, **options)
     else:
         params = {"ids": args.ids} if args.command == "inspect" else {"limit": args.limit}
+        if args.command == "inspect" and args.recheck_from:
+            params["recheck_from"] = args.recheck_from
         response = requests.get(endpoint, params=params, **options)
     try:
         payload = response.json()

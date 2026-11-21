@@ -49,6 +49,32 @@ class CalendarMarketReviewTests(TestCase):
     def login_staff(self):
         self.client.force_login(get_user_model().objects.create_user("market-staff", is_staff=True))
 
+    def test_full_recheck_enumerates_all_sources_and_can_correct_an_ended_sale(self):
+        first = watch_lot(source="Other source", source_lot_id="ended", event_at=self.start + timedelta(days=1))
+        next_lot = watch_lot(source_lot_id="later", event_at=self.start + timedelta(days=4))
+        watch_lot(source_lot_id="superseded", event_at=first.event_at, superseded_by=first)
+        watch_lot(source_lot_id="undated", event_at=None)
+        self.assertEqual(self.post(self.plan(first)).status_code, 200)
+        self.clock.return_value = self.start + timedelta(days=3, hours=1)
+
+        origin = "2026-11-21"
+        first_page = self.get(mode="census", start=origin, page_size=1).json()
+        self.assertEqual([item["id"] for item in first_page["lots"]], [first.pk])
+        second_page = self.get(mode="census", start=origin, page_size=1, cursor=first_page["next_cursor"]).json()
+        self.assertEqual([item["id"] for item in second_page["lots"]], [next_lot.pk])
+        self.assertIsNone(second_page["next_cursor"])
+        self.assertEqual(self.get(mode="census", start="2026-11-20").status_code, 400)
+        self.assertTrue(self.get(ids=str(first.pk), recheck_from=origin).json()["lots"][0]["eligible"])
+        self.assertFalse(self.get(ids=str(self.lot.pk), recheck_from=origin).json()["lots"][0]["eligible"])
+        plan = self.plan(first, status="clear")
+        self.assertEqual(self.post(plan).status_code, 409)
+        path = f"{self.endpoint}?recheck_from={origin}"
+        response = self.client.post(path, {"reviews": [plan]}, content_type="application/json", HTTP_X_API_KEY=KEY)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.get(ids=str(first.pk)).json()["lots"][0]["review"]["status"], "clear")
+        excluded = self.client.post(path, {"reviews": [self.plan()]}, content_type="application/json", HTTP_X_API_KEY=KEY)
+        self.assertEqual(excluded.status_code, 409)
+
     def test_api_requires_key_and_prioritizes_upcoming_lots_from_all_sources(self):
         self.login_staff()
         self.assertEqual(self.client.get(self.endpoint).status_code, 401)

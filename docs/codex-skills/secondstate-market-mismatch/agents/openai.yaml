@@ -1,4 +1,4 @@
 interface:
   display_name: "SecondState Market Mismatch"
   short_description: "Find lots with cultural ties or stronger collecting elsewhere"
-  default_prompt: "Use $secondstate-market-mismatch to find lots with a cultural connection to another place or stronger collecting evidence elsewhere. Review every lot on today’s SecondState Calendar, then move forward in sale order."
+  default_prompt: "Use $secondstate-market-mismatch to investigate and verify every SecondState Auction Calendar lot from November 21, 2026 onward in sale-date order. Recheck saved assessments and report conclusions with evidence."

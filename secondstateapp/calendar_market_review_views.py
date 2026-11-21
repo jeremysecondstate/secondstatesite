@@ -1,7 +1,7 @@
 """Review current and future Calendar lots in auction order."""
 
 from collections import Counter
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from itertools import islice
 import json
 import re
@@ -26,17 +26,32 @@ from .sale_geography import sale_geography
 MAX_BATCH = 200
 MAX_BYTES = 1_000_000
 RETRY_UNCERTAIN = timedelta(days=7)
+RECHECK_START_DAY = date(2026, 11, 21)
 validate_web_url = URLValidator(schemes=["http", "https"])
 
 
-def _review_start():
+def _review_start(recheck_from=None):
     zone = _calendar_zone()
+    if recheck_from is not None:
+        if recheck_from != RECHECK_START_DAY.isoformat():
+            raise ValueError(f"The full Calendar recheck starts on {RECHECK_START_DAY}.")
+        return datetime.combine(RECHECK_START_DAY, time.min, tzinfo=zone)
     first_day = max(FIRST_REVIEW_DAY, timezone.localdate(timezone=zone))
     return datetime.combine(first_day, time.min, tzinfo=zone)
 
 
-def _eligible_lots():
-    return AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=_review_start())
+def _eligible_lots(recheck_from=None):
+    return AuctionWatchLot.objects.filter(superseded_by__isnull=True, event_at__gte=_review_start(recheck_from))
+
+
+def _census(params):
+    start = params.get("start", RECHECK_START_DAY.isoformat())
+    cursor = int(params.get("cursor", "0"))
+    size = int(params.get("page_size", "500"))
+    if not 0 <= cursor <= 2**63 - 1 or not 1 <= size <= 500:
+        raise ValueError("Invalid census cursor or page size.")
+    lots = list(_eligible_lots(start).filter(pk__gt=cursor).order_by("pk").values("id", "event_at")[:size + 1])
+    return {"lots": lots[:size], "next_cursor": str(lots[size - 1]["id"]) if len(lots) > size else None}
 
 
 def _projections(lots):
@@ -68,10 +83,10 @@ def _ids(raw):
     return result
 
 
-def _inspect(raw_ids):
+def _inspect(raw_ids, recheck_from=None):
     lots = list(AuctionWatchLot.objects.select_related("market_review").filter(pk__in=_ids(raw_ids)).order_by("pk"))
     rows = _projections(lots)
-    start = _review_start()
+    start = _review_start(recheck_from)
     for lot, row in zip(lots, rows):
         review = getattr(lot, "market_review", None)
         row.update(
@@ -200,10 +215,10 @@ def _plan(payload):
 
 
 @transaction.atomic
-def _apply(plan):
+def _apply(plan, recheck_from=None):
     # Lock canonical lot rows in consistent order before reading or creating the review.
     # An outer join to the optional review cannot be locked on PostgreSQL.
-    lots = list(_eligible_lots().select_for_update().filter(pk__in=plan).order_by("pk"))
+    lots = list(_eligible_lots(recheck_from).select_for_update().filter(pk__in=plan).order_by("pk"))
     if len(lots) != len(plan):
         raise ValueError("One or more lots fall outside the current Calendar review window. Read the lots again.")
     saved = AuctionLotMarketReview.objects.in_bulk(plan, field_name="lot_id")
@@ -233,7 +248,12 @@ def calendar_market_review(request):
         return JsonResponse({"ok": False, "error": "Unauthorized."}, status=401)
     if request.method == "GET":
         try:
-            result = _inspect(request.GET["ids"]) if "ids" in request.GET else _pending(request.GET.get("limit", 50))
+            if request.GET.get("mode") == "census":
+                result = _census(request.GET)
+            elif "ids" in request.GET:
+                result = _inspect(request.GET["ids"], request.GET.get("recheck_from"))
+            else:
+                result = _pending(request.GET.get("limit", 50))
         except ValueError as exc:
             return JsonResponse({"ok": False, "error": str(exc)}, status=400)
     else:
@@ -248,7 +268,7 @@ def calendar_market_review(request):
         except (ValueError, UnicodeDecodeError) as exc:
             return JsonResponse({"ok": False, "error": str(exc)}, status=400)
         try:
-            result = _apply(plan)
+            result = _apply(plan, request.GET.get("recheck_from"))
         except ValueError as exc:
             return JsonResponse({"ok": False, "error": str(exc)}, status=409)
     return JsonResponse({"ok": True, "version": 1, **result})
