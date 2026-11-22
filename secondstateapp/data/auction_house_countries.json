@@ -1498,6 +1498,22 @@
       "evidence_url": "https://www.estatesales.net/MO/Kansas-City/64105/5122110",
       "evidence": "Circle Auction lists its December 5, 2026 Jewelry, Fine Art, and Historical Collectibles sale in Kansas City, Missouri. The house identifies Kansas City as the location for its online auctions at https://circle-auction.com/upcoming-kansas-city-auctions-near-me/.",
       "verified_at": "2026-11-20"
+    },
+    {
+      "name": "Antiques & Modern Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.estatesales.net/FL/West-Palm-Beach/33405/5168871",
+      "evidence": "The gallery lists its December 5, 2026 Fine Artwork & Decorative Arts sale in West Palm Beach, Florida. Its own schedule gives the same sale time and the gallery address at 811A Belvedere Road in West Palm Beach (https://www.antiquesmodern.com/auctions.html).",
+      "verified_at": "2026-11-22"
+    },
+    {
+      "name": "Davis Brothers Auction",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://hibid.com/auction/796847/end-of-the-year-extravaganza---day-1",
+      "evidence": "Davis Brothers lists the December 2, 2026 opening session of its End of the Year Extravaganza in Missoula, Montana. The auctioneer also identifies Missoula as its home at https://davisbrothersauction.com/about-us/.",
+      "verified_at": "2026-11-22"
     }
   ]
 }
