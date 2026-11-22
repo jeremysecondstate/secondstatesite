@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 
+from .calendar_market_evidence import resale_auction_houses
 from .models import AuctionLotMarketReview
 
 
@@ -27,10 +28,6 @@ def review_fingerprint(lot, attribution, country, region):
     return sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def signature_required(lot):
-    return bool(lot.event_at and lot.event_at.astimezone(ZoneInfo(settings.CALENDAR_TIME_ZONE)).date() >= RECHECK_START_DAY)
-
-
 def has_artist_signature(sources):
     for source in sources:
         evidence = source.get("artist_signature")
@@ -39,11 +36,21 @@ def has_artist_signature(sources):
     return False
 
 
+def missing_mismatch_evidence(lot, status, sources):
+    if status != AuctionLotMarketReview.Status.MISMATCH or not lot.event_at:
+        return None
+    if lot.event_at.astimezone(ZoneInfo(settings.CALENDAR_TIME_ZONE)).date() < RECHECK_START_DAY:
+        return None
+    if not has_artist_signature(sources):
+        return "cited evidence of the artist’s hand signature on the offered object"
+    if not resale_auction_houses(sources):
+        return "a cited resale venue labeled 'Resale auction house · House name · City, Country'"
+    return None
+
+
 def review_is_current(lot, review, fingerprint):
-    return bool(review and review.fingerprint == fingerprint and (
-        review.status != AuctionLotMarketReview.Status.MISMATCH or not signature_required(lot)
-        or has_artist_signature(review.sources)
-    ))
+    return bool(review and review.fingerprint == fingerprint
+                and not missing_mismatch_evidence(lot, review.status, review.sources))
 
 
 def market_review_fields(lot, row):
@@ -57,5 +64,6 @@ def market_review_fields(lot, row):
         finding = {
             "sale_market": review.sale_market, "stronger_market": review.stronger_market,
             "reason": review.reason, "sources": review.sources, "reviewed_at": review.reviewed_at.isoformat(),
+            "resale_auction_houses": resale_auction_houses(review.sources),
         }
     return {"market_review_status": review.status, "market_mismatch": finding}

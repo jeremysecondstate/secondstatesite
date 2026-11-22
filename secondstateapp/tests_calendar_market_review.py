@@ -35,7 +35,8 @@ class CalendarMarketReviewTests(TestCase):
         if status == "mismatch":
             result.update(sale_market="Regional Irish art auctions", stronger_market="New York Latin American prints",
                           sources=[{"label": "Current catalog", "url": "https://example.com/catalog/1"},
-                                   {"label": "Auction results", "url": "https://example.com/results/5"}])
+                                   {"label": "Resale auction house · Example Auctions · New York, USA",
+                                    "url": "https://example.com/results/5"}])
             result["sources"][0]["artist_signature"] = {"artist": "Test artist", "observation": "Signed in pencil at lower right."}
         return result
 
@@ -99,6 +100,42 @@ class CalendarMarketReviewTests(TestCase):
         self.assertEqual([lot["id"] for lot in self.get().json()["lots"]], [self.lot.pk])
         self.assertEqual(self.post(self.plan(status="clear")).status_code, 200)
         self.assertEqual(finding()["market_review_status"], "clear")
+
+    def test_named_resale_house_required_from_recheck_start_and_older_flags_return_for_research(self):
+        self.login_staff()
+        prior = self.plan()
+        prior["sources"][1]["label"] = "Regional prints fair"
+        self.assertEqual(self.post(prior).status_code, 200)
+        self.assertEqual(self.day_row()["market_mismatch"]["resale_auction_houses"], [])
+
+        next_lot = watch_lot(source_lot_id="nov-21", event_at=self.start + timedelta(days=1))
+        plan = self.plan(next_lot)
+        citation = plan["sources"][1]
+        for label in ("Nice, France", "Resale auction house · · Nice, France",
+                      "Resale auction house · Example Auctions · France"):
+            with self.subTest(label=label):
+                citation["label"] = label
+                self.assertEqual(self.post(plan).status_code, 409)
+        citation["label"] = "Resale auction house · Example Auctions · Nice, France"
+        self.assertEqual(self.post(plan).status_code, 200)
+        day = {"day": "2026-11-21"}
+        day_url = reverse("auction_calendar_day_lots")
+        finding = self.client.get(day_url, day).json()["lots"][0]["market_mismatch"]
+        self.assertEqual(finding["resale_auction_houses"], [
+            {"name": "Example Auctions", "location": "Nice, France", "url": citation["url"]},
+        ])
+        self.assertEqual(finding["sources"], plan["sources"])
+        self.assertEqual(self.get().json()["pending_count"], 0)
+
+        citation["label"] = "Regional prints fair"
+        AuctionLotMarketReview.objects.filter(lot=next_lot).update(sources=plan["sources"])
+        self.assertIsNone(self.client.get(day_url, day).json()["lots"][0]["market_mismatch"])
+        pending = self.get().json()
+        self.assertEqual([r["id"] for r in pending["lots"]], [next_lot.pk])
+        self.assertEqual(pending["oldest_pending_day_count"], 1)
+        inspection = self.get(ids=str(next_lot.pk), recheck_from="2026-11-21").json()["lots"][0]
+        self.assertEqual(inspection["review"]["status"], "mismatch")
+        self.assertFalse(inspection["review"]["current"])
 
     def test_api_requires_key_and_prioritizes_upcoming_lots_from_all_sources(self):
         self.login_staff()

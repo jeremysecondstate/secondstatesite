@@ -795,17 +795,25 @@
     appendText(details, "summary", "", "Market mismatch");
     appendText(details, "p", "", `Offered in · ${finding.sale_market}`);
     appendText(details, "p", "", `Market connection · ${finding.stronger_market}`);
-    appendText(details, "p", "", finding.reason);
+    const houses = new Map((finding.resale_auction_houses || []).map(house => [house.url, house]));
     const sources = document.createElement("ul");
     for (const source of finding.sources) {
       if (!/^https?:\/\//i.test(source.url)) continue;
-      const item = document.createElement("li");
-      item.appendChild(externalLink(source.url, "lot-auction-link", source.label));
+      const house = houses.get(source.url);
+      const item = document.createElement(house ? "div" : "li");
+      if (house) {
+        item.textContent = "Resale auction house · ";
+        item.appendChild(externalLink(source.url, "lot-auction-link", `${house.name} · ${house.location}`));
+        details.appendChild(item);
+      } else {
+        item.appendChild(externalLink(source.url, "lot-auction-link", source.label));
+        sources.appendChild(item);
+      }
       if (source.artist_signature) {
         appendText(item, "p", "", `Artist’s hand signature · ${source.artist_signature.artist} · ${source.artist_signature.observation}`);
       }
-      sources.appendChild(item);
     }
+    appendText(details, "p", "", finding.reason);
     if (sources.children.length) details.appendChild(sources);
     parent.appendChild(details);
   };

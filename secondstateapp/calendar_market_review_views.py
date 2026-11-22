@@ -17,8 +17,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from .calendar_market_review import (
-    CATALOG_FIELDS, FIRST_REVIEW_DAY, RECHECK_START_DAY, has_artist_signature,
-    review_fingerprint, review_is_current, signature_required,
+    CATALOG_FIELDS, FIRST_REVIEW_DAY, RECHECK_START_DAY, missing_mismatch_evidence,
+    review_fingerprint, review_is_current,
 )
 from .calendar_views import _artist_label, _attach_superseded_attribution, _calendar_zone, _sync_authorized
 from .lot_presentation import artist_attribution_label
@@ -117,7 +117,7 @@ def _pending(raw_limit):
     for row in pending:
         row["revision"] = 0
     # Re-evaluate fingerprints on reviewed rows, even if other, unrelated source
-    # observations have changed. Legacy flags also need signature evidence.
+    # observations have changed. Legacy flags also need current mismatch evidence.
     reviewed = ordered.filter(market_review__isnull=False).select_related("market_review").only(
         *CATALOG_FIELDS, "active", "sold_price", "sold_currency",
         "market_review__fingerprint", "market_review__status", "market_review__reviewed_at", "market_review__revision",
@@ -238,9 +238,9 @@ def _apply(plan, recheck_from=None):
     results = []
     for lot, row in zip(lots, _projections(lots)):
         expected_revision, evidence = plan[lot.pk]
-        if (evidence["status"] == AuctionLotMarketReview.Status.MISMATCH and signature_required(lot)
-                and not has_artist_signature(evidence["sources"])):
-            raise ValueError(f"Lot {lot.pk} requires cited evidence of the artist’s hand signature on the offered object.")
+        missing = missing_mismatch_evidence(lot, evidence["status"], evidence["sources"])
+        if missing:
+            raise ValueError(f"Lot {lot.pk} requires {missing}.")
         if row["fingerprint"] != evidence["fingerprint"]:
             raise ValueError(f"Lot {lot.pk} catalog facts changed. Read the lot again.")
         record = saved.get(lot.pk)

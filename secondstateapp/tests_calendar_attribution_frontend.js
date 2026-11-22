@@ -88,6 +88,26 @@ test("market mismatch details explain the finding and link its evidence on the f
   assert.equal(withClass(render.galleryCard(lot(), 0), "lot-market-mismatch").length, 0);
 });
 
+test("the resale auction house is linked once, alongside the cultural connection and autograph evidence", () => {
+  const url = "https://auction.example/sales/prints-12";
+  const finding = {sale_market: "Paris, France", stronger_market: "Saint-André-de-la-Roche, France",
+    reason: "A Nice auctioneer has offered prints from this portfolio.",
+    resale_auction_houses: [{name: "Example Auctions", location: "Nice, France", url}],
+    sources: [
+      {label: "Source lot", url: "https://other.example/lot/310",
+        artist_signature: {artist: "Test artist", observation: "Pencil monogram at lower right."}},
+      {label: "Resale auction house · Example Auctions · Nice, France", url},
+    ]};
+  const [details] = withClass(renderer().galleryCard(lot({market_mismatch: finding}), 0), "lot-market-mismatch");
+  assert.match(details.textContent, /Market connection · Saint-André-de-la-Roche, France/);
+  assert.match(details.textContent, /Resale auction house · Example Auctions · Nice, France/);
+  assert.match(details.textContent, /Artist’s hand signature · Test artist · Pencil monogram/);
+  const candidates = descendants(details).filter(node => node.tagName === "a" && node.href === url);
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].textContent, "Example Auctions · Nice, France");
+  assert.equal(candidates[0].rel, "noopener noreferrer");
+});
+
 test("every catalog lot exposes an estimated arrival separately from the listed time without requiring a board", () => {
   for (const saved_bid_board of [null, {qualifying_bid: "300"}, {qualifying_bid: null}]) {
     const source = lot({event_at: "2026-11-04T13:00:00Z", time: "5:00 AM", lot_number: "39", saved_bid_board});
