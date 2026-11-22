@@ -22,7 +22,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import RequestDataTooBig, ValidationError
 from django.core.validators import URLValidator
 from django.db import transaction
-from django.db.models import Count, Max, Q
+from django.db.models import Count, F, Max, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -55,8 +55,10 @@ from .auction_email import (
 )
 from .bid_board_snapshot import saved_board_summary, uses_max_bid_label
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
+from .calendar_linked_sales import LinkedCatalogs
 from .calendar_lot_numbers import calendar_lot_number
 from .calendar_market_review import FIRST_REVIEW_DAY, market_review_fields
+from .calendar_published_catalogs import published_catalog
 from .calendar_sales import calendar_event_at, combined_catalog_starts, verified_sale, verified_timed_catalog
 from .calendar_images import (
     is_saved_calendar_image_url,
@@ -133,8 +135,8 @@ def _artist_label(lot: AuctionWatchLot) -> str:
     return lot.artist_watchlist_name or lot.artist or "Unknown artist"
 
 
-def _sale_identity(lot: AuctionWatchLot) -> str:
-    sale = verified_sale(lot)
+def _sale_identity(lot: AuctionWatchLot, sale_for=verified_sale) -> str:
+    sale = sale_for(lot)
     if sale:
         return sale["identity"]
     if lot.sale_url:
@@ -211,26 +213,30 @@ def _time_label(lot: AuctionWatchLot, zone: ZoneInfo, *, published_closing=False
     return local.strftime(pattern).lstrip("0")
 
 
-def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
+def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo, sale_for=verified_sale) -> list[dict]:
     grouped: dict[str, list[AuctionWatchLot]] = {}
     for lot in lots:
-        grouped.setdefault(_sale_identity(lot), []).append(lot)
+        grouped.setdefault(_sale_identity(lot, sale_for), []).append(lot)
 
     groups = []
     for sale_lots in grouped.values():
         first = sale_lots[0]
-        sale = next((match for lot in sale_lots if (match := verified_sale(lot))), None)
+        sale = next((match for lot in sale_lots if (match := sale_for(lot))), None)
         display_time = first
         if sale:
             display_time = copy(first)
             display_time.event_at = sale["starts_at"]
-        starts = combined_catalog_starts(sale_lots) or (display_time,)
+        if sale and sale.get("combined_starts"):
+            by_time = {lot.event_at: lot for lot in sale_lots}
+            starts = tuple(by_time[start] for start in sorted(by_time))
+        else:
+            starts = combined_catalog_starts(sale_lots) or (display_time,)
         auction_house = next((lot.auction_house for lot in sale_lots if lot.auction_house), first.source or "Auction")
         sale_title = next((lot.sale_title for lot in sale_lots if lot.sale_title), "")
         sale_url = first.sale_url
         if sale and sale.get("catalog_url"):
             sale_url = sale["catalog_url"]
-            sale_title = sale_title or sale["title"]
+            sale_title = sale.get("session_title") or sale_title or sale.get("title", "")
         artists = sorted({artist_display_name(name) for name in {_artist_label(lot) for lot in sale_lots}}, key=artist_sort_key)
         groups.append(
             {
@@ -515,6 +521,22 @@ def auction_calendar(request):
     following_month = _next_month(selected_month)
     month_weeks = month_calendar.Calendar(firstweekday=0).monthdatescalendar(selected_month.year, selected_month.month)
     range_start, range_end = _utc_bounds(month_weeks[0][0], month_weeks[-1][-1] + timedelta(days=1), zone)
+    today_start, upcoming_end = _utc_bounds(now_local.date(), now_local.date() + timedelta(days=181), zone)
+
+    linked_catalogs = LinkedCatalogs(AuctionWatchLot.objects.filter(
+        Q(event_at__gte=range_start, event_at__lt=range_end) | Q(event_at__gte=today_start, event_at__lt=upcoming_end),
+        source="Drouot", active=False, is_all_day=False, superseded_by__source="Invaluable",
+        superseded_by__superseded_by__isnull=True, superseded_by__is_all_day=False,
+        event_at=F("superseded_by__event_at"),
+    ).select_related("superseded_by").only(
+        "auction_house", "sale_url", "lot_number", "lot_url", "source_lot_id",
+        "superseded_by__auction_house", "superseded_by__event_at",
+        "superseded_by__lot_number", "superseded_by__lot_url", "superseded_by__image_url", "superseded_by__sale_url",
+    ).order_by())
+
+    @lru_cache(maxsize=None)
+    def sale_for(lot):
+        return verified_sale(lot) or published_catalog(lot) or linked_catalogs.sale(lot)
 
     active_email_batch = AuctionEmailBatch.objects.filter(is_active=True).first()
     selected_lot_ids = set(active_email_batch.items.values_list("lot_id", flat=True)) if active_email_batch else set()
@@ -523,7 +545,7 @@ def auction_calendar(request):
     # Month navigation needs sale/artist grouping and verified-sale identifiers.
     # Fetch prices, saved research and action URLs only for the day being read.
     summary_lots = AuctionWatchLot.objects.filter(superseded_by__isnull=True).only(
-        "id", "event_at", "is_all_day", "active", "source", "sale_url", "sale_title",
+        "id", "event_at", "is_all_day", "active", "source", "source_lot_id", "sale_url", "sale_title",
         "auction_house", "artist", "artist_watchlist_name", "lot_number", "lot_url", "image_url",
     ).order_by("event_at", "auction_house", "artist", "id")
     month_lots = summary_lots.filter(
@@ -539,9 +561,9 @@ def auction_calendar(request):
     is_scoped_house = lru_cache(maxsize=None)(is_oliver_house)
 
     def summarize_day(day, day_lots):
-        groups = _group_lots(day_lots, zone)
+        groups = _group_lots(day_lots, zone, sale_for)
         oliver_lots = [lot for lot in day_lots if is_scoped_house(lot.auction_house)]
-        scoped_groups = groups if len(oliver_lots) == len(day_lots) else _group_lots(oliver_lots, zone)
+        scoped_groups = groups if len(oliver_lots) == len(day_lots) else _group_lots(oliver_lots, zone, sale_for)
         if day_lots:
             iso = day.isoformat()
             calendar_day_counts[iso] = {"lots": len(day_lots), "oliver_lots": len(oliver_lots)}
@@ -574,7 +596,6 @@ def auction_calendar(request):
             )
         weeks.append(week_items)
 
-    today_start, upcoming_end = _utc_bounds(now_local.date(), now_local.date() + timedelta(days=181), zone)
     upcoming_query = summary_lots.filter(
         active=True, event_at__gte=today_start, event_at__lt=upcoming_end,
     )
@@ -591,10 +612,10 @@ def auction_calendar(request):
         upcoming_by_day_and_sale: dict[tuple[date, str], list[AuctionWatchLot]] = {}
         for lot in lots:
             local_day = timezone.localtime(lot.event_at, zone).date()
-            upcoming_by_day_and_sale.setdefault((local_day, _sale_identity(lot)), []).append(lot)
+            upcoming_by_day_and_sale.setdefault((local_day, _sale_identity(lot, sale_for)), []).append(lot)
         groups = []
         for (local_day, _identity), sale_lots in upcoming_by_day_and_sale.items():
-            group = _group_lots(sale_lots, zone)[0]
+            group = _group_lots(sale_lots, zone, sale_for)[0]
             group["date_iso"] = local_day.isoformat()
             group["date_label"] = local_day.strftime("%a, %b %d").replace(" 0", " ")
             if track_identity:
@@ -627,10 +648,10 @@ def auction_calendar(request):
             sale_lots = [
                 lot for lot in complete_day_lots[group["date_iso"]]
                 if lot.active and (not oliver_only or is_scoped_house(lot.auction_house))
-                and _sale_identity(lot) == identity
+                and _sale_identity(lot, sale_for) == identity
             ]
             if sale_lots:
-                group.update(_group_lots(sale_lots, zone)[0])
+                group.update(_group_lots(sale_lots, zone, sale_for)[0])
 
     in_month_days = sorted(day for day in lots_by_day if selected_month <= day < following_month)
     if now_local.date() in in_month_days:

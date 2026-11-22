@@ -219,3 +219,158 @@ class TimedSaleCalendarViewTests(TestCase):
         for model in models:
             self.assertEqual(list(model.objects.order_by("pk").values()), before[model])
         self.assertEqual(list(first.max_bid_analysis.__class__.objects.values()), analysis_before)
+
+
+@override_settings(CALENDAR_TIME_ZONE="America/Los_Angeles", AUCTION_EMAIL_SENDING_ENABLED=False)
+class CrossProviderCatalogViewTests(TestCase):
+    start = datetime(2026, 12, 3, 10, tzinfo=timezone.utc)
+
+    def setUp(self):
+        self.client.force_login(get_user_model().objects.create_user("catalog-staff", is_staff=True))
+        clock = patch("secondstateapp.calendar_views.timezone.now", return_value=self.start - timedelta(days=1))
+        clock.start()
+        self.addCleanup(clock.stop)
+
+    def invaluable(self, number, catalog="822832", **changes):
+        values = dict(
+            auction_house="Artcurial", sale_title="", sale_url="", lot_number=str(number),
+            source_lot_id=str(207000000 + number), event_at=self.start,
+            image_url=f"https://image.invaluable.com/housePhotos/Artcurial/32/{catalog}/H0900-L{number}.jpg",
+            lot_url=f"https://www.invaluable.com/auction-lot/print-{number}-c-{number:010x}",
+        )
+        return watch_lot(**{**values, **changes})
+
+    def drouot(self, number, catalog="188405", survivor=None, **changes):
+        source_id = str(36000000 + number)
+        values = dict(
+            source="Drouot", source_lot_id=source_id, auction_house="Artcurial", sale_title="",
+            event_at=self.start, lot_number=str(number), lot_url=f"https://drouot.com/en/l/{source_id}-print",
+            sale_url=f"https://drouot.com/en/v/{catalog}", superseded_by=survivor, active=survivor is None,
+        )
+        return watch_lot(**{**values, **changes})
+
+    def data(self, day="2026-12-03"):
+        response = self.client.get(reverse("auction_calendar"), {"day": day, "view": "catalog"})
+        self.assertEqual(response.status_code, 200)
+        return response.context
+
+    def test_verified_catalog_is_counted_once_across_both_scopes_and_upcoming(self):
+        survivor = self.invaluable(25)
+        hidden = self.drouot(25, survivor=survivor)
+        other_invaluable = self.invaluable(26)
+        other_drouot = self.drouot(27)
+        self.invaluable(28, catalog="822899")
+        self.drouot(29, catalog="188499")
+        before = list(AuctionWatchLot.objects.order_by("pk").values())
+
+        day = "2026-12-03"
+        context = self.data(day)
+        for key in ("calendar_sales_data", "oliver_calendar_sales_data", "upcoming_groups", "oliver_upcoming_groups"):
+            with self.subTest(key=key):
+                groups = context[key][day] if key.endswith("_data") else context[key]
+                self.assertCountEqual([group["lot_count"] for group in groups], [3, 1, 1])
+                joined, = [group for group in groups if group["lot_count"] == 3]
+                self.assertEqual(joined["sale_url"], other_drouot.sale_url)
+        lots = {lot["id"]: lot for lot in context["calendar_data"][day]}
+        self.assertEqual(len(lots), 5)
+        self.assertNotIn(hidden.pk, lots)
+        for lot in (survivor, other_invaluable, other_drouot):
+            self.assertEqual(lots[lot.pk]["lot_url"], lot.lot_url)
+        self.assertEqual(list(AuctionWatchLot.objects.order_by("pk").values()), before)
+
+    def test_conflicting_catalog_evidence_keeps_two_drouot_catalogs_distinct(self):
+        self.drouot(25, survivor=self.invaluable(25))
+        self.drouot(26, catalog="188499", survivor=self.invaluable(26))
+        self.invaluable(27)
+        self.drouot(28)
+        self.drouot(29, catalog="188499")
+
+        sales = self.data()["calendar_sales_data"]["2026-12-03"]
+        self.assertCountEqual([sale["lot_count"] for sale in sales], [3, 1, 1])
+
+    def test_unrelated_explicit_catalog_and_mismatched_lot_number_keep_their_own_groups(self):
+        self.drouot(25, survivor=self.invaluable(25))
+        self.drouot(26)
+        self.invaluable(27, sale_url="https://www.invaluable.com/catalog/zls47cuze8")
+        self.invaluable(28, lot_url="https://www.invaluable.com/auction-lot/print-300-c-a0a0a0a0a0")
+
+        sales = self.data()["calendar_sales_data"]["2026-12-03"]
+        counts = {sale["sale_url"]: sale["lot_count"] for sale in sales}
+        self.assertEqual(counts, {
+            "https://drouot.com/en/v/188405": 2,
+            "https://www.invaluable.com/catalog/zls47cuze8": 1,
+            "": 1,
+        })
+
+    def test_changed_number_or_source_link_cannot_identify_a_catalog(self):
+        first = self.invaluable(25)
+        self.drouot(27, survivor=first)
+        second = self.invaluable(26)
+        self.drouot(26, survivor=second, lot_url="https://drouot.com/en/l/36999999-different-print")
+        self.drouot(30)
+
+        sales = self.data()["calendar_sales_data"]["2026-12-03"]
+        self.assertEqual({sale["sale_url"]: sale["lot_count"] for sale in sales}, {
+            "https://drouot.com/en/v/188405": 1, "": 2,
+        })
+
+    def test_mixed_mallet_catalog_preserves_both_represented_start_times(self):
+        house = {"auction_house": "Mallet Auction"}
+        for number, start_hour, photo in ((1019, 3, "47/823047"), (62, 6, "51/823051")):
+            start = datetime(2026, 12, 10, start_hour, tzinfo=timezone.utc)
+            inv = self.invaluable(
+                number, **house, event_at=start,
+                image_url=f"https://image.invaluable.com/housePhotos/malletauctionjapan/{photo}/H3876-L{number}.jpg",
+            )
+            self.drouot(number, "188574", survivor=inv, **house, event_at=start)
+            self.drouot(number + 1, "188574", **house, event_at=start)
+
+        group, = self.data("2026-12-09")["calendar_sales_data"]["2026-12-09"]
+        self.assertEqual((group["lot_count"], group["time_label"]), (4, "7:00 PM and 10:00 PM"))
+
+    def test_lempertz_day_sales_retain_their_own_catalogs_and_start_times(self):
+        for number, start_hour, photo in ((201, 10, "82/821482"), (437, 13, "83/821483")):
+            session = {"auction_house": "Lempertz", "event_at": datetime(2026, 12, 5, start_hour, tzinfo=timezone.utc)}
+            inv = self.invaluable(
+                number, **session,
+                image_url=f"https://image.invaluable.com/housePhotos/Lempertz/{photo}/H0684-L{number}.jpg",
+            )
+            self.drouot(number, "187112", survivor=inv, **session)
+            self.drouot(number + 1, "187112", **session)
+
+        sales = self.data("2026-12-05")["calendar_sales_data"]["2026-12-05"]
+        self.assertEqual([(sale["lot_count"], sale["time_label"]) for sale in sales], [(2, "2:00 AM"), (2, "5:00 AM")])
+        self.assertEqual([sale["sale_url"] for sale in sales], [
+            "https://www.lempertz.com/en/catalogues/detail/1303-1-day-sale-modern-art.html",
+            "https://www.lempertz.com/en/catalogues/detail/1303-2-day-sale-contemporary-art.html",
+        ])
+
+    def test_published_catalogs_combine_distinct_lots_without_a_common_watched_lot(self):
+        cases = [
+            ("2026-11-25T14:00:00+00:00", "Il Ponte", "Il Ponte Auction House",
+             "188002", 224, 282, "ilPonte/86/822386/H0611"),
+            ("2026-12-02T17:00:00+00:00", "Piasa", "Piasa",
+             "188158", 65, 35, "Piasa/91/818591/H0837"),
+            ("2026-12-11T15:00:00+00:00", "Accademia Fine Art", "Accademia Fine Art",
+             "188578", 311, 350, "Accademia/60/823060/H4638"),
+        ]
+        for clock, drouot_house, inv_house, catalog, drouot_number, inv_number, photo in cases:
+            with self.subTest(sale=drouot_house):
+                when = datetime.fromisoformat(clock)
+                self.drouot(drouot_number, catalog, auction_house=drouot_house, event_at=when)
+                inv = self.invaluable(
+                    inv_number, auction_house=inv_house, event_at=when,
+                    image_url=f"https://image.invaluable.com/housePhotos/{photo}-L{inv_number}.jpg",
+                )
+                self.invaluable(
+                    inv_number + 1, auction_house=inv_house, event_at=when,
+                    image_url=inv.image_url.replace(photo, photo.replace("H", "H00")),
+                )
+                day = when.date().isoformat()
+                context = self.data(day)
+                sales = context["calendar_sales_data"][day]
+                self.assertCountEqual([sale["lot_count"] for sale in sales], [2, 1])
+                published, = [sale for sale in sales if sale["lot_count"] == 2]
+                self.assertTrue(published["sale_url"])
+                self.assertTrue(published["sale_title"])
+                self.assertEqual(len(context["calendar_data"][day]), 3)
