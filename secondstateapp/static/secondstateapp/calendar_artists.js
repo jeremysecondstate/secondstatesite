@@ -44,8 +44,10 @@
       const schedule = lot.arrival_schedule;
       const at = knownInstant(schedule.at);
       if (schedule.kind === "published_closing") {
+        const invaluableLot = /^https:\/\/(?:www\.)?invaluable\.com\/auction-lot\/[a-z0-9_-]+-(\d+[a-z]*)-c-[a-f0-9]{10}\/?$/i.exec(schedule.source_url);
         const verifiedSource = /^https:\/\/(?:www\.)?sothebys\.com\/en\/buy\/auction\/2026\/modern-contemporary-discoveries-de2640\/[^/?#]+\/?(?:\?[^#]*)?$/.test(schedule.source_url)
-          || /^https:\/\/onlinesale\.kettererkunst\.com\/item\.php\?id=[0-9]+$/.test(schedule.source_url);
+          || /^https:\/\/onlinesale\.kettererkunst\.com\/item\.php\?id=[0-9]+$/.test(schedule.source_url)
+          || (invaluableLot && invaluableLot[1].toLowerCase() === match[0].toLowerCase());
         if (at !== time || schedule.source_url !== lot.lot_url || !verifiedSource) return null;
         return {number, time, startTime: time, kind: schedule.kind, sourceUrl: schedule.source_url, minutes: null};
       }
@@ -179,6 +181,7 @@
     const crossesDay = times.some(at => dateFormat.format(artist.earliestTime) !== dateFormat.format(at));
     const clock = new Intl.DateTimeFormat("en-US", {
       timeZone, hour: "numeric", minute: "2-digit", hour12: true,
+      second: artist.arrivalKind === "published_closing" && new Date(artist.arrivalTime).getUTCSeconds() ? "2-digit" : undefined,
       ...(crossesDay ? {month: "short", day: "numeric"} : {}),
     });
     return [...new Set(times.map(at => clock.format(at)))].join("–");
@@ -192,7 +195,7 @@
   const formatLotArrival = (lot, timeZone) => {
     const details = lotArrivalDetails(lot);
     if (details === null) return "Unavailable";
-    return formatArrival({earliestTime: details.startTime, arrivalTime: details.time,
+    return formatArrival({earliestTime: details.startTime, arrivalTime: details.time, arrivalKind: details.kind,
       arrivalWindow: details.arrivalWindow}, timeZone);
   };
 

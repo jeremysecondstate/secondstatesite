@@ -8,6 +8,32 @@ const CalendarArtists = require("./static/secondstateapp/calendar_artists.js");
 
 const names = (artists) => artists.map((artist) => artist.name);
 
+test("Invaluable uses the published lot closing only for the matching lot link, number and time", () => {
+  const url = "https://www.invaluable.com/auction-lot/takashi-murakami-jigsaw-puzzle-108-bonno-997-c-5dad25890c";
+  const event = "2026-11-23T04:10:00Z";
+  const schedule = {kind: "published_closing", at: event, source_url: url};
+  const lot = {lot_number: "997", lot_url: url, event_at: event, arrival_schedule: schedule};
+  assert.equal(CalendarArtists.formatLotArrival(lot, "America/Los_Angeles"), "8:10 PM");
+  const closing = "2026-11-23T04:10:45Z";
+  const precise = {...lot, event_at: closing, arrival_schedule: {...schedule, at: closing}};
+  assert.equal(CalendarArtists.formatLotArrival(precise, "America/Los_Angeles"), "8:10:45 PM");
+  assert.equal(CalendarArtists.formatArrival(CalendarArtists.summarize([precise])[0], "America/Los_Angeles"), "8:10:45 PM");
+  assert.equal(CalendarArtists.formatLotArrival({...precise, lot_number: "1", arrival_schedule: undefined},
+    "America/Los_Angeles"), "8:11 PM");
+  assert.equal(CalendarArtists.arrivalLabel(CalendarArtists.lotArrivalDetails(lot).kind), "Lot closes");
+  assert.equal(CalendarArtists.lotArrivalDetails({...lot, lot_number: "1"}), null);
+  assert.equal(CalendarArtists.lotArrivalDetails({...lot, event_at: "2026-11-22T20:00:00Z"}), null);
+  assert.equal(CalendarArtists.lotArrivalDetails({...lot, lot_url: url.replace("5dad25890c", "0123456789")}), null);
+  for (const source_url of [
+    "https://www.invaluable.com/catalog/y4fscaz8rx", url.replace("https:", "http:"),
+    url.replace(".com/", ".com.example.test/"), url.replace(".com/", ".com@other.example/"),
+    url.replace("/auction-lot/", "/other/"), url.replace("-c-5dad25890c", "-c-invalid"),
+  ]) {
+    assert.equal(CalendarArtists.lotArrivalDetails({...lot, lot_url: source_url,
+      arrival_schedule: {...schedule, source_url}}), null);
+  }
+});
+
 test("Ketterer closing metadata uses exact source time and preserves shared source data", () => {
   const url = "https://onlinesale.kettererkunst.com/item.php?id=126000766";
   const lot = {artist: "Nagel, Peter", lot_number: "149", lot_url: url, event_at: "2026-11-15T15:14:00Z",

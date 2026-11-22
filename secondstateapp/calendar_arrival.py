@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
 from .calendar_sessions_2026 import NUMBERED_SESSIONS, drouot_url_matches, invaluable_image_catalog_matches
+from .calendar_sales import verified_timed_catalog
 
 
 # Verified sale 609 selection, captured November 11, 2026. Each pair binds
@@ -378,6 +379,8 @@ def published_lot_arrival(lot):
     event = lot.event_at
     if lot.is_all_day or not event or event.utcoffset() is None:
         return None
+    if verified_timed_catalog(lot):
+        return {"kind": "published_closing", "at": event.astimezone(timezone.utc).isoformat(), "source_url": lot.lot_url}
     if lot.source == "Sotheby's":
         return _sothebys_lot_closing(lot)
     if lot.source == "Ketterer Kunst":

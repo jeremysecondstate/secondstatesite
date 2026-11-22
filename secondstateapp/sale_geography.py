@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from .calendar_sales import verified_timed_catalog
+
 
 def _key(value):
     text = unicodedata.normalize("NFKD", str(value or "")).casefold()
@@ -185,7 +187,9 @@ def sale_geography(lot):
     location = getattr(lot, "location", "") or ""
     country = _location_country(location)
     if not country and _key(location) in _ONLINE_LOCATIONS:
-        country = _verified_sale_country(lot) or _HOUSE_COUNTRIES.get(_key(getattr(lot, "auction_house", "")), "")
+        timed_catalog = verified_timed_catalog(lot)
+        country = (timed_catalog["country_code"] if timed_catalog else _verified_sale_country(lot))
+        country = country or _HOUSE_COUNTRIES.get(_key(getattr(lot, "auction_house", "")), "")
     currency = str(getattr(lot, "currency", "") or "").strip().upper()
     native_foreign_currency = bool(re.fullmatch(r"[A-Z]{3}", currency)) and currency not in {"USD", "XXX"}
     region = "us" if country == "US" else "outside_us" if country else "unknown"

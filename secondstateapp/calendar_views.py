@@ -57,7 +57,7 @@ from .bid_board_snapshot import saved_board_summary, uses_max_bid_label
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
 from .calendar_lot_numbers import calendar_lot_number
 from .calendar_market_review import FIRST_REVIEW_DAY, market_review_fields
-from .calendar_sales import calendar_event_at, combined_catalog_starts, verified_sale
+from .calendar_sales import calendar_event_at, combined_catalog_starts, verified_sale, verified_timed_catalog
 from .calendar_images import (
     is_saved_calendar_image_url,
     prepare_saved_calendar_image,
@@ -134,11 +134,11 @@ def _artist_label(lot: AuctionWatchLot) -> str:
 
 
 def _sale_identity(lot: AuctionWatchLot) -> str:
-    if lot.sale_url:
-        return f"sale:{lot.sale_url}"
     sale = verified_sale(lot)
     if sale:
         return sale["identity"]
+    if lot.sale_url:
+        return f"sale:{lot.sale_url}"
     return "|".join(
         (
             lot.source,
@@ -203,12 +203,12 @@ def _bid_label(lot: AuctionWatchLot) -> str:
     return label
 
 
-def _time_label(lot: AuctionWatchLot, zone: ZoneInfo) -> str:
+def _time_label(lot: AuctionWatchLot, zone: ZoneInfo, *, published_closing=False) -> str:
     if not lot.event_at or lot.is_all_day:
         return "Time TBA"
-    return timezone.localtime(lot.event_at, zone).strftime("%-I:%M %p") if os.name != "nt" else timezone.localtime(
-        lot.event_at, zone
-    ).strftime("%I:%M %p").lstrip("0")
+    local = timezone.localtime(lot.event_at, zone)
+    pattern = "%I:%M:%S %p" if published_closing and local.second else "%I:%M %p"
+    return local.strftime(pattern).lstrip("0")
 
 
 def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
@@ -219,7 +219,7 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
     groups = []
     for sale_lots in grouped.values():
         first = sale_lots[0]
-        sale = verified_sale(first)
+        sale = next((match for lot in sale_lots if (match := verified_sale(lot))), None)
         display_time = first
         if sale:
             display_time = copy(first)
@@ -227,6 +227,10 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
         starts = combined_catalog_starts(sale_lots) or (display_time,)
         auction_house = next((lot.auction_house for lot in sale_lots if lot.auction_house), first.source or "Auction")
         sale_title = next((lot.sale_title for lot in sale_lots if lot.sale_title), "")
+        sale_url = first.sale_url
+        if sale and sale.get("catalog_url"):
+            sale_url = sale["catalog_url"]
+            sale_title = sale_title or sale["title"]
         artists = sorted({artist_display_name(name) for name in {_artist_label(lot) for lot in sale_lots}}, key=artist_sort_key)
         groups.append(
             {
@@ -236,8 +240,8 @@ def _group_lots(lots: list[AuctionWatchLot], zone: ZoneInfo) -> list[dict]:
                 "artists": "; ".join(artists[:3]),
                 "additional_artists": max(0, len(artists) - 3),
                 "time_label": " and ".join(_time_label(start, zone) for start in starts),
-                "url": first.sale_url or first.lot_url,
-                "sale_url": first.sale_url,
+                "url": sale_url or first.lot_url,
+                "sale_url": sale_url,
                 "ended": all(not lot.active for lot in sale_lots),
                 "sort_at": starts[0].event_at,
             }
@@ -273,6 +277,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
             path="/".join(artist_url.path.split("/")[:4]) + "/lots/pasts",
             params="", query="idcategory=2&p=1&sort=datesale_desc", fragment="",
         ).geturl()
+    timed_catalog = verified_timed_catalog(lot)
     arrival_schedule = published_lot_arrival(lot)
     arrival_estimate = sale_arrival_estimate(lot)
     numbering_baseline = sale_numbering_baseline(lot)
@@ -291,7 +296,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "auction_house": clean_display_text(lot.auction_house or lot.source or "Auction"),
         "oliver_house": bool(canonical_oliver_house),
         "oliver_house_name": canonical_oliver_house,
-        "sale_title": clean_display_text(lot.sale_title),
+        "sale_title": clean_display_text(lot.sale_title or (timed_catalog["title"] if timed_catalog else "")),
         "lot_number": display_lot_number,
         **({"arrival_lot_number": lot.lot_number} if display_lot_number != lot.lot_number else {}),
         "medium": clean_display_text(lot.medium),
@@ -301,11 +306,13 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         "estimate": _estimate_label(lot),
         "bid": _bid_label(lot),
         "sold": _sold_label(lot),
-        "time": _time_label(lot, zone),
+        "time": _time_label(lot, zone, published_closing=(
+            arrival_schedule is not None and arrival_schedule["kind"] == "published_closing"
+        )),
         "event_at": lot.event_at.isoformat() if lot.event_at and not lot.is_all_day else None,
         "url": lot.lot_url or lot.sale_url,
         "lot_url": lot.lot_url,
-        "sale_url": lot.sale_url,
+        "sale_url": lot.sale_url or (timed_catalog["catalog_url"] if timed_catalog else ""),
         "images": [image_url] if image_url else [],
         "image_urls": [image_url] if image_url else [],
         "currency": lot.currency,
@@ -517,7 +524,7 @@ def auction_calendar(request):
     # Fetch prices, saved research and action URLs only for the day being read.
     summary_lots = AuctionWatchLot.objects.filter(superseded_by__isnull=True).only(
         "id", "event_at", "is_all_day", "active", "source", "sale_url", "sale_title",
-        "auction_house", "artist", "artist_watchlist_name", "lot_url", "image_url",
+        "auction_house", "artist", "artist_watchlist_name", "lot_number", "lot_url", "image_url",
     ).order_by("event_at", "auction_house", "artist", "id")
     month_lots = summary_lots.filter(
         event_at__gte=range_start, event_at__lt=range_end,
@@ -2707,6 +2714,7 @@ def sync_auction_calendar(request):
                 "event_at": calendar_event_at(
                     event_at, source=source, auction_house=auction_house, sale_url=sale_url, is_all_day=is_all_day,
                     lot_number=lot_number, source_lot_id=source_lot_id, lot_url=lot_url, image_url=image_url,
+                    observed_at=last_seen_at,
                 ),
                 "is_all_day": is_all_day,
                 "estimate_low": _decimal(record.get("estimate_low")),

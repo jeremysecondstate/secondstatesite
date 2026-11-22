@@ -133,6 +133,46 @@ class TimedSaleCalendarViewTests(TestCase):
         clock.start()
         self.addCleanup(clock.stop)
 
+    def test_november_22_alyes_catalog_groups_linked_and_unlinked_lots_at_the_first_closing(self):
+        day = "2026-11-22"
+        catalog_url = "https://www.invaluable.com/catalog/y4fscaz8rx"
+        source = {"auction_house": "Alyes Auctions", "sale_title": ""}
+        first = watch_lot(
+            **source, source_lot_id="207555685", lot_number="1", sale_url="",
+            artist="Keith Haring", artist_watchlist_name="Keith Haring",
+            title="Keith Haring - Self Portrait, Palladium Invitation, 1985",
+            lot_url="https://www.invaluable.com/auction-lot/keith-haring-self-portrait-palladium-invitation-1985-1-c-80f795d7f9",
+            image_url="https://image.invaluable.com/housePhotos/Alyes/94/822594/H21147-LsKCac25rGbM6C.jpg",
+            event_at=datetime(2026, 11, 22, 20, tzinfo=timezone.utc),
+        )
+        last = watch_lot(
+            **source, source_lot_id="207556670", lot_number="997", sale_url=catalog_url,
+            artist="Takashi Murakami", artist_watchlist_name="Takashi Murakami",
+            title="Takashi Murakami - Jigsaw Puzzle 108 Bonno",
+            lot_url="https://www.invaluable.com/auction-lot/takashi-murakami-jigsaw-puzzle-108-bonno-997-c-5dad25890c",
+            image_url="https://image.invaluable.com/housePhotos/Alyes/94/822594/H21147-LviZMT8SH2Lweb.jpg",
+            event_at=datetime(2026, 11, 23, 4, 10, tzinfo=timezone.utc),
+        )
+
+        response = self.client.get(reverse("auction_calendar"), {"day": day, "view": "catalog"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["calendar_sales_data"][day], [{
+            "auction_house": "Alyes Auctions", "sale_title": "Street, Pop & Pokémon: Contemporary Art Auction",
+            "lot_count": 2, "time_label": "12:00 PM", "sale_url": catalog_url,
+        }])
+        self.assertEqual(response.context["oliver_calendar_sales_data"][day], [])
+
+        cards = {card["id"]: card for card in response.context["calendar_data"][day]}
+        self.assertEqual(set(cards), {first.pk, last.pk})
+        for lot, clock in ((first, "12:00 PM"), (last, "8:10 PM")):
+            card = cards[lot.pk]
+            self.assertEqual(card["time"], clock)
+            self.assertEqual(card["arrival_schedule"], {
+                "kind": "published_closing", "at": lot.event_at.isoformat(), "source_url": lot.lot_url,
+            })
+        first.refresh_from_db()
+        self.assertEqual(first.sale_url, "")
+
     def test_grid_day_list_and_upcoming_share_one_sale_without_changing_lots_or_saved_work(self):
         first = watch_lot(**alyes_values("first", artist="Pierre Soulages (after)", won_by_us=True,
                                        artprice_url="https://www.artprice.com/artist/26343/pierre-soulages/lots/pasts"))

@@ -1,0 +1,82 @@
+[
+  {
+    "auction_house": "Alyes Auctions",
+    "photo_prefix": "/housePhotos/Alyes/94/822594/H21147",
+    "first_closing": "2026-11-22T20:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/y4fscaz8rx",
+    "title": "Street, Pop & Pokémon: Contemporary Art Auction",
+    "country_code": "HK"
+  },
+  {
+    "auction_house": "Weschler's",
+    "photo_prefix": "/housePhotos/weschlers/51/820351/H0143",
+    "first_closing": "2026-11-24T15:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/2vsj20nczp",
+    "title": "Metro Online",
+    "country_code": "US"
+  },
+  {
+    "auction_house": "Gibson's",
+    "photo_prefix": "/housePhotos/gibsonsauctions/01/818301/H21402",
+    "first_closing": "2026-11-24T23:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/knjv6vqz4x",
+    "title": "Prints & Multiples",
+    "country_code": "AU"
+  },
+  {
+    "auction_house": "Ozbid Auctions",
+    "photo_prefix": "/housePhotos/ozbid/69/822969/H4502",
+    "first_closing": "2026-11-30T09:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/tp5ezokvsw",
+    "title": "Black Friday Contemporary Art Clearance",
+    "country_code": "AU"
+  },
+  {
+    "auction_house": "Leonard Joel",
+    "photo_prefix": "/housePhotos/leonardjoel/84/814284/H3018",
+    "first_closing": "2026-11-30T23:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/zls47cuze8",
+    "title": "Prints & Multiples",
+    "country_code": "AU"
+  },
+  {
+    "auction_house": "For-Auction",
+    "photo_prefix": "/housePhotos/ForAuction/65/822565/H22978",
+    "first_closing": "2026-12-01T06:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/7m3kbjr8mb",
+    "title": "Australian and International Art Including The Jeffrey Swift Collection of Indigenous Art Part 2",
+    "country_code": "AU"
+  },
+  {
+    "auction_house": "Ripley Auctions",
+    "photo_prefix": "/housePhotos/ripleyauctions/52/822652/H0071",
+    "first_closing": "2026-12-02T20:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/qs77vvq8yd",
+    "title": "Fine Art Gallery Collection: Works on Paper, Prints, & Multiples TIMED Auction",
+    "country_code": "US"
+  },
+  {
+    "auction_house": "De Vuyst",
+    "photo_prefix": "/housePhotos/deVuyst/79/823079/H0426",
+    "first_closing": "2026-12-05T09:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/fsmjfi2w0i",
+    "title": "Timed Auction – Modern and Contemporary Art",
+    "country_code": "BE"
+  },
+  {
+    "auction_house": "Bradford's",
+    "photo_prefix": "/housePhotos/bradfordsauction/48/815448/H22021",
+    "first_closing": "2026-12-06T16:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/681t8hybuo",
+    "title": "WILD WEST TRADING POST AUCTION! 590+ LOTS NATIVE AMERICAN & WESTERN, SILVER JEWELRY, ART, POTTERY, RUGS, BASKETS & MORE!",
+    "country_code": "US"
+  },
+  {
+    "auction_house": "Neal Auction Company",
+    "photo_prefix": "/housePhotos/nealauction/60/822560/H0120",
+    "first_closing": "2026-12-08T17:00:00Z",
+    "catalog_url": "https://www.invaluable.com/catalog/tztpio7ij0",
+    "title": "LA Purchase Auction™ Lagniappe | Timed Auction",
+    "country_code": "US"
+  }
+]

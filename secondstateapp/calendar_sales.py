@@ -1,10 +1,14 @@
 """Verified sale times and catalog identities for the Calendar."""
 
+import json
 import re
+from collections import defaultdict
 from datetime import date, datetime, timezone
+from pathlib import Path
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
+from .calendar_closing_times_2026 import corrected_lot_close
 from .calendar_sessions_2026 import SESSION_TIMES, corrected_session_time, drouot_url_matches
 
 
@@ -18,8 +22,60 @@ _ALYES_START = datetime(2026, 11, 8, 19, tzinfo=timezone.utc)
 _ALYES_IMAGE = re.compile(r"/housePhotos/Alyes/39/821739/H21147-[A-Za-z0-9_-]+\.jpg")
 
 
+def _load_timed_catalogs():
+    rules = defaultdict(list)
+    path = Path(__file__).with_name("data") / "timed_auction_catalogs.json"
+    for row in json.loads(path.read_text(encoding="utf-8")):
+        start = datetime.fromisoformat(row["first_closing"])
+        day = start.astimezone(ZoneInfo("America/Los_Angeles")).date()
+        rules[(row["auction_house"].casefold(), day)].append({
+            **row, "starts_at": start, "identity": "sale:" + row["catalog_url"],
+        })
+    return dict(rules)
+
+
+_TIMED_CATALOGS = _load_timed_catalogs()
+
+
+def verified_timed_catalog(lot):
+    """Match the house and Pacific sale day plus a provider catalog or catalog photo."""
+    event = getattr(lot, "event_at", None)
+    if (getattr(lot, "source", "") != "Invaluable" or not isinstance(event, datetime)
+            or event.utcoffset() is None or getattr(lot, "is_all_day", False)):
+        return None
+    house = " ".join(lot.auction_house.split()).casefold()
+    candidates = _TIMED_CATALOGS.get((house, event.astimezone(ZoneInfo("America/Los_Angeles")).date()))
+    if not candidates:
+        return None
+    number = str(getattr(lot, "lot_number", ""))
+    if not re.fullmatch(r"[0-9]+[A-Za-z]?", number):
+        return None
+    try:
+        link = urlsplit(getattr(lot, "lot_url", "") or "")
+        if (link.scheme != "https" or link.netloc not in {"www.invaluable.com", "invaluable.com"}
+                or not re.fullmatch(rf"/auction-lot/[^/]+-(?i:{number})-c-[a-fA-F0-9]{{10}}/?", link.path)):
+            return None
+        sale_url = getattr(lot, "sale_url", "")
+        if sale_url:
+            sale = urlsplit(sale_url)
+            if sale.scheme != "https" or sale.netloc not in {"www.invaluable.com", "invaluable.com"}:
+                return None
+            ref = re.fullmatch(r"/(?:catalog/|auction-catalog/[^/]+_)([a-zA-Z0-9]{10})/?", sale.path)
+            if ref:
+                return next((c for c in candidates if c["catalog_url"].endswith("/" + ref[1].lower())), None)
+        else:
+            photo = urlsplit(getattr(lot, "image_url", "") or "")
+            if photo.scheme == "https" and photo.netloc == "image.invaluable.com":
+                for catalog in candidates:
+                    if re.fullmatch(re.escape(catalog["photo_prefix"]) + r"-[A-Za-z0-9_-]+\.(?i:jpg)", photo.path):
+                        return catalog
+    except ValueError:
+        return None
+    return None
+
+
 def calendar_event_at(event_at, *, source, auction_house, sale_url, is_all_day, source_lot_id="", lot_number="",
-                      lot_url="", image_url=""):
+                      lot_url="", image_url="", observed_at=None):
     # Drouot catalog 188631 supplied 03:00 CET. Templum publishes 15:00
     # in Barcelona for this live sale, also confirmed by the Invaluable lots.
     # https://templumauctions.com/auction/312-gran-subasta-de-es/
@@ -31,6 +87,10 @@ def calendar_event_at(event_at, *, source, auction_house, sale_url, is_all_day, 
         and drouot_url_matches(sale_url, "v", "188631")
     ):
         return datetime(2026, 12, 3, 14, tzinfo=timezone.utc)
+    event_at = corrected_lot_close(
+        event_at, source=source, auction_house=auction_house, sale_url=sale_url, is_all_day=is_all_day,
+        source_lot_id=source_lot_id, lot_number=lot_number, lot_url=lot_url, image_url=image_url, observed_at=observed_at,
+    )
     return corrected_session_time(
         event_at, source=source, auction_house=auction_house, sale_url=sale_url,
         is_all_day=is_all_day, source_lot_id=source_lot_id, lot_number=lot_number,
@@ -57,7 +117,10 @@ def combined_catalog_starts(lots):
 
 
 def verified_sale(lot):
-    """Return presentation metadata only for the corroborated missing sale."""
+    """Return presentation metadata only for a corroborated catalog."""
+    timed_catalog = verified_timed_catalog(lot)
+    if timed_catalog:
+        return timed_catalog
     if (lot.sale_url or lot.source != "Invaluable"
             or " ".join(lot.auction_house.split()).casefold() != "alyes auctions"
             or not lot.event_at or lot.event_at.tzinfo is None or lot.is_all_day):
