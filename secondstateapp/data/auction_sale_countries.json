@@ -552,6 +552,18 @@
       "evidence_url": "https://bid.sofedesignauctions.com/auctions/4-NQ5QTP/antique-arms-armor-fine-art-dec-19-2026",
       "evidence": "Sofe's December 19 catalog lists Salvador Dali's Petites Nus as lot 12020 and gives the live auction venue as 2550 E. Trinity Mills Rd., Suite 110, Carrollton, Texas. The scheduled start is 16:00 UTC.",
       "verified_at": "2026-11-19"
+    },
+    {
+      "auction_house": "RR Auction",
+      "source": "Drouot",
+      "date": "2026-12-09",
+      "country_code": "US",
+      "sale_urls": [
+        "https://drouot.com/en/v/188135"
+      ],
+      "evidence_url": "https://www.rrauction.com/auctions/lot-detail/351994007550413-norman-rockwell-signed-print-stockbridge-main-street-at-christmas/?cat=216",
+      "evidence": "RR Auction lists Rockwell's Stockbridge Main Street at Christmas as lot 413 in its December 9 Fine Autographs and Artifacts sale 755, matching Drouot catalog 188135. Section 21 of the auction terms places the sale in Massachusetts (https://www.rrauction.com/buy/terms-conditions/).",
+      "verified_at": "2026-11-23"
     }
   ]
 }
