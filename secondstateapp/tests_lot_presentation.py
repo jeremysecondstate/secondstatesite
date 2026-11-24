@@ -169,6 +169,7 @@ class ArtistPresentationTests(TestCase):
             "James Abbott McNeill Whistler": "Whistler, James Abbott McNeill",
             "Zaha Hadid": "Hadid, Zaha",
             "Horst Janssen": "Janssen, Horst",
+            "Jörg Immendorff": "Immendorff, Jörg",
             "Maurits Cornelis Escher": "Escher, Maurits Cornelis", "M.C. Escher": "Escher, Maurits Cornelis",
             "Aaron Garber-Maikovska": "Garber-Maikovska, Aaron", "Hank Willis Thomas": "Thomas, Hank Willis",
             "Jeffrey Gibson (Choctaw/Cherokee)": "Gibson, Jeffrey (Choctaw/Cherokee)",
