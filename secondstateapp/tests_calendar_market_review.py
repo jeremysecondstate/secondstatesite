@@ -51,6 +51,20 @@ class CalendarMarketReviewTests(TestCase):
     def login_staff(self):
         self.client.force_login(get_user_model().objects.create_user("market-staff", is_staff=True))
 
+    def test_rossini_engraver_credit_agrees_on_the_calendar_and_market_review(self):
+        self.login_staff()
+        self.lot = watch_lot(source="Drouot", source_lot_id="35858577", event_at=self.start,
+                             auction_house="Rossini", artist="Sorlier, after Bernard Buffet",
+                             artist_watchlist_name="", title="Affiche en lithographie")
+        row = self.get(ids=str(self.lot.pk)).json()["lots"][0]
+        self.assertEqual(row["attribution_label"], "After")
+        self.assertEqual(self.post(self.plan(status="clear")).status_code, 200)
+        cards = self.client.get(reverse("auction_calendar_day_lots"),
+                                {"day": self.today.isoformat(), "artists": "all"}).json()["lots"]
+        card = next(card for card in cards if card["id"] == self.lot.pk)
+        self.assertEqual(card["attribution_label"], "After")
+        self.assertEqual(card["market_review_status"], "clear")
+
     def test_full_recheck_enumerates_all_sources_and_can_correct_an_ended_sale(self):
         first = watch_lot(source="Other source", source_lot_id="ended", event_at=self.start + timedelta(days=1))
         next_lot = watch_lot(source_lot_id="later", event_at=self.start + timedelta(days=4))

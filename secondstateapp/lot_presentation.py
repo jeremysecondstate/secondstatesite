@@ -411,6 +411,11 @@ def _structured_title_credits(text: str):
         yield f"After {match['name']}"
 
 
+# Rossini lot 572 names the engraver only as Sorlier. Keep the two roles
+# bound to this complete source credit without expanding the engraver's name.
+_SORLIER_AFTER_BUFFET = re.compile(r"Sorlier,\s*after\s+(?P<designer>Bernard Buffet|Buffet,\s*Bernard)", re.IGNORECASE)
+
+
 def artist_attribution_label(*artists: object, title: object = "") -> str:
     """Flag explicit After/Attributed-to credits, including bound title credits.
 
@@ -422,6 +427,10 @@ def artist_attribution_label(*artists: object, title: object = "") -> str:
         label, _ = _attribution_credit(artist)
         if label:
             return label
+    if artists and (credit := _SORLIER_AFTER_BUFFET.fullmatch(clean_display_text(artists[0]))):
+        displayed = clean_display_text(artists[-1])
+        if _SORLIER_AFTER_BUFFET.fullmatch(displayed) or _credit_name_key(displayed) == _credit_name_key(credit["designer"]):
+            return "After"
     # Keep the bilingual marker together before splitting title/credit fields.
     text = _BILINGUAL_AFTER.sub("After", clean_display_text(title, strip_lot_markers=True))
     if not _ATTRIBUTION_TITLE_MARKER.search(text):

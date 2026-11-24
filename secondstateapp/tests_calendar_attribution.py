@@ -239,6 +239,29 @@ class ArtistAttributionLabelTests(SimpleTestCase):
 
 
 class CalendarAttributionPayloadTests(SimpleTestCase):
+    def test_rossini_names_sorlier_as_engraver_after_buffet(self):
+        credit = "Sorlier, after Bernard Buffet"
+        title = "Affiche en lithographie"
+        for house, raw, watched, work, expected in (
+            ("Rossini", credit, "", title, "After"),
+            ("Rossini", credit, "Buffet, Bernard", title, "After"),
+            ("Rossini", credit, "Charles Sorlier", title, ""),
+            ("Rossini", credit, "Jean Dubuffet", title, ""),
+            ("Rossini", "BUFFET Bernard", "", title, ""),
+            ("Rossini", "Sorlier", "", title, ""),
+            ("Rossini", "Sorlier, after Bernard Buffet Jr.", "Bernard Buffet", title, ""),
+            ("Rossini", "Sorlier", "", credit, ""),
+            ("Another house", credit, "", title, "After"),
+        ):
+            with self.subTest(house=house, raw=raw, watched=watched, work=work):
+                lot = AuctionWatchLot(pk=21459, source="Drouot", source_lot_id="35858577",
+                                      auction_house=house, artist=raw, artist_watchlist_name=watched, title=work)
+                lot._state.fields_cache["bid_board_analysis"] = None
+                row = _lot_json(lot, ZoneInfo("Europe/Paris"))
+                self.assertEqual(row["attribution_label"], expected)
+                self.assertEqual(row["artist_source"], watched or raw)
+                self.assertEqual(lot.artist, raw)
+
     def test_warning_uses_raw_credit_and_preserves_lot_data_links_and_selections(self):
         artist_url = "https://www.artprice.com/artist/22796/pablo-picasso/lots/pasts?idcategory=2"
         saved_work_url = "https://www.artprice.com/lots/7777/saved-work"
