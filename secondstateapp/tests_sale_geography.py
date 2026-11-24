@@ -38,6 +38,14 @@ class SaleGeographyTests(SimpleTestCase):
         self.assert_country("US", auction_house="Aalders Auctions", location="New York, NY, US")
         self.assert_country("", auction_house="DuMouchelles", location="Unconfirmed venue")
 
+    def test_millon_paris_venue_requires_the_complete_address(self):
+        fields = {"auction_house": "Millon & Associes", "source": "Invaluable", "currency": ""}
+        self.assert_country("FR", **fields, location="Salle Millon Drouot, 3 rue Rossini, Paris")
+        for location in ("Paris", "Salle Millon Drouot, Paris", "3 rue Rossini, Paris",
+                         "Salle Millon Drouot, 33 rue Rossini, Paris", "Salle Millon Drouot, 3 rue Rossini, Lyon"):
+            with self.subTest(location=location):
+                self.assert_country("", **fields, location=location)
+
     def test_address_state_abbreviations_are_not_mistaken_for_countries(self):
         for location in ("CA", "Los Angeles, CA", "Wilmington, DE",
                          "Chicago, IL", "Indianapolis, IN",

@@ -34,6 +34,17 @@ def dali_values(**changes):
 
 
 class CalendarLotNumberTests(SimpleTestCase):
+    def test_artcurial_pinocchio_retains_the_published_suffix(self):
+        lot = SimpleNamespace(
+            source="Drouot", source_lot_id="35815049", auction_house="Artcurial", lot_number="75",
+            event_at=datetime(2026, 11, 24, 15, tzinfo=timezone.utc),
+            sale_url="https://drouot.com/en/v/187761", lot_url="https://drouot.com/fr/l/35815049",
+        )
+        self.assertEqual(calendar_lot_number(lot), "75-b")
+        self.assertEqual(lot.lot_number, "75")
+        lot.sale_url = "https://drouot.com/en/v/187762"
+        self.assertEqual(calendar_lot_number(lot), "75")
+
     def test_verified_suffix_is_display_only(self):
         lot = SimpleNamespace(**leger_values())
         before = vars(lot).copy()

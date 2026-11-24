@@ -30,9 +30,10 @@ _HOUSE_COUNTRIES = {
     for house in _REGISTRY["houses"]
     for name in (house["name"], *house.get("aliases", []))
 }
-_SALE_COUNTRIES = json.loads(
+_SALE_REGISTRY = json.loads(
     (Path(__file__).with_name("data") / "auction_sale_countries.json").read_text(encoding="utf-8")
-)["sales"]
+)
+_SALE_COUNTRIES = _SALE_REGISTRY["sales"]
 _COUNTRY_NAMES = {
     "US": ("United States", "United States of America", "USA", "U.S.", "U.S.A."),
     "GB": ("United Kingdom", "Great Britain", "UK", "U.K.", "England", "Scotland", "Wales", "Northern Ireland"),
@@ -97,12 +98,11 @@ _AMBIGUOUS_CODE_CITIES = {
     "CO": {"bogota", "medellin"},
     "IL": {"tel aviv", "jerusalem", "netanya"},
 }
-# These labels occur as complete sale locations, rather than inferred words in
-# artwork descriptions or titles. New York denotes the US city/state; the
-# other labels are not reused for a US state or a country.
+# Match a complete city label or a verified venue's full address.
 _EXACT_LOCATION_COUNTRIES = {
     "new york": "US", "new york city": "US",
     "hong kong": "HK", "stockholm": "SE", "cologne": "DE",
+    **{_key(venue["location"]): venue["country_code"] for venue in _SALE_REGISTRY["venues"]},
 }
 _ONLINE_LOCATIONS = {"", "online", "online only", "internet", "virtual"}
 
@@ -131,9 +131,7 @@ def _location_country(location):
     if raw_code in _AMBIGUOUS_CODE_CITIES:
         if any(_key(part) in _AMBIGUOUS_CODE_CITIES[raw_code] for part in parts[:-1]):
             return raw_code
-    if len(parts) == 1:
-        return _EXACT_LOCATION_COUNTRIES.get(tail, "")
-    return ""
+    return _EXACT_LOCATION_COUNTRIES.get(_key(location), "")
 
 
 def _source_url(value):

@@ -6,39 +6,31 @@ from zoneinfo import ZoneInfo
 from .calendar_sales import drouot_url_matches
 
 
+_DROUOT_NUMBERS = {
+    # https://drouot.com/fr/l/36007953
+    "36007953": ("Quai des Enchères", "187811", date(2026, 11, 20), "97", "97-1"),
+    # https://www.interencheres.com/art-decoration/tableaux-anciens-et-modernes-estampes-sculptures-et-tapis-693682/lot-89946549.html
+    "36035570": ("Les Andelys Enchères", "188346", date(2026, 12, 12), "601", "601-1"),
+    # Artcurial lists Jim Dine's Pinocchio as 75-b and James Turrell's aquatint as 75.
+    # https://www.artcurial.com/en/sales/6573/lots/75-b
+    # https://drouot.com/fr/v/187761-limited-edition
+    "35815049": ("Artcurial", "187761", date(2026, 11, 24), "75", "75-b"),
+}
+
+
 def calendar_lot_number(lot):
     """Return a narrowly verified display correction, otherwise the raw number."""
-    number = lot.lot_number
+    correction = _DROUOT_NUMBERS.get(lot.source_lot_id)
+    if lot.source.casefold() != "drouot" or correction is None:
+        return lot.lot_number
+    house, sale_id, day, raw_number, display_number = correction
     event_at = lot.event_at
-    # Verified November 16, 2026 from the visible lot heading and sale link:
-    # https://drouot.com/fr/l/36007953
-    # https://drouot.com/fr/v/187811-arts-decoratifs-du-xxe-design
-    # Leger's Couple, edition 482/600, is 97-1; Miro's El Innocente is 97.
-    # The search observation supplied only 97. Preserve that source value.
     if (
-        lot.source.casefold() == "drouot"
-        and lot.source_lot_id == "36007953"
-        and lot.auction_house == "Quai des Enchères"
-        and number == "97"
+        lot.auction_house == house and lot.lot_number == raw_number
         and isinstance(event_at, datetime) and event_at.tzinfo is not None
-        and event_at.astimezone(ZoneInfo("Europe/Paris")).date() == date(2026, 11, 20)
-        and drouot_url_matches(lot.sale_url, "v", "187811")
-        and drouot_url_matches(lot.lot_url, "l", "36007953")
+        and event_at.astimezone(ZoneInfo("Europe/Paris")).date() == day
+        and drouot_url_matches(lot.sale_url, "v", sale_id)
+        and drouot_url_matches(lot.lot_url, "l", lot.source_lot_id)
     ):
-        return "97-1"
-    # The house's December 12 sale publishes The Lion, edition 115/195,
-    # as 601-1; the separate Pantagruel's Humorous Dreams remains lot 601.
-    # https://www.interencheres.com/art-decoration/tableaux-anciens-et-modernes-estampes-sculptures-et-tapis-693682/lot-89946549.html
-    # https://www.interencheres.com/art-decoration/tableaux-anciens-et-modernes-estampes-sculptures-et-tapis-693682/lot-89946548.html
-    if (
-        lot.source.casefold() == "drouot"
-        and lot.source_lot_id == "36035570"
-        and lot.auction_house == "Les Andelys Enchères"
-        and number == "601"
-        and isinstance(event_at, datetime) and event_at.tzinfo is not None
-        and event_at.astimezone(ZoneInfo("Europe/Paris")).date() == date(2026, 12, 12)
-        and drouot_url_matches(lot.sale_url, "v", "188346")
-        and drouot_url_matches(lot.lot_url, "l", "36035570")
-    ):
-        return "601-1"
-    return number
+        return display_number
+    return lot.lot_number

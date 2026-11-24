@@ -1,6 +1,16 @@
 {
   "version": 1,
-  "policy": "Country evidence for exact sales of multinational houses. Match source, auction house, UTC sale date and observed sale URL or the exact source lot identity/URL/number; never infer from headquarters.",
+  "policy": "Match venues by the full published address. Match sales by source, auction house, UTC sale date and observed sale URL or the exact source lot identity/URL/number. Never infer from headquarters.",
+  "venues": [
+    {
+      "location": "Salle Millon Drouot, 3 rue Rossini, Paris",
+      "country_code": "FR",
+      "evidence_url": "https://www.gazette-drouot.com/telechargement/catalogue?venteId=187595",
+      "evidence": "Millon's November 23, 2026 catalog lists Salle Millon Drouot at 3 rue Rossini, 75009 Paris. The matching Drouot listing for lot 17 gives the same street address and names France.",
+      "lot_evidence_url": "https://drouot.com/en/l/35768128-vassily-kandinsky-1866-1944-xylographies-1907-1909-portfolio",
+      "verified_at": "2026-11-23"
+    }
+  ],
   "sales": [
     {
       "auction_house": "Heritage Auctions",
