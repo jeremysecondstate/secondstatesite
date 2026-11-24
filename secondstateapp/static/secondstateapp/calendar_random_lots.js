@@ -1,5 +1,5 @@
 /* Saved lots page separately from the selected day's tracked lots. */
-function createRandomLotsGallery(document, window, renderCard) {
+function createRandomLotsGallery(document, window, renderCard, updatePrices) {
   const element = (id) => document.getElementById(id);
   const catalog = element("day-gallery-catalog");
   const panel = element("random-lots-panel");
@@ -14,6 +14,7 @@ function createRandomLotsGallery(document, window, renderCard) {
   const countBadge = element("random-lots-count");
   let saleDay = "";
   let loadedDay = "";
+  let lots = [];
   let page = 0;
   let pending = null;
 
@@ -26,6 +27,24 @@ function createRandomLotsGallery(document, window, renderCard) {
     window.history[method](window.history.state, "", url);
   }
 
+  async function loadPrices(url, request) {
+    if (!lots.some(window.CalendarCurrency.hasForeignPrices)) return;
+    url.searchParams.set("prices", "usd");
+    let quotes = [];
+    try {
+      const response = await window.fetch(url, {
+        credentials: "same-origin", headers: {Accept: "application/json"}, signal: request.signal,
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        if (payload.day === loadedDay && payload.page === page && Array.isArray(payload.lots)) quotes = payload.lots;
+      }
+    } catch {
+      // The original prices stay visible when an exchange-rate source is unavailable.
+    }
+    if (request === pending) updatePrices(grid, lots, quotes);
+  }
+
   async function loadPage(number) {
     pending?.abort();
     const request = new AbortController();
@@ -33,6 +52,7 @@ function createRandomLotsGallery(document, window, renderCard) {
     const day = saleDay;
     loadedDay = day;
     page = number;
+    lots = [];
     grid.replaceChildren();
     grid.setAttribute("aria-busy", "true");
     pagination.hidden = true;
@@ -54,8 +74,9 @@ function createRandomLotsGallery(document, window, renderCard) {
       const data = await response.json();
       if (request !== pending) return;
       if (data.day !== day) throw new Error("Unexpected sale date");
-      const cards = data.lots.map(renderCard);
-      grid.replaceChildren(...cards);
+      lots = data.lots;
+      grid.replaceChildren(...lots.map(renderCard));
+      grid.setAttribute("aria-busy", "false");
       page = data.page;
       if (number !== page) writeLocation(page, "replaceState");
       countBadge.textContent = String(data.total);
@@ -66,6 +87,7 @@ function createRandomLotsGallery(document, window, renderCard) {
       previous.disabled = page <= 1;
       next.disabled = page >= data.pages;
       pagination.hidden = data.pages <= 1;
+      await loadPrices(url, request);
     } catch {
       if (request !== pending) return;
       status.textContent = "The saved lots couldn’t load.";
@@ -94,6 +116,7 @@ function createRandomLotsGallery(document, window, renderCard) {
       pending?.abort();
       pending = null;
       page = 0;
+      lots = [];
       grid.replaceChildren();
       if (!open.hidden) {
         element("day-gallery-houses").open = true;
@@ -126,7 +149,7 @@ function createRandomLotsGallery(document, window, renderCard) {
   previous.addEventListener("click", () => goToPage(page - 1));
   next.addEventListener("click", () => goToPage(page + 1));
   retry.addEventListener("click", () => loadPage(page));
-  return {syncView};
+  return {syncView, get lots() { return lots; }};
 }
 
 if (typeof module !== "undefined" && module.exports) module.exports = {createRandomLotsGallery};

@@ -273,7 +273,7 @@ def _sale_json(group: dict) -> dict:
 
 def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] | None = None, research_queue_state: dict | None = None) -> dict:
     selected_lot_ids = selected_lot_ids or set()
-    image_url = _calendar_image_url(lot.image_url)
+    image_url = _calendar_lot_image(lot)
     canonical_oliver_house = oliver_house_name(lot.auction_house)
     source_artist = _artist_label(lot)
     artist_artprice_url, artist_invaluable_url = artist_research_urls(source_artist)
@@ -295,8 +295,11 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
     numbering_baseline = sale_numbering_baseline(lot)
     geography = sale_geography(lot)
     display_lot_number = calendar_lot_number(lot)
+    lot_url = _url(lot.lot_url)
+    sale_url = _url(lot.sale_url) or (timed_catalog["catalog_url"] if timed_catalog else "")
     return {
         "id": lot.pk,
+        "calendar_day": timezone.localdate(lot.event_at, zone).isoformat() if lot.event_at else "",
         **({"numbering_baseline": numbering_baseline} if numbering_baseline is not None else {}),
         **({"arrival_schedule": arrival_schedule} if arrival_schedule else {}),
         **({"arrival_estimate": arrival_estimate} if arrival_estimate else {}),
@@ -322,9 +325,9 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
             arrival_schedule is not None and arrival_schedule["kind"] == "published_closing"
         )),
         "event_at": lot.event_at.isoformat() if lot.event_at and not lot.is_all_day else None,
-        "url": lot.lot_url or lot.sale_url,
-        "lot_url": lot.lot_url,
-        "sale_url": lot.sale_url or (timed_catalog["catalog_url"] if timed_catalog else ""),
+        "url": lot_url or sale_url,
+        "lot_url": lot_url,
+        "sale_url": sale_url,
         "images": [image_url] if image_url else [],
         "image_urls": [image_url] if image_url else [],
         "currency": lot.currency,
@@ -505,21 +508,31 @@ def _calendar_display_lots(request):
     return lots.filter(request._calendar_artist_filter)
 
 
-def _day_lot_data(request, selected_day, zone, selected_lot_ids, research_queue_state):
-    day_start, day_end = _utc_bounds(selected_day, selected_day + timedelta(days=1), zone)
-    lots = _calendar_display_lots(request).filter(
-        event_at__gte=day_start, event_at__lt=day_end,
-    ).select_related("watchlist_artist", "bid_board_analysis", "resale_research", "market_review").defer(
+def _with_catalog_details(lots):
+    return lots.select_related("watchlist_artist", "bid_board_analysis", "resale_research", "market_review").defer(
         "bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids",
-    ).order_by("event_at", "auction_house", "artist", "id")
-    day = selected_day.isoformat()
+    )
+
+
+def _catalog_rows(request, lots, zone, selected_lot_ids, research_queue_state):
     rows = [_lot_json(lot, zone, selected_lot_ids, research_queue_state) for lot in lots]
-    calendar_data = {day: rows}
+    calendar_data = defaultdict(list)
+    for row in rows:
+        calendar_data[row["calendar_day"]].append(row)
     _attach_superseded_attribution(calendar_data)
     for lot, row in zip(lots, rows):
         row.update(market_review_fields(lot, row))
     retained = _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, research_queue_state, request)
-    return {"day": day, "lots": rows, "retained_research_lot": retained}
+    return rows, retained
+
+
+def _day_lot_data(request, selected_day, zone, selected_lot_ids, research_queue_state):
+    day_start, day_end = _utc_bounds(selected_day, selected_day + timedelta(days=1), zone)
+    lots = _with_catalog_details(_calendar_display_lots(request)).filter(
+        event_at__gte=day_start, event_at__lt=day_end,
+    ).order_by("event_at", "auction_house", "artist", "id")
+    rows, retained = _catalog_rows(request, lots, zone, selected_lot_ids, research_queue_state)
+    return {"day": selected_day.isoformat(), "lots": rows, "retained_research_lot": retained}
 
 
 @never_cache
@@ -547,19 +560,18 @@ def _random_lot_membership():
     return identities
 
 
-def _random_lot_image(lot):
+def _calendar_lot_image(lot):
     image = _calendar_image_url(lot.image_url)
-    if image:
+    if image or lot.auction_house != "Kiefer" or not re.fullmatch(r"[0-9]{4}", lot.lot_number):
         return image
     # Kiefer's sale 146 photographs are matched to verified provider IDs.
     # Check the house and printed number again when showing a fallback.
     images = _random_lot_manifest().get("image_urls", {}).get(lot.source, {})
     candidate = images.get(lot.source_lot_id, "")
-    if (lot.auction_house == "Kiefer" and re.fullmatch(r"[0-9]{4}", lot.lot_number)
-            and candidate in (
-                f"https://www.kiefer.de/Abbildungen/146/146-{lot.lot_number}-01.jpg",
-                f"https://www.kiefer.de/Abbildungen/146/146-{lot.lot_number}-02.jpg",
-            )):
+    if candidate in (
+        f"https://www.kiefer.de/Abbildungen/146/146-{lot.lot_number}-01.jpg",
+        f"https://www.kiefer.de/Abbildungen/146/146-{lot.lot_number}-02.jpg",
+    ):
         return candidate
     return ""
 
@@ -630,33 +642,45 @@ def auction_calendar_random_lots(request):
         return JsonResponse({"error": "This page is outside the collection."}, status=404)
 
     ids = [lot.pk for lot in page]
-    details = AuctionWatchLot.objects.filter(superseded_by__isnull=True).only(
-        "event_at", "source", "source_lot_id", "artist", "artist_watchlist_name", "title",
-        "medium", "auction_house", "lot_number", "lot_url", "sale_url", "image_url",
-    ).in_bulk(ids)
+    page_lots = AuctionWatchLot.objects.filter(superseded_by__isnull=True, pk__in=ids)
+    if day_bounds:
+        page_lots = page_lots.filter(event_at__gte=day_bounds[0], event_at__lt=day_bounds[1])
     cards = []
-    for lot_id in ids:
-        lot = details.get(lot_id)
-        if lot is None:
-            continue
-        day = timezone.localdate(lot.event_at, zone).isoformat() if lot.event_at else ""
-        params = {"view": "research", "day": day, "lot": lot.pk, "look": "dossier", "artists": "all"}
-        cards.append({
-            "id": lot.pk,
-            "artist": clean_display_text(lot.artist or lot.artist_watchlist_name) or "Unknown artist",
-            "title": clean_display_text(lot.title, strip_lot_markers=True) or "Untitled lot",
-            "medium": clean_display_text(lot.medium),
-            "auction_house": clean_display_text(lot.auction_house or lot.source),
-            "lot_number": calendar_lot_number(lot),
-            "calendar_day": day,
-            "image_url": _random_lot_image(lot),
-            "lot_url": _url(lot.lot_url),
-            "research_url": f"{reverse('auction_calendar')}?{urlencode(params)}" if day else "",
-        })
+    if request.GET.get("prices") == "usd":
+        prices = {row["id"]: row for row in _catalog_usd_prices(page_lots)}
+        cards = [prices[pk] for pk in ids if pk in prices]
+    elif ids:
+        details = _with_catalog_details(page_lots).in_bulk()
+        ordered_lots = [details[pk] for pk in ids if pk in details]
+        selected_lot_ids = set(AuctionEmailBatchItem.objects.filter(batch__is_active=True).values_list("lot_id", flat=True))
+        cards, _ = _catalog_rows(request, ordered_lots, zone, selected_lot_ids, selected_queue_state())
+        for card in cards:
+            card["image_url"] = card["images"][0] if card["images"] else ""
+            day = card["calendar_day"]
+            params = {"view": "research", "day": day, "lot": card["id"], "look": "dossier", "artists": "all"}
+            card["research_url"] = f"{reverse('auction_calendar')}?{urlencode(params)}" if day else ""
     payload = {"total": pages.count, "page": page.number, "pages": pages.num_pages, "lots": cards}
     if day_bounds:
         payload["day"] = selected_day.isoformat()
     return JsonResponse(payload)
+
+
+def _catalog_usd_prices(lots):
+    source_lots = lots.order_by("id").values(
+        "id", "currency", "sold_currency", "estimate_low", "estimate_high", "current_bid", "sold_price",
+    )
+    # convert_to_usd reuses cached currency quotes, including failed lookups,
+    # so all amounts from the same currency share a quote without per-lot requests.
+    return [
+        {
+            "id": lot["id"],
+            "estimate_low": convert_to_usd(lot["estimate_low"], lot["currency"]),
+            "estimate_high": convert_to_usd(lot["estimate_high"], lot["currency"]),
+            "current_bid": convert_to_usd(lot["current_bid"], lot["currency"]),
+            "sold_price": convert_to_usd(lot["sold_price"], lot["sold_currency"] or lot["currency"]),
+        }
+        for lot in source_lots
+    ]
 
 
 @never_cache
@@ -670,24 +694,8 @@ def auction_calendar_usd_prices(request):
         return JsonResponse({"error": "Choose a valid calendar day (YYYY-MM-DD)."}, status=400)
 
     day_start, day_end = _utc_bounds(selected_day, selected_day + timedelta(days=1), _calendar_zone())
-    source_lots = _calendar_display_lots(request).filter(
-        event_at__gte=day_start, event_at__lt=day_end,
-    ).order_by("id").values(
-        "id", "currency", "sold_currency", "estimate_low", "estimate_high", "current_bid", "sold_price",
-    )
-    # convert_to_usd reuses cached currency quotes, including failed lookups,
-    # so all amounts from the same currency share a quote without per-lot requests.
-    lots = [
-        {
-            "id": lot["id"],
-            "estimate_low": convert_to_usd(lot["estimate_low"], lot["currency"]),
-            "estimate_high": convert_to_usd(lot["estimate_high"], lot["currency"]),
-            "current_bid": convert_to_usd(lot["current_bid"], lot["currency"]),
-            "sold_price": convert_to_usd(lot["sold_price"], lot["sold_currency"] or lot["currency"]),
-        }
-        for lot in source_lots
-    ]
-    return JsonResponse({"day": day_value, "lots": lots})
+    lots = _calendar_display_lots(request).filter(event_at__gte=day_start, event_at__lt=day_end)
+    return JsonResponse({"day": day_value, "lots": _catalog_usd_prices(lots)})
 
 
 @never_cache

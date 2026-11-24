@@ -29,6 +29,7 @@ class Element {
   contains(node) { return this === node || this.children.some(child => child.contains(node)); }
   matches(selector) {
     if (selector === "[data-gallery-filter]") return Boolean(this.dataset.galleryFilter);
+    if (selector === "[data-gallery-email-lot-id]") return Boolean(this.dataset.galleryEmailLotId);
     return selector.startsWith(".") ? this.className.split(/\s+/).includes(selector.slice(1)) : this.tag === selector;
   }
   closest(selector) { return this.matches(selector) ? this : this.parentElement?.closest(selector) || null; }
@@ -230,6 +231,44 @@ test("retained board and research links follow the current owner after switching
     assertResearchDestination(root.querySelector(".lot-retained-link"), 12, expectedScope);
   }
   assert.equal(JSON.stringify(source), before, "navigation must not change saved records");
+});
+
+test("Random Lots cards use the saved owner's dossier, Email Tray and retained board controls", async () => {
+  const regular = lot(20);
+  const saved = lot(21, {calendar_day: "2026-11-04",
+    research_url: "/calendar/?view=research&day=2026-11-04&lot=21&look=dossier&artists=all",
+    email_tray_update_url: "/email/21", retained_saved_work: [lot(22, {saved_bid_board: board("25")})]});
+  const p = page(regular);
+  useResearchNavigation(p);
+  Object.assign(p, {saved, URLSearchParams, syncLotInstances() {}, artpriceEditorInstances: new Map(), updateEmailTrayCount() {}});
+  p.run(block("  const refreshGalleryLot =", "  const appendLotBrowserMedia =")
+    + block("  const updateGalleryEmailButton =", "  const galleryPrice ="));
+  p.galleryCatalog.randomLots = {lots: [saved]};
+  const card = p.run("galleryCard(saved)");
+  p.galleryCatalog.append(card);
+  assert.equal(card.dataset.randomLotId, "21");
+  assert.equal(card.dataset.galleryLotId, "21");
+  for (const selector of [".day-gallery-open", ".day-gallery-quick-look", ".lot-board-provenance"]) {
+    const destination = new URL(card.querySelector(selector).href);
+    assert.equal(destination.searchParams.get("artists"), "all");
+    assert.equal(destination.searchParams.get("lot"), selector === ".lot-board-provenance" ? "22" : "21");
+  }
+  const star = card.querySelector(".day-gallery-email");
+  let dossier;
+  p.window.location.assign = url => { dossier = url; };
+  await star.events.click();
+  assert.equal(dossier, card.querySelector(".day-gallery-open").href);
+  saved.artprice_url = "https://www.artprice.com/lot/123";
+  p.fetch = async (url, options) => {
+    assert.equal(url, "/email/21");
+    assert.equal(options.body.get("selected"), "true");
+    return {ok: true, headers: {get: () => "application/json"},
+      json: async () => ({ok: true, selected: true, selected_count: 1})};
+  };
+  await star.events.click();
+  assert.equal(star.attributes["aria-pressed"], "true");
+  assert.equal(star.textContent, "★");
+  assert.equal(regular.email_tray_selected, undefined);
 });
 
 test("cached retained research keeps the current owner when returning to its canonical lot", () => {

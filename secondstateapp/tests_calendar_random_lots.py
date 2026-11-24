@@ -3,6 +3,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
@@ -73,6 +74,43 @@ class CalendarRandomLotsTests(TestCase):
         self.assertNotIn(aguttes.pk, visible_ids)
         self.assertEqual(AuctionWatchLot.objects.count(), 5)
 
+    def test_saved_card_matches_the_regular_card_and_its_actions_target_the_off_watchlist_lot(self):
+        lot = watch_lot(
+            source_lot_id="207302212", artist="An off-watchlist artist", artist_watchlist_name="",
+            image_url="https://image.invaluable.com/housePhotos/Example/print.jpg",
+            artprice_url="https://www.artprice.com/artist/1/example/lots/pasts",
+            current_bid=1500, bid_count=3,
+        )
+        day = {"day": "2026-07-25"}
+        row, = self.client.get(self.url, day).json()["lots"]
+        dossier = self.client.get(row["research_url"])
+        self.assertEqual(dossier.status_code, 200)
+        self.assertEqual([card["id"] for card in dossier.context["calendar_data"][day["day"]]], [lot.pk])
+        for action in ("email_tray_update_url", "research_queue_update_url"):
+            with self.subTest(action=action):
+                result = self.client.post(row[action], {"selected": "true"})
+                self.assertEqual(result.status_code, 200)
+                self.assertTrue(result.json()["selected"])
+
+        saved, = self.client.get(self.url, day).json()["lots"]
+        regular, = self.client.get(reverse("auction_calendar_day_lots"), {**day, "artists": "all"}).json()["lots"]
+        self.assertTrue(saved["email_tray_selected"])
+        self.assertTrue(saved["research_queue_selected"])
+        self.assertEqual(saved["research_queue_status"], "queued")
+        self.assertEqual(saved["images"], [lot.image_url])
+        for field, value in regular.items():
+            with self.subTest(field=field):
+                self.assertEqual(saved[field], value)
+        self.assertEqual(self.client.get(reverse("auction_calendar_day_lots"), day).json()["lots"], [])
+
+    def test_saved_card_keeps_its_verified_house_image_for_the_regular_renderer(self):
+        watch_lot(source="Drouot", source_lot_id="35868096", auction_house="Kiefer", lot_number="2917",
+                  image_url="", artist="An off-watchlist artist", artist_watchlist_name="")
+        row, = self.client.get(self.url, {"day": "2026-07-25"}).json()["lots"]
+        self.assertEqual(row["image_url"], "https://www.kiefer.de/Abbildungen/146/146-2917-01.jpg")
+        self.assertEqual(row["images"], [row["image_url"]])
+        self.assertEqual(row["image_urls"], row["images"])
+
     def test_converging_supersession_chains_show_the_saved_survivor_on_its_current_sale_day_once(self):
         survivor = watch_lot(source_lot_id="verified-replacement", title="Current saved title",
                              event_at=datetime(2026, 7, 26, 17, tzinfo=timezone.utc))
@@ -133,7 +171,7 @@ class CalendarRandomLotsTests(TestCase):
         source_ids = json.loads(path.read_text(encoding="utf-8"))["source_lot_ids"]["Drouot"][:26]
         numbers = ["1", "2", "2a", "2b", *map(str, range(3, 24))]
         for source_id, number in reversed(list(zip(source_ids[:25], numbers, strict=True))):
-            watch_lot(source="Drouot", source_lot_id=source_id, lot_number=number)
+            watch_lot(source="Drouot", source_lot_id=source_id, lot_number=number, currency="EUR")
         watch_lot(source="Drouot", source_lot_id=source_ids[25], lot_number="1",
                   event_at=datetime(2026, 7, 26, 17, tzinfo=timezone.utc))
 
@@ -147,11 +185,22 @@ class CalendarRandomLotsTests(TestCase):
         self.assertEqual([r["lot_number"] for r in rows], numbers)
         self.assertEqual(len({r["id"] for r in rows}), 25)
 
+        with patch("secondstateapp.currency._usd_quote", return_value={"date": "2026-07-24", "rate": "1.2"}):
+            prices = self.client.get(self.url, {"day": "2026-07-25", "page": 2, "prices": "usd"}).json()
+        self.assertEqual((prices["day"], prices["page"], prices["total"]), ("2026-07-25", 2, 25))
+        price, = prices["lots"]
+        self.assertEqual(price["id"], rows[-1]["id"])
+        self.assertEqual(price["estimate_low"]["usd_amount"], "2400.00")
+        self.assertEqual(price["estimate_high"]["usd_amount"], "3600.00")
+
     def test_unsafe_saved_links_are_not_returned_to_the_gallery(self):
-        watch_lot(source_lot_id="207302212", lot_url="javascript:alert(1)", image_url="data:text/html,test")
+        watch_lot(source_lot_id="207302212", lot_url="javascript:alert(1)", sale_url="data:text/html,test",
+                  image_url="data:text/html,test")
         row = self.client.get(self.url).json()["lots"][0]
         self.assertFalse(row["lot_url"])
+        self.assertFalse(row["url"])
         self.assertFalse(row["image_url"])
+        self.assertEqual(row["images"], [])
 
     def test_collection_requires_staff(self):
         self.client.logout()

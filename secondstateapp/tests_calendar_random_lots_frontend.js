@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const {setImmediate: completeRequests} = require("node:timers/promises");
 const {test} = require("node:test");
 const {createRandomLotsGallery} = require("./static/secondstateapp/calendar_random_lots.js");
+const CalendarCurrency = require("./static/secondstateapp/calendar_currency.js");
 
 function gallery(search, fetchPage) {
   const elements = new Map();
@@ -23,10 +24,12 @@ function gallery(search, fetchPage) {
   element("random-lots-panel").dataset.url = "/calendar/random-lots/";
   const location = new URL("/calendar/?" + search, "https://secondstate.art");
   const navigate = (_state, _title, url) => { location.href = url; };
-  const window = {location, history: {pushState: navigate, replaceState: navigate}, fetch: fetchPage};
-  const controller = createRandomLotsGallery({getElementById: element}, window, lot => lot.id);
+  const window = {location, history: {pushState: navigate, replaceState: navigate}, fetch: fetchPage, CalendarCurrency};
+  const prices = [];
+  const controller = createRandomLotsGallery({getElementById: element}, window, lot => lot.id,
+    (_grid, lots, quotes) => prices.push({lots, quotes}));
   return {
-    element, location, controller,
+    element, location, controller, prices,
     click: id => element(id).dispatchEvent(new Event("click")),
   };
 }
@@ -69,6 +72,31 @@ test("opening and paging the saved collection preserves the selected catalog day
   g.click("random-lots-back");
   assert.equal(g.element("random-lots-panel").hidden, true);
   assert.equal(g.location.searchParams.toString(), search);
+});
+
+test("cards are usable before USD conversion and a late quote cannot change the next page", async () => {
+  const day = "2026-11-26";
+  const savedLots = [1, 2].map(id => ({id, currency: "EUR", estimate_low: "30.00"}));
+  const pendingPrices = new Map();
+  const g = gallery(`view=catalog&day=${day}&collection=random`, async url => {
+    const page = Number(url.searchParams.get("page"));
+    if (url.searchParams.get("prices") === "usd") {
+      return new Promise(resolve => pendingPrices.set(page, resolve));
+    }
+    return {ok: true, json: async () => ({day, page, pages: 2, total: 25, lots: [savedLots[page - 1]]})};
+  });
+  g.controller.syncView("catalog", day, 25);
+  await completeRequests();
+  assert.deepEqual(g.element("random-lots-grid").children, [1]);
+  assert.equal(g.element("random-lots-grid")["aria-busy"], "false");
+  g.click("random-lots-next");
+  await completeRequests();
+  assert.deepEqual(g.element("random-lots-grid").children, [2]);
+  pendingPrices.get(1)({ok: true, json: async () => ({day, page: 1, lots: [{id: 1}]})});
+  pendingPrices.get(2)({ok: true, json: async () => ({day, page: 2, lots: [{id: 2}]})});
+  await completeRequests();
+  assert.deepEqual(g.prices, [{lots: [savedLots[1]], quotes: [{id: 2}]}]);
+  assert.deepEqual(g.controller.lots, [savedLots[1]]);
 });
 
 test("a direct page link supports retry and safely discards a response after leaving the gallery", async () => {

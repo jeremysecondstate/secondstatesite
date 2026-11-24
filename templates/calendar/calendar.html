@@ -481,7 +481,7 @@
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=bid-research-20261118"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=timed-catalogs-20261121"></script>
-<script src="{% static 'secondstateapp/calendar_random_lots.js' %}?v=daily-random-lots-20261123"></script>
+<script src="{% static 'secondstateapp/calendar_random_lots.js' %}?v=catalog-cards-20261123"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=saved-sale-images-20261118"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-modes-20261028"></script>
 <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261118"></script>
@@ -505,6 +505,7 @@
   const savedBoardMembership = new Map(Object.values(data).flat()
     .flatMap((lot) => [lot, ...(lot.retained_saved_work || [])])
     .map((lot) => [String(lot.id), savedBoardFilterMembership(lot.saved_bid_board)]));
+  const loadedCatalogLots = () => Object.values(data).flat().concat(galleryCatalog.randomLots?.lots || []);
   const refreshGalleryMembership = (focusedCardId, focusedFilter, refreshCards) => {
     renderGalleryFilters();
     if (refreshCards) {
@@ -526,7 +527,7 @@
     const membershipChanged = savedBoardMembership.has(lotId)
       && savedBoardMembership.get(lotId) !== savedBoardFilterMembership(event.detail.savedBoard);
     if (savedBoardMembership.has(lotId)) savedBoardMembership.set(lotId, savedBoardFilterMembership(event.detail.savedBoard));
-    Object.values(data).flat().forEach((lot) => {
+    loadedCatalogLots().forEach((lot) => {
       [lot, ...(lot.retained_saved_work || [])].forEach((work) => {
         if (String(work.id) === lotId) work.saved_bid_board = event.detail.savedBoard;
       });
@@ -738,18 +739,27 @@
     node.className = className;
     node.dataset.calendarPriceLotId = String(lot.id);
     node.dataset.calendarPriceKind = kind;
+    if (lot.research_url && lot.calendar_day) node.collectionPriceLot = lot;
     applyCurrencyPrice(node, lot, kind);
     parent.appendChild(node);
   };
 
+  const refreshCurrencyNodes = (root) => {
+    root.querySelectorAll("[data-calendar-price-lot-id]").forEach((node) => {
+      const lot = node.collectionPriceLot || currencyLotsById.get(node.dataset.calendarPriceLotId);
+      if (lot) applyCurrencyPrice(node, lot, node.dataset.calendarPriceKind);
+    });
+  };
+  const applyCurrencyQuotes = (lots, quotes) => {
+    const byId = new Map(quotes.map((prices) => [String(prices.id), prices]));
+    lots.forEach((lot) => {
+      lot.usd_prices = byId.get(String(lot.id)) || {};
+      lot.usd_status = window.CalendarCurrency.hasUnavailablePrices(lot) ? "unavailable" : "ready";
+    });
+  };
   const refreshCurrencyPrices = (day) => {
     // Update price nodes only: research editors and cached drafts keep their DOM and focus.
-    for (const root of [document, ...researchLotCache.values()]) {
-      root.querySelectorAll("[data-calendar-price-lot-id]").forEach((node) => {
-        const lot = currencyLotsById.get(node.dataset.calendarPriceLotId);
-        if (lot) applyCurrencyPrice(node, lot, node.dataset.calendarPriceKind);
-      });
-    }
+    [document, ...researchLotCache.values()].forEach(refreshCurrencyNodes);
     if (day !== selectedDay) return;
     const state = currencyDays.get(day)?.state;
     const unavailable = dayLots(day).some(window.CalendarCurrency.hasUnavailablePrices);
@@ -800,11 +810,7 @@
         if (!response.ok) throw new Error("USD conversion unavailable");
         const payload = await response.json();
         if (payload.day !== day || !Array.isArray(payload.lots)) throw new Error("Invalid USD prices");
-        const byId = new Map(payload.lots.map((prices) => [String(prices.id), prices]));
-        lots.forEach((lot) => {
-          lot.usd_prices = byId.get(String(lot.id)) || {};
-          lot.usd_status = window.CalendarCurrency.hasUnavailablePrices(lot) ? "unavailable" : "ready";
-        });
+        applyCurrencyQuotes(lots, payload.lots);
         state.state = "ready";
       } catch (_error) {
         lots.forEach((lot) => { lot.usd_prices = null; lot.usd_status = "unavailable"; });
@@ -3702,38 +3708,14 @@
     return [image, fallback];
   };
 
-  const randomLotCard = (lot) => {
-    const card = document.createElement("article");
-    card.className = "day-gallery-work";
-    card.dataset.randomLotId = String(lot.id);
-    const visual = document.createElement("div");
-    visual.className = "day-gallery-visual";
-    const images = galleryImage({...lot, images: [lot.image_url]});
-    const target = lot.research_url || lot.lot_url;
-    if (target) {
-      const open = externalLink(target, "day-gallery-open", "");
-      open.setAttribute("aria-label", `View ${lot.title} (opens in a new tab)`);
-      open.append(...images);
-      visual.appendChild(open);
-    } else visual.append(...images);
-    if (lot.lot_number) appendText(visual, "span", "day-gallery-lot-number", `LOT ${lot.lot_number}`);
-    const caption = document.createElement("div");
-    caption.className = "day-gallery-caption";
-    appendText(caption, "p", "day-gallery-artist", lot.artist || "Artist uncredited");
-    appendText(caption, "h3", "day-gallery-title", lot.title);
-    const date = lot.calendar_day ? formatCalendarDay(lot.calendar_day, {month: "short", day: "numeric", year: "numeric"}) : "Sale date unavailable";
-    appendText(caption, "p", "day-gallery-meta", [date, lot.auction_house].filter(Boolean).join(" · "));
-    appendText(caption, "p", "day-gallery-meta", lot.medium);
-    const actions = document.createElement("div");
-    actions.className = "day-gallery-actions";
-    if (lot.research_url) actions.appendChild(externalLink(lot.research_url, "day-gallery-quick-look", "Research this lot ↗"));
-    if (lot.lot_url) actions.appendChild(externalLink(lot.lot_url, "day-gallery-auction-link", "Auction ↗"));
-    caption.appendChild(actions);
-    card.append(visual, caption);
-    return card;
-  };
-
-  const galleryResearchUrl = (lot, {look = researchLook} = {}) => {
+  const galleryResearchUrl = (lot, {look = researchLook, collectionLot} = {}) => {
+    const saved = collectionLot || lot;
+    if (saved.calendar_day && saved.research_url) {
+      const url = new URL(saved.research_url, window.location.origin);
+      url.searchParams.set("lot", String(lot.id));
+      url.searchParams.set("look", look);
+      return url.href;
+    }
     const url = new URL(window.location.pathname, window.location.origin);
     url.search = new URLSearchParams({
       view: "research", day: selectedDay, lot: String(lot.id), look,
@@ -3754,15 +3736,15 @@
     retained.forEach((work) => {
       const details = [work.saved_bid_board ? "Bid Board" : "", work.email_tray_selected ? "Email Tray" : "",
         work.research_queue_selected ? "Research Queue" : "", work.has_market_review ? "Market review" : ""].filter(Boolean);
-      const link = retainedResearchLink(work.id, "lot-retained-link", `${work.source} saved work${details.length ? ` · ${details.join(" / ")}` : ""} ↗`);
+      const link = retainedResearchLink(work.id, "lot-retained-link", `${work.source} saved work${details.length ? ` · ${details.join(" / ")}` : ""} ↗`, lot);
       link.setAttribute("aria-label", `Open saved ${work.source} work for ${lot.title}${details.length ? ` · ${details.join(" / ")}` : ""} (opens in a new tab)`);
       links.appendChild(link);
     });
     target.appendChild(links);
   };
 
-  const retainedResearchLink = (lotId, className, label) => {
-    const link = externalLink(galleryResearchUrl({id: lotId}, {look: "workbench"}), className, label);
+  const retainedResearchLink = (lotId, className, label, collectionLot) => {
+    const link = externalLink(galleryResearchUrl({id: lotId}, {look: "workbench", collectionLot}), className, label);
     link.dataset.retainedResearchLotId = String(lotId);
     return link;
   };
@@ -3785,7 +3767,7 @@
       view.summaries.set(String(work.id), savedBoard);
       if (String(work.id) !== String(group.id)) {
         const label = `Saved with ${work.source}${work.has_market_review ? " · Market review" : ""}`;
-        const provenance = retainedResearchLink(work.id, "lot-board-provenance", `${label} ↗`);
+        const provenance = retainedResearchLink(work.id, "lot-board-provenance", `${label} ↗`, group);
         provenance.setAttribute("aria-label", `${label} for ${lot.title} (opens in a new tab)`);
         savedBoard.appendChild(provenance);
       }
@@ -3795,11 +3777,16 @@
       root.appendChild(window.ResearchQueue.createSelection(lot, {
         csrfToken,
         onSelectionSaved(selected) {
-          const wasMember = lotHasBidBoardResearch(group);
+          const dayGroup = isGalleryView() && dayLots().find((item) => item.id === group.id);
+          const wasMember = dayGroup && lotHasBidBoardResearch(dayGroup);
           // Retained research pages carry a full lot while the catalog holds its compact summary.
           const owner = owners.find((work) => String(work.id) === String(lot.id));
           if (owner) owner.research_queue_selected = selected;
-          if (isGalleryView() && dayLots().includes(group) && wasMember !== lotHasBidBoardResearch(group)) {
+          if (dayGroup && dayGroup !== group) {
+            const dayOwner = lotBoardOwners(dayGroup).find((work) => work.id === lot.id);
+            if (dayOwner) dayOwner.research_queue_selected = selected;
+          }
+          if (dayGroup && wasMember !== lotHasBidBoardResearch(dayGroup)) {
             const focus = document.activeElement;
             refreshGalleryMembership(focus?.closest(".day-gallery-work")?.dataset.galleryLotId,
               focus?.closest("[data-gallery-filter]")?.dataset.galleryFilter, galleryFilter === "bidboards");
@@ -3840,6 +3827,7 @@
   const galleryCard = (lot, index, bidResearch = false) => {
     const card = document.createElement("article");
     card.dataset.galleryLotId = String(lot.id);
+    if (lot.research_url && lot.calendar_day) card.dataset.randomLotId = String(lot.id);
     card.className = `day-gallery-work${lot.ended ? " is-ended" : ""}${lot.won_by_us ? " is-won" : ""}${lot.attribution_label ? " has-attribution" : ""}`;
     const visual = document.createElement("div");
     visual.className = "day-gallery-visual";
@@ -4081,24 +4069,28 @@
   };
 
   const refreshGalleryLot = (lot) => {
-    Object.values(data).flat().forEach((canonical) => {
-      const retained = canonical.retained_saved_work?.find((work) => work.id === lot.id);
-      if (retained) retained.email_tray_selected = Boolean(lot.email_tray_selected);
+    loadedCatalogLots().forEach((canonical) => {
+      const owner = lotBoardOwners(canonical).find((work) => work.id === lot.id);
+      if (owner) {
+        owner.email_tray_selected = Boolean(lot.email_tray_selected);
+        if (owner === canonical) owner.artprice_url = lot.artprice_url;
+      }
     });
     if (!isGalleryView()) return;
+    Array.from(galleryCatalog.querySelectorAll("[data-gallery-email-lot-id]"))
+      .filter((button) => button.dataset.galleryEmailLotId === String(lot.id))
+      .forEach((button) => updateGalleryEmailButton(button, lot));
     if (galleryFilter === "tray") {
       renderGalleryCatalog();
       return;
     }
-    Array.from(galleryGrid.querySelectorAll("[data-gallery-email-lot-id]"))
-      .filter((button) => button.dataset.galleryEmailLotId === String(lot.id))
-      .forEach((button) => updateGalleryEmailButton(button, lot));
     renderGalleryFilters();
   };
 
   const toggleGalleryEmail = async (lot, index, button) => {
     if (!lot.artprice_url) {
-      openResearchWorkspace(index);
+      if (lot.research_url && lot.calendar_day) window.location.assign(galleryResearchUrl(lot));
+      else openResearchWorkspace(index);
       return;
     }
     const selected = !lot.email_tray_selected;
@@ -4121,7 +4113,7 @@
       syncLotInstances(artpriceEditorInstances, lot.id, lot);
       updateEmailTrayCount(Number(payload.selected_count) || 0);
       refreshGalleryLot(lot);
-      if (galleryFilter !== "tray") {
+      if (galleryFilter !== "tray" || button.isConnected) {
         button.disabled = false;
         button.focus({preventScroll: true});
       } else {
@@ -5249,7 +5241,9 @@
   const initialDay = "{{ initial_day|escapejs }}";
   const initialOliverDay = "{{ initial_oliver_day|escapejs }}";
   researchDaySelect.addEventListener("change", () => selectCalendarDay(researchDaySelect.value));
-  galleryCatalog.randomLots = window.createRandomLotsGallery(document, window, randomLotCard);
+  galleryCatalog.randomLots = window.createRandomLotsGallery(document, window,
+    (lot) => galleryCard(lot),
+    (grid, lots, quotes) => { applyCurrencyQuotes(lots, quotes); refreshCurrencyNodes(grid); });
   const initialParams = new URLSearchParams(window.location.search);
   galleryHideAttributed = initialParams.get("hide_attributed") === "1";
   restoreGalleryOrganization(initialParams);
