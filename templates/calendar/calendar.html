@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=random-lots-20261123">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=daily-random-lots-20261123">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=bid-research-20261118">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
@@ -115,13 +115,21 @@
                     {% if day.oliver_more_count %}<span class="more-events">+{{ day.oliver_more_count }} more auction{{ day.oliver_more_count|pluralize }}</span>{% endif %}
                   </span>
                 </button>
-                {% if day.lot_count %}
+                <div class="calendar-day-links">
+                  {% if day.lot_count %}
+                    <a
+                      class="day-catalog-link"
+                      href="?month={{ month_value }}&amp;day={{ day.iso }}&amp;view=catalog{% if all_saved_artists %}&amp;artists=all{% endif %}"
+                      aria-label="Jeremy’s Catalog for {{ day.date|date:'l, F j, Y' }}"
+                    >Jeremy’s Catalog <span aria-hidden="true">→</span></a>
+                  {% endif %}
                   <a
-                    class="day-catalog-link"
-                    href="?month={{ month_value }}&amp;day={{ day.iso }}&amp;view=catalog{% if all_saved_artists %}&amp;artists=all{% endif %}"
-                    aria-label="Jeremy’s Catalog for {{ day.date|date:'l, F j, Y' }}"
-                  >Jeremy’s Catalog <span aria-hidden="true">→</span></a>
-                {% endif %}
+                    class="day-random-lots-link"
+                    data-calendar-scope="all"
+                    href="?month={{ month_value }}&amp;day={{ day.iso }}&amp;view=catalog&amp;collection=random{% if all_saved_artists %}&amp;artists=all{% endif %}"
+                    aria-label="Random Lots for {{ day.date|date:'l, F j, Y' }}, {{ day.random_lots_count }} saved lot{{ day.random_lots_count|pluralize }}"
+                  >Random Lots <span>{{ day.random_lots_count }}</span></a>
+                </div>
               </div>
             {% endfor %}
           {% endfor %}
@@ -270,7 +278,7 @@
         <div id="day-gallery-house-filters" class="day-gallery-house-choices"></div>
         <button id="random-lots-open" class="day-gallery-filter" type="button" aria-controls="random-lots-panel" hidden>
           <span class="day-gallery-filter-name">Random Lots</span>
-          <span class="day-gallery-filter-count">{{ random_lots_count }}</span>
+          <span id="random-lots-count" class="day-gallery-filter-count">{{ random_lots_count }}</span>
         </button>
       </div>
     </details>
@@ -315,7 +323,7 @@
     <section id="random-lots-panel" aria-labelledby="random-lots-title" data-url="{% url 'auction_calendar_random_lots' %}" hidden>
       <header class="day-gallery-header">
         <div>
-          <p class="calendar-kicker">Jeremy’s Catalog / All sale dates</p>
+          <p id="random-lots-date" class="calendar-kicker"></p>
           <h2 id="random-lots-title" tabindex="-1">Random Lots<span aria-hidden="true">.</span></h2>
           <p id="random-lots-status" role="status"></p>
         </div>
@@ -464,6 +472,7 @@
 
 {{ calendar_data|json_script:"auction-calendar-data" }}
 {{ calendar_day_counts|json_script:"auction-calendar-day-counts" }}
+{{ random_lots_by_day|json_script:"auction-calendar-random-lots-by-day" }}
 {{ calendar_sales_data|json_script:"auction-calendar-sales-data" }}
 {{ oliver_calendar_sales_data|json_script:"oliver-calendar-sales-data" }}
 {{ retained_research_lot|json_script:"auction-calendar-retained-research" }}
@@ -472,7 +481,7 @@
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=bid-research-20261118"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=timed-catalogs-20261121"></script>
-<script src="{% static 'secondstateapp/calendar_random_lots.js' %}"></script>
+<script src="{% static 'secondstateapp/calendar_random_lots.js' %}?v=daily-random-lots-20261123"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=saved-sale-images-20261118"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-modes-20261028"></script>
 <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261118"></script>
@@ -480,6 +489,7 @@
 (() => {
   const data = JSON.parse(document.getElementById("auction-calendar-data").textContent);
   const dayCounts = JSON.parse(document.getElementById("auction-calendar-day-counts").textContent);
+  const randomLotsByDay = JSON.parse(document.getElementById("auction-calendar-random-lots-by-day").textContent);
   const salesData = JSON.parse(document.getElementById("auction-calendar-sales-data").textContent);
   const oliverSalesData = JSON.parse(document.getElementById("oliver-calendar-sales-data").textContent);
   let retainedResearchLot = JSON.parse(document.getElementById("auction-calendar-retained-research").textContent) || null;
@@ -4684,6 +4694,8 @@
     if (activeView !== "catalog") {
       url.searchParams.delete("collection");
       url.searchParams.delete("collection_page");
+    } else if (url.searchParams.has("day") && url.searchParams.get("day") !== selectedDay) {
+      url.searchParams.delete("collection_page");
     }
     writeGalleryOrganization(url);
     if (activeView !== "calendar") url.searchParams.set("view", activeView);
@@ -4740,10 +4752,11 @@
       else monthUrl.searchParams.delete("hide_attributed");
       link.href = monthUrl;
     });
-    document.querySelectorAll(".day-catalog-link").forEach((link) => {
+    const dayLinks = [...document.querySelectorAll(".day-catalog-link"), ...document.querySelectorAll(".day-random-lots-link")];
+    dayLinks.forEach((link) => {
       const catalogUrl = new URL(link.href);
       writeGalleryOrganization(catalogUrl);
-      catalogUrl.searchParams.set("view", inOliverScope() ? "oliver" : "catalog");
+      catalogUrl.searchParams.set("view", inOliverScope() && !catalogUrl.searchParams.has("collection") ? "oliver" : "catalog");
       if (galleryFilter === "qualifying") catalogUrl.searchParams.set("filter", "qualifying");
       else if (catalogUrl.searchParams.get("filter") === "qualifying") catalogUrl.searchParams.delete("filter");
       if (galleryHideAttributed) catalogUrl.searchParams.set("hide_attributed", "1");
@@ -4888,7 +4901,7 @@
       }
     }
     updateCalendarLocation({push});
-    galleryCatalog.randomLots?.syncView(activeView);
+    galleryCatalog.randomLots?.syncView(activeView, selectedDay, randomLotsByDay[selectedDay], title.textContent);
     if (selectedDay && Object.hasOwn(data, selectedDay)) refreshCurrencyPrices(selectedDay);
   };
 
@@ -4918,7 +4931,8 @@
     const params = new URLSearchParams(window.location.search);
     const day = params.get("day");
     const validDay = day && /^\d{4}-\d{2}-\d{2}$/.test(day)
-      && (Object.hasOwn(dayCounts, day) || dayButtons.some((button) => button.dataset.calendarDay === day));
+      && (Object.hasOwn(dayCounts, day) || dayButtons.some((button) => button.dataset.calendarDay === day)
+        || (params.get("collection") === "random" && Object.hasOwn(randomLotsByDay, day)));
     const historyLocation = window.location.href;
     withCalendarDay(validDay ? day : null, () => {
       if (window.location.href !== historyLocation) return;
@@ -4940,7 +4954,8 @@
         const view = params.get("view");
         galleryFilter = params.get("artist") ? `artist:${params.get("artist")}` : (["tray", "bidboards", "qualifying"].includes(params.get("filter")) || params.get("filter")?.startsWith("house:")) ? params.get("filter") : "all";
         setCalendarView(view);
-        const focusTarget = view === "research" ? researchTitle
+        const focusTarget = view === "catalog" && params.get("collection") === "random" ? document.getElementById("random-lots-title")
+          : view === "research" ? researchTitle
           : isGalleryView() ? document.getElementById("day-gallery-title")
           : activeView === "oliver-calendar" ? oliverCalendarViewToggle : calendarViewToggle;
         focusTarget.focus({preventScroll: true});
@@ -5213,6 +5228,7 @@
     else if (activeView === "research") renderResearchWorkspace();
     else { renderDaySales(isoDate); renderSidebarLots(lots); }
     updateCalendarLocation();
+    galleryCatalog.randomLots?.syncView(activeView, isoDate, randomLotsByDay[isoDate], dayLabel);
     loadCurrencyPrices(isoDate);
   };
 
@@ -5240,7 +5256,8 @@
   const requestedView = initialParams.get("view");
   const requestedDay = initialParams.get("day");
   const validRequestedDay = requestedDay && /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
-    && (Object.hasOwn(dayCounts, requestedDay) || dayButtons.some((button) => button.dataset.calendarDay === requestedDay));
+    && (Object.hasOwn(dayCounts, requestedDay) || dayButtons.some((button) => button.dataset.calendarDay === requestedDay)
+      || (initialParams.get("collection") === "random" && Object.hasOwn(randomLotsByDay, requestedDay)));
   const requestedLook = initialParams.get("look");
   researchLook = ["dossier", "workbench", "bidboard"].includes(requestedLook) ? requestedLook : "dossier";
   researchTab = researchLook === "bidboard" ? "bids" : researchLook === "workbench" ? "comps" : "sources";

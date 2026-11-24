@@ -7,7 +7,7 @@ import math
 import os
 import re
 import secrets
-from collections import defaultdict
+from collections import Counter, defaultdict
 from copy import copy
 from datetime import date, datetime, time, timedelta, timezone as datetime_timezone
 from decimal import Decimal, InvalidOperation
@@ -24,6 +24,7 @@ from django.core.paginator import EmptyPage, Paginator
 from django.core.validators import URLValidator
 from django.db import transaction
 from django.db.models import Count, F, Max, Q
+from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -563,9 +564,15 @@ def _random_lot_image(lot):
     return ""
 
 
-def _saved_random_lots(*fields):
+def _saved_random_lots(*fields, day_bounds=None):
     """Follow each audit identity to its current survivor, including later merges."""
     lots = AuctionWatchLot.objects.order_by().only("id", "superseded_by", *fields)
+    if day_bounds:
+        # A saved listing can move to another day when its survivor is corrected.
+        # Follow all replacement links, then apply the date to the terminal lots.
+        lots = lots.filter(
+            Q(superseded_by__isnull=False) | Q(event_at__gte=day_bounds[0], event_at__lt=day_bounds[1])
+        )
     pending = lots.filter(_random_lot_membership())
     seen = set()
     visible = []
@@ -583,25 +590,32 @@ def _saved_random_lots(*fields):
         pending = lots.filter(pk__in=replacements)
 
 
-def _random_lot_count():
-    # The Calendar only needs the badge. Usually every saved lot is already
-    # its own survivor, so one indexed aggregate avoids loading the collection.
-    counts = AuctionWatchLot.objects.filter(_random_lot_membership()).aggregate(
-        total=Count("pk"), merged=Count("superseded_by"),
-    )
-    return len(_saved_random_lots()) if counts["merged"] else counts["total"]
+def _random_lots_by_day(zone):
+    counts = list(AuctionWatchLot.objects.filter(_random_lot_membership()).order_by().values(
+        sale_day=TruncDate("event_at", tzinfo=zone),
+    ).annotate(total=Count("pk"), merged=Count("superseded_by")))
+    if any(row["merged"] for row in counts):
+        return dict(Counter(timezone.localdate(lot.event_at, zone).isoformat()
+                            for lot in _saved_random_lots("event_at") if lot.event_at))
+    return {row["sale_day"].isoformat(): row["total"] for row in counts if row["sale_day"]}
 
 
 @never_cache
 @staff_member_required
 @require_http_methods(["GET"])
 def auction_calendar_random_lots(request):
+    zone = _calendar_zone()
+    day_bounds = None
+    if "day" in request.GET:
+        selected_day = _calendar_requested_date(request.GET["day"])
+        if selected_day is None:
+            return JsonResponse({"error": "Choose a valid calendar day (YYYY-MM-DD)."}, status=400)
+        day_bounds = _utc_bounds(selected_day, selected_day + timedelta(days=1), zone)
     page_number = request.GET.get("page", "1")
     if not re.fullmatch(r"[1-9][0-9]{0,8}", page_number):
         return JsonResponse({"error": "Choose a positive page number."}, status=400)
 
-    zone = _calendar_zone()
-    lots = _saved_random_lots("event_at", "auction_house", "lot_number")
+    lots = _saved_random_lots("event_at", "auction_house", "lot_number", day_bounds=day_bounds)
 
     def catalog_order(lot):
         day = timezone.localdate(lot.event_at, zone) if lot.event_at else date.max
@@ -639,7 +653,10 @@ def auction_calendar_random_lots(request):
             "lot_url": _url(lot.lot_url),
             "research_url": f"{reverse('auction_calendar')}?{urlencode(params)}" if day else "",
         })
-    return JsonResponse({"total": pages.count, "page": page.number, "pages": pages.num_pages, "lots": cards})
+    payload = {"total": pages.count, "page": page.number, "pages": pages.num_pages, "lots": cards}
+    if day_bounds:
+        payload["day"] = selected_day.isoformat()
+    return JsonResponse(payload)
 
 
 @never_cache
@@ -737,6 +754,7 @@ def auction_calendar(request):
     calendar_sales_data = {}
     oliver_calendar_sales_data = {}
     calendar_day_counts = {}
+    random_lots_by_day = _random_lots_by_day(zone)
     is_scoped_house = lru_cache(maxsize=None)(is_oliver_house)
 
     def summarize_day(day, day_lots):
@@ -767,6 +785,7 @@ def auction_calendar(request):
                     "more_count": max(0, len(event_groups) - 3),
                     "sale_count": len(event_groups),
                     "lot_count": len(day_lots),
+                    "random_lots_count": random_lots_by_day.get(day.isoformat(), 0),
                     "oliver_event_groups": oliver_event_groups[:3],
                     "oliver_more_count": max(0, len(oliver_event_groups) - 3),
                     "oliver_sale_count": len(oliver_event_groups),
@@ -809,6 +828,11 @@ def auction_calendar(request):
     # The upcoming list is capped for display, but each date it can select must
     # include every lot even when the initial upcoming query stops at 1,000.
     upcoming_days = {group["date_iso"] for group in visible_upcoming_groups + oliver_upcoming_groups}
+    if (requested_date and request.GET.get("collection") == "random"
+            and not month_weeks[0][0] <= requested_date <= month_weeks[-1][-1]):
+        # A saved gallery link can retain a different month in its return URL.
+        upcoming_days.add(requested_date.isoformat())
+        calendar_day_counts.setdefault(requested_date.isoformat(), {"lots": 0, "oliver_lots": 0})
     complete_day_lots = {day.isoformat(): lots for day, lots in lots_by_day.items()}
     for day_iso in sorted(upcoming_days):
         if day_iso in complete_day_lots:
@@ -894,7 +918,8 @@ def auction_calendar(request):
         "oliver_house_count": len(oliver_house_names()),
         "oliver_house_names": list(oliver_house_names()),
         "synced_lot_count": summary_lots.count(),
-        "random_lots_count": _random_lot_count(),
+        "random_lots_by_day": random_lots_by_day,
+        "random_lots_count": random_lots_by_day.get(starting_day, 0),
         "all_saved_artists": request.GET.get("artists") == "all",
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),

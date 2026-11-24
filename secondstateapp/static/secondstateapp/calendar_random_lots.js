@@ -1,4 +1,4 @@
-/* The saved collection has its own pages and never replaces the selected day's data. */
+/* Saved lots page separately from the selected day's tracked lots. */
 function createRandomLotsGallery(document, window, renderCard) {
   const element = (id) => document.getElementById(id);
   const catalog = element("day-gallery-catalog");
@@ -11,6 +11,9 @@ function createRandomLotsGallery(document, window, renderCard) {
   const previous = element("random-lots-previous");
   const next = element("random-lots-next");
   const retry = element("random-lots-retry");
+  const countBadge = element("random-lots-count");
+  let saleDay = "";
+  let loadedDay = "";
   let page = 0;
   let pending = null;
 
@@ -27,6 +30,8 @@ function createRandomLotsGallery(document, window, renderCard) {
     pending?.abort();
     const request = new AbortController();
     pending = request;
+    const day = saleDay;
+    loadedDay = day;
     page = number;
     grid.replaceChildren();
     grid.setAttribute("aria-busy", "true");
@@ -34,6 +39,7 @@ function createRandomLotsGallery(document, window, renderCard) {
     retry.hidden = true;
     status.textContent = "Loading saved lots…";
     const url = new URL(panel.dataset.url, window.location.origin);
+    url.searchParams.set("day", day);
     url.searchParams.set("page", number);
     try {
       const response = await window.fetch(url, {
@@ -47,11 +53,15 @@ function createRandomLotsGallery(document, window, renderCard) {
       if (!response.ok) throw new Error("Random Lots unavailable");
       const data = await response.json();
       if (request !== pending) return;
+      if (data.day !== day) throw new Error("Unexpected sale date");
       const cards = data.lots.map(renderCard);
       grid.replaceChildren(...cards);
       page = data.page;
       if (number !== page) writeLocation(page, "replaceState");
-      status.textContent = data.total ? `${data.total} saved lots across all sale dates` : "No saved lots in this collection.";
+      countBadge.textContent = String(data.total);
+      status.textContent = data.total
+        ? `${data.total} saved lot${data.total === 1 ? "" : "s"} for this date`
+        : "No saved lots for this date.";
       element("random-lots-page").textContent = `Page ${page} of ${data.pages}`;
       previous.disabled = page <= 1;
       next.disabled = page >= data.pages;
@@ -68,8 +78,7 @@ function createRandomLotsGallery(document, window, renderCard) {
     }
   }
 
-  function syncView(view) {
-    open.hidden = view !== "catalog";
+  function syncPanel() {
     const params = new URL(window.location.href).searchParams;
     const visible = !open.hidden && params.get("collection") === "random";
     const wasVisible = !panel.hidden;
@@ -79,7 +88,7 @@ function createRandomLotsGallery(document, window, renderCard) {
     if (visible) {
       const requested = Number(params.get("collection_page"));
       const number = Number.isSafeInteger(requested) && requested > 0 ? requested : 1;
-      if (number !== page) loadPage(number);
+      if (loadedDay !== saleDay || number !== page) loadPage(number);
       if (!wasVisible) heading.focus();
     } else if (wasVisible) {
       pending?.abort();
@@ -93,13 +102,21 @@ function createRandomLotsGallery(document, window, renderCard) {
     }
   }
 
+  function syncView(view, day, count, dayLabel = day) {
+    if (day !== saleDay) countBadge.textContent = String(count || 0);
+    saleDay = day;
+    open.hidden = view !== "catalog" || !day;
+    element("random-lots-date").textContent = day ? `Jeremy’s Catalog / ${dayLabel}` : "";
+    syncPanel();
+  }
+
   open.addEventListener("click", () => {
     writeLocation(1, "pushState");
-    syncView("catalog");
+    syncPanel();
   });
   element("random-lots-back").addEventListener("click", () => {
     writeLocation(0, "replaceState");
-    syncView("catalog");
+    syncPanel();
   });
   function goToPage(number) {
     writeLocation(number, "replaceState");

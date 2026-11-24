@@ -452,7 +452,14 @@
   font-weight: 700;
 }
 
-.day-catalog-link {
+.calendar-day-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+}
+
+.day-catalog-link,
+.day-random-lots-link {
   position: relative;
   z-index: 1;
   display: inline-flex;
@@ -468,11 +475,17 @@
   text-underline-offset: 3px;
 }
 
-.day-catalog-link:hover {
+.day-random-lots-link {
+  color: var(--calendar-muted);
+}
+
+.day-catalog-link:hover,
+.day-random-lots-link:hover {
   color: #fff;
 }
 
-.day-catalog-link:focus-visible {
+.day-catalog-link:focus-visible,
+.day-random-lots-link:focus-visible {
   outline: 2px solid var(--calendar-gold);
   outline-offset: 3px;
 }

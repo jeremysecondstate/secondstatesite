@@ -1,4 +1,4 @@
-"""The saved audit collection is independent of the day and tracked-artist filters."""
+"""Saved audit lots belong to their current sale day, independently of tracked artists."""
 
 import json
 from datetime import datetime, timezone
@@ -24,7 +24,7 @@ class CalendarRandomLotsTests(TestCase):
         self.url = reverse("auction_calendar_random_lots")
         self.client.force_login(self.staff)
 
-    def test_collection_opens_other_days_without_changing_daily_tracked_view(self):
+    def test_collection_uses_the_calendar_local_sale_day_without_changing_daily_tracked_view(self):
         # The first two source identities belong to the retained audit set.
         # The third was a tracked addition in the same audit.
         after_midnight_utc = datetime(2026, 11, 24, 3, tzinfo=timezone.utc)
@@ -40,12 +40,20 @@ class CalendarRandomLotsTests(TestCase):
         watch_lot(source_lot_id="unrelated-outside-roster", artist="Outside roster",
                   artist_watchlist_name="", event_at=after_midnight_utc)
 
-        selected_day = {"day": "2026-11-24", "house": "Unrelated house", "hide_attributed": "1"}
+        selected_day = {"day": "2026-11-23", "house": "Unrelated house", "hide_attributed": "1"}
         response = self.client.get(self.url, selected_day)
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual((data["total"], data["page"], data["pages"]), (2, 1, 1))
-        self.assertEqual([row["id"] for row in data["lots"]], [aguttes.pk, base_zero.pk])
+        self.assertEqual(data["day"], "2026-11-23")
+        self.assertEqual((data["total"], data["page"], data["pages"]), (1, 1, 1))
+        self.assertEqual([row["id"] for row in data["lots"]], [aguttes.pk])
+        next_sale = self.client.get(self.url, {"day": "2026-11-26"}).json()
+        self.assertEqual([row["id"] for row in next_sale["lots"]], [base_zero.pk])
+        empty_day = self.client.get(self.url, {"day": "2026-11-24"}).json()
+        self.assertEqual(empty_day["day"], "2026-11-24")
+        self.assertEqual((empty_day["total"], empty_day["pages"], empty_day["lots"]), (0, 1, []))
+        all_dates = self.client.get(self.url).json()
+        self.assertEqual([row["id"] for row in all_dates["lots"]], [aguttes.pk, base_zero.pk])
         first = data["lots"][0]
         self.assertEqual(first["calendar_day"], "2026-11-23")
         self.assertEqual(first["auction_house"], "Aguttes")
@@ -65,19 +73,24 @@ class CalendarRandomLotsTests(TestCase):
         self.assertNotIn(aguttes.pk, visible_ids)
         self.assertEqual(AuctionWatchLot.objects.count(), 5)
 
-    def test_converging_supersession_chains_show_the_saved_survivor_once(self):
-        survivor = watch_lot(source_lot_id="verified-replacement", title="Current saved title")
+    def test_converging_supersession_chains_show_the_saved_survivor_on_its_current_sale_day_once(self):
+        survivor = watch_lot(source_lot_id="verified-replacement", title="Current saved title",
+                             event_at=datetime(2026, 7, 26, 17, tzinfo=timezone.utc))
         middle = watch_lot(source_lot_id="older-replacement", superseded_by=survivor)
         watch_lot(source="Drouot", source_lot_id="35991044", superseded_by=middle)
         watch_lot(source="Invaluable", source_lot_id="207302212", superseded_by=survivor)
 
-        data = self.client.get(self.url).json()
+        data = self.client.get(self.url, {"day": "2026-07-26"}).json()
         self.assertEqual(data["total"], 1)
         self.assertEqual([r["id"] for r in data["lots"]], [survivor.pk])
         self.assertEqual(data["lots"][0]["title"], survivor.title)
+        self.assertEqual(self.client.get(self.url, {"day": "2026-07-25"}).json()["total"], 0)
         self.assertEqual(AuctionWatchLot.objects.filter(superseded_by__isnull=False).count(), 3)
+        response = self.client.get(reverse("auction_calendar"), {"day": "2026-07-26"})
+        counts = {day["iso"]: day["random_lots_count"] for week in response.context["weeks"] for day in week}
+        self.assertEqual((counts["2026-07-25"], counts["2026-07-26"]), (0, 1))
 
-    def test_catalog_house_grid_exposes_collection_even_on_day_without_its_lots(self):
+    def test_calendar_and_catalog_offer_random_lots_even_on_a_day_without_saved_or_tracked_lots(self):
         watch_lot(source_lot_id="207302212", artist="", artist_watchlist_name="",
                   event_at=datetime(2026, 11, 23, 20, tzinfo=timezone.utc))
         response = self.client.get(reverse("auction_calendar"), {"day": "2026-11-24", "view": "catalog"})
@@ -85,10 +98,25 @@ class CalendarRandomLotsTests(TestCase):
         houses = dom.select_one("#day-gallery-house-filters")
         trigger = houses.find_next_sibling("button")
         self.assertEqual(trigger.select_one(".day-gallery-filter-name").get_text(strip=True), "Random Lots")
-        self.assertEqual(trigger.select_one(".day-gallery-filter-count").get_text(strip=True), "1")
+        self.assertEqual(trigger.select_one(".day-gallery-filter-count").get_text(strip=True), "0")
         panel = dom.find(id=trigger["aria-controls"])
         self.assertEqual(panel["data-url"], self.url)
         self.assertTrue(panel.has_attr("hidden"))
+        self.assertEqual(response.context["random_lots_count"], 0)
+        cells = dom.select(".calendar-grid .calendar-day")
+        self.assertGreaterEqual(len(cells), 28)
+        for cell in cells:
+            day = cell.select_one(".calendar-day-select")["data-calendar-day"]
+            link = cell.select_one(".day-random-lots-link")
+            with self.subTest(day=day):
+                self.assertIsNotNone(link)
+                self.assertFalse(link.find_parent("button"))
+                params = parse_qs(urlsplit(link["href"]).query)
+                self.assertEqual(params["day"], [day])
+                self.assertEqual(params["collection"], ["random"])
+                self.assertEqual(params["view"], ["catalog"])
+                self.assertIn("Random Lots", link.get_text(" ", strip=True))
+                self.assertIn("1" if day == "2026-11-23" else "0", link.get_text(" ", strip=True))
 
     def test_empty_collection_and_page_limits(self):
         empty = self.client.get(self.url).json()
@@ -96,16 +124,22 @@ class CalendarRandomLotsTests(TestCase):
         self.assertEqual(self.client.get(self.url, {"page": "0"}).status_code, 400)
         self.assertEqual(self.client.get(self.url, {"page": "invalid"}).status_code, 400)
         self.assertEqual(self.client.get(self.url, {"page": "2"}).status_code, 404)
+        for invalid in ("", "not-a-date", "2026-02-30"):
+            with self.subTest(day=invalid):
+                self.assertEqual(self.client.get(self.url, {"day": invalid}).status_code, 400)
 
     def test_paging_uses_natural_lot_numbers_and_returns_each_saved_identity_once(self):
         path = Path(__file__).with_name("data") / "random_lots.json"
-        source_ids = json.loads(path.read_text(encoding="utf-8"))["source_lot_ids"]["Drouot"][:25]
+        source_ids = json.loads(path.read_text(encoding="utf-8"))["source_lot_ids"]["Drouot"][:26]
         numbers = ["1", "2", "2a", "2b", *map(str, range(3, 24))]
-        for source_id, number in reversed(list(zip(source_ids, numbers, strict=True))):
+        for source_id, number in reversed(list(zip(source_ids[:25], numbers, strict=True))):
             watch_lot(source="Drouot", source_lot_id=source_id, lot_number=number)
+        watch_lot(source="Drouot", source_lot_id=source_ids[25], lot_number="1",
+                  event_at=datetime(2026, 7, 26, 17, tzinfo=timezone.utc))
 
-        first = self.client.get(self.url).json()
-        second = self.client.get(self.url, {"page": 2}).json()
+        first = self.client.get(self.url, {"day": "2026-07-25"}).json()
+        second = self.client.get(self.url, {"day": "2026-07-25", "page": 2}).json()
+        self.assertEqual(self.client.get(self.url, {"day": "2026-07-26", "page": 2}).status_code, 404)
         self.assertEqual((first["total"], first["pages"], second["page"]), (25, 2, 2))
         self.assertEqual(len(first["lots"]), 24)
         self.assertEqual(len(second["lots"]), 1)
