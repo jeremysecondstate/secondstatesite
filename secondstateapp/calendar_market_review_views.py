@@ -18,12 +18,10 @@ from django.views.decorators.http import require_http_methods
 
 from .calendar_market_review import (
     CATALOG_FIELDS, FIRST_REVIEW_DAY, RECHECK_START_DAY, missing_mismatch_evidence,
-    review_fingerprint, review_is_current,
+    review_is_current, saved_review_details,
 )
-from .calendar_views import _artist_label, _attach_superseded_attribution, _calendar_zone, _sync_authorized
-from .lot_presentation import artist_attribution_label
+from .calendar_views import _calendar_zone, _market_review_projections, _sync_authorized
 from .models import AuctionLotMarketReview, AuctionWatchLot
-from .sale_geography import sale_geography
 
 
 MAX_BATCH = 200
@@ -56,24 +54,6 @@ def _census(params):
     return {"lots": lots[:size], "next_cursor": str(lots[size - 1]["id"]) if len(lots) > size else None}
 
 
-def _projections(lots):
-    rows = []
-    for lot in lots:
-        row = {name: getattr(lot, name) for name in CATALOG_FIELDS}
-        artist = _artist_label(lot)
-        geography = sale_geography(lot)
-        row.update(
-            artist_source=artist, attribution_label=artist_attribution_label(lot.artist, artist, title=lot.title),
-            sale_country=geography["country_code"], sale_region=geography["region"],
-            active=lot.active, sold_price=lot.sold_price, sold_currency=lot.sold_currency,
-        )
-        rows.append(row)
-    _attach_superseded_attribution({"lots": rows})
-    for lot, row in zip(lots, rows):
-        row["fingerprint"] = review_fingerprint(lot, row["attribution_label"], row["sale_country"], row["sale_region"])
-    return rows
-
-
 def _ids(raw):
     values = raw.split(",")
     if (not 1 <= len(values) <= MAX_BATCH
@@ -87,7 +67,7 @@ def _ids(raw):
 
 def _inspect(raw_ids, recheck_from=None):
     lots = list(AuctionWatchLot.objects.select_related("market_review").filter(pk__in=_ids(raw_ids)).order_by("pk"))
-    rows = _projections(lots)
+    rows = _market_review_projections(lots)
     start = _review_start(recheck_from)
     for lot, row in zip(lots, rows):
         review = getattr(lot, "market_review", None)
@@ -96,11 +76,7 @@ def _inspect(raw_ids, recheck_from=None):
             revision=review.revision if review else 0, review=None,
         )
         if review:
-            row["review"] = {
-                "current": review_is_current(lot, review, row["fingerprint"]), "status": review.status,
-                "reason": review.reason, "sale_market": review.sale_market, "stronger_market": review.stronger_market,
-                "sources": review.sources, "reviewed_at": review.reviewed_at,
-            }
+            row["review"] = saved_review_details(lot, review, row["fingerprint"])
     return {"lots": rows}
 
 
@@ -113,7 +89,7 @@ def _pending(raw_limit):
     ordered = _eligible_lots().order_by("event_at", "pk")
     unreviewed = ordered.filter(market_review__isnull=True)
     pending_count = eligible_count = unreviewed.count()
-    pending = _projections(list(unreviewed[:limit]))
+    pending = _market_review_projections(list(unreviewed[:limit]))
     for row in pending:
         row["revision"] = 0
     # Re-evaluate fingerprints on reviewed rows, even if other, unrelated source
@@ -127,7 +103,7 @@ def _pending(raw_limit):
     due_by_day = Counter()
     while batch := list(islice(reviewed, 500)):
         eligible_count += len(batch)
-        for lot, row in zip(batch, _projections(batch)):
+        for lot, row in zip(batch, _market_review_projections(batch)):
             review = lot.market_review
             if (review_is_current(lot, review, row["fingerprint"])
                     and (review.status != AuctionLotMarketReview.Status.UNCERTAIN or review.reviewed_at > retry_before)):
@@ -236,7 +212,7 @@ def _apply(plan, recheck_from=None):
         raise ValueError("One or more lots fall outside the current Calendar review window. Read the lots again.")
     saved = AuctionLotMarketReview.objects.in_bulk(plan, field_name="lot_id")
     results = []
-    for lot, row in zip(lots, _projections(lots)):
+    for lot, row in zip(lots, _market_review_projections(lots)):
         expected_revision, evidence = plan[lot.pk]
         missing = missing_mismatch_evidence(lot, evidence["status"], evidence["sources"])
         if missing:

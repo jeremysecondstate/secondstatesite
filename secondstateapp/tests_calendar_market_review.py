@@ -233,6 +233,52 @@ class CalendarMarketReviewTests(TestCase):
         self.assertEqual(self.get().json()["lots"][0]["attribution_label"], "After")
         self.assertIsNone(self.day_row()["market_mismatch"])
 
+    def test_catalog_links_retained_market_reviews_to_their_original_evidence(self):
+        self.login_staff()
+        day = self.today.isoformat()
+        day_url = reverse("auction_calendar_day_lots")
+        children = []
+        for status in ("clear", "uncertain", "mismatch"):
+            child = watch_lot(source="Drouot", source_lot_id=status, event_at=self.start, artprice_url="")
+            plan = self.plan(child, status=status)
+            self.assertEqual(self.post(plan).status_code, 200)
+            child.superseded_by = self.lot
+            child.save(update_fields=["superseded_by"])
+            children.append(child)
+        before = list(AuctionLotMarketReview.objects.order_by("lot_id").values())
+        row = self.day_row()
+        self.assertEqual((row["market_review_status"], row["market_mismatch"]), ("unreviewed", None))
+        links = {work["id"]: work for work in row["retained_saved_work"]}
+        self.assertEqual(set(links), {child.pk for child in children})
+        for child, original in zip(children, before):
+            self.assertTrue(links[child.pk]["has_market_review"])
+            self.assertNotIn("sources", links[child.pk])
+            self.assertEqual(original["lot_id"], child.pk)
+            detail = self.client.get(links[child.pk]["research_url"]).context["retained_research_lot"]
+            self.assertEqual((detail["id"], detail["retained_listing"]["source"]), (child.pk, "Drouot"))
+            self.assertEqual(detail["retained_listing"]["canonical_id"], self.lot.pk)
+            review = detail["retained_market_review"]
+            self.assertTrue(review["current"])
+            for field in ("status", "revision", "reason", "sale_market", "stronger_market", "sources"):
+                self.assertEqual(review[field], original[field])
+            self.assertEqual(review["reviewed_at"], original["reviewed_at"].isoformat())
+            if review["status"] == "mismatch":
+                self.assertEqual(review["resale_auction_houses"][0]["name"], "Example Auctions")
+            response = self.client.get(day_url, {"day": day, "view": "research", "lot": child.pk}).json()
+            self.assertEqual(response["retained_research_lot"]["retained_market_review"], review)
+            self.assertEqual([r["id"] for r in response["lots"]], [self.lot.pk])
+
+        child = children[-1]
+        AuctionWatchLot.objects.filter(pk=child.pk).update(title="Updated catalogue evidence")
+        stale = self.client.get(links[child.pk]["research_url"]).context["retained_research_lot"]["retained_market_review"]
+        self.assertFalse(stale["current"])
+        self.assertEqual(stale["status"], "mismatch")
+        self.assertEqual(stale["sources"], before[-1]["sources"])
+        self.assertEqual(list(AuctionLotMarketReview.objects.order_by("lot_id").values()), before)
+        self.client.logout()
+        self.assertEqual(self.client.get(links[child.pk]["research_url"]).status_code, 302)
+        self.assertEqual(self.client.get(day_url, {"day": day, "view": "research", "lot": child.pk}).status_code, 302)
+
     def test_uncertainty_waits_one_week_and_equivalent_retry_preserves_review_date(self):
         self.login_staff()
         plan = self.plan(status="uncertain")

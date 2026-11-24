@@ -380,3 +380,38 @@ test("retained source controls respect a board saved on its current canonical li
   assert.equal(selections(root)[0].querySelector("input").checked, true);
   assert.equal(canonical.research_queue_selected, false);
 });
+
+test("Catalog market review links open the source that owns each review, with or without other saved work", () => {
+  const children = [
+    lot(11, {source: "Drouot", has_market_review: true}),
+    lot(12, {source: "Forum", has_market_review: true, saved_bid_board: board("100")}),
+    lot(13, {source: "Invaluable", email_tray_selected: true}),
+  ];
+  const canonical = lot(20, {retained_saved_work: children});
+  const context = page(canonical);
+  const card = context.run("galleryCard(source, 0)");
+  const reviewLinks = card.querySelectorAll("a").filter(link => /market review/i.test(link.textContent));
+  assert.deepEqual(reviewLinks.map(link => link.href).sort(), ["/research/11", "/research/12"]);
+  for (const link of reviewLinks) assert.match(link.attributes["aria-label"], /market review/i);
+  assert.equal(card.querySelector("details"), null);
+});
+
+test("Archive shows the retained review status, currency of the evidence, and original citations", () => {
+  for (const [status, label, current] of [["clear", "Clear", true], ["uncertain", "Inconclusive", true], ["mismatch", "Mismatch", false]]) {
+    const child = lot(11, {source: "Drouot", has_market_review: true});
+    const canonical = lot(20, {retained_saved_work: [child]});
+    const retained = {...child, retained_listing: {canonical_id: 20, source: "Drouot"},
+      retained_market_review: {status, current, reason: "Source-specific catalog evidence.", sources: [
+        {label: "Original catalog", url: "https://drouot.example/lot/11"},
+      ]}};
+    const context = page(canonical, retained);
+    context.run("renderResearchWorkspace()");
+    const details = context.researchLotCard.querySelector("details");
+    assert.ok(details);
+    const summary = details.querySelector("summary").textContent;
+    assert.ok(summary.includes(`Drouot market review · ${label}`));
+    assert.equal(/out of date/i.test(summary), !current);
+    assert.ok(details.querySelectorAll("p").some(p => p.textContent === retained.retained_market_review.reason));
+    assert.equal(details.querySelector("a").href, retained.retained_market_review.sources[0].url);
+  }
+});

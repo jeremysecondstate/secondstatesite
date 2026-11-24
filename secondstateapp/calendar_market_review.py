@@ -53,6 +53,14 @@ def review_is_current(lot, review, fingerprint):
                 and not missing_mismatch_evidence(lot, review.status, review.sources))
 
 
+def saved_review_details(lot, review, fingerprint):
+    return {
+        "current": review_is_current(lot, review, fingerprint), "status": review.status,
+        "reason": review.reason, "sale_market": review.sale_market, "stronger_market": review.stronger_market,
+        "sources": review.sources, "reviewed_at": review.reviewed_at,
+    }
+
+
 def market_review_fields(lot, row):
     review = getattr(lot, "market_review", None)
     if not review or not review_is_current(lot, review, review_fingerprint(

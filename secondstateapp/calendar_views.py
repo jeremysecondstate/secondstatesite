@@ -57,7 +57,10 @@ from .bid_board_snapshot import saved_board_summary, uses_max_bid_label
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
 from .calendar_linked_sales import LinkedCatalogs
 from .calendar_lot_numbers import calendar_lot_number
-from .calendar_market_review import FIRST_REVIEW_DAY, market_review_fields
+from .calendar_market_evidence import resale_auction_houses
+from .calendar_market_review import (
+    CATALOG_FIELDS, FIRST_REVIEW_DAY, market_review_fields, review_fingerprint, saved_review_details,
+)
 from .calendar_published_catalogs import published_catalog
 from .calendar_sales import calendar_event_at, combined_catalog_starts, verified_sale, verified_timed_catalog
 from .calendar_images import (
@@ -381,6 +384,25 @@ def _attach_superseded_attribution(calendar_data):
             unqualified[survivor_id]["attribution_label"] = next(iter(source_labels))
 
 
+def _market_review_projections(lots):
+    """Use the same source facts and qualifications for worker and Calendar review validity."""
+    rows = []
+    for lot in lots:
+        row = {name: getattr(lot, name) for name in CATALOG_FIELDS}
+        artist = _artist_label(lot)
+        geography = sale_geography(lot)
+        row.update(
+            artist_source=artist, attribution_label=artist_attribution_label(lot.artist, artist, title=lot.title),
+            sale_country=geography["country_code"], sale_region=geography["region"],
+            active=lot.active, sold_price=lot.sold_price, sold_currency=lot.sold_currency,
+        )
+        rows.append(row)
+    _attach_superseded_attribution({"lots": rows})
+    for lot, row in zip(lots, rows):
+        row["fingerprint"] = review_fingerprint(lot, row["attribution_label"], row["sale_country"], row["sale_region"])
+    return rows
+
+
 def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, research_queue_state, request):
     """Link saved work on explicitly superseded listings without moving its owner."""
     visible = {lot["id"]: (day, lot) for day, lots in calendar_data.items() for lot in lots}
@@ -390,8 +412,10 @@ def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, resear
         Q(max_bid_analysis__isnull=False) | Q(liveart_resale_analysis__isnull=False) | Q(resale_research__isnull=False)
         | Q(bid_board_analysis__isnull=False) | Q(email_batch_items__isnull=False)
         | Q(research_queue_item__isnull=False) | Q(research_run_items__isnull=False)
-        | ~Q(artprice_url="") | Q(won_by_us=True) | Q(sold_price__isnull=False)
-    ).select_related("watchlist_artist", "bid_board_analysis", "resale_research").defer(
+        | ~Q(artprice_url="") | Q(won_by_us=True) | Q(sold_price__isnull=False) | Q(market_review__isnull=False)
+    ).annotate(saved_market_review_id=F("market_review__pk")).select_related(
+        "watchlist_artist", "bid_board_analysis", "resale_research",
+    ).defer(
         "bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids",
     ).distinct().order_by("source", "id")
     requested_id = request.GET.get("lot", "")
@@ -403,6 +427,7 @@ def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, resear
         })
         work = {
             "id": child.pk, "source": child.source, "research_url": research_url,
+            **({"has_market_review": True} if child.saved_market_review_id is not None else {}),
             "title": clean_display_text(child.title, strip_lot_markers=True) or "Untitled lot",
             "artist": artist_display_name(_artist_label(child)),
             "auction_house": clean_display_text(child.auction_house or child.source or "Auction"),
@@ -424,6 +449,15 @@ def _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, resear
             display_child = copy(child)
             display_child.active = not canonical["ended"]
             retained = _lot_json(display_child, zone, selected_lot_ids, research_queue_state)
+            if child.saved_market_review_id is not None:
+                # Read full evidence only for the requested owner, using the review worker's fingerprint.
+                projection, = _market_review_projections([child])
+                review = child.market_review
+                retained["retained_market_review"] = {
+                    **saved_review_details(child, review, projection["fingerprint"]),
+                    "revision": review.revision, "reviewed_at": review.reviewed_at.isoformat(),
+                    "resale_auction_houses": resale_auction_houses(review.sources),
+                }
             retained["retained_listing"] = {
                 "source": child.source, "canonical_id": canonical["id"],
                 "canonical_url": reverse("auction_calendar") + "?" + urlencode({

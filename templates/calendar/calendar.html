@@ -789,12 +789,12 @@
     return link;
   };
 
-  const appendMarketMismatch = (parent, finding) => {
+  const appendMarketReview = (parent, finding, heading = "Market mismatch") => {
     const details = document.createElement("details");
     details.className = "lot-market-mismatch";
-    appendText(details, "summary", "", "Market mismatch");
-    appendText(details, "p", "", `Offered in · ${finding.sale_market}`);
-    appendText(details, "p", "", `Market connection · ${finding.stronger_market}`);
+    appendText(details, "summary", "", heading);
+    if (finding.sale_market) appendText(details, "p", "", `Offered in · ${finding.sale_market}`);
+    if (finding.stronger_market) appendText(details, "p", "", `Market connection · ${finding.stronger_market}`);
     const houses = new Map((finding.resale_auction_houses || []).map(house => [house.url, house]));
     const sources = document.createElement("ul");
     for (const source of finding.sources) {
@@ -3680,9 +3680,10 @@
     const links = document.createElement("div");
     links.className = "lot-retained-work";
     retained.forEach((work) => {
-      const details = [work.saved_bid_board ? "Bid Board" : "", work.email_tray_selected ? "Email Tray" : "", work.research_queue_selected ? "Research Queue" : ""].filter(Boolean);
+      const details = [work.saved_bid_board ? "Bid Board" : "", work.email_tray_selected ? "Email Tray" : "",
+        work.research_queue_selected ? "Research Queue" : "", work.has_market_review ? "Market review" : ""].filter(Boolean);
       const link = retainedResearchLink(work.id, "lot-retained-link", `${work.source} saved work${details.length ? ` · ${details.join(" / ")}` : ""} ↗`);
-      link.setAttribute("aria-label", `Open saved ${work.source} work for ${lot.title} (opens in a new tab)`);
+      link.setAttribute("aria-label", `Open saved ${work.source} work for ${lot.title}${details.length ? ` · ${details.join(" / ")}` : ""} (opens in a new tab)`);
       links.appendChild(link);
     });
     target.appendChild(links);
@@ -3711,8 +3712,9 @@
       if (window.SavedBidBoard) window.SavedBidBoard.mountSummary(savedBoard, {lot: work, csrfToken, getOliverScope: () => inOliverScope()});
       view.summaries.set(String(work.id), savedBoard);
       if (String(work.id) !== String(group.id)) {
-        const provenance = retainedResearchLink(work.id, "lot-board-provenance", `Saved with ${work.source} ↗`);
-        provenance.setAttribute("aria-label", `Open saved ${work.source} work for ${lot.title} (opens in a new tab)`);
+        const label = `Saved with ${work.source}${work.has_market_review ? " · Market review" : ""}`;
+        const provenance = retainedResearchLink(work.id, "lot-board-provenance", `${label} ↗`);
+        provenance.setAttribute("aria-label", `${label} for ${lot.title} (opens in a new tab)`);
         savedBoard.appendChild(provenance);
       }
       root.appendChild(savedBoard);
@@ -3808,7 +3810,7 @@
     caption.appendChild(arrivalLabel);
     appendCurrencyPrice(caption, lot, "estimate", "day-gallery-estimate");
     appendCurrencyPrice(caption, lot, "bid", "day-gallery-bid");
-    if (lot.market_mismatch) appendMarketMismatch(caption, lot.market_mismatch);
+    if (lot.market_mismatch) appendMarketReview(caption, lot.market_mismatch);
     appendLotControls(caption, lot);
     const actions = document.createElement("div");
     actions.className = "day-gallery-actions";
@@ -4428,7 +4430,13 @@
     appendCurrencyPrice(overview, lot, "estimate", "lot-facts");
     if (lot.location) appendText(overview, "p", "lot-location", `Location: ${lot.location}`);
     appendCurrencyPrice(overview, lot, "bid", "lot-bid");
-    if (lot.market_mismatch) appendMarketMismatch(overview, lot.market_mismatch);
+    if (lot.retained_market_review) {
+      const review = lot.retained_market_review;
+      const status = {clear: "Clear", uncertain: "Inconclusive", mismatch: "Mismatch"}[review.status];
+      appendMarketReview(overview, review, `${lot.retained_listing.source} market review · ${status}${review.current ? "" : " (out of date)"}`);
+    } else if (lot.market_mismatch) {
+      appendMarketReview(overview, lot.market_mismatch);
+    }
     const actionLinks = document.createElement("div");
     actionLinks.className = "lot-browser-action-links";
     if (lot.url) actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "Open auction lot ↗"));
@@ -4517,7 +4525,7 @@
     appendCurrencyPrice(copy, lot, "estimate", "lot-facts");
     appendText(copy, "p", "lot-location", lot.location ? `Location: ${lot.location}` : "");
     appendCurrencyPrice(copy, lot, "bid", "lot-bid");
-    if (lot.market_mismatch) appendMarketMismatch(copy, lot.market_mismatch);
+    if (lot.market_mismatch) appendMarketReview(copy, lot.market_mismatch);
 
     const actionLinks = document.createElement("div");
     actionLinks.className = "lot-browser-action-links";
@@ -5033,7 +5041,7 @@
       appendText(item, "p", "lot-facts", facts.join(" · "));
       appendCurrencyPrice(item, lot, "estimate", "lot-facts");
       appendCurrencyPrice(item, lot, "bid", "lot-bid");
-      if (lot.market_mismatch) appendMarketMismatch(item, lot.market_mismatch);
+      if (lot.market_mismatch) appendMarketReview(item, lot.market_mismatch);
       const actionLinks = document.createElement("div");
       actionLinks.className = "lot-action-links";
       if (lot.url) {
