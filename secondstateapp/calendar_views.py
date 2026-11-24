@@ -94,6 +94,8 @@ from .models import (
 
 MAX_SYNC_LOTS = 1000
 MAX_SYNC_BYTES = 2_000_000
+RANDOM_LOTS_CREATE_MODE = "random_lots_create_only"
+RANDOM_LOTS_BATCH = 100
 MAX_ARTPRICE_SOURCES = 10
 MAX_ARTPRICE_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_SELECTED_RESALE_COMPS = 25
@@ -554,7 +556,7 @@ def _random_lot_manifest():
 
 @lru_cache(maxsize=1)
 def _random_lot_membership():
-    identities = Q(pk__in=[])
+    identities = Q(random_lot=True)
     for source, ids in _random_lot_manifest()["source_lot_ids"].items():
         identities |= Q(source=source, source_lot_id__in=ids)
     return identities
@@ -576,7 +578,7 @@ def _calendar_lot_image(lot):
     return ""
 
 
-def _saved_random_lots(*fields, day_bounds=None):
+def _saved_random_lots(*fields, day_bounds=None, merged_only=False):
     """Follow each audit identity to its current survivor, including later merges."""
     lots = AuctionWatchLot.objects.order_by().only("id", "superseded_by", *fields)
     if day_bounds:
@@ -586,6 +588,8 @@ def _saved_random_lots(*fields, day_bounds=None):
             Q(superseded_by__isnull=False) | Q(event_at__gte=day_bounds[0], event_at__lt=day_bounds[1])
         )
     pending = lots.filter(_random_lot_membership())
+    if merged_only:
+        pending = pending.filter(superseded_by__isnull=False)
     seen = set()
     visible = []
     while True:
@@ -603,13 +607,18 @@ def _saved_random_lots(*fields, day_bounds=None):
 
 
 def _random_lots_by_day(zone):
-    counts = list(AuctionWatchLot.objects.filter(_random_lot_membership()).order_by().values(
+    grouped = list(AuctionWatchLot.objects.filter(_random_lot_membership()).order_by().values(
         sale_day=TruncDate("event_at", tzinfo=zone),
-    ).annotate(total=Count("pk"), merged=Count("superseded_by")))
-    if any(row["merged"] for row in counts):
-        return dict(Counter(timezone.localdate(lot.event_at, zone).isoformat()
-                            for lot in _saved_random_lots("event_at") if lot.event_at))
-    return {row["sale_day"].isoformat(): row["total"] for row in counts if row["sale_day"]}
+    ).annotate(total=Count("pk", filter=Q(superseded_by__isnull=True)), merged=Count("superseded_by")))
+    counts = Counter({row["sale_day"].isoformat(): row["total"] for row in grouped if row["sale_day"] and row["total"]})
+    if any(row["merged"] for row in grouped):
+        # Direct members were counted in SQL. Only merged identities can add
+        # a formerly unrelated survivor on a different Calendar day.
+        legacy = _random_lot_manifest()["source_lot_ids"]
+        for lot in _saved_random_lots("source", "source_lot_id", "random_lot", "event_at", merged_only=True):
+            if lot.event_at and not lot.random_lot and lot.source_lot_id not in legacy.get(lot.source, ()):
+                counts[timezone.localdate(lot.event_at, zone).isoformat()] += 1
+    return dict(counts)
 
 
 @never_cache
@@ -2695,6 +2704,107 @@ def _sync_authorized(request) -> bool:
     return bool(expected and provided and secrets.compare_digest(expected, provided))
 
 
+def _effective_random_member_ids(lots):
+    """Resolve membership inherited from saved provider listings merged into these survivors."""
+    legacy = _random_lot_manifest()["source_lot_ids"]
+    members = set()
+    pending = {}
+    for lot in lots:
+        if lot.superseded_by_id is not None:
+            continue
+        if lot.random_lot or lot.source_lot_id in legacy.get(lot.source, ()):
+            members.add(lot.pk)
+        else:
+            pending[lot.pk] = lot.pk
+    while pending:
+        descendants = {}
+        for pk, parent, source, identity, saved in AuctionWatchLot.objects.filter(
+            superseded_by_id__in=pending,
+        ).order_by().values_list("pk", "superseded_by_id", "source", "source_lot_id", "random_lot"):
+            canonical = pending[parent]
+            if saved or identity in legacy.get(source, ()):
+                members.add(canonical)
+            else:
+                descendants[pk] = canonical
+        pending = {pk: canonical for pk, canonical in descendants.items() if canonical not in members}
+    return members
+
+
+def _random_lot_receipt(lot, zone):
+    return {
+        "id": lot.pk, "source": lot.source, "source_lot_id": lot.source_lot_id,
+        "calendar_day": timezone.localdate(lot.event_at, zone).isoformat() if lot.event_at else "",
+        "superseded_by_id": lot.superseded_by_id,
+    }
+
+
+@csrf_exempt
+@never_cache
+@require_http_methods(["GET", "POST"])
+def auction_calendar_random_lot_membership(request):
+    if not _sync_authorized(request):
+        return JsonResponse({"ok": False, "error": "Unauthorized."}, status=401)
+    verify_only = request.method == "GET"
+    if verify_only:
+        if not request.GET:
+            return JsonResponse({"ok": True, "schema_version": 1, "max_batch": RANDOM_LOTS_BATCH,
+                                 "create_mode": RANDOM_LOTS_CREATE_MODE})
+        records = [request.GET.dict()]
+    else:
+        try:
+            body = request.body
+        except RequestDataTooBig:
+            return JsonResponse({"ok": False, "error": "Membership payload is too large."}, status=413)
+        if len(body) > MAX_SYNC_BYTES:
+            return JsonResponse({"ok": False, "error": "Membership payload is too large."}, status=413)
+        try:
+            payload = json.loads(body)
+        except (ValueError, UnicodeDecodeError):
+            return JsonResponse({"ok": False, "error": "Request body must be valid JSON."}, status=400)
+        if not isinstance(payload, dict) or not isinstance(payload.get("verify_only", False), bool):
+            return JsonResponse({"ok": False, "error": "Expected a JSON object and boolean verify_only."}, status=400)
+        verify_only = payload.get("verify_only", False)
+        records = payload.get("lots")
+    if not isinstance(records, list) or not 1 <= len(records) <= RANDOM_LOTS_BATCH:
+        return JsonResponse({"ok": False, "error": f"Supply between 1 and {RANDOM_LOTS_BATCH} lots."}, status=400)
+    expected = {}
+    for record in records:
+        if not isinstance(record, dict) or not re.fullmatch(r"[1-9][0-9]{0,17}", str(record.get("id", ""))):
+            return JsonResponse({"ok": False, "error": "Each lot requires a positive Calendar ID."}, status=400)
+        pk = int(record["id"])
+        if pk in expected or not all(isinstance(record.get(k), str) and record[k].strip()
+                                     for k in ("source", "source_lot_id", "calendar_day")):
+            return JsonResponse({"ok": False, "error": "Supply distinct IDs with source, source_lot_id and calendar_day."}, status=400)
+        if _calendar_requested_date(record["calendar_day"]) is None:
+            return JsonResponse({"ok": False, "error": "Choose a valid calendar day (YYYY-MM-DD)."}, status=400)
+        expected[pk] = record
+    zone = _calendar_zone()
+    with transaction.atomic():
+        lots = AuctionWatchLot.objects.filter(pk__in=expected).only(
+            "pk", "source", "source_lot_id", "event_at", "superseded_by", "random_lot",
+        ).order_by("pk")
+        if not verify_only:
+            lots = lots.select_for_update()
+        by_id = {lot.pk: lot for lot in lots}
+        receipts = []
+        for pk, record in expected.items():
+            lot = by_id.get(pk)
+            if lot is None:
+                return JsonResponse({"ok": False, "error": "Calendar lot no longer exists.", "id": pk}, status=409)
+            row = _random_lot_receipt(lot, zone)
+            if lot.superseded_by_id or any(row[k] != record[k] for k in ("source", "source_lot_id", "calendar_day")):
+                return JsonResponse({"ok": False, "error": "Recheck the current source, survivor and sale day.", "lot": row}, status=409)
+            receipts.append(row)
+        members = _effective_random_member_ids(by_id.values())
+        added = set() if verify_only else expected.keys() - members
+        if added:
+            AuctionWatchLot.objects.filter(pk__in=added).update(random_lot=True)
+        for row in receipts:
+            row["membership_added"] = row["id"] in added
+            row["random_lot"] = row["membership_added"] or row["id"] in members
+    return JsonResponse({"ok": True, "lots": receipts})
+
+
 @never_cache
 @require_http_methods(["GET"])
 def auction_calendar_inventory(request):
@@ -2862,6 +2972,31 @@ def _fallback_lot_id(record: dict) -> str:
     return f"generated-{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:32]}"
 
 
+@transaction.atomic
+def _create_random_lots(prepared, zone):
+    artist_keys = {artist_key for _, _, _, _, artist_key in prepared if artist_key}
+    artists = AuctionWatchArtist.objects.filter(normalized_name__in=artist_keys).values_list("normalized_name", "pk")
+    artist_ids = dict(artists)
+    rows = []
+    lots = []
+    for source, identity, defaults, _name, artist_key in prepared:
+        # A concurrent sync can insert the source identity after the audit's
+        # latest census. The unique constraint and get_or_create preserve that row.
+        lot, created = AuctionWatchLot.objects.select_for_update().get_or_create(
+            source=source, source_lot_id=identity,
+            defaults={**defaults, "watchlist_artist_id": artist_ids.get(artist_key), "random_lot": True},
+        )
+        lots.append(lot)
+        rows.append({**_random_lot_receipt(lot, zone), "created": created, "membership_added": created})
+    members = _effective_random_member_ids(lots)
+    for row in rows:
+        row["random_lot"] = row["id"] in members
+    return JsonResponse({
+        "ok": True, "mode": RANDOM_LOTS_CREATE_MODE, "received": len(rows),
+        "created": sum(row["created"] for row in rows), "updated": 0, "lots": rows,
+    })
+
+
 @csrf_exempt
 @require_POST
 def sync_auction_calendar(request):
@@ -2884,6 +3019,12 @@ def sync_auction_calendar(request):
         return JsonResponse({"ok": False, "error": "Request must contain a lots array."}, status=400)
     if len(payload["lots"]) > MAX_SYNC_LOTS:
         return JsonResponse({"ok": False, "error": f"At most {MAX_SYNC_LOTS} lots may be synced at once."}, status=400)
+    mode = payload.get("mode")
+    if mode not in (None, RANDOM_LOTS_CREATE_MODE):
+        return JsonResponse({"ok": False, "error": "Unknown sync mode."}, status=400)
+    create_only = mode == RANDOM_LOTS_CREATE_MODE
+    if create_only and (not 1 <= len(payload["lots"]) <= RANDOM_LOTS_BATCH or payload.get("artist_links")):
+        return JsonResponse({"ok": False, "error": f"Supply 1–{RANDOM_LOTS_BATCH} lots without artist link changes."}, status=400)
     raw_artist_links = payload.get("artist_links", [])
     if not isinstance(raw_artist_links, list):
         return JsonResponse({"ok": False, "error": "artist_links must be an array."}, status=400)
@@ -2896,6 +3037,7 @@ def sync_auction_calendar(request):
     zone = _calendar_zone()
     prepared = []
     prepared_images = []
+    input_identities = set()
     prepared_artist_links: dict[str, tuple[str, str]] = {}
     try:
         for index, record in enumerate(raw_artist_links):
@@ -2923,6 +3065,11 @@ def sync_auction_calendar(request):
             if not source:
                 raise ValueError(f"lots[{index}].source is required")
             source_lot_id = _text(record.get("source_lot_id"), 255) or _fallback_lot_id(record)
+            if create_only:
+                key = (source, source_lot_id)
+                if source != record.get("source") or source_lot_id != record.get("source_lot_id") or key in input_identities:
+                    raise ValueError(f"lots[{index}] requires a distinct, exact source and source_lot_id")
+                input_identities.add(key)
             event_value = record.get("end_at") or record.get("start_at") or record.get("event_at")
             event_at, is_all_day = _source_datetime(event_value, zone)
             is_all_day = bool(record.get("is_all_day")) or is_all_day
@@ -2964,6 +3111,11 @@ def sync_auction_calendar(request):
                 "source_first_seen_at": first_seen_at,
                 "source_last_seen_at": last_seen_at,
             }
+            if create_only:
+                sale_day = record.get("calendar_day")
+                if (not isinstance(sale_day, str) or _calendar_requested_date(sale_day) is None
+                        or defaults["event_at"] is None or timezone.localdate(defaults["event_at"], zone).isoformat() != sale_day):
+                    raise ValueError(f"lots[{index}].calendar_day must match the Calendar-local auction date")
             # Missing results on a legacy or partial refresh are not a retraction.
             if sold_price is not None:
                 defaults["sold_price"] = sold_price
@@ -2992,6 +3144,8 @@ def sync_auction_calendar(request):
                 prepared_lot[2]["image_url"] = store_saved_calendar_image(saved_image)
     except OSError:
         return JsonResponse({"ok": False, "error": "Calendar image storage is unavailable. Please retry."}, status=503)
+    if create_only:
+        return _create_random_lots(prepared, zone)
     with transaction.atomic():
         artists_by_key: dict[str, AuctionWatchArtist] = {}
         for normalized_name, (name, artprice_url) in prepared_artist_links.items():

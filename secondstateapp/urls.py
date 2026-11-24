@@ -37,6 +37,8 @@ urlpatterns = [
     ),
     path("calendar/day-lots/", calendar_views.auction_calendar_day_lots, name="auction_calendar_day_lots"),
     path("calendar/random-lots/", calendar_views.auction_calendar_random_lots, name="auction_calendar_random_lots"),
+    path("calendar/random-lots/membership/", calendar_views.auction_calendar_random_lot_membership,
+         name="auction_calendar_random_lot_membership"),
     path("calendar/lots/<int:lot_id>/resale-report/", resale_research.auction_lot_resale_report, name="auction_lot_resale_report"),
     path("calendar/proposals/", consignment_proposals.proposal_workspace, name="calendar_consignment_proposals"),
     path("calendar/proposals/catalog.pdf", consignment_proposals.proposal_pdf, name="calendar_consignment_proposal_pdf"),

@@ -206,6 +206,7 @@ class AuctionWatchLot(models.Model):
     sale_title = models.CharField(max_length=500, blank=True)
     lot_number = models.CharField(max_length=80, blank=True)
     location = models.CharField(max_length=255, blank=True)
+    random_lot = models.BooleanField(default=False, db_default=False)
     event_at = models.DateTimeField(blank=True, null=True, db_index=True)
     is_all_day = models.BooleanField(default=False)
     estimate_low = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
@@ -232,6 +233,7 @@ class AuctionWatchLot(models.Model):
 
     class Meta:
         ordering = ["event_at", "auction_house", "artist", "id"]
+        indexes = [models.Index(fields=["event_at"], condition=models.Q(random_lot=True), name="random_lot_sale_date")]
         constraints = [
             models.UniqueConstraint(
                 fields=("source", "source_lot_id"),
