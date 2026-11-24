@@ -11,6 +11,18 @@ from .models import AuctionWatchArtist, AuctionWatchLot
 
 
 class ArtistAttributionLabelTests(SimpleTestCase):
+    def test_metz_janssen_after_backhuysen_credit_preserves_roles(self):
+        credit = "Horst Janssen after Backhuysen"
+        self.assertEqual(artist_attribution_label(credit, credit, title="Claudia"), "After")
+        self.assertEqual(artist_attribution_label(credit, "Backhuysen"), "After")
+        for displayed in ("Horst Janssen", "Janssen, Horst", "Bernard Buffet"):
+            with self.subTest(displayed=displayed):
+                self.assertEqual(artist_attribution_label(credit, displayed), "")
+        for different_credit in ("Backhuysen after Horst Janssen", "Horst Janssen after Backhuysen II"):
+            with self.subTest(credit=different_credit):
+                self.assertEqual(artist_attribution_label(different_credit), "")
+        self.assertEqual(artist_attribution_label("Horst Janssen", title=credit), "")
+
     def test_explicit_artist_prefixes_suffixes_and_biography_are_flagged(self):
         cases = {
             "After Pablo Picasso": "After",
