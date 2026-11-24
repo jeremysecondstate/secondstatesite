@@ -172,6 +172,8 @@ class ArtistPresentationTests(TestCase):
             "Jörg Immendorff": "Immendorff, Jörg",
             "Charles Blackman": "Blackman, Charles",
             "Charles Raymond Blackman": "Blackman, Charles",
+            "Pierre AMBROGIANI": "Ambrogiani, Pierre",
+            "Pierre AMBROGIANI I": "Ambrogiani, Pierre",
             "Maurits Cornelis Escher": "Escher, Maurits Cornelis", "M.C. Escher": "Escher, Maurits Cornelis",
             "Aaron Garber-Maikovska": "Garber-Maikovska, Aaron", "Hank Willis Thomas": "Thomas, Hank Willis",
             "Jeffrey Gibson (Choctaw/Cherokee)": "Gibson, Jeffrey (Choctaw/Cherokee)",
@@ -190,6 +192,7 @@ class ArtistPresentationTests(TestCase):
     def test_attribution_is_retained_and_sorting_uses_the_artist(self):
         examples = {
             "After Pablo Picasso": "After Picasso, Pablo",
+            "After Pierre Ambrogiani": "After Ambrogiani, Pierre",
             "ATTRIBUTED TO GEORGES BRAQUE": "ATTRIBUTED TO Braque, Georges",
             "Albrecht Dürer (attributed to)": "Dürer, Albrecht (attributed to)",
             "Pablo Picasso, after": "Picasso, Pablo, after",

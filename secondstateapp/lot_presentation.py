@@ -141,6 +141,7 @@ _ARTISTS = (
     # Curated bookmarks also explicitly establish Nauman/Judd/Frankenthaler/
     # Lozowick/Serra/Matta/LeWitt/Ruff/Ting. Retain qualifiers and stage names.
     ("Albuquerque, Lita",), ("Anderson, Noel",), ("Armleder, John",), ("Arsham, Daniel",),
+    ("Ambrogiani, Pierre", "Pierre AMBROGIANI I"),
     ("Bartlett, Jennifer",), ("Bidlo, Mike",), ("Bochner, Mel",), ("Bolotowsky, Ilya",),
     ("Blackman, Charles", "Charles Raymond Blackman"),
     ("Brice, Lisa",), ("Burr, George Elbert",), ("Cannon, T.C.", "T. C. Cannon"),
