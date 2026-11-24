@@ -167,6 +167,7 @@ class ArtistPresentationTests(TestCase):
         examples = {
             "Alice Neel": "Neel, Alice", "Richard Serra": "Serra, Richard", "Sol LeWitt": "LeWitt, Sol",
             "James Abbott McNeill Whistler": "Whistler, James Abbott McNeill",
+            "Zaha Hadid": "Hadid, Zaha",
             "Maurits Cornelis Escher": "Escher, Maurits Cornelis", "M.C. Escher": "Escher, Maurits Cornelis",
             "Aaron Garber-Maikovska": "Garber-Maikovska, Aaron", "Hank Willis Thomas": "Thomas, Hank Willis",
             "Jeffrey Gibson (Choctaw/Cherokee)": "Gibson, Jeffrey (Choctaw/Cherokee)",
@@ -206,6 +207,7 @@ class ArtistPresentationTests(TestCase):
         for value in ("Gilbert & George", "Christo and Jeanne-Claude", "Bernd and Hilla Becher",
                       "Katherine Bernhardt and Jonathan Edelhuber", "Unknown Multi Token Artist",
                       "Jane O’Neill", "Doe, Jane", "Jane Doe Jr.", "Estate of Pablo Picasso",
+                      "Zaha Hadid Architects",
                       "El Anatsui", "Le Corbusier", "Various Artists", "Various Artists (20th/21st Century)"):
             with self.subTest(value=value):
                 self.assertEqual(artist_display_name(value), value)

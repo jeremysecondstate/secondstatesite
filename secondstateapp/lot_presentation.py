@@ -100,6 +100,7 @@ _ARTISTS = (
     ("Dine, Jim",), ("Dürer, Albrecht", "Albrecht (1471) Dürer"), ("Ernst, Max",),
     ("Estes, Richard",), ("Fairey, Shepard",), ("Francis, Sam",), ("Friedeberg, Pedro",),
     ("Frink, Elisabeth",), ("Garcia, Jerry",), ("Gottlieb, Adolph",), ("Goya, Francisco de",),
+    ("Hadid, Zaha",),
     ("Haring, Keith",), ("Hirst, Damien",), ("Hockney, David",),
     ("Hundertwasser, Friedensreich", "Friedrich Hundertwasser", "Hundertwasser, Friedrich"),
     ("Icart, Louis",), ("Kahn, Wolf",), ("Katz, Alex",), ("Kelly, Ellsworth",), ("Kent, Rockwell",),
