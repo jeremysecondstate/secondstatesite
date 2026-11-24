@@ -170,6 +170,8 @@ class ArtistPresentationTests(TestCase):
             "Zaha Hadid": "Hadid, Zaha",
             "Horst Janssen": "Janssen, Horst",
             "Jörg Immendorff": "Immendorff, Jörg",
+            "Charles Blackman": "Blackman, Charles",
+            "Charles Raymond Blackman": "Blackman, Charles",
             "Maurits Cornelis Escher": "Escher, Maurits Cornelis", "M.C. Escher": "Escher, Maurits Cornelis",
             "Aaron Garber-Maikovska": "Garber-Maikovska, Aaron", "Hank Willis Thomas": "Thomas, Hank Willis",
             "Jeffrey Gibson (Choctaw/Cherokee)": "Gibson, Jeffrey (Choctaw/Cherokee)",

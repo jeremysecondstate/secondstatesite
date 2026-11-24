@@ -142,6 +142,7 @@ _ARTISTS = (
     # Lozowick/Serra/Matta/LeWitt/Ruff/Ting. Retain qualifiers and stage names.
     ("Albuquerque, Lita",), ("Anderson, Noel",), ("Armleder, John",), ("Arsham, Daniel",),
     ("Bartlett, Jennifer",), ("Bidlo, Mike",), ("Bochner, Mel",), ("Bolotowsky, Ilya",),
+    ("Blackman, Charles", "Charles Raymond Blackman"),
     ("Brice, Lisa",), ("Burr, George Elbert",), ("Cannon, T.C.", "T. C. Cannon"),
     ("Cole, Willie",), ("Copley, William N.", "William N Copley"), ("Crichlow, Ernest",),
     ("Diebenkorn, Richard",), ("Dunham, Carroll",),
