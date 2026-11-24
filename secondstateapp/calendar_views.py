@@ -34,6 +34,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
+from catalogapp.tracked_artists import allows_watchlist_credit, is_tracked_credit, tracked_artist_keys
 
 from .artprice_image_store import saved_artprice_image_url, store_saved_artprice_image
 from .artprice_max_bid import (
@@ -483,10 +484,29 @@ def _calendar_requested_date(day_value):
     return None
 
 
+def _calendar_display_lots(request):
+    lots = AuctionWatchLot.objects.filter(superseded_by__isnull=True)
+    if request.GET.get("artists") == "all":
+        return lots
+    if not hasattr(request, "_calendar_artist_filter"):
+        roster = tracked_artist_keys(Path(settings.BASE_DIR) / "docs" / "artist-links.html")
+        # Sync can create artist rows for any artist. Resolve each distinct stored
+        # credit once, including historical lots with no watchlist foreign key.
+        pairs = list(lots.order_by().values_list("artist", "artist_watchlist_name").distinct())
+        labels = {value for pair in pairs for value in pair}
+        names = {label for label in labels if is_tracked_credit(label, roster)}
+        # Some verified mixed-lot credits abbreviate their contributor list.
+        # A saved canonical name can identify the tracked print in that case.
+        qualified = {credit for credit, watch in pairs
+                     if watch in names and credit not in names and allows_watchlist_credit(credit)}
+        request._calendar_artist_filter = Q(artist__in=names) | Q(artist_watchlist_name__in=names, artist__in=qualified)
+    return lots.filter(request._calendar_artist_filter)
+
+
 def _day_lot_data(request, selected_day, zone, selected_lot_ids, research_queue_state):
     day_start, day_end = _utc_bounds(selected_day, selected_day + timedelta(days=1), zone)
-    lots = AuctionWatchLot.objects.filter(
-        superseded_by__isnull=True, event_at__gte=day_start, event_at__lt=day_end,
+    lots = _calendar_display_lots(request).filter(
+        event_at__gte=day_start, event_at__lt=day_end,
     ).select_related("watchlist_artist", "bid_board_analysis", "resale_research", "market_review").defer(
         "bid_board_analysis__evidence_snapshot", "bid_board_analysis__assumptions", "bid_board_analysis__selected_ids",
     ).order_by("event_at", "auction_house", "artist", "id")
@@ -522,8 +542,8 @@ def auction_calendar_usd_prices(request):
         return JsonResponse({"error": "Choose a valid calendar day (YYYY-MM-DD)."}, status=400)
 
     day_start, day_end = _utc_bounds(selected_day, selected_day + timedelta(days=1), _calendar_zone())
-    source_lots = AuctionWatchLot.objects.filter(
-        superseded_by__isnull=True, event_at__gte=day_start, event_at__lt=day_end,
+    source_lots = _calendar_display_lots(request).filter(
+        event_at__gte=day_start, event_at__lt=day_end,
     ).order_by("id").values(
         "id", "currency", "sold_currency", "estimate_low", "estimate_high", "current_bid", "sold_price",
     )
@@ -547,6 +567,20 @@ def auction_calendar_usd_prices(request):
 def auction_calendar(request):
     zone = _calendar_zone()
     now_local = timezone.localtime(timezone.now(), zone)
+    # Previously saved dossier/queue links can point directly to an artist who
+    # has left the roster. Keep that explicit lot accessible in the saved view.
+    requested_lot = request.GET.get("lot", "")
+    requested_date = _calendar_requested_date(request.GET.get("day", ""))
+    if (request.GET.get("view") == "research" and request.GET.get("artists") != "all"
+            and requested_date and re.fullmatch(r"[0-9]{1,18}", requested_lot)):
+        day_start, day_end = _utc_bounds(requested_date, requested_date + timedelta(days=1), zone)
+        target = AuctionWatchLot.objects.filter(
+            pk=requested_lot, event_at__gte=day_start, event_at__lt=day_end,
+        ).values_list("id", "superseded_by_id").first()
+        if target and not _calendar_display_lots(request).filter(pk=target[1] or target[0]).exists():
+            params = request.GET.copy()
+            params["artists"] = "all"
+            return redirect(f"{reverse('auction_calendar')}?{params.urlencode()}")
     # A shared research link can name its day without a separate month parameter.
     selected_month = _month_start(
         request.GET.get("month") or (request.GET.get("day") or "")[:7],
@@ -578,7 +612,7 @@ def auction_calendar(request):
 
     # Month navigation needs sale/artist grouping and verified-sale identifiers.
     # Fetch prices, saved research and action URLs only for the day being read.
-    summary_lots = AuctionWatchLot.objects.filter(superseded_by__isnull=True).only(
+    summary_lots = _calendar_display_lots(request).only(
         "id", "event_at", "is_all_day", "active", "source", "source_lot_id", "sale_url", "sale_title",
         "auction_house", "artist", "artist_watchlist_name", "lot_number", "lot_url", "image_url",
     ).order_by("event_at", "auction_house", "artist", "id")
@@ -710,7 +744,6 @@ def auction_calendar(request):
         initial_oliver_day = initial_day
 
     view = request.GET.get("view")
-    requested_date = _calendar_requested_date(request.GET.get("day", ""))
     if requested_date and (month_weeks[0][0] <= requested_date <= month_weeks[-1][-1]
                            or requested_date.isoformat() in calendar_day_counts):
         starting_day = requested_date.isoformat()
@@ -749,7 +782,8 @@ def auction_calendar(request):
         "market_review_start": FIRST_REVIEW_DAY.isoformat(),
         "oliver_house_count": len(oliver_house_names()),
         "oliver_house_names": list(oliver_house_names()),
-        "synced_lot_count": AuctionWatchLot.objects.filter(superseded_by__isnull=True).count(),
+        "synced_lot_count": summary_lots.count(),
+        "all_saved_artists": request.GET.get("artists") == "all",
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),
         "research_queue_count": len(research_queue_state),

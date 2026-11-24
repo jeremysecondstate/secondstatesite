@@ -1076,7 +1076,8 @@ class AuctionCalendarViewTests(TestCase):
         )
         self.client.force_login(self.staff)
 
-        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        # The unknown and invalid artist fixtures are visible in the saved-lots view.
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07", "artists": "all"})
 
         details = {item["id"]: item for item in response.context["calendar_data"]["2026-07-25"]}
         self.assertEqual(details[linked_lot.pk]["artist_artprice_url"], imported_url)

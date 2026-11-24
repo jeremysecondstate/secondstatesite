@@ -25,7 +25,9 @@
     <div>
       <p class="calendar-kicker">Artist Watchlist</p>
       <h1 id="calendar-title">Auction Calendar</h1>
-      <p>Watched lots organized by their sale date. Times use {{ timezone_label }}.</p>
+      <p>{% if all_saved_artists %}Showing all saved lots.{% else %}Showing lots by tracked artists.{% endif %} Times use {{ timezone_label }}.
+        <a id="calendar-artist-scope" href="{% if all_saved_artists and request.GET.view == 'research' %}{% querystring artists=None lot=None look=None view='catalog' %}{% elif all_saved_artists %}{% querystring artists=None %}{% else %}{% querystring artists='all' %}{% endif %}">{% if all_saved_artists %}Show tracked artists{% else %}Show all saved lots{% endif %}</a>
+      </p>
     </div>
     <div class="calendar-sync-note" title="Lots synchronized from the desktop Artist Watchlist">
       <span class="sync-dot" aria-hidden="true"></span>
@@ -65,8 +67,8 @@
           <p id="calendar-scope-description">Choose a day to see every auction and its suggested lots.</p>
         </div>
         <nav class="month-nav" aria-label="Calendar month navigation">
-          <a href="?month={{ previous_month }}" aria-label="Previous month">← Previous</a>
-          <a href="?month={{ next_month }}" aria-label="Next month">Next →</a>
+          <a href="?month={{ previous_month }}{% if all_saved_artists %}&amp;artists=all{% endif %}" aria-label="Previous month">← Previous</a>
+          <a href="?month={{ next_month }}{% if all_saved_artists %}&amp;artists=all{% endif %}" aria-label="Next month">Next →</a>
         </nav>
       </div>
 
@@ -116,7 +118,7 @@
                 {% if day.lot_count %}
                   <a
                     class="day-catalog-link"
-                    href="?month={{ month_value }}&amp;day={{ day.iso }}&amp;view=catalog"
+                    href="?month={{ month_value }}&amp;day={{ day.iso }}&amp;view=catalog{% if all_saved_artists %}&amp;artists=all{% endif %}"
                     aria-label="Jeremy’s Catalog for {{ day.date|date:'l, F j, Y' }}"
                   >Jeremy’s Catalog <span aria-hidden="true">→</span></a>
                 {% endif %}
@@ -206,8 +208,8 @@
           <button id="day-gallery-next" type="button" aria-label="Next day with watched lots">Next day →</button>
         </div>
         <nav class="month-nav day-gallery-month-nav" aria-label="Catalog month navigation">
-          <a href="?month={{ previous_month }}">← Previous month</a>
-          <a href="?month={{ next_month }}">Next month →</a>
+          <a href="?month={{ previous_month }}{% if all_saved_artists %}&amp;artists=all{% endif %}">← Previous month</a>
+          <a href="?month={{ next_month }}{% if all_saved_artists %}&amp;artists=all{% endif %}">Next month →</a>
         </nav>
         <button id="day-gallery-browser-launch" class="day-gallery-browser-launch" type="button">Research this day →</button>
       </div>
@@ -754,7 +756,9 @@
     const timeout = setTimeout(() => controller.abort(), 30000);
     state.promise = (async () => {
       try {
-        const url = "{% url 'auction_calendar_usd_prices' %}?" + new URLSearchParams({day});
+        const params = new URLSearchParams({day});
+        if (new URLSearchParams(window.location?.search).get("artists") === "all") params.set("artists", "all");
+        const url = "{% url 'auction_calendar_usd_prices' %}?" + params;
         const response = await fetch(url, {credentials: "same-origin", signal: controller.signal,
           headers: {"Accept": "application/json"}});
         if (!response.ok) throw new Error("USD conversion unavailable");
@@ -3667,6 +3671,7 @@
     url.search = new URLSearchParams({
       view: "research", day: selectedDay, lot: String(lot.id), look,
     }).toString();
+    if (new URLSearchParams(window.location.search).get("artists") === "all") url.searchParams.set("artists", "all");
     if (inOliverScope()) url.searchParams.set("scope", "oliver");
     if (galleryHideAttributed) url.searchParams.set("hide_attributed", "1");
     writeGalleryOrganization(url);
@@ -4644,6 +4649,18 @@
     const state = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
     if (push) window.history.pushState({...state, researchEntry: true}, "", url);
     else window.history.replaceState(state, "", url);
+    const artistScopeLink = document.getElementById("calendar-artist-scope");
+    if (artistScopeLink) {
+      const toggleUrl = new URL(url);
+      if (toggleUrl.searchParams.get("artists") === "all") {
+        toggleUrl.searchParams.delete("artists");
+        if (toggleUrl.searchParams.get("view") === "research") {
+          toggleUrl.searchParams.set("view", inOliverScope() ? "oliver" : "catalog");
+          ["lot", "look", "scope"].forEach((key) => toggleUrl.searchParams.delete(key));
+        }
+      } else toggleUrl.searchParams.set("artists", "all");
+      artistScopeLink.href = toggleUrl;
+    }
     document.querySelectorAll(".month-nav a").forEach((link) => {
       const monthUrl = new URL(link.href);
       writeGalleryOrganization(monthUrl);
@@ -4728,6 +4745,7 @@
     dayStatus.hidden = false;
     dayRetry.hidden = true;
     const params = new URLSearchParams({day});
+    if (new URLSearchParams(window.location.search).get("artists") === "all") params.set("artists", "all");
     if (researchLotId) { params.set("view", "research"); params.set("lot", String(researchLotId)); }
     const timeout = setTimeout(() => request.abort(), 45000);
     return fetch("{% url 'auction_calendar_day_lots' %}?" + params, {
