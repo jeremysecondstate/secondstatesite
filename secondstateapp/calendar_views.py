@@ -20,6 +20,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import RequestDataTooBig, ValidationError
+from django.core.paginator import EmptyPage, Paginator
 from django.core.validators import URLValidator
 from django.db import transaction
 from django.db.models import Count, F, Max, Q
@@ -531,6 +532,116 @@ def auction_calendar_day_lots(request):
     return JsonResponse(_day_lot_data(request, selected_day, _calendar_zone(), selected_lot_ids, selected_queue_state()))
 
 
+@lru_cache(maxsize=1)
+def _random_lot_manifest():
+    path = Path(__file__).with_name("data") / "random_lots.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@lru_cache(maxsize=1)
+def _random_lot_membership():
+    identities = Q(pk__in=[])
+    for source, ids in _random_lot_manifest()["source_lot_ids"].items():
+        identities |= Q(source=source, source_lot_id__in=ids)
+    return identities
+
+
+def _random_lot_image(lot):
+    image = _calendar_image_url(lot.image_url)
+    if image:
+        return image
+    # Kiefer's sale 146 photographs are matched to verified provider IDs.
+    # Check the house and printed number again when showing a fallback.
+    images = _random_lot_manifest().get("image_urls", {}).get(lot.source, {})
+    candidate = images.get(lot.source_lot_id, "")
+    if (lot.auction_house == "Kiefer" and re.fullmatch(r"[0-9]{4}", lot.lot_number)
+            and candidate in (
+                f"https://www.kiefer.de/Abbildungen/146/146-{lot.lot_number}-01.jpg",
+                f"https://www.kiefer.de/Abbildungen/146/146-{lot.lot_number}-02.jpg",
+            )):
+        return candidate
+    return ""
+
+
+def _saved_random_lots(*fields):
+    """Follow each audit identity to its current survivor, including later merges."""
+    lots = AuctionWatchLot.objects.order_by().only("id", "superseded_by", *fields)
+    pending = lots.filter(_random_lot_membership())
+    seen = set()
+    visible = []
+    while True:
+        replacements = set()
+        for lot in pending:
+            seen.add(lot.pk)
+            if lot.superseded_by_id:
+                replacements.add(lot.superseded_by_id)
+            else:
+                visible.append(lot)
+        replacements -= seen
+        if not replacements:
+            return visible
+        pending = lots.filter(pk__in=replacements)
+
+
+def _random_lot_count():
+    # The Calendar only needs the badge. Usually every saved lot is already
+    # its own survivor, so one indexed aggregate avoids loading the collection.
+    counts = AuctionWatchLot.objects.filter(_random_lot_membership()).aggregate(
+        total=Count("pk"), merged=Count("superseded_by"),
+    )
+    return len(_saved_random_lots()) if counts["merged"] else counts["total"]
+
+
+@never_cache
+@staff_member_required
+@require_http_methods(["GET"])
+def auction_calendar_random_lots(request):
+    page_number = request.GET.get("page", "1")
+    if not re.fullmatch(r"[1-9][0-9]{0,8}", page_number):
+        return JsonResponse({"error": "Choose a positive page number."}, status=400)
+
+    zone = _calendar_zone()
+    lots = _saved_random_lots("event_at", "auction_house", "lot_number")
+
+    def catalog_order(lot):
+        day = timezone.localdate(lot.event_at, zone) if lot.event_at else date.max
+        number = tuple(int(part) if i % 2 else part.casefold()
+                       for i, part in enumerate(re.split(r"([0-9]+)", lot.lot_number)))
+        return day, lot.auction_house.casefold(), number, lot.pk
+
+    pages = Paginator(sorted(lots, key=catalog_order), 24)
+    try:
+        page = pages.page(int(page_number))
+    except EmptyPage:
+        return JsonResponse({"error": "This page is outside the collection."}, status=404)
+
+    ids = [lot.pk for lot in page]
+    details = AuctionWatchLot.objects.filter(superseded_by__isnull=True).only(
+        "event_at", "source", "source_lot_id", "artist", "artist_watchlist_name", "title",
+        "medium", "auction_house", "lot_number", "lot_url", "sale_url", "image_url",
+    ).in_bulk(ids)
+    cards = []
+    for lot_id in ids:
+        lot = details.get(lot_id)
+        if lot is None:
+            continue
+        day = timezone.localdate(lot.event_at, zone).isoformat() if lot.event_at else ""
+        params = {"view": "research", "day": day, "lot": lot.pk, "look": "dossier", "artists": "all"}
+        cards.append({
+            "id": lot.pk,
+            "artist": clean_display_text(lot.artist or lot.artist_watchlist_name) or "Unknown artist",
+            "title": clean_display_text(lot.title, strip_lot_markers=True) or "Untitled lot",
+            "medium": clean_display_text(lot.medium),
+            "auction_house": clean_display_text(lot.auction_house or lot.source),
+            "lot_number": calendar_lot_number(lot),
+            "calendar_day": day,
+            "image_url": _random_lot_image(lot),
+            "lot_url": _url(lot.lot_url),
+            "research_url": f"{reverse('auction_calendar')}?{urlencode(params)}" if day else "",
+        })
+    return JsonResponse({"total": pages.count, "page": page.number, "pages": pages.num_pages, "lots": cards})
+
+
 @never_cache
 @staff_member_required
 @require_http_methods(["GET"])
@@ -783,6 +894,7 @@ def auction_calendar(request):
         "oliver_house_count": len(oliver_house_names()),
         "oliver_house_names": list(oliver_house_names()),
         "synced_lot_count": summary_lots.count(),
+        "random_lots_count": _random_lot_count(),
         "all_saved_artists": request.GET.get("artists") == "all",
         "email_batch": active_email_batch,
         "email_selected_count": len(selected_lot_ids),

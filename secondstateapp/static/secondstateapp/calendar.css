@@ -2702,6 +2702,18 @@ body:has(.lot-browser[open]) {
   padding-bottom: 20px;
 }
 
+.day-gallery-house-choices {
+  display: contents;
+}
+
+.day-gallery-catalog.is-random-lots-open > :not(#random-lots-panel) {
+  display: none;
+}
+
+#random-lots-grid {
+  margin-top: 24px;
+}
+
 .day-gallery-house-filters:empty {
   padding-bottom: 0;
 }

@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=market-mismatches-20261119">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=random-lots-20261123">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=bid-research-20261118">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
@@ -266,7 +266,13 @@
           <span id="day-gallery-houses-summary" class="day-gallery-section-summary"></span>
         </span>
       </summary>
-      <div id="day-gallery-house-filters" class="day-gallery-house-filters" role="group" aria-label="Filter by auction house"></div>
+      <div class="day-gallery-house-filters" role="group" aria-label="Auction houses and saved lots">
+        <div id="day-gallery-house-filters" class="day-gallery-house-choices"></div>
+        <button id="random-lots-open" class="day-gallery-filter" type="button" aria-controls="random-lots-panel" hidden>
+          <span class="day-gallery-filter-name">Random Lots</span>
+          <span class="day-gallery-filter-count">{{ random_lots_count }}</span>
+        </button>
+      </div>
     </details>
     <details id="day-gallery-artists" class="day-gallery-section day-gallery-artists" data-time-zone="{{ calendar_timezone }}" hidden>
       <summary class="day-gallery-section-toggle">
@@ -306,6 +312,25 @@
     <div class="day-gallery-pagination">
       <button id="day-gallery-more" type="button" hidden>Show more lots</button>
     </div>
+    <section id="random-lots-panel" aria-labelledby="random-lots-title" data-url="{% url 'auction_calendar_random_lots' %}" hidden>
+      <header class="day-gallery-header">
+        <div>
+          <p class="calendar-kicker">Jeremy’s Catalog / All sale dates</p>
+          <h2 id="random-lots-title" tabindex="-1">Random Lots<span aria-hidden="true">.</span></h2>
+          <p id="random-lots-status" role="status"></p>
+        </div>
+        <div class="day-gallery-header-actions">
+          <button id="random-lots-back" class="day-gallery-browser-launch" type="button">← Back to catalog</button>
+        </div>
+      </header>
+      <button id="random-lots-retry" class="day-gallery-filter" type="button" hidden>Retry loading lots</button>
+      <div id="random-lots-grid" class="day-gallery-grid"></div>
+      <nav id="random-lots-pagination" class="day-gallery-pagination" aria-label="Random Lots pages" hidden>
+        <button id="random-lots-previous" type="button">← Previous page</button>
+        <span id="random-lots-page"></span>
+        <button id="random-lots-next" type="button">Next page →</button>
+      </nav>
+    </section>
   </section>
 
   <section id="day-research-workspace" class="research-workspace" data-look="dossier" aria-labelledby="research-workspace-title" hidden>
@@ -447,6 +472,7 @@
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=bid-research-20261118"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=timed-catalogs-20261121"></script>
+<script src="{% static 'secondstateapp/calendar_random_lots.js' %}"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=saved-sale-images-20261118"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-modes-20261028"></script>
 <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261118"></script>
@@ -3666,6 +3692,37 @@
     return [image, fallback];
   };
 
+  const randomLotCard = (lot) => {
+    const card = document.createElement("article");
+    card.className = "day-gallery-work";
+    card.dataset.randomLotId = String(lot.id);
+    const visual = document.createElement("div");
+    visual.className = "day-gallery-visual";
+    const images = galleryImage({...lot, images: [lot.image_url]});
+    const target = lot.research_url || lot.lot_url;
+    if (target) {
+      const open = externalLink(target, "day-gallery-open", "");
+      open.setAttribute("aria-label", `View ${lot.title} (opens in a new tab)`);
+      open.append(...images);
+      visual.appendChild(open);
+    } else visual.append(...images);
+    if (lot.lot_number) appendText(visual, "span", "day-gallery-lot-number", `LOT ${lot.lot_number}`);
+    const caption = document.createElement("div");
+    caption.className = "day-gallery-caption";
+    appendText(caption, "p", "day-gallery-artist", lot.artist || "Artist uncredited");
+    appendText(caption, "h3", "day-gallery-title", lot.title);
+    const date = lot.calendar_day ? formatCalendarDay(lot.calendar_day, {month: "short", day: "numeric", year: "numeric"}) : "Sale date unavailable";
+    appendText(caption, "p", "day-gallery-meta", [date, lot.auction_house].filter(Boolean).join(" · "));
+    appendText(caption, "p", "day-gallery-meta", lot.medium);
+    const actions = document.createElement("div");
+    actions.className = "day-gallery-actions";
+    if (lot.research_url) actions.appendChild(externalLink(lot.research_url, "day-gallery-quick-look", "Research this lot ↗"));
+    if (lot.lot_url) actions.appendChild(externalLink(lot.lot_url, "day-gallery-auction-link", "Auction ↗"));
+    caption.appendChild(actions);
+    card.append(visual, caption);
+    return card;
+  };
+
   const galleryResearchUrl = (lot, {look = researchLook} = {}) => {
     const url = new URL(window.location.pathname, window.location.origin);
     url.search = new URLSearchParams({
@@ -4624,6 +4681,10 @@
   const updateCalendarLocation = ({push = false} = {}) => {
     if (restoringHistory) return;
     const url = new URL(window.location.href);
+    if (activeView !== "catalog") {
+      url.searchParams.delete("collection");
+      url.searchParams.delete("collection_page");
+    }
     writeGalleryOrganization(url);
     if (activeView !== "calendar") url.searchParams.set("view", activeView);
     else url.searchParams.delete("view");
@@ -4827,6 +4888,7 @@
       }
     }
     updateCalendarLocation({push});
+    galleryCatalog.randomLots?.syncView(activeView);
     if (selectedDay && Object.hasOwn(data, selectedDay)) refreshCurrencyPrices(selectedDay);
   };
 
@@ -5171,6 +5233,7 @@
   const initialDay = "{{ initial_day|escapejs }}";
   const initialOliverDay = "{{ initial_oliver_day|escapejs }}";
   researchDaySelect.addEventListener("change", () => selectCalendarDay(researchDaySelect.value));
+  galleryCatalog.randomLots = window.createRandomLotsGallery(document, window, randomLotCard);
   const initialParams = new URLSearchParams(window.location.search);
   galleryHideAttributed = initialParams.get("hide_attributed") === "1";
   restoreGalleryOrganization(initialParams);
