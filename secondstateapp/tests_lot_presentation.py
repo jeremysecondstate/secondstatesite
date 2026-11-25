@@ -172,6 +172,7 @@ class ArtistPresentationTests(TestCase):
             "Horst Janssen": "Janssen, Horst",
             "Nissan Engel": "Engel, Nissan",
             "Gianfranco Ferroni": "Ferroni, Gianfranco",
+            "Edward Weston": "Weston, Edward",
             "Kim Weston": "Weston, Kim",
             "Ernst Fuchs": "Fuchs, Ernst",
             "Jörg Immendorff": "Immendorff, Jörg",
