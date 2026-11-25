@@ -15,6 +15,9 @@ _DROUOT_NUMBERS = {
     # https://www.artcurial.com/en/sales/6573/lots/75-b
     # https://drouot.com/fr/v/187761-limited-edition
     "35815049": ("Artcurial", "187761", date(2026, 11, 24), "75", "75-b"),
+    # Ivoire Troyes lists Picasso as 106,1 and Barrère as 106.
+    # https://www.ivoire-troyes.com/fr/lot-5447-1632489-1061_pablo_picasso_1882_1979frederic_jol?p=177
+    "35825863": ("Ivoire Troyes - Boisseau-Pomez", "187807", date(2026, 11, 26), "106", "106-1"),
 }
 
 

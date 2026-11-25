@@ -34,6 +34,15 @@ def dali_values(**changes):
 
 
 class CalendarLotNumberTests(SimpleTestCase):
+    def test_ivoire_troyes_picasso_displays_its_published_suffix(self):
+        lot = SimpleNamespace(
+            source="Drouot", source_lot_id="35825863", auction_house="Ivoire Troyes - Boisseau-Pomez",
+            lot_number="106", event_at=datetime(2026, 11, 26, 8, tzinfo=timezone.utc),
+            sale_url="https://drouot.com/en/v/187807", lot_url="https://drouot.com/en/l/35825863",
+        )
+        self.assertEqual(calendar_lot_number(lot), "106-1")
+        self.assertEqual(lot.lot_number, "106")
+
     def test_artcurial_pinocchio_retains_the_published_suffix(self):
         lot = SimpleNamespace(
             source="Drouot", source_lot_id="35815049", auction_house="Artcurial", lot_number="75",
