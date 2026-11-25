@@ -192,7 +192,7 @@ _ARTISTS = (
     ("Hall, Norma Bassett",), ("Hamaguchi, Yozo",), ("Hamilton, Ann",),
     ("Hancock, Trenton Doyle",), ("Heilmann, Mary",), ("Heizer, Michael",),
     ("Held, Al",), ("Helleu, Paul César",), ("Howell-Sickles, Donna",),
-    ("Hoyland, John",), ("Hughes, Shara",),
+    ("Hoyland, John",), ("Hrdlicka, Alfred",), ("Hughes, Shara",),
     ("Immendorff, Jörg",), ("Janssen, Horst",), ("Jettmar, Rudolf",), ("Kandinsky, Wassily",),
     ("Kent, Mary Corita",), ("Kentridge, William",), ("Klimt, Gustav",),
     ("Knight, Gwendolyn",), ("Kohlmeyer, Ida Rittenberg",), ("Lanskoy, André",), ("Laurencin, Marie",),
