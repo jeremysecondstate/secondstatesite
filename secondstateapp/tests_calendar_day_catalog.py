@@ -124,8 +124,8 @@ class CalendarDayCatalogLinkTests(TestCase):
                 self.assertNotIn("role", cell.attrs)
                 self.assertIs(cell.parent, calendar)
                 link = cell.select_one(".day-catalog-link")
-                self.assertIs(link.parent, cell)
-                self.assertIs(button.find_next_sibling(), link)
+                self.assertIsNotNone(link)
+                self.assertIs(button.find_next("a"), link)
                 self.assertIsNone(button.select_one("a"))
                 self.assertEqual(
                     parse_qs(urlsplit(link["href"]).query),

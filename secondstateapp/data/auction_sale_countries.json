@@ -574,6 +574,28 @@
       "evidence_url": "https://www.rrauction.com/auctions/lot-detail/351994007550413-norman-rockwell-signed-print-stockbridge-main-street-at-christmas/?cat=216",
       "evidence": "RR Auction lists Rockwell's Stockbridge Main Street at Christmas as lot 413 in its December 9 Fine Autographs and Artifacts sale 755, matching Drouot catalog 188135. Section 21 of the auction terms places the sale in Massachusetts (https://www.rrauction.com/buy/terms-conditions/).",
       "verified_at": "2026-11-23"
+    },
+    {
+      "auction_house": "Black Rock Galleries",
+      "source": "Invaluable",
+      "date": "2026-12-10",
+      "country_code": "US",
+      "sale_urls": [
+        "https://www.invaluable.com/catalog/HKTGPRVRDW"
+      ],
+      "lots": {
+        "207747214": {
+          "lot_number": "1",
+          "lot_url": "https://www.invaluable.com/auction-lot/pierre-auguste-renoir-french-1841-1919-claude-renoir-tourna-a-gauche-original-lithograph-1-c-0fd9c48c6e"
+        },
+        "207747217": {
+          "lot_number": "4",
+          "lot_url": "https://www.invaluable.com/auction-lot/alexander-calder-american-1898-1976-boomerang-lithograph-1974-4-c-aaf5acb6f7"
+        }
+      },
+      "evidence_url": "https://www.blackrockgalleries.com/live-sale/greenwich-winter-exceptional-auction-live-online-format--3089.html",
+      "evidence": "Black Rock Galleries lists Renoir's Claude Renoir as lot 1 and Calder's Boomerang as lot 4 in its December 9 Greenwich Winter Exceptional Auction. The auctioneer's listing on LiveAuctioneers gives the sale location as Greenwich, Connecticut, United States (https://www.liveauctioneers.com/catalog/439592_greenwich-winter-exceptional-live-online/). The evening sale falls on December 10 UTC.",
+      "verified_at": "2026-11-24"
     }
   ]
 }
