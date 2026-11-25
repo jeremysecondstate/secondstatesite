@@ -170,6 +170,7 @@ class ArtistPresentationTests(TestCase):
             "Zaha Hadid": "Hadid, Zaha",
             "Horst Janssen": "Janssen, Horst",
             "Jörg Immendorff": "Immendorff, Jörg",
+            "Rudolf Jettmar": "Jettmar, Rudolf",
             "Charles Blackman": "Blackman, Charles",
             "Charles Raymond Blackman": "Blackman, Charles",
             "Pierre AMBROGIANI": "Ambrogiani, Pierre",
@@ -214,7 +215,7 @@ class ArtistPresentationTests(TestCase):
         for value in ("Gilbert & George", "Christo and Jeanne-Claude", "Bernd and Hilla Becher",
                       "Katherine Bernhardt and Jonathan Edelhuber", "Unknown Multi Token Artist",
                       "Jane O’Neill", "Doe, Jane", "Jane Doe Jr.", "Estate of Pablo Picasso",
-                      "Zaha Hadid Architects",
+                      "Zaha Hadid Architects", "Rudolf Jettmar, A. Zdrazila",
                       "Horst Janssen and an unidentified poster artist", "Horst Janssen after Backhuysen",
                       "Horst Janssen; Hans Gottfried von Stockhausen (drawing)",
                       "El Anatsui", "Le Corbusier", "Various Artists", "Various Artists (20th/21st Century)"):

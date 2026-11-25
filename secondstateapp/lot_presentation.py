@@ -193,7 +193,7 @@ _ARTISTS = (
     ("Hancock, Trenton Doyle",), ("Heilmann, Mary",), ("Heizer, Michael",),
     ("Held, Al",), ("Helleu, Paul César",), ("Howell-Sickles, Donna",),
     ("Hoyland, John",), ("Hughes, Shara",),
-    ("Immendorff, Jörg",), ("Janssen, Horst",), ("Kandinsky, Wassily",),
+    ("Immendorff, Jörg",), ("Janssen, Horst",), ("Jettmar, Rudolf",), ("Kandinsky, Wassily",),
     ("Kent, Mary Corita",), ("Kentridge, William",), ("Klimt, Gustav",),
     ("Knight, Gwendolyn",), ("Kohlmeyer, Ida Rittenberg",), ("Laurencin, Marie",),
     ("Le Parc, Julio",), ("Lowry, Laurence Stephen",), ("Lynch, Rhett",),
