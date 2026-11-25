@@ -162,7 +162,7 @@ function page(data, view = "calendar") {
     "auctionCalendar", "calendarPageShell", "galleryCatalog", "researchWorkspace", "researchTitle",
     "researchBack", "researchPrevious", "researchSearch", "title", "list", "salesSection", "salesCount", "salesList",
     "lotBrowserLaunch", "researchLaunch"]) context[name] = new Element();
-  const functions = ["galleryOrganization", "gallerySortOrders", "restoreGalleryOrganization", "writeGalleryOrganization", "isGalleryView", "inOliverScope", "dayLots", "renderCalendarScope", "renderDaySales", "renderSidebarLots",
+  const functions = ["appendRetainedSourceLinks", "galleryOrganization", "gallerySortOrders", "restoreGalleryOrganization", "writeGalleryOrganization", "isGalleryView", "inOliverScope", "dayLots", "renderCalendarScope", "renderDaySales", "renderSidebarLots",
     "dayMarketSummary", "updateSidebarLaunches", "showDay", "setCalendarView", "updateCalendarLocation", "openResearchWorkspace"];
   vm.runInContext(functions.map(declaration).join("\n"), context);
   vm.runInContext(between('  researchBack.addEventListener("click"', '  researchPrevious.addEventListener("click"'), context);

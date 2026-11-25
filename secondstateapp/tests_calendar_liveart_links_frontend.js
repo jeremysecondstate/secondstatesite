@@ -108,6 +108,26 @@ test("Gallery Catalog and Oliver's shared lot cards include the saved LiveArt ar
     [source.url, source.artist_invaluable_url, liveartUrl]);
 });
 
+test("Catalog card and Archive dossier keep both retained Drouot links beside the current lot", () => {
+  const retained = {source: "Drouot", lot_url: "https://drouot.com/en/l/103", sale_url: "https://drouot.com/en/v/42"};
+  const source = lot({retained_sources: [retained, {source: "Drouot", lot_url: "", sale_url: retained.sale_url}]});
+  const original = JSON.stringify(source);
+  const render = renderer(source);
+  for (const surface of [render.galleryCard(source, 0), render.research()]) {
+    const links = descendants(surface).filter(element => element.tagName === "a");
+    assert.ok(links.some(link => link.href === source.url), "the canonical auction link is still present");
+    for (const [kind, url] of [["lot", retained.lot_url], ["sale", retained.sale_url]]) {
+      const matching = links.filter(link => link.href === url);
+      assert.equal(matching.length, 1, `the retained Drouot ${kind} is linked once`);
+      assert.match(matching[0].textContent, new RegExp(`Drouot ${kind}`, "i"));
+      assert.equal(matching[0].target, "_blank");
+      assert.equal(matching[0].rel, "noopener noreferrer");
+    }
+    assert.equal(withClass(surface, "lot-retained-link").length, 0, "source links do not imply saved work");
+  }
+  assert.equal(JSON.stringify(source), original);
+});
+
 test("Zwaan shared lot card shows the session-based ETA and explains its estimated pace", () => {
   const sourceUrl = "https://veilinggebouw.dezwaan.nl/wp-content/uploads/Orde-der-veiling-V117-2.pdf";
   const source = lot({artist: "Zúñiga, Francisco", title: "FRANCISCO ZUNIGA (1912 - 1998)",

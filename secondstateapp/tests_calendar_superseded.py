@@ -120,6 +120,50 @@ class CalendarSupersededLotTests(TestCase):
         self.assertTrue(details[historical.pk]["ended"])
         self.assertEqual(response.context["synced_lot_count"], 2)
 
+    def test_drouot_source_links_reach_the_invaluable_survivor_without_saved_work(self):
+        day = "2026-07-25"
+        survivor = watch_lot(auction_house="Forum Auctions", lot_number="103", artist="After Joan Miró")
+        child = watch_lot(
+            source="Drouot", source_lot_id="drouot-103", auction_house="Forum Auctions",
+            lot_number="103", lot_url="https://drouot.com/en/l/103",
+            sale_url="https://drouot.com/en/v/42", superseded_by=survivor, active=False,
+        )
+        response = self.calendar(day=day, view="catalog")
+        detail = self.client.get(reverse("auction_calendar_day_lots"), {
+            "day": day, "view": "research", "lot": survivor.pk,
+        })
+        self.assertEqual(detail.status_code, 200)
+        for lots in (response.context["calendar_data"][day], detail.json()["lots"]):
+            canonical, = lots
+            self.assertEqual(canonical["id"], survivor.pk)
+            self.assertEqual(canonical["attribution_label"], "After")
+            self.assertEqual(canonical["url"], survivor.lot_url)
+            self.assertEqual(canonical["sale_url"], survivor.sale_url)
+            self.assertFalse(canonical.get("retained_saved_work"))
+            retained, = canonical["retained_sources"]
+            self.assertEqual((retained["source"], retained["lot_url"], retained["sale_url"]),
+                             ("Drouot", child.lot_url, child.sale_url))
+
+    def test_retained_source_links_skip_withdrawn_relistings_and_invalid_destinations(self):
+        withdrawn, survivor = self.replacement_pair()
+        withdrawn.source = " invaluable "
+        withdrawn.save(update_fields=["source"])
+        child = watch_lot(
+            source="Drouot", source_lot_id="sale-only", superseded_by=survivor,
+            lot_url="javascript:void(0)", sale_url="https://drouot.com/en/v/43",
+        )
+        watch_lot(
+            source="Drouot", source_lot_id="no-destinations", superseded_by=survivor,
+            lot_url="", sale_url="",
+        )
+
+        canonical, = self.calendar().context["calendar_data"]["2026-07-25"]
+
+        retained, = canonical["retained_sources"]
+        self.assertEqual(retained["source"], child.source)
+        self.assertFalse(retained["lot_url"])
+        self.assertEqual(retained["sale_url"], child.sale_url)
+
     def test_replacement_keeps_verified_source_qualification_without_saved_work_or_source_edits(self):
         for day in ("2026-07-25", "2026-08-03"):
             with self.subTest(day=day):

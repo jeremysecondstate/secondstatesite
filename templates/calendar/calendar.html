@@ -835,6 +835,18 @@
     return link;
   };
 
+  const appendRetainedSourceLinks = (parent, lot, className) => {
+    if (!lot.retained_sources?.length) return;
+    const linked = new Set([lot.url]);
+    for (const source of lot.retained_sources) {
+      for (const [kind, href] of [["lot", source.lot_url], ["sale", source.sale_url]]) {
+        if (!href || linked.has(href)) continue;
+        parent.appendChild(externalLink(href, className, `${source.source} ${kind} ↗`));
+        linked.add(href);
+      }
+    }
+  };
+
   const appendMarketReview = (parent, finding, heading = "Market mismatch") => {
     const details = document.createElement("details");
     details.className = "lot-market-mismatch";
@@ -3880,6 +3892,7 @@
     if (publishedArrival) actions.appendChild(externalLink(arrivalDetails.sourceUrl, "day-gallery-auction-link", "House timetable ↗"));
     if (["published_pace", "published_pace_range", "session_estimate"].includes(arrivalDetails?.kind)) actions.appendChild(externalLink(arrivalDetails.sourceUrl, "day-gallery-auction-link", "Estimate basis ↗"));
     if (lot.url) actions.appendChild(externalLink(lot.url, "day-gallery-auction-link", "Auction ↗"));
+    appendRetainedSourceLinks(actions, lot, "day-gallery-auction-link");
     if (lot.artist_invaluable_url) actions.appendChild(externalLink(lot.artist_invaluable_url, "day-gallery-auction-link", "Invaluable ↗"));
     if (lot.artist_liveart_url) {
       const liveartLink = externalLink(lot.artist_liveart_url, "day-gallery-auction-link lot-artist-liveart-link", "LiveArt ↗");
@@ -4504,6 +4517,7 @@
     const actionLinks = document.createElement("div");
     actionLinks.className = "lot-browser-action-links";
     if (lot.url) actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "Open auction lot ↗"));
+    appendRetainedSourceLinks(actionLinks, lot, "lot-auction-link");
     if (lot.artist_artprice_url) {
       const artistLink = externalLink(lot.artist_artprice_url, "lot-artist-artprice-link", "Open Artprice ↗");
       artistLink.setAttribute("aria-label", `Open ${lot.artist || "artist"} on Artprice (opens in a new tab)`);
@@ -4594,6 +4608,7 @@
     const actionLinks = document.createElement("div");
     actionLinks.className = "lot-browser-action-links";
     if (lot.url) actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "Open auction lot ↗"));
+    appendRetainedSourceLinks(actionLinks, lot, "lot-auction-link");
     if (lot.artprice_url) {
       actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
     }
@@ -5134,6 +5149,7 @@
       if (lot.url) {
         actionLinks.appendChild(externalLink(lot.url, "lot-auction-link", "View auction lot ↗"));
       }
+      appendRetainedSourceLinks(actionLinks, lot, "lot-auction-link");
       if (lot.artprice_url) {
         actionLinks.appendChild(externalLink(lot.artprice_url, "lot-artprice-link", "View on Artprice ↗"));
       }

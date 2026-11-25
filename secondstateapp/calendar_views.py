@@ -301,6 +301,7 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
     sale_url = _url(lot.sale_url) or (timed_catalog["catalog_url"] if timed_catalog else "")
     return {
         "id": lot.pk,
+        "source": lot.source,
         "calendar_day": timezone.localdate(lot.event_at, zone).isoformat() if lot.event_at else "",
         **({"numbering_baseline": numbering_baseline} if numbering_baseline is not None else {}),
         **({"arrival_schedule": arrival_schedule} if arrival_schedule else {}),
@@ -365,22 +366,33 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
     }
 
 
-def _attach_superseded_attribution(calendar_data):
-    """Retain a verified duplicate's bound credit without rewriting either source."""
-    unqualified = {
+def _attach_superseded_attribution(calendar_data, *, include_source_links=False):
+    """Attach direct children's credits and optional source links to their surviving lots."""
+    survivors = {
         lot["id"]: lot for lots in calendar_data.values() for lot in lots
-        if not lot["attribution_label"]
+        if include_source_links or not lot["attribution_label"]
     }
-    if not unqualified:
+    if not survivors:
         return
     labels = defaultdict(set)
-    children = AuctionWatchLot.objects.filter(superseded_by_id__in=unqualified).values_list(
-        "superseded_by_id", "artist", "title",
+    link_fields = ("source", "lot_url", "sale_url") if include_source_links else ()
+    children = AuctionWatchLot.objects.filter(superseded_by_id__in=survivors).order_by("source", "id").values_list(
+        "superseded_by_id", "artist", "title", *link_fields,
     )
-    for survivor_id, artist, title in children:
+    for survivor_id, artist, title, *links in children:
+        survivor = survivors[survivor_id]
+        if links:
+            source, lot_url, sale_url = links
+            source = source.strip()
+            lot_url, sale_url = _url(lot_url), _url(sale_url)
+            # A replacement on the same provider can supersede a withdrawn listing.
+            if source and source.casefold() != survivor["source"].strip().casefold() and (lot_url or sale_url):
+                survivor.setdefault("retained_sources", []).append({"source": source, "lot_url": lot_url, "sale_url": sale_url})
+        if survivor["attribution_label"]:
+            continue
         # The explicit replacement link establishes lot identity. Still require
         # the qualified credit to name the survivor's artist, not a title mention.
-        survivor_artist = unqualified[survivor_id]["artist_source"]
+        survivor_artist = survivor["artist_source"]
         label = artist_attribution_label(survivor_artist, title=artist) or artist_attribution_label(
             survivor_artist, title=title,
         )
@@ -389,7 +401,7 @@ def _attach_superseded_attribution(calendar_data):
     for survivor_id, source_labels in labels.items():
         # Conflicting source qualifications need review, not an arbitrary choice.
         if len(source_labels) == 1:
-            unqualified[survivor_id]["attribution_label"] = next(iter(source_labels))
+            survivors[survivor_id]["attribution_label"] = next(iter(source_labels))
 
 
 def _market_review_projections(lots):
@@ -521,7 +533,7 @@ def _catalog_rows(request, lots, zone, selected_lot_ids, research_queue_state):
     calendar_data = defaultdict(list)
     for row in rows:
         calendar_data[row["calendar_day"]].append(row)
-    _attach_superseded_attribution(calendar_data)
+    _attach_superseded_attribution(calendar_data, include_source_links=True)
     for lot, row in zip(lots, rows):
         row.update(market_review_fields(lot, row))
     retained = _attach_retained_calendar_work(calendar_data, zone, selected_lot_ids, research_queue_state, request)
