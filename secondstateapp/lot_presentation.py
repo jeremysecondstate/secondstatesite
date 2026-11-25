@@ -186,7 +186,7 @@ _ARTISTS = (
     ("Dubuffet, Jean",), ("Duchamp, Marcel",), ("Dylan, Bob",),
     ("Emin, Tracey",), ("Engel, Nissan",), ("Ensor, James",), ("Fahlström, Öyvind",),
     ("Feininger, Lyonel",), ("Fini, Leonor",), ("Fitzpatrick, Tony",),
-    ("Fontana, Lucio",), ("Foujita, Léonard Tsuguharu",), ("Fry, Anthony",),
+    ("Fontana, Lucio",), ("Foujita, Léonard Tsuguharu",), ("Fry, Anthony",), ("Fuchs, Ernst",),
     ("García Ortega, José",), ("Giacometti, Alberto",), ("Gilliam, Sam",),
     ("Golub, Leon Albert",), ("Grignion, Charles",), ("Gromaire, Marcel",),
     ("Hall, Norma Bassett",), ("Hamaguchi, Yozo",), ("Hamilton, Ann",),
