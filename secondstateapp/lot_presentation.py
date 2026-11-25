@@ -195,7 +195,7 @@ _ARTISTS = (
     ("Hoyland, John",), ("Hughes, Shara",),
     ("Immendorff, Jörg",), ("Janssen, Horst",), ("Jettmar, Rudolf",), ("Kandinsky, Wassily",),
     ("Kent, Mary Corita",), ("Kentridge, William",), ("Klimt, Gustav",),
-    ("Knight, Gwendolyn",), ("Kohlmeyer, Ida Rittenberg",), ("Laurencin, Marie",),
+    ("Knight, Gwendolyn",), ("Kohlmeyer, Ida Rittenberg",), ("Lanskoy, André",), ("Laurencin, Marie",),
     ("Le Parc, Julio",), ("Lowry, Laurence Stephen",), ("Lynch, Rhett",),
     ("Maillol, Aristide",), ("Manet, Édouard",), ("Mapplethorpe, Robert",),
     ("Marini, Marino",), ("Martin, Fletcher",), ("Mell, Ed",), ("Milton, Peter",),
