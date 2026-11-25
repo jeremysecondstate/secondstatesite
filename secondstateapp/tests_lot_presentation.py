@@ -170,6 +170,7 @@ class ArtistPresentationTests(TestCase):
             "James Abbott McNeill Whistler": "Whistler, James Abbott McNeill",
             "Zaha Hadid": "Hadid, Zaha",
             "Horst Janssen": "Janssen, Horst",
+            "Nissan Engel": "Engel, Nissan",
             "Jörg Immendorff": "Immendorff, Jörg",
             "Rudolf Jettmar": "Jettmar, Rudolf",
             "Georges Rouault": "Rouault, Georges",
