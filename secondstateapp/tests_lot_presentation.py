@@ -171,6 +171,7 @@ class ArtistPresentationTests(TestCase):
             "Zaha Hadid": "Hadid, Zaha",
             "Horst Janssen": "Janssen, Horst",
             "Nissan Engel": "Engel, Nissan",
+            "Gianfranco Ferroni": "Ferroni, Gianfranco",
             "Ernst Fuchs": "Fuchs, Ernst",
             "Jörg Immendorff": "Immendorff, Jörg",
             "Rudolf Jettmar": "Jettmar, Rudolf",
