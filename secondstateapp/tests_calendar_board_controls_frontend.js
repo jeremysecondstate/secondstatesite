@@ -294,6 +294,51 @@ test("cached retained research keeps the current owner when returning to its can
   assert.equal(JSON.stringify([canonical, retained]), before);
 });
 
+function lotBrowserPage(lots) {
+  const context = page(lots[0]);
+  Object.assign(context, {Element, dayLots: () => lots, lotBrowser: new Element("dialog")});
+  context.run(block("  const moveLotBrowser =", "  const openLotBrowser =")
+    + block('  lotBrowser.addEventListener("keydown"', "  const updateCalendarLocation ="));
+  context.run("renderLotBrowser()");
+  context.press = key => context.lotBrowser.events.keydown({
+    key, target: context.document.activeElement, preventDefault() {},
+  });
+  return context;
+}
+
+test("lot browser navigation from a card control focuses the newly displayed lot title", () => {
+  const lots = [1, 2, 3].map(id => lot(id, {url: `/auction/${id}`}));
+  const context = lotBrowserPage(lots);
+  const card = context.lotBrowserCard;
+  card.querySelector(".lot-auction-link").focus();
+  for (const [key, index] of [["ArrowRight", 1], ["End", 2], ["Home", 0], ["ArrowLeft", 2]]) {
+    context.press(key);
+    const title = card.querySelector(".lot-title");
+    assert.equal(title.textContent, lots[index].title);
+    assert.equal(context.document.activeElement === title, true, `${key} must focus the current lot title`);
+    assert.equal(title.tabIndex, -1, "the title is programmatically focusable");
+  }
+  context.lotBrowserNext.focus();
+  context.press("ArrowRight");
+  assert.equal(card.querySelector(".lot-title").textContent, lots[0].title);
+  assert.equal(context.document.activeElement, context.lotBrowserNext);
+});
+
+test("Home and End on the current lot preserve the focused control and the rendered card", () => {
+  for (const ids of [[1], [1, 2]]) {
+    const context = lotBrowserPage(ids.map(id => lot(id, {url: `/auction/${id}`})));
+    for (const key of ["Home", "End"]) {
+      if (key === "End" && ids.length > 1) context.press("ArrowRight");
+      const link = context.lotBrowserCard.querySelector(".lot-auction-link");
+      link.focus();
+      context.press(key);
+      assert.equal(context.lotBrowserCard.querySelector(".lot-auction-link") === link, true,
+        `${key} must keep the current card when already at the boundary`);
+      assert.equal(context.document.activeElement, link);
+    }
+  }
+});
+
 for (const surface of ["catalog", "sidebar", "browser", "archive"]) {
   test(`${surface} uses the shared saved-board controls and suppresses research selection`, () => {
     const retained = lot(11, {saved_bid_board: board("200"), source: "Invaluable"});

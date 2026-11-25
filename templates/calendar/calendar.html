@@ -4587,6 +4587,7 @@
     lotBrowserPrevious.disabled = lots.length === 1;
     lotBrowserNext.disabled = lots.length === 1;
 
+    const focusWasInCard = lotBrowserCard.contains(document.activeElement);
     lotBrowserCard.replaceChildren();
     lotBrowserCard.classList.toggle("is-ended", Boolean(lot.ended));
     lotBrowserCard.classList.toggle("is-won", Boolean(lot.won_by_us));
@@ -4596,7 +4597,11 @@
     copy.className = "lot-browser-copy has-workflow";
     if (lot.won_by_us) appendText(copy, "span", "lot-won-badge", "✓ Won by SECONDSTATE");
     appendArtistLabel(copy, lot);
-    appendText(copy, "h3", "lot-title", lot.title);
+    const heading = document.createElement("h3");
+    heading.className = "lot-title";
+    heading.textContent = lot.title;
+    heading.tabIndex = -1;
+    copy.appendChild(heading);
     appendText(copy, "p", "lot-house", [lot.auction_house, lot.sale_title].filter(Boolean).join(" · "));
     const facts = [lot.time, lot.lot_number ? `Lot ${lot.lot_number}` : "", lot.medium].filter(Boolean);
     appendText(copy, "p", "lot-facts", facts.join(" · "));
@@ -4625,11 +4630,12 @@
     copy.appendChild(workflow);
     appendArtpriceEditor(workflow, lot, actionLinks, {idPrefix: "browser"});
     appendArtpriceAnalysis(workflow, lot, {idPrefix: "browser", quick: true});
+    if (focusWasInCard) heading.focus();
   };
 
   const moveLotBrowser = (distance) => {
     const lots = dayLots();
-    if (lots.length < 2) return;
+    if (lots.length < 2 || distance === 0) return;
     lotBrowserIndex = (lotBrowserIndex + distance + lots.length) % lots.length;
     renderLotBrowser();
   };
@@ -4686,12 +4692,10 @@
       moveLotBrowser(1);
     } else if (event.key === "Home") {
       event.preventDefault();
-      lotBrowserIndex = 0;
-      renderLotBrowser();
+      moveLotBrowser(-lotBrowserIndex);
     } else if (event.key === "End") {
       event.preventDefault();
-      lotBrowserIndex = Math.max(0, dayLots().length - 1);
-      renderLotBrowser();
+      moveLotBrowser(dayLots().length - 1 - lotBrowserIndex);
     }
   });
 
