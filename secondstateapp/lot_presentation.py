@@ -205,6 +205,7 @@ _ARTISTS = (
     ("Pirnie, Larry",), ("Pollock, Jackson",), ("Porter, Fairfield",),
     ("Ramberg, Christina",), ("Rego, Paula",), ("Reinhardt, Ad",),
     ("Rijn, Rembrandt Harmensz. van",), ("Robert, Hubert",), ("Roberts, Dolona",),
+    ("Rouault, Georges", "ROUAULT Georges", "Georges (1871) Rouault"),
     ("Salle, David",), ("Schenck, Bill",), ("Scholder, Fritz",), ("Scholz, Georg",),
     ("Scully, Sean",), ("Severini, Gino",), ("Shapiro, Joel",), ("Shires, William",),
     ("Shonibare, Yinka",), ('Shufelt, Robert "Shoofly"',), ("Sorlier, Charles",),

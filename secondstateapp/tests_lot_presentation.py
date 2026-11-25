@@ -154,6 +154,7 @@ class ArtistPresentationTests(TestCase):
         examples = {
             "Alexander (1898) Calder": "Calder, Alexander", "Henry (1898) Moore": "Moore, Henry",
             "Albrecht (1471) Dürer": "Dürer, Albrecht", "John (1871) Sloan": "Sloan, John",
+            "Georges (1871) Rouault": "Rouault, Georges",
             "Leroy Neimann": "Neiman, LeRoy", "Romare Bearden": "Bearden, Romare Howard",
             "John W. Nieto": "Nieto, John", "Will Barnett": "Barnet, Will",
             "Auguste Renoir": "Renoir, Pierre-Auguste",
@@ -171,6 +172,8 @@ class ArtistPresentationTests(TestCase):
             "Horst Janssen": "Janssen, Horst",
             "Jörg Immendorff": "Immendorff, Jörg",
             "Rudolf Jettmar": "Jettmar, Rudolf",
+            "Georges Rouault": "Rouault, Georges",
+            "ROUAULT Georges": "Rouault, Georges",
             "Charles Blackman": "Blackman, Charles",
             "Charles Raymond Blackman": "Blackman, Charles",
             "Pierre AMBROGIANI": "Ambrogiani, Pierre",
@@ -194,6 +197,7 @@ class ArtistPresentationTests(TestCase):
         examples = {
             "After Pablo Picasso": "After Picasso, Pablo",
             "After Pierre Ambrogiani": "After Ambrogiani, Pierre",
+            "After Georges Rouault": "After Rouault, Georges",
             "ATTRIBUTED TO GEORGES BRAQUE": "ATTRIBUTED TO Braque, Georges",
             "Albrecht Dürer (attributed to)": "Dürer, Albrecht (attributed to)",
             "Pablo Picasso, after": "Picasso, Pablo, after",
@@ -216,6 +220,7 @@ class ArtistPresentationTests(TestCase):
                       "Katherine Bernhardt and Jonathan Edelhuber", "Unknown Multi Token Artist",
                       "Jane O’Neill", "Doe, Jane", "Jane Doe Jr.", "Estate of Pablo Picasso",
                       "Zaha Hadid Architects", "Rudolf Jettmar, A. Zdrazila",
+                      "Otto Dix and after Georges Rouault", "In the style of Georges Rouault",
                       "Horst Janssen and an unidentified poster artist", "Horst Janssen after Backhuysen",
                       "Horst Janssen; Hans Gottfried von Stockhausen (drawing)",
                       "El Anatsui", "Le Corbusier", "Various Artists", "Various Artists (20th/21st Century)"):
