@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
+from .calendar_published_catalogs import published_catalog
 from .calendar_sales import verified_sale
 from .calendar_views import _group_lots, _sale_identity
 from .models import AuctionBidBoardAnalysis, AuctionEmailBatch, AuctionEmailBatchItem, AuctionWatchLot
@@ -37,6 +38,20 @@ def alyes_values(identity, **changes):
 class VerifiedTimedSaleGroupingTests(SimpleTestCase):
     def lot(self, identity="first", **changes):
         return AuctionWatchLot(**alyes_values(identity, **changes))
+
+    def test_soulis_catalog_requires_matching_session_photo_and_numbered_lot_link(self):
+        start = datetime(2026, 12, 6, 17, tzinfo=timezone.utc)
+        values = dict(auction_house="Soulis Auctions", event_at=start, lot_number="604",
+                      lot_url="https://www.invaluable.com/auction-lot/kusama-604-c-b1dd216647",
+                      image_url="https://image.invaluable.com/housePhotos/soulis/89/822689/H1081-L604.jpg")
+        self.assertIsNotNone(published_catalog(self.lot(**values)))
+        for change in (
+            {"event_at": start + timedelta(minutes=90)}, {"image_url": ""}, {"lot_number": "605"},
+            {"auction_house": "Other Auctions"}, {"source": "Drouot"}, {"is_all_day": True},
+            {"sale_url": "https://www.invaluable.com/catalog/OTHERSALE1"}, {"sale_title": "Another session"},
+        ):
+            with self.subTest(change=change):
+                self.assertIsNone(published_catalog(self.lot(**{**values, **change})))
 
     def test_combined_mallet_catalog_lists_both_represented_sessions_in_pacific_time(self):
         fields = dict(source="Drouot", sale_url="https://drouot.com/en/v/188574", auction_house="Mallet Auction")
@@ -253,6 +268,26 @@ class CrossProviderCatalogViewTests(TestCase):
         response = self.client.get(reverse("auction_calendar"), {"day": day, "view": "catalog"})
         self.assertEqual(response.status_code, 200)
         return response.context
+
+    def test_soulis_lots_with_missing_sale_links_join_their_own_published_session(self):
+        day = "2026-12-06"
+        expected = []
+        for hour, minute, first, photo, catalog_id, title, clock in (
+            (17, 0, 603, "89/822689", "P2E3A4896Q", "The MutualArt x Soulis Inaugural Fine Art Auction", "9:00 AM"),
+            (18, 30, 720, "92/822692", "PV1TQ5N75E", "The 21st Annual Winter Art Auction", "10:30 AM"),
+        ):
+            url = f"https://www.invaluable.com/catalog/{catalog_id}"
+            start = datetime(2026, 12, 6, hour, minute, tzinfo=timezone.utc)
+            for number, sale_url in ((first, ""), (first + 1, url)):
+                self.invaluable(number, auction_house="Soulis Auctions", event_at=start, sale_url=sale_url,
+                                sale_title=title if sale_url else "",
+                                image_url=f"https://image.invaluable.com/housePhotos/soulis/{photo}/H1081-L{number}.jpg")
+            expected.append((url, title, clock, 2))
+
+        context = self.data(day)
+        for groups in (context["calendar_sales_data"][day], context["upcoming_groups"]):
+            self.assertEqual([(g["sale_url"], g["sale_title"], g["time_label"], g["lot_count"]) for g in groups], expected)
+        self.assertEqual(len(context["calendar_data"][day]), 4)
 
     def test_verified_catalog_is_counted_once_across_both_scopes_and_upcoming(self):
         survivor = self.invaluable(25)

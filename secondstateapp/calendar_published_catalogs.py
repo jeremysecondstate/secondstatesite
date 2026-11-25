@@ -1,4 +1,4 @@
-"""Published catalogs whose watched lots differ between Drouot and Invaluable."""
+"""Published catalog identities for Calendar lots with incomplete sale links."""
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -44,10 +44,33 @@ _CATALOGS = {
 }
 
 
+# Soulis publishes separate catalogs for the 11:00 and 12:30 Central sessions.
+# Invaluable lot pages link each catalog to its own photo directory.
+# https://soulisauctions.com/auctions/the-21st-annual-winter-art-auction/
+_SOULIS_SESSIONS = {
+    datetime(2026, 12, 6, 17, tzinfo=timezone.utc): (
+        "/housePhotos/soulis/89/822689/H1081", "https://www.invaluable.com/catalog/P2E3A4896Q",
+        "The MutualArt x Soulis Inaugural Fine Art Auction",
+    ),
+    datetime(2026, 12, 6, 18, 30, tzinfo=timezone.utc): (
+        "/housePhotos/soulis/92/822692/H1081", "https://www.invaluable.com/catalog/PV1TQ5N75E",
+        "The 21st Annual Winter Art Auction",
+    ),
+}
+
+
 def published_catalog(lot):
     """Resolve a source observation only within its published sale and session."""
+    if lot.is_all_day:
+        return None
+    session = _SOULIS_SESSIONS.get(lot.event_at)
+    if session and lot.source == "Invaluable" and lot.auction_house == "Soulis Auctions" and not lot.sale_url:
+        prefix, url, title = session
+        if lot.sale_title in ("", title) and _invaluable_catalog(lot) == ((lot.auction_house, lot.event_at, prefix), ""):
+            return {"identity": "sale:" + url, "catalog_url": url, "session_title": title, "starts_at": lot.event_at}
+
     catalog = _CATALOGS.get(lot.event_at)
-    if not catalog or lot.is_all_day or not re.fullmatch(r"[0-9]{1,4}", lot.lot_number or ""):
+    if not catalog or not re.fullmatch(r"[0-9]{1,4}", lot.lot_number or ""):
         return None
     if int(lot.lot_number) not in catalog.numbers:
         return None
