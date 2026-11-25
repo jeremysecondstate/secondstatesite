@@ -1522,6 +1522,38 @@
       "evidence_url": "https://www.estatesale.com/sales/view/912327.html",
       "evidence": "Uniques & Antiques lists its December 2, 2026 Modern and Decorative auction at 2500 Market Street, Upper Chichester, Pennsylvania. Its Invaluable auctioneer profile lists the same gallery in Aston, Pennsylvania (https://www.invaluable.com/auction-house/uniques-%26-antiques-pml6q3m4ro).",
       "verified_at": "2026-11-23"
+    },
+    {
+      "name": "Winter Associates, Inc.",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/catalog/QIZZGWFV45",
+      "evidence": "The December 7, 2026 catalog places the sale in Plainville, Connecticut. Winter Associates identifies its auction gallery at 21 Cooke Street in Plainville (https://www.auctionsappraisers.com/sell-bid/how-to-sell/).",
+      "verified_at": "2026-11-25"
+    },
+    {
+      "name": "Phoenix Mill - A Potomack Tributary",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/catalog/GJYL10ZIE9",
+      "evidence": "The December 9, 2026 catalog places the sale in Alexandria, Virginia. Phoenix Mill conducts its sales online and offers pickup at its Alexandria auction house (https://www.phoenixmill.com/buying-at-auction/).",
+      "verified_at": "2026-11-25"
+    },
+    {
+      "name": "Freedom Auction Company",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.invaluable.com/catalog/UQ9OB3KWMW",
+      "evidence": "The December 11, 2026 catalog places the sale in Sarasota, Florida. Freedom Auction Company lists this Sarasota Estates sale and identifies its Florida auction business (https://freedomauctions.com/).",
+      "verified_at": "2026-11-25"
+    },
+    {
+      "name": "Chamberlain Auction Gallery",
+      "country_code": "US",
+      "aliases": [],
+      "evidence_url": "https://www.chamberlainsgallery.com/",
+      "evidence": "Chamberlain's December 11, 2026 evening auction takes place at its gallery in Ortonville, Michigan. The provider catalog also lists Ortonville (https://www.invaluable.com/catalog/ZDU4RH77VG).",
+      "verified_at": "2026-11-25"
     }
   ]
 }
