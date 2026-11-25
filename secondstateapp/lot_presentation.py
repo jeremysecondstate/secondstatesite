@@ -211,7 +211,7 @@ _ARTISTS = (
     ("Shonibare, Yinka",), ('Shufelt, Robert "Shoofly"',), ("Sorlier, Charles",),
     ("Sultan, Donald K.",), ("Surls, James",), ("Thornley, Georges William",),
     ("Trova, Ernest Tino",), ("Turk, Gavin",), ("van Ostade, Adriaen Jansz",),
-    ("Vigil, Dan",), ("Villon, Jacques",), ("Walker, Caroline",), ("Wewerka, Stefan",),
+    ("Vigil, Dan",), ("Villon, Jacques",), ("Walker, Caroline",), ("Weston, Kim",), ("Wewerka, Stefan",),
     ("Whitney, Stanley",), ("Wieghorst, Olaf",), ("Wilson, John Woodrow",),
     ("Wylie, Rose",), ("Yoshida, Hiroshi",), ("Young, Russell",), ("Zerbini, Luiz",),
     # Verified artist credits in Bukowskis Modern Art & Design sale 676.
