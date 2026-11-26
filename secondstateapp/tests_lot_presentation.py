@@ -173,6 +173,8 @@ class ArtistPresentationTests(TestCase):
             "Nissan Engel": "Engel, Nissan",
             "Alfred Hrdlicka": "Hrdlicka, Alfred",
             "Charles Lapicque": "Lapicque, Charles",
+            "Honoré Daumier": "Daumier, Honoré",
+            "DAUMIER Honoré": "Daumier, Honoré",
             "LAPICQUE Charles": "Lapicque, Charles",
             "Gianfranco Ferroni": "Ferroni, Gianfranco",
             "René Gruau": "Gruau, René",
@@ -209,6 +211,7 @@ class ArtistPresentationTests(TestCase):
         examples = {
             "After Pablo Picasso": "After Picasso, Pablo",
             "After Charles Lapicque": "After Lapicque, Charles",
+            "After Honore Daumier": "After Daumier, Honoré",
             "After Pierre Ambrogiani": "After Ambrogiani, Pierre",
             "After Georges Rouault": "After Rouault, Georges",
             "ATTRIBUTED TO GEORGES BRAQUE": "ATTRIBUTED TO Braque, Georges",
@@ -238,6 +241,8 @@ class ArtistPresentationTests(TestCase):
                       "Edward Weston, printed later by Kim Weston", "Edward Weston, printed by Kim Weston",
                       "Otto Dix and after Georges Rouault", "In the style of Georges Rouault",
                       "René Gruau (monogram)", "René Gruau / after Raoul Dufy and others",
+                      "Honoré Daumier with Charles Philipon (concept and caption)",
+                      "H. Daumier", "After Honoré Daumier (two prints)",
                       "Horst Janssen and an unidentified poster artist", "Horst Janssen after Backhuysen",
                       "Horst Janssen; Hans Gottfried von Stockhausen (drawing)",
                       "El Anatsui", "Le Corbusier", "Various Artists", "Various Artists (20th/21st Century)"):
