@@ -2,6 +2,7 @@
 
 import re
 from collections import defaultdict
+from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from .calendar_sessions_2026 import PUBLISHED_SESSIONS, drouot_url_matches
@@ -21,6 +22,15 @@ _LEMPERTZ_SESSIONS = {
 _MULTI_SESSION = {
     (rule.drouot_catalog, rule.published): rule for rule in PUBLISHED_SESSIONS
     if rule.drouot_catalog in {"187112", "188574"}
+}
+
+# Azca sale 60 includes both the four linked lots (150–152 and 157) whose
+# Invaluable records lack a catalog URL and lot 123 in catalog 7DSS8MXKK1.
+# https://www.azcaauctions.com/auction/details/-the-christmas-sale-jewellery-watches-luxury-fashion-art-antiques-and-collectables/?au=60
+_PUBLISHED_REFS = {
+    (("Azca Auctions", "188450"),
+     ("Azca Auctions", datetime(2026, 12, 2, 12, tzinfo=timezone.utc),
+      "/housePhotos/azca/05/822905/H23126")): "7dss8mxkk1",
 }
 
 
@@ -94,9 +104,10 @@ class LinkedCatalogs:
             key = (copy.auction_house, catalog)
             photos_by_catalog[key].add(photo)
             catalogs_by_photo[photo].add(key)
-            if ref:
-                refs_by_photo[photo].add(ref)
-                photos_by_ref[ref].add(photo)
+            for catalog_ref in (ref, _PUBLISHED_REFS.get((key, photo))):
+                if catalog_ref:
+                    refs_by_photo[photo].add(catalog_ref)
+                    photos_by_ref[catalog_ref].add(photo)
 
         self._drouot = {}
         self._invaluable = {}

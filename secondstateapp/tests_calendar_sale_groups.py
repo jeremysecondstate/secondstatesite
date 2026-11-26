@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
+from .calendar_linked_sales import LinkedCatalogs
 from .calendar_published_catalogs import published_catalog
 from .calendar_sales import verified_sale
 from .calendar_views import _group_lots, _sale_identity
@@ -268,6 +269,37 @@ class CrossProviderCatalogViewTests(TestCase):
         response = self.client.get(reverse("auction_calendar"), {"day": day, "view": "catalog"})
         self.assertEqual(response.status_code, 200)
         return response.context
+
+    def test_azca_christmas_catalog_joins_linked_and_unlinked_lots(self):
+        house = "Azca Auctions"
+        start = datetime(2026, 12, 2, 12, tzinfo=timezone.utc)
+        image = "https://image.invaluable.com/housePhotos/azca/05/822905/H23126-L"
+        catalog = "https://www.invaluable.com/catalog/7DSS8MXKK1"
+        title = "The Christmas Sale: Jewellery, Watches, Luxury Fashion, Art, Antiques and Collectables"
+        survivor = self.invaluable(150, auction_house=house, event_at=start, image_url=image + "150.jpg")
+        retained = self.drouot(150, "188450", survivor=survivor, auction_house=house, event_at=start)
+        listed = self.invaluable(123, auction_house=house, event_at=start, image_url=image + "123.jpg",
+                                 sale_url=catalog, sale_title=title)
+
+        day = "2026-12-02"
+        context = self.data(day)
+        for groups in (context["calendar_sales_data"][day], context["upcoming_groups"]):
+            joined, = groups
+            self.assertEqual((joined["lot_count"], joined["sale_url"], joined["sale_title"]),
+                             (2, retained.sale_url, title))
+        cards = {lot["id"]: lot["lot_url"] for lot in context["calendar_data"][day]}
+        self.assertEqual(cards, {survivor.pk: survivor.lot_url, listed.pk: listed.lot_url})
+
+        linked = LinkedCatalogs([retained])
+        for change in (
+            {"sale_url": "https://www.invaluable.com/catalog/OTHERSALE1"},
+            {"auction_house": "Other Auctions"}, {"event_at": start + timedelta(hours=1)},
+            {"image_url": listed.image_url.replace("822905", "822906")}, {"lot_number": "124"},
+        ):
+            with self.subTest(change=change), patch.multiple(listed, **change):
+                self.assertIsNone(linked.sale(listed))
+        with patch.object(survivor, "sale_url", "https://www.invaluable.com/catalog/OTHERSALE1"):
+            self.assertIsNone(LinkedCatalogs([retained]).sale(listed))
 
     def test_soulis_lots_with_missing_sale_links_join_their_own_published_session(self):
         day = "2026-12-06"
