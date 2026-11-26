@@ -172,6 +172,8 @@ class ArtistPresentationTests(TestCase):
             "Horst Janssen": "Janssen, Horst",
             "Nissan Engel": "Engel, Nissan",
             "Alfred Hrdlicka": "Hrdlicka, Alfred",
+            "Charles Lapicque": "Lapicque, Charles",
+            "LAPICQUE Charles": "Lapicque, Charles",
             "Gianfranco Ferroni": "Ferroni, Gianfranco",
             "Andre Lanskoy": "Lanskoy, André",
             "André Lanskoy": "Lanskoy, André",
@@ -204,6 +206,7 @@ class ArtistPresentationTests(TestCase):
     def test_attribution_is_retained_and_sorting_uses_the_artist(self):
         examples = {
             "After Pablo Picasso": "After Picasso, Pablo",
+            "After Charles Lapicque": "After Lapicque, Charles",
             "After Pierre Ambrogiani": "After Ambrogiani, Pierre",
             "After Georges Rouault": "After Rouault, Georges",
             "ATTRIBUTED TO GEORGES BRAQUE": "ATTRIBUTED TO Braque, Georges",
