@@ -188,7 +188,7 @@ _ARTISTS = (
     ("Feininger, Lyonel",), ("Ferroni, Gianfranco",), ("Fini, Leonor",), ("Fitzpatrick, Tony",),
     ("Fontana, Lucio",), ("Foujita, Léonard Tsuguharu",), ("Fry, Anthony",), ("Fuchs, Ernst",),
     ("García Ortega, José",), ("Giacometti, Alberto",), ("Gilliam, Sam",),
-    ("Golub, Leon Albert",), ("Grignion, Charles",), ("Gromaire, Marcel",),
+    ("Golub, Leon Albert",), ("Grignion, Charles",), ("Gromaire, Marcel",), ("Gruau, René",),
     ("Hall, Norma Bassett",), ("Hamaguchi, Yozo",), ("Hamilton, Ann",),
     ("Hancock, Trenton Doyle",), ("Heilmann, Mary",), ("Heizer, Michael",),
     ("Held, Al",), ("Helleu, Paul César",), ("Howell-Sickles, Donna",),

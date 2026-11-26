@@ -175,6 +175,8 @@ class ArtistPresentationTests(TestCase):
             "Charles Lapicque": "Lapicque, Charles",
             "LAPICQUE Charles": "Lapicque, Charles",
             "Gianfranco Ferroni": "Ferroni, Gianfranco",
+            "René Gruau": "Gruau, René",
+            "René GRUAU": "Gruau, René",
             "Andre Lanskoy": "Lanskoy, André",
             "André Lanskoy": "Lanskoy, André",
             "Edward Weston": "Weston, Edward",
@@ -235,6 +237,7 @@ class ArtistPresentationTests(TestCase):
                       "Paul Wunderlich, Alfred Hrdlicka and Harald Stetzer", "Alfred Hrdlicka and HAP Grieshaber",
                       "Edward Weston, printed later by Kim Weston", "Edward Weston, printed by Kim Weston",
                       "Otto Dix and after Georges Rouault", "In the style of Georges Rouault",
+                      "René Gruau (monogram)", "René Gruau / after Raoul Dufy and others",
                       "Horst Janssen and an unidentified poster artist", "Horst Janssen after Backhuysen",
                       "Horst Janssen; Hans Gottfried von Stockhausen (drawing)",
                       "El Anatsui", "Le Corbusier", "Various Artists", "Various Artists (20th/21st Century)"):
