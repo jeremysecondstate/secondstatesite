@@ -75,6 +75,20 @@ class ArtistResearchRegistryTests(SimpleTestCase):
             self.assertEqual(artist_research_urls("Ellsworth Kelly")[0], curated)
             self.assertEqual(artist_research_urls("Jane Kelly")[0], generated)
 
+    def test_first_matching_bookmark_wins_across_exact_and_initial_aliases(self):
+        with TemporaryDirectory() as directory, self.settings(BASE_DIR=Path(directory)):
+            docs = Path(directory) / "docs"
+            docs.mkdir()
+            first = "https://www.invaluable.com/search?artistName=John%20A%20Smith&ref=first"
+            second = first.replace("ref=first", "ref=second")
+            (docs / "artist-links.html").write_text(
+                '<DL><DT><H3>ARTISTS INVALUABLE</H3><DL>'
+                f'<DT><A HREF="{first}">John A. Smith</A>'
+                f'<DT><A HREF="{second}">John Smith</A></DL></DL>', encoding="utf-8",
+            )
+            self.assertEqual(artist_research_urls("John Smith")[1], first)
+            self.assertEqual(artist_research_urls("John Q. Smith")[1], second)
+
     def test_invalid_generated_name_or_source_path_is_ignored_per_record(self):
         with TemporaryDirectory() as directory, self.settings(BASE_DIR=Path(directory)):
             docs = Path(directory) / "docs"

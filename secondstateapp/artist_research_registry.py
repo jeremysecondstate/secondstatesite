@@ -1,5 +1,6 @@
 """Offline artist links shared by whole-sale and watchlist Calendar lots."""
 
+from collections import defaultdict
 from functools import lru_cache
 import json
 from pathlib import Path
@@ -95,6 +96,37 @@ def _liveart_artist(value: str) -> tuple[str, str] | None:
     return match.group(1), match.group(2).replace("-", " ")
 
 
+def _without_initials(words):
+    """Each form with exactly one single-letter word omitted."""
+    return (words - {word} for word in words if len(word) == 1)
+
+
+def _alias_index(records, *, liveart=False):
+    index = defaultdict(list)
+    for position, (provider_or_id, url, aliases) in enumerate(records):
+        keys = set()
+        for alias in aliases:
+            if liveart:
+                alias = liveart_artist_search_name(alias)
+            name = artist_identity_key(alias)
+            if not name:
+                continue
+            keys.add(name)
+            surname = alias.split(",", 1)[0] if "," in alias else alias.split()[-1]
+            surname = normalize_artist_name(surname)
+            if len(surname.split()) == 1:
+                keys.add(surname)
+            # LiveArt full names require exact or explicitly verified aliases.
+            # Other providers also allow one missing middle initial in either direction.
+            if not liveart and len(name.split()) >= 2:
+                words = frozenset(name.split())
+                keys.add(("full", words))
+                keys.update(("shortened", shorter) for shorter in _without_initials(words))
+        for key in keys:
+            index[key].append((position, provider_or_id, url))
+    return index
+
+
 @lru_cache(maxsize=8)
 def _liveart_registry(bookmarks_signature):
     records = []
@@ -106,7 +138,7 @@ def _liveart_registry(bookmarks_signature):
             continue
         title = re.sub(r"\s*[-\u2013\u2014]\s*LiveArt\s*$", "", bookmark.title, flags=re.IGNORECASE)
         records.append((parsed[0], bookmark.url, (title, parsed[1])))
-    return tuple(records)
+    return _alias_index(records, liveart=True)
 
 
 @lru_cache(maxsize=8)
@@ -144,38 +176,29 @@ def _registry(bookmarks_signature, generated_signature):
                 continue
             parsed = _valid_artprice_artist_url(url)
             records.append(("generated_artprice", url, (row["name"], parsed[1])))
-    return tuple(records)
-
-
-def _name_matches(name: str, alias: str) -> bool:
-    key, alias_key = artist_identity_key(name), artist_identity_key(alias)
-    if not key or not alias_key:
-        return False
-    if key == alias_key:
-        return True
-    # Catalogs sometimes omit a middle initial (Charles R. Sheeler).
-    words, alias_words = key.split(), alias_key.split()
-    if len(words) >= 2 and len(alias_words) >= 2:
-        smaller, larger = sorted((set(words), set(alias_words)), key=len)
-        extra = larger - smaller
-        return smaller < larger and len(extra) == 1 and len(next(iter(extra))) == 1
-    # A supplied surname is usable only if it identifies one artist in the
-    # entire registry; the caller rejects multiple distinct artist IDs.
-    if len(words) == 1:
-        surname = alias.split(",", 1)[0] if "," in alias else alias.split()[-1]
-        return key == normalize_artist_name(surname)
-    return False
+    return _alias_index(records)
 
 
 @lru_cache(maxsize=4096)
 def _lookup(name, bookmarks_signature, generated_signature):
     name = _FORUM_CREDIT_ALIASES.get(normalize_artist_name(name), name)
+    key = artist_identity_key(name)
+    words = key.split()
+    index = _registry(bookmarks_signature, generated_signature)
+    candidates = set(index.get(key, ()))
+    if len(words) >= 2:
+        word_set = frozenset(words)
+        candidates.update(index.get(("shortened", word_set), ()))
+        for shorter in _without_initials(word_set):
+            candidates.update(index.get(("full", shorter), ()))
+
     matches = {"artprice": {}, "invaluable": {}, "generated_artprice": {}}
-    for provider, url, aliases in _registry(bookmarks_signature, generated_signature):
-        if any(_name_matches(name, alias) for alias in aliases):
-            identity = _valid_artprice_artist_url(url)[0] if "artprice" in provider else artist_identity_key(_invaluable_name(url))
-            matches[provider].setdefault(identity, url)
-    if len(artist_identity_key(name).split()) == 1:
+    # A bookmark can match through several aliases. Keep its original position
+    # so the first URL for each provider identity retains precedence.
+    for _, provider, url in sorted(candidates):
+        identity = _valid_artprice_artist_url(url)[0] if "artprice" in provider else artist_identity_key(_invaluable_name(url))
+        matches[provider].setdefault(identity, url)
+    if len(words) == 1:
         # A surname must identify one artist across both sources, even when
         # one candidate was curated and the other was discovered later.
         artprice = {**matches["generated_artprice"], **matches["artprice"]}
@@ -205,14 +228,8 @@ def _liveart_lookup(name, bookmarks_signature):
     key = artist_identity_key(name)
     if not key:
         return ""
-    for identity, url, aliases in _liveart_registry(bookmarks_signature):
-        normalized_aliases = tuple(liveart_artist_search_name(alias) for alias in aliases)
-        # Full names need an exact normalized or explicitly verified alias;
-        # do not infer a different middle initial from a provider's shorter name.
-        if any(key == artist_identity_key(alias) or (
-            len(key.split()) == 1 and _name_matches(name, alias)
-        ) for alias in normalized_aliases):
-            matches.setdefault(identity, url)
+    for _, identity, url in _liveart_registry(bookmarks_signature).get(key, ()):
+        matches.setdefault(identity, url)
     return next(iter(matches.values())) if len(matches) == 1 else ""
 
 
