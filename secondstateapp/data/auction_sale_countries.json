@@ -576,6 +576,18 @@
       "verified_at": "2026-11-23"
     },
     {
+      "auction_house": "RR Auction",
+      "source": "Drouot",
+      "date": "2026-12-10",
+      "country_code": "US",
+      "sale_urls": [
+        "https://drouot.com/en/v/188135"
+      ],
+      "evidence_url": "https://www.rrauction.com/auctions/details/755-fine-autographs-and-artifacts-featuring-sports-encapsulation-and-animation/",
+      "evidence": "RR Auction sale 755 enters timed closing at 7 p.m. EST on December 9, midnight December 10 UTC. Drouot catalog 188135 lists the United States. Section 21 of RR Auction's terms places the sale in Massachusetts (https://www.rrauction.com/buy/terms-conditions/).",
+      "verified_at": "2026-11-25"
+    },
+    {
       "auction_house": "Black Rock Galleries",
       "source": "Invaluable",
       "date": "2026-12-10",
