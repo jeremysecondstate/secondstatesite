@@ -19,6 +19,7 @@ class CalendarPresentationTests(TestCase):
     def test_screenshot_examples_render_cleanly_without_rewriting_source_or_links(self):
         cases = (
             ("James Ensor", "View of Ostend", "Ensor, James"),
+            ("Roland Reed", "The Pottery Maker", "Reed, Roland"),
             ("Joseph Beuys", "Original source title", "Beuys, Joseph"),
             ("Joseph Beuys (German, 1921-1986)", "A complete source biography", "Beuys, Joseph (German, 1921-1986)"),
             ("Leonor Fini", "La gardienne", "Fini, Leonor"),
@@ -41,12 +42,12 @@ class CalendarPresentationTests(TestCase):
             self.assertEqual(displayed["artist"], expected_artist)
             self.assertEqual(displayed["artist_source"], artist)
             self.assertEqual(displayed["title"], title.removeprefix("Â§ ").removeprefix("§ "))
-            self.assertEqual(displayed["artist_artprice_url"], artprice)
+            self.assertEqual(displayed["artist_artprice_url"], artprice + "?idcategory=2&p=1&sort=datesale_desc")
             self.assertEqual(displayed["artist_invaluable_url"], invaluable)
             self.assertEqual(displayed["lot_url"], lot.lot_url)
             self.assertEqual(displayed["id"], lot.pk)
 
-        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07", "artists": "all"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["calendar_data"]["2026-07-25"]), len(cases))
         for pk, artist, title in source_rows:
