@@ -32,6 +32,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.cache import never_cache
+from django.views.decorators.gzip import gzip_page
 from django.views.decorators.http import require_http_methods, require_POST
 
 from catalogapp.artprice_artist_links import artist_identity_key
@@ -552,6 +553,7 @@ def _day_lot_data(request, selected_day, zone, selected_lot_ids, research_queue_
 @never_cache
 @staff_member_required
 @require_http_methods(["GET"])
+@gzip_page
 def auction_calendar_day_lots(request):
     selected_day = _calendar_requested_date(request.GET.get("day", ""))
     if selected_day is None:
@@ -721,6 +723,7 @@ def auction_calendar_usd_prices(request):
 
 @never_cache
 @staff_member_required
+@gzip_page
 def auction_calendar(request):
     zone = _calendar_zone()
     now_local = timezone.localtime(timezone.now(), zone)

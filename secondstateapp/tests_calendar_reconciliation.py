@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 from decimal import Decimal
+import gzip
 import json
 import os
 from unittest.mock import patch
@@ -84,6 +85,21 @@ class CalendarReconciliationTests(TestCase):
         self.assertEqual([row["id"] for row in self.get(ids=str(old.pk)).json()["lots"]], [old.pk])
         for params in ({"cursor": "-1"}, {"ids": "0"}, {"page_size": "501"}, {"start": "not-a-date"}):
             self.assertEqual(self.get(**params).status_code, 400)
+
+    def test_gzip_is_negotiated_only_for_readback(self):
+        keep, old = self.pair()
+        headers = {"HTTP_X_API_KEY": KEY, "HTTP_ACCEPT_ENCODING": "gzip"}
+        with patch("django.utils.timezone.now", return_value=keep.event_at):
+            plain = self.get()
+            compressed = self.client.get(self.endpoint, **headers)
+        self.assertNotIn("Content-Encoding", plain.headers)
+        self.assertEqual(compressed.headers["Content-Encoding"], "gzip")
+        self.assertIn("Accept-Encoding", compressed.headers["Vary"])
+        self.assertIn("no-store", compressed.headers["Cache-Control"])
+        self.assertEqual(gzip.decompress(compressed.content), plain.content)
+        receipt = self.client.post(self.endpoint, self.plan((keep, old)), content_type="application/json", **headers)
+        self.assertTrue(receipt.json()["ok"])
+        self.assertNotIn("Content-Encoding", receipt.headers)
 
     def test_audit_is_bounded_and_never_applies_candidates(self):
         keep, old = self.pair()

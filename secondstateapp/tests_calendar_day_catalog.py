@@ -1,3 +1,4 @@
+import gzip
 import json
 from datetime import datetime
 from decimal import Decimal
@@ -20,6 +21,30 @@ class CalendarDayCatalogLinkTests(TestCase):
         self.client.force_login(
             get_user_model().objects.create_user("day-catalog-admin", is_staff=True)
         )
+
+    def test_catalog_html_and_day_json_negotiate_gzip(self):
+        lot = watch_lot()
+        day = "2026-07-25"
+        for route in ("auction_calendar", "auction_calendar_day_lots"):
+            with self.subTest(route=route):
+                url = reverse(route)
+                params = {"day": day, "view": "catalog"}
+                plain = self.client.get(url, params)
+                response = self.client.get(url, params, HTTP_ACCEPT_ENCODING="gzip")
+                self.assertNotIn("Content-Encoding", plain.headers)
+                self.assertEqual(response.headers["Content-Encoding"], "gzip")
+                self.assertIn("Accept-Encoding", response.headers["Vary"])
+                self.assertIn("no-store", response.headers["Cache-Control"])
+                self.assertLess(len(response.content), len(plain.content))
+                body = gzip.decompress(response.content)
+                if route == "auction_calendar":
+                    page = BeautifulSoup(body, "html.parser")
+                    lots = json.loads(page.select_one("#auction-calendar-data").string)[day]
+                    self.assertEqual(lots, plain.context["calendar_data"][day])
+                else:
+                    self.assertEqual(body, plain.content)
+                    lots = json.loads(body)["lots"]
+                self.assertEqual([row["id"] for row in lots], [lot.pk])
 
     def test_sale_location_choices_keep_all_source_records_available_for_research(self):
         domestic = watch_lot(source_lot_id="region-us", auction_house="DuMouchelles", location="Detroit, MI, US",

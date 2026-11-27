@@ -18,6 +18,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.gzip import gzip_page
 from django.views.decorators.http import require_http_methods
 
 from .calendar_duplicates import PUBLIC_FIELDS, apply_pairs, audit_lots, fingerprint, snapshot
@@ -71,6 +72,7 @@ def _query(request):
     return rows, bounds, ids
 
 
+@gzip_page
 def _read(request):
     operation = request.GET.get("operation")
     if operation is not None:
