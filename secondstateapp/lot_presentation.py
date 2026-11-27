@@ -204,7 +204,7 @@ _ARTISTS = (
     ("Monet, Claude",), ("Morgan, Barbara",), ("Murphy, Brenda",),
     ("Oiestad, H Steven",), ("Olitski, Jules",), ("Paladino, Mimmo",),
     ("Paschke, Ed",), ("Pasmore, Victor",), ("Perkinson, Tom",), ("Perry, Grayson",),
-    ("Pirnie, Larry",), ("Pollock, Jackson",), ("Porter, Fairfield",),
+    ("Pirnie, Larry",), ("Plattner, Karl",), ("Pollock, Jackson",), ("Porter, Fairfield",),
     ("Ramberg, Christina",), ("Rego, Paula",), ("Reinhardt, Ad",),
     ("Rijn, Rembrandt Harmensz. van",), ("Robert, Hubert",), ("Roberts, Dolona",),
     ("Rouault, Georges", "ROUAULT Georges", "Georges (1871) Rouault"),

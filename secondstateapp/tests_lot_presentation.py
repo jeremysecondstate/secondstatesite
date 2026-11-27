@@ -173,6 +173,7 @@ class ArtistPresentationTests(TestCase):
             "Nissan Engel": "Engel, Nissan",
             "Alfred Hrdlicka": "Hrdlicka, Alfred",
             "Charles Lapicque": "Lapicque, Charles",
+            "Karl Plattner": "Plattner, Karl",
             "Honoré Daumier": "Daumier, Honoré",
             "DAUMIER Honoré": "Daumier, Honoré",
             "LAPICQUE Charles": "Lapicque, Charles",
