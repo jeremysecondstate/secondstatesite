@@ -174,6 +174,7 @@ class ArtistPresentationTests(TestCase):
             "Alfred Hrdlicka": "Hrdlicka, Alfred",
             "Charles Lapicque": "Lapicque, Charles",
             "Karl Plattner": "Plattner, Karl",
+            "Harry Sternberg": "Sternberg, Harry",
             "Honoré Daumier": "Daumier, Honoré",
             "DAUMIER Honoré": "Daumier, Honoré",
             "LAPICQUE Charles": "Lapicque, Charles",

@@ -211,7 +211,7 @@ _ARTISTS = (
     ("Salle, David",), ("Schenck, Bill",), ("Scholder, Fritz",), ("Scholz, Georg",),
     ("Scully, Sean",), ("Severini, Gino",), ("Shapiro, Joel",), ("Shires, William",),
     ("Shonibare, Yinka",), ('Shufelt, Robert "Shoofly"',), ("Sorlier, Charles",),
-    ("Sultan, Donald K.",), ("Surls, James",), ("Thornley, Georges William",),
+    ("Sternberg, Harry",), ("Sultan, Donald K.",), ("Surls, James",), ("Thornley, Georges William",),
     ("Trova, Ernest Tino",), ("Turk, Gavin",), ("van Ostade, Adriaen Jansz",),
     ("Vigil, Dan",), ("Villon, Jacques",), ("Walker, Caroline",),
     ("Weston, Edward",), ("Weston, Kim",), ("Wewerka, Stefan",),
