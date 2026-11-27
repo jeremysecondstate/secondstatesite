@@ -34,6 +34,20 @@ def dali_values(**changes):
 
 
 class CalendarLotNumberTests(SimpleTestCase):
+    def test_delon_hoebanx_suffix_distinguishes_picasso_from_ravello_in_this_catalog(self):
+        sale = {
+            "source": "Drouot", "auction_house": "Delon - Hoebanx", "lot_number": "248",
+            "event_at": datetime(2026, 12, 2, 12, 30, tzinfo=timezone.utc),
+            "sale_url": "https://drouot.com/en/v/182351",
+        }
+        picasso = SimpleNamespace(**sale, source_lot_id="36054380", lot_url="https://drouot.com/en/l/36054380")
+        ravello = SimpleNamespace(**sale, source_lot_id="36039353", lot_url="https://drouot.com/en/l/36039353")
+        self.assertEqual(calendar_lot_number(picasso), "248-1")
+        self.assertEqual(picasso.lot_number, "248")
+        self.assertEqual(calendar_lot_number(ravello), "248")
+        picasso.sale_url = "https://drouot.com/en/v/182352"
+        self.assertEqual(calendar_lot_number(picasso), "248")
+
     def test_ivoire_troyes_picasso_displays_its_published_suffix(self):
         lot = SimpleNamespace(
             source="Drouot", source_lot_id="35825863", auction_house="Ivoire Troyes - Boisseau-Pomez",

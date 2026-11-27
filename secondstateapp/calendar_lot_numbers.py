@@ -18,6 +18,10 @@ _DROUOT_NUMBERS = {
     # Ivoire Troyes lists Picasso as 106,1 and Barrère as 106.
     # https://www.ivoire-troyes.com/fr/lot-5447-1632489-1061_pablo_picasso_1882_1979frederic_jol?p=177
     "35825863": ("Ivoire Troyes - Boisseau-Pomez", "187807", date(2026, 11, 26), "106", "106-1"),
+    # Delon-Hoebanx lists the Ravello set at 248 and the lithograph after Picasso at 248 .1.
+    # https://www.delon-hoebanx.com/en/catalog/182351?max=50&offset=250&search=
+    # https://drouot.com/fr/l/36054380-pablo-picasso-1881-1973-dapres-latelier-de-cannes
+    "36054380": ("Delon - Hoebanx", "182351", date(2026, 12, 2), "248", "248-1"),
 }
 
 
