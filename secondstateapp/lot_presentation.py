@@ -178,7 +178,7 @@ _ARTISTS = (
     ("Balderssari, John",),
     ("Biggers, Sanford",), ("Bonnard, Pierre", "Pierre (1867) Bonnard"),
     ("Borofsky, Jonathan",), ("Bowling, Frank",),
-    ("Brown, Christopher",), ("Brown, Harley",), ("Brown, Roger",), ("Burden, Chris",),
+    ("Bromley, David",), ("Brown, Christopher",), ("Brown, Harley",), ("Brown, Roger",), ("Burden, Chris",),
     ("Cassatt, Mary",), ("Cassatt, Mary Stevenson",), ("Cézanne, Paul",),
     ("Chadwick, Helen",), ("Chughtai, Abdur Rahman",), ("Cocteau, Jean",),
     ("Craig-Martin, Michael",), ("Daumier, Honoré", "Daumier Honoré"),

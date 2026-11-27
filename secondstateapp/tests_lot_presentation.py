@@ -176,6 +176,8 @@ class ArtistPresentationTests(TestCase):
             "Karl Plattner": "Plattner, Karl",
             "Harry Sternberg": "Sternberg, Harry",
             "Doel Reed": "Reed, Doel",
+            "David Bromley": "Bromley, David",
+            "T. L. Atkinson after Valentine Walter Bromley": "T. L. Atkinson after Valentine Walter Bromley",
             "Roland Reed": "Reed, Roland",
             "Georges Mathieu": "Mathieu, Georges",
             "MATHIEU Georges": "Mathieu, Georges",
