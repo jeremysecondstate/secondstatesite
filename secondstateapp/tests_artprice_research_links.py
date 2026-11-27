@@ -71,7 +71,7 @@ class CalendarArtpriceResearchLinkTests(TestCase):
             artist_watchlist_name="", watchlist_artist=None,
         )
 
-        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07"})
+        response = self.client.get(reverse("auction_calendar"), {"month": "2026-07", "artists": "all"})
 
         detail = response.context["calendar_data"]["2026-07-25"][0]
         self.assertEqual(detail["artist_artprice_url"], "")

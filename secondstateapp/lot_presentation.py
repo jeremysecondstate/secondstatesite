@@ -218,6 +218,7 @@ _ARTISTS = (
     ("Weston, Edward",), ("Weston, Kim",), ("Wewerka, Stefan",),
     ("Whitney, Stanley",), ("Wieghorst, Olaf",), ("Wilson, John Woodrow",),
     ("Wylie, Rose",), ("Yoshida, Hiroshi",), ("Young, Russell",), ("Zerbini, Luiz",),
+    ("Zille, Heinrich",),
     # Verified artist credits in Bukowskis Modern Art & Design sale 676.
     ("Bærtling, Olle", "Olle Baertling", "Baertling, Olle"),
     ("Dufy, Raoul",), ("Lindström, Bengt",), ("Poliakoff, Serge",),

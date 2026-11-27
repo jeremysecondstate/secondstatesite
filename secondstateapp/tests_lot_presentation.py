@@ -177,6 +177,7 @@ class ArtistPresentationTests(TestCase):
             "Harry Sternberg": "Sternberg, Harry",
             "Doel Reed": "Reed, Doel",
             "David Bromley": "Bromley, David",
+            "Heinrich Zille": "Zille, Heinrich",
             "T. L. Atkinson after Valentine Walter Bromley": "T. L. Atkinson after Valentine Walter Bromley",
             "Roland Reed": "Reed, Roland",
             "Georges Mathieu": "Mathieu, Georges",
@@ -219,6 +220,7 @@ class ArtistPresentationTests(TestCase):
         examples = {
             "After Pablo Picasso": "After Picasso, Pablo",
             "After Charles Lapicque": "After Lapicque, Charles",
+            "After Heinrich Zille": "After Zille, Heinrich",
             "After Honore Daumier": "After Daumier, Honoré",
             "After Pierre Ambrogiani": "After Ambrogiani, Pierre",
             "After Georges Rouault": "After Rouault, Georges",
