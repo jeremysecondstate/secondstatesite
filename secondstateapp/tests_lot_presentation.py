@@ -175,6 +175,8 @@ class ArtistPresentationTests(TestCase):
             "Charles Lapicque": "Lapicque, Charles",
             "Karl Plattner": "Plattner, Karl",
             "Harry Sternberg": "Sternberg, Harry",
+            "Georges Mathieu": "Mathieu, Georges",
+            "MATHIEU Georges": "Mathieu, Georges",
             "Honoré Daumier": "Daumier, Honoré",
             "DAUMIER Honoré": "Daumier, Honoré",
             "LAPICQUE Charles": "Lapicque, Charles",
