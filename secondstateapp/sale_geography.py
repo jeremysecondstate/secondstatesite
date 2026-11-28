@@ -101,6 +101,8 @@ _AMBIGUOUS_CODE_CITIES = {
 # Match a complete city label or a verified venue's full address.
 _EXACT_LOCATION_COUNTRIES = {
     "new york": "US", "new york city": "US",
+    # Rafael Osona's auction venue: https://www.rafaelosonaauction.com/auctions/2026-auctions/december-5-2026/
+    "nantucket ma": "US",
     "hong kong": "HK", "stockholm": "SE", "cologne": "DE",
     **{_key(venue["location"]): venue["country_code"] for venue in _SALE_REGISTRY["venues"]},
 }

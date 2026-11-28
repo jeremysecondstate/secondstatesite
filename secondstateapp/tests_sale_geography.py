@@ -27,7 +27,7 @@ class SaleGeographyTests(SimpleTestCase):
             "Sydney, NSW, AU": "AU", "Hong Kong, HK": "HK",
             "online, IT": "IT", "Berlin, DE": "DE",
             "Toronto, ON, CA": "CA", "New York": "US",
-            "Stockholm": "SE", "Cologne": "DE",
+            "Stockholm": "SE", "Cologne": "DE", "Nantucket, MA": "US",
         }
         for location, country in cases.items():
             with self.subTest(location=location):
@@ -47,7 +47,7 @@ class SaleGeographyTests(SimpleTestCase):
                 self.assert_country("", **fields, location=location)
 
     def test_address_state_abbreviations_are_not_mistaken_for_countries(self):
-        for location in ("CA", "Los Angeles, CA", "Wilmington, DE",
+        for location in ("CA", "MA", "Nantucket", "Los Angeles, CA", "Wilmington, DE",
                          "Chicago, IL", "Indianapolis, IN",
                          "123 Main Street, Los Angeles, CA"):
             with self.subTest(location=location):
