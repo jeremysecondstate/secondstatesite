@@ -126,6 +126,12 @@ class ArtistPresentationTests(TestCase):
                       "After the Party", "James Ensor and Unknown Artist d'après"):
             self.assertEqual(artist_attribution_label("James Ensor", title=title), "")
 
+    def test_german_after_artist_credit_keeps_qualifier_in_catalog(self):
+        self.assertEqual(artist_attribution_label("nach Pablo Picasso"), "After")
+        self.assertEqual(artist_display_name("nach Pablo Picasso"), "nach Picasso, Pablo")
+        self.assertEqual(artist_sort_key("nach Pablo Picasso"), artist_sort_key("Pablo Picasso"))
+        self.assertEqual(artist_attribution_label("Pablo Picasso", title="Nach dem Regen"), "")
+
     def test_unknown_credits_and_stage_names_are_not_split_or_assigned_to_known_artists(self):
         for value in ("After James Ensor, by Unknown Maker", "Unknown Artist after. Jacques Villon",
                       "Unknown Artist (German, 1921-1986)", "James Ensor Jr.",

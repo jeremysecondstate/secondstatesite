@@ -20,6 +20,9 @@ class CalendarTrackedArtistsTests(TestCase):
         for artist, label, tracked in [
             ("After Picasso, Pablo", "", True),
             ("(after) PICASSO, Pablo", "", True),
+            ("nach Pablo Picasso", "", True),
+            ("Nach Wassily Kandinsky", "", True),
+            ("nach Unbekannt", "Pablo Picasso", False),
             ("Georges Test and Sonia Delaunay", "", True),
             ("D’après plusieurs artistes, de Dürer à Dufy", "Albrecht Dürer", True),
             ("Jean-Baptiste Piranèse", "", True),

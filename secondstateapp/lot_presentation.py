@@ -264,7 +264,7 @@ for _display, *_aliases in _ARTISTS:
         _DISPLAY_NAMES[_name_key(_variant)] = _display
 
 _ATTRIBUTION = r"(?:attributed to|circle of|school of|studio of|workshop of|manner of|style of|followers? of|after)"
-_ATTRIBUTION_PREFIX = re.compile(rf"^(?P<prefix>{_ATTRIBUTION}|\({_ATTRIBUTION}\))\s+(?P<name>.+)$", re.IGNORECASE)
+_ATTRIBUTION_PREFIX = re.compile(rf"^(?P<prefix>{_ATTRIBUTION}|\({_ATTRIBUTION}\)|nach)\s+(?P<name>.+)$", re.IGNORECASE)
 _ATTRIBUTION_SUFFIX = re.compile(
     rf"^(?P<name>.+?)(?P<suffix>\s*\({_ATTRIBUTION}\)|(?:,\s*|\s+){_ATTRIBUTION}\.?)$", re.IGNORECASE,
 )
@@ -368,6 +368,7 @@ def _attribution_credit(value: object) -> tuple[str, str]:
     text = clean_display_text(value, strip_lot_markers=True)
     text = " ".join(_CREDIT_BIOGRAPHY.sub(" ", text).split())
     text = _BILINGUAL_AFTER.sub("After", text)
+    text = re.sub(r"^nach\s+", "After ", text, flags=re.IGNORECASE)
     # Lux uses bare trailing d'après; Forum can end a qualifier with a full
     # stop and append printmaker Jacques Villon. Normalize these credit endings
     # only; source text stays intact and title credits still require a name match.

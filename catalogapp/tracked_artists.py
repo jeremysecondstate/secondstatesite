@@ -85,6 +85,9 @@ def _load_names(path: Path, modified_ns: int, size: int) -> Mapping[str, str]:
 def _credit_keys(credit: str) -> tuple[str, ...]:
     def identity(value):
         value = _LIFESPAN.sub("", value.strip())
+        # German "nach" credits name the artist whose work was copied.
+        # Match that name against the roster without enabling a watchlist fallback.
+        value = re.sub(r"^nach\s+", "", value, flags=re.I)
         return artist_identity_key(_END_QUALIFIER.sub("", _QUALIFIER.sub("", value)))
 
     # An inspiration or subject clause can name several artists. Its scope
