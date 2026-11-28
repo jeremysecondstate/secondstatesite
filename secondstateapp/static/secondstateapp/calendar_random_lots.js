@@ -71,10 +71,14 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
     control.rendered = {options, selected, query};
     const count = options.reduce((total, option) => total + option.count, 0);
     const focusedKey = list.contains(document.activeElement) ? document.activeElement.dataset.key : undefined;
+    const searchTerms = query.split(/[\s,]+/).filter(Boolean);
     let focusTarget;
     const buttons = [];
     for (const {key, label, count: optionCount} of [{key: "", label: all, count}, ...options]) {
-      if (key && query && !searchText(label).includes(query)) continue;
+      if (key && searchTerms.length) {
+        const nameText = searchText(label);
+        if (!searchTerms.every(term => nameText.includes(term))) continue;
+      }
       const button = document.createElement("button");
       button.className = "day-gallery-filter";
       button.type = "button";

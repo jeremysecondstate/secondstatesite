@@ -217,7 +217,7 @@ test("saved-lot facets combine across pages, preserve catalog settings and searc
   const catalog = `view=catalog&day=${day}&house=Main+House&artist=Main+Artist&sort=time_asc`;
   const requests = [];
   const houses = [{key: "h:2 / α", label: "House Two", count: 27}, {key: "h1", label: "House One", count: 25}];
-  const artists = [{key: "a:é", label: "Émilie Müller", count: 25}, {key: "other", label: "Marc", count: 27}];
+  const artists = [{key: "a:é", label: "Müller, Émilie", count: 25}, {key: "other", label: "Marc", count: 27}];
   const g = gallery(catalog + "&collection=random&collection_page=2&collection_sort=estimate-desc", async url => {
     const params = url.searchParams;
     const house = params.get("collection_house");
@@ -258,7 +258,7 @@ test("saved-lot facets combine across pages, preserve catalog settings and searc
 
   const search = g.element("random-lots-artist-search");
   const numberOfRequests = requests.length;
-  search.value = "MULLER";
+  search.value = "emilie muller";
   search.focus();
   search.dispatchEvent(new Event("input"));
   assert.ok(choice(g, "artist", artists[0].key));
