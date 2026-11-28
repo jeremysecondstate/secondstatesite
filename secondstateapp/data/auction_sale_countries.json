@@ -620,6 +620,30 @@
       "evidence_url": "https://www.lefloch-drouot.fr/vente/182157-design-and-art-contemporain",
       "evidence": "Le Floc'h lists its November 29 Design & art contemporain sale at 1 ter, boulevard de la République, 92210 Saint-Cloud, France. Its lot page identifies Alain Jacquet's Frog thighs as lot 98 (https://lefloch-drouot.fr/l/35769396-alain-jacquet-1939-2008-frog-thighs-1965-serigraphie-sur-une).",
       "verified_at": "2026-11-27"
+    },
+    {
+      "auction_house": "Bamberger Auktionshaus",
+      "source": "Drouot",
+      "date": "2026-11-27",
+      "country_code": "DE",
+      "sale_urls": [
+        "https://drouot.com/en/v/188786"
+      ],
+      "evidence_url": "https://www.gazette-drouot.com/en/auctions/188786-29th-auction",
+      "evidence": "Drouot lists Bamberger Auktionshaus's 29th Auction on November 27 at Untere Königstr. 26, 96052 Bamberg, Germany.",
+      "verified_at": "2026-11-27"
+    },
+    {
+      "auction_house": "Brissonneau",
+      "source": "Drouot",
+      "date": "2026-11-27",
+      "country_code": "FR",
+      "sale_urls": [
+        "https://drouot.com/en/v/183108"
+      ],
+      "evidence_url": "https://www.brissonneau.net/catalogue/183108-livres-anciens-et-modernes-tableaux-anciens-et-modernes",
+      "evidence": "Brissonneau places its November 27 sale in Salle 16 at Hôtel Drouot, 9 rue Drouot, 75009 Paris, France.",
+      "verified_at": "2026-11-27"
     }
   ]
 }
