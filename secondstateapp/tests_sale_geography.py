@@ -196,6 +196,21 @@ class SaleGeographyTests(SimpleTestCase):
                 self.assert_country("", **{**fields, **changed})
         self.assert_country("GB", **fields, location="London, UK")
 
+    def test_lot_specific_venue_requires_the_catalog_and_lot_identity(self):
+        for house, sale_id, lot_id, number, country in (
+            ("Bamberger Auktionshaus", "188786", "36226583", "5", "DE"),
+            ("Brissonneau", "183108", "35879479", "20", "FR"),
+        ):
+            fields = dict(auction_house=house, currency="", source_lot_id=lot_id, lot_number=number,
+                          event_at=datetime(2026, 11, 27, 12, tzinfo=timezone.utc),
+                          sale_url=f"https://drouot.com/en/v/{sale_id}", lot_url=f"https://drouot.com/en/l/{lot_id}")
+            with self.subTest(house=house):
+                self.assert_country(country, **fields)
+            for changed in ({"source_lot_id": "other"}, {"lot_number": "1"}, {"lot_url": ""},
+                            {"sale_url": ""}, {"sale_url": "https://drouot.com/en/v/1"}):
+                with self.subTest(house=house, changed=changed):
+                    self.assert_country("", **{**fields, **changed})
+
     def test_verified_bonhams_source_lot_fallback_does_not_cover_other_sales(self):
         fields = dict(auction_house="Bonhams", source="Invaluable", currency="USD",
                       source_lot_id="207195647", lot_number="29",

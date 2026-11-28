@@ -159,16 +159,16 @@ def _verified_sale_country(lot):
             continue
         if sale_url and sale_url in {_source_url(url) for url in sale.get("sale_urls", [])}:
             return sale["country_code"]
-        # Old imports may have no catalog URL. Exact source identity, lot URL,
-        # number, house and date bind these entries to the verified sale.
-        if not sale_url:
-            known = sale.get("lots", {}).get(str(getattr(lot, "source_lot_id", "")))
-            if (
-                known
-                and str(getattr(lot, "lot_number", "")).strip() == known["lot_number"]
-                and _source_url(getattr(lot, "lot_url", "")) == _source_url(known["lot_url"])
-            ):
-                return sale["country_code"]
+        # Lot-specific evidence matches the recorded catalog URL, including
+        # an absent URL on older imports.
+        known = sale.get("lots", {}).get(str(getattr(lot, "source_lot_id", "")))
+        if (
+            known
+            and sale_url == _source_url(known.get("sale_url"))
+            and str(getattr(lot, "lot_number", "")).strip() == known["lot_number"]
+            and _source_url(getattr(lot, "lot_url", "")) == _source_url(known["lot_url"])
+        ):
+            return sale["country_code"]
     return ""
 
 
