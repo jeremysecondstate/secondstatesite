@@ -7,6 +7,7 @@ import math
 import os
 import re
 import secrets
+import unicodedata
 from collections import Counter, defaultdict
 from copy import copy
 from datetime import date, datetime, time, timedelta, timezone as datetime_timezone
@@ -650,15 +651,47 @@ def auction_calendar_random_lots(request):
     if not re.fullmatch(r"[1-9][0-9]{0,8}", page_number):
         return JsonResponse({"error": "Choose a positive page number."}, status=400)
 
-    lots = _saved_random_lots("event_at", "auction_house", "lot_number", day_bounds=day_bounds)
+    sort = request.GET.get("sort", "catalog")
+    estimate_sort = sort in ("estimate-desc", "estimate-asc")
+    fields = ["event_at", "auction_house", "lot_number"]
+    if sort == "artist":
+        fields.extend(("artist", "artist_watchlist_name"))
+    elif estimate_sort:
+        fields.extend(("currency", "estimate_low", "estimate_high"))
+    lots = _saved_random_lots(*fields, day_bounds=day_bounds)
+    # Repeated estimates, including unavailable conversions, share a result
+    # during this request. The USD response can reuse it for the selected page.
+    convert = lru_cache(maxsize=1024)(convert_to_usd) if estimate_sort else convert_to_usd
 
-    def catalog_order(lot):
+    def collection_order(lot):
         day = timezone.localdate(lot.event_at, zone) if lot.event_at else date.max
         number = tuple(int(part) if i % 2 else part.casefold()
                        for i, part in enumerate(re.split(r"([0-9]+)", lot.lot_number)))
-        return day, lot.auction_house.casefold(), number, lot.pk
+        catalog = (day, lot.auction_house.casefold(), number, lot.pk)
+        if sort == "artist":
+            artist = artist_sort_key(_artist_label(lot))
+            if artist in {"unknown", "unknown artist", "anonymous", "anonymous artist",
+                          "uncredited", "unidentified", "unidentified artist"}:
+                artist = ""
+            return not artist, artist, catalog
+        if sort == "house":
+            house = clean_display_text(lot.auction_house).casefold()
+            house = "".join(c for c in unicodedata.normalize("NFKD", house) if not unicodedata.combining(c))
+            if house in {"unknown", "house unknown", "unknown house", "unknown auction house"}:
+                house = ""
+            return not house, house, catalog
+        if estimate_sort:
+            estimate = lot.estimate_low
+            if estimate is None or estimate <= 0:
+                estimate = lot.estimate_high
+            quote = convert(estimate, lot.currency) if estimate is not None and estimate > 0 else None
+            if quote is None:
+                return True, 0, catalog
+            usd = Decimal(quote["usd_amount"])
+            return False, -usd if sort == "estimate-desc" else usd, catalog
+        return catalog
 
-    pages = Paginator(sorted(lots, key=catalog_order), 24)
+    pages = Paginator(sorted(lots, key=collection_order), 24)
     try:
         page = pages.page(int(page_number))
     except EmptyPage:
@@ -670,7 +703,7 @@ def auction_calendar_random_lots(request):
         page_lots = page_lots.filter(event_at__gte=day_bounds[0], event_at__lt=day_bounds[1])
     cards = []
     if request.GET.get("prices") == "usd":
-        prices = {row["id"]: row for row in _catalog_usd_prices(page_lots)}
+        prices = {row["id"]: row for row in _catalog_usd_prices(page_lots, convert=convert)}
         cards = [prices[pk] for pk in ids if pk in prices]
     elif ids:
         details = _with_catalog_details(page_lots).in_bulk()
@@ -688,7 +721,9 @@ def auction_calendar_random_lots(request):
     return JsonResponse(payload)
 
 
-def _catalog_usd_prices(lots):
+def _catalog_usd_prices(lots, *, convert=None):
+    if convert is None:
+        convert = convert_to_usd
     source_lots = lots.order_by("id").values(
         "id", "currency", "sold_currency", "estimate_low", "estimate_high", "current_bid", "sold_price",
     )
@@ -697,10 +732,10 @@ def _catalog_usd_prices(lots):
     return [
         {
             "id": lot["id"],
-            "estimate_low": convert_to_usd(lot["estimate_low"], lot["currency"]),
-            "estimate_high": convert_to_usd(lot["estimate_high"], lot["currency"]),
-            "current_bid": convert_to_usd(lot["current_bid"], lot["currency"]),
-            "sold_price": convert_to_usd(lot["sold_price"], lot["sold_currency"] or lot["currency"]),
+            "estimate_low": convert(lot["estimate_low"], lot["currency"]),
+            "estimate_high": convert(lot["estimate_high"], lot["currency"]),
+            "current_bid": convert(lot["current_bid"], lot["currency"]),
+            "sold_price": convert(lot["sold_price"], lot["sold_currency"] or lot["currency"]),
         }
         for lot in source_lots
     ]

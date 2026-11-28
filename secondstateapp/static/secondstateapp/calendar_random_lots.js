@@ -12,32 +12,40 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
   const next = element("random-lots-next");
   const retry = element("random-lots-retry");
   const countBadge = element("random-lots-count");
+  const orderSelect = element("random-lots-sort");
+  const sortNote = element("random-lots-sort-note");
+  const orders = new Set(["catalog", "artist", "house", "estimate-desc", "estimate-asc"]);
   let saleDay = "";
   let loadedDay = "";
+  let loadedOrder = "catalog";
   let lots = [];
   let page = 0;
   let pending = null;
 
-  function writeLocation(number, method) {
+  function writeLocation(number, method, order = loadedOrder) {
     const url = new URL(window.location.href);
     if (number) url.searchParams.set("collection", "random");
     else url.searchParams.delete("collection");
     if (number > 1) url.searchParams.set("collection_page", number);
     else url.searchParams.delete("collection_page");
+    if (number && order !== "catalog") url.searchParams.set("collection_sort", order);
+    else url.searchParams.delete("collection_sort");
     window.history[method](window.history.state, "", url);
   }
 
   async function loadPrices(url, request) {
     if (!lots.some(window.CalendarCurrency.hasForeignPrices)) return;
-    url.searchParams.set("prices", "usd");
+    const priceUrl = new URL(url);
+    priceUrl.searchParams.set("prices", "usd");
     let quotes = [];
     try {
-      const response = await window.fetch(url, {
+      const response = await window.fetch(priceUrl, {
         credentials: "same-origin", headers: {Accept: "application/json"}, signal: request.signal,
       });
       if (response.ok) {
         const payload = await response.json();
-        if (payload.day === loadedDay && payload.page === page && Array.isArray(payload.lots)) quotes = payload.lots;
+        if (payload.day === loadedDay && payload.page === page &&
+            (payload.sort == null || payload.sort === loadedOrder) && Array.isArray(payload.lots)) quotes = payload.lots;
       }
     } catch {
       // The original prices stay visible when an exchange-rate source is unavailable.
@@ -45,12 +53,13 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
     if (request === pending) updatePrices(grid, lots, quotes);
   }
 
-  async function loadPage(number) {
+  async function loadPage(number, order = loadedOrder) {
     pending?.abort();
     const request = new AbortController();
     pending = request;
     const day = saleDay;
     loadedDay = day;
+    loadedOrder = order;
     page = number;
     lots = [];
     grid.replaceChildren();
@@ -61,6 +70,7 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
     const url = new URL(panel.dataset.url, window.location.origin);
     url.searchParams.set("day", day);
     url.searchParams.set("page", number);
+    url.searchParams.set("sort", order);
     try {
       const response = await window.fetch(url, {
         credentials: "same-origin", headers: {Accept: "application/json"}, signal: request.signal,
@@ -74,6 +84,7 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
       const data = await response.json();
       if (request !== pending) return;
       if (data.day !== day) throw new Error("Unexpected sale date");
+      if (data.sort != null && data.sort !== order) throw new Error("Unexpected sort order");
       lots = data.lots;
       grid.replaceChildren(...lots.map(renderCard));
       grid.setAttribute("aria-busy", "false");
@@ -110,7 +121,11 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
     if (visible) {
       const requested = Number(params.get("collection_page"));
       const number = Number.isSafeInteger(requested) && requested > 0 ? requested : 1;
-      if (loadedDay !== saleDay || number !== page) loadPage(number);
+      const requestedOrder = params.get("collection_sort");
+      const order = orders.has(requestedOrder) ? requestedOrder : "catalog";
+      orderSelect.value = order;
+      sortNote.hidden = !order.startsWith("estimate-");
+      if (loadedDay !== saleDay || number !== page || order !== loadedOrder) loadPage(number, order);
       if (!wasVisible) heading.focus();
     } else if (wasVisible) {
       pending?.abort();
@@ -134,11 +149,15 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
   }
 
   open.addEventListener("click", () => {
-    writeLocation(1, "pushState");
+    writeLocation(1, "pushState", "catalog");
     syncPanel();
   });
   element("random-lots-back").addEventListener("click", () => {
     writeLocation(0, "replaceState");
+    syncPanel();
+  });
+  orderSelect.addEventListener("change", () => {
+    writeLocation(1, "replaceState", orderSelect.value);
     syncPanel();
   });
   function goToPage(number) {

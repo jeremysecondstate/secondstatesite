@@ -120,6 +120,47 @@ test("a direct page link supports retry and safely discards a response after lea
   assert.deepEqual(g.element("random-lots-grid").children, []);
 });
 
+test("changing the saved-lot sort resets pagination and keeps cards and quotes in the selected order", async () => {
+  const day = "2026-11-30";
+  const catalogQuery = `view=catalog&day=${day}&sort=artist-desc`;
+  const requests = [];
+  let finishOldQuotes;
+  const g = gallery(`${catalogQuery}&collection=random&collection_page=2&collection_sort=artist`, async url => {
+    const sort = url.searchParams.get("sort");
+    const page = Number(url.searchParams.get("page"));
+    const isQuote = url.searchParams.get("prices") === "usd";
+    const id = sort === "artist" ? 12 : page + 20;
+    requests.push([sort, page, isQuote]);
+    const payload = {day, page, pages: 2, total: 26, lots: [{id, currency: "EUR", estimate_low: "75"}]};
+    if (isQuote && sort === "artist") {
+      return new Promise(resolve => { finishOldQuotes = () => resolve({ok: true, json: async () => payload}); });
+    }
+    return {ok: true, json: async () => payload};
+  });
+  g.controller.syncView("catalog", day, 26);
+  await completeRequests();
+  const sort = g.element("random-lots-sort");
+  assert.equal(sort.value, "artist");
+  sort.value = "estimate-desc";
+  sort.dispatchEvent(new Event("change"));
+  await completeRequests();
+  finishOldQuotes();
+  await completeRequests();
+  assert.deepEqual(requests, [
+    ["artist", 2, false], ["artist", 2, true],
+    ["estimate-desc", 1, false], ["estimate-desc", 1, true],
+  ]);
+  assert.equal(g.location.searchParams.get("collection_page"), null);
+  assert.equal(g.location.searchParams.get("collection_sort"), "estimate-desc");
+  assert.deepEqual(g.element("random-lots-grid").children, [21]);
+  assert.deepEqual(g.prices.map(result => result.quotes[0].id), [21]);
+  g.click("random-lots-next");
+  await completeRequests();
+  assert.deepEqual(requests.slice(-2), [["estimate-desc", 2, false], ["estimate-desc", 2, true]]);
+  g.click("random-lots-back");
+  assert.equal(g.location.searchParams.toString(), catalogQuery);
+});
+
 test("changing the date with an open gallery replaces its count and ignores the previous day's late response", async () => {
   const oldDay = "2026-11-26";
   const newDay = "2026-11-27";

@@ -166,14 +166,75 @@ class CalendarRandomLotsTests(TestCase):
             with self.subTest(day=invalid):
                 self.assertEqual(self.client.get(self.url, {"day": invalid}).status_code, 400)
 
+    def test_catalog_artist_and_house_order_across_sale_days(self):
+        warhol = watch_lot(source_lot_id="sort-warhol", random_lot=True, artist="After Andy Warhol",
+                           artist_watchlist_name="", auction_house="Zephyr", lot_number="1")
+        later = datetime(2026, 7, 26, 17, tzinfo=timezone.utc)
+        miro = watch_lot(source_lot_id="sort-miro", random_lot=True, artist="Unresolved catalogue spelling",
+                         artist_watchlist_name="Joan Miró", auction_house="Aster", lot_number="10", event_at=later)
+        monet = watch_lot(source_lot_id="sort-monet", random_lot=True, artist="Claude Monet",
+                          artist_watchlist_name="", auction_house="Aster", lot_number="2a", event_at=later)
+        expectations = (
+            ({}, [warhol.pk, monet.pk, miro.pk]),
+            ({"sort": "catalog"}, [warhol.pk, monet.pk, miro.pk]),
+            ({"sort": "artist"}, [miro.pk, monet.pk, warhol.pk]),
+            ({"sort": "house"}, [monet.pk, miro.pk, warhol.pk]),
+        )
+        for params, expected in expectations:
+            with self.subTest(params=params):
+                rows = self.client.get(self.url, params).json()["lots"]
+                self.assertEqual([row["id"] for row in rows], expected)
+
+    def test_estimates_use_usd_before_paging_and_prices_follow_the_same_sorted_page(self):
+        estimates = {
+            1: ("USD", 1000, 1100),
+            2: ("EUR", 100, 2000),  # $200, tied with the later USD lots.
+            3: ("USD", 125, 9000),  # The high estimate cannot override a positive low.
+            4: ("USD", None, 700),
+            5: ("USD", None, None),
+            6: ("XYZ", 10000, 20000),  # No USD quote.
+            7: ("USD", 0, 450),
+        }
+        by_number = {}
+        for number in range(31, 0, -1):
+            currency, low, high = estimates.get(number, ("USD", 200, 250))
+            by_number[number] = watch_lot(
+                source_lot_id=f"sort-estimate-{number}", random_lot=True, lot_number=str(number),
+                currency=currency, estimate_low=low, estimate_high=high, current_bid=20000,
+            ).pk
+
+        tied = [2, *range(8, 32)]
+        orders = {
+            "estimate-asc": [3, *tied, 7, 4, 1, 5, 6],
+            "estimate-desc": [1, 4, 7, *tied, 3, 5, 6],
+        }
+        quotes = {"EUR": {"date": "2026-07-24", "rate": "2"}}
+        with patch("secondstateapp.currency._usd_quote", side_effect=quotes.get):
+            for sort, numbers in orders.items():
+                expected_ids = [by_number[number] for number in numbers]
+                price_by_id = {}
+                for page, expected in enumerate((expected_ids[:24], expected_ids[24:]), start=1):
+                    with self.subTest(sort=sort, page=page):
+                        params = {"day": "2026-07-25", "sort": sort, "page": page}
+                        cards = self.client.get(self.url, params).json()
+                        prices = self.client.get(self.url, {**params, "prices": "usd"}).json()
+                        price_by_id.update({row["id"]: row for row in prices["lots"]})
+                        for payload in (cards, prices):
+                            self.assertEqual((payload["total"], payload["pages"], payload["page"]), (31, 2, page))
+                            self.assertEqual([row["id"] for row in payload["lots"]], expected)
+                self.assertEqual(price_by_id[by_number[2]]["estimate_low"]["usd_amount"], "200.00")
+                self.assertIsNone(price_by_id[by_number[6]]["estimate_low"])
+
     def test_paging_uses_natural_lot_numbers_and_returns_each_saved_identity_once(self):
         path = Path(__file__).with_name("data") / "random_lots.json"
         source_ids = json.loads(path.read_text(encoding="utf-8"))["source_lot_ids"]["Drouot"][:26]
         numbers = ["1", "2", "2a", "2b", *map(str, range(3, 24))]
         for source_id, number in reversed(list(zip(source_ids[:25], numbers, strict=True))):
-            watch_lot(source="Drouot", source_lot_id=source_id, lot_number=number, currency="EUR")
-        watch_lot(source="Drouot", source_lot_id=source_ids[25], lot_number="1",
-                  event_at=datetime(2026, 7, 26, 17, tzinfo=timezone.utc))
+            artist = "Alexander Calder" if number == "23" else "Joan Miró"
+            watch_lot(source="Drouot", source_lot_id=source_id, lot_number=number, currency="EUR",
+                      artist=artist, artist_watchlist_name="")
+        next_day = watch_lot(source="Drouot", source_lot_id=source_ids[25], lot_number="1",
+                             auction_house="Aster", event_at=datetime(2026, 7, 26, 17, tzinfo=timezone.utc))
 
         first = self.client.get(self.url, {"day": "2026-07-25"}).json()
         second = self.client.get(self.url, {"day": "2026-07-25", "page": 2}).json()
@@ -184,6 +245,15 @@ class CalendarRandomLotsTests(TestCase):
         rows = first["lots"] + second["lots"]
         self.assertEqual([r["lot_number"] for r in rows], numbers)
         self.assertEqual(len({r["id"] for r in rows}), 25)
+        catalog_ids = [r["id"] for r in rows]
+        for params, expected in (
+            ({"day": "2026-07-25", "sort": "artist"}, [catalog_ids[-1], *catalog_ids[:-1]]),
+            ({"sort": "house"}, [next_day.pk, *catalog_ids]),
+        ):
+            with self.subTest(params=params):
+                for page, page_ids in enumerate((expected[:24], expected[24:]), start=1):
+                    ordered = self.client.get(self.url, {**params, "page": page}).json()["lots"]
+                    self.assertEqual([r["id"] for r in ordered], page_ids)
 
         with patch("secondstateapp.currency._usd_quote", return_value={"date": "2026-07-24", "rate": "1.2"}):
             prices = self.client.get(self.url, {"day": "2026-07-25", "page": 2, "prices": "usd"}).json()

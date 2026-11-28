@@ -329,8 +329,18 @@
         </div>
         <div class="day-gallery-header-actions">
           <button id="random-lots-back" class="day-gallery-browser-launch" type="button">← Back to catalog</button>
+          <label class="day-gallery-sort-label" for="random-lots-sort">Sort lots
+            <select id="random-lots-sort" class="day-gallery-sort" aria-controls="random-lots-grid" aria-describedby="random-lots-sort-note">
+              <option value="catalog">Catalog order</option>
+              <option value="artist">Artist surname A–Z</option>
+              <option value="house">Auction house</option>
+              <option value="estimate-desc">Highest estimate first</option>
+              <option value="estimate-asc">Lowest estimate first</option>
+            </select>
+          </label>
         </div>
       </header>
+      <p id="random-lots-sort-note" class="day-gallery-sort-note" hidden>Uses the low estimate in USD, or the high estimate when no low estimate is available. Lots without a USD estimate appear last.</p>
       <button id="random-lots-retry" class="day-gallery-filter" type="button" hidden>Retry loading lots</button>
       <div id="random-lots-grid" class="day-gallery-grid"></div>
       <nav id="random-lots-pagination" class="day-gallery-pagination" aria-label="Random Lots pages" hidden>
@@ -481,7 +491,7 @@
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=bid-research-20261118"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=timed-catalogs-20261121"></script>
-<script src="{% static 'secondstateapp/calendar_random_lots.js' %}?v=catalog-cards-20261123"></script>
+<script src="{% static 'secondstateapp/calendar_random_lots.js' %}?v=random-lots-sort-20261127"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=saved-sale-images-20261118"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-modes-20261028"></script>
 <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261118"></script>
@@ -4705,6 +4715,7 @@
     if (activeView !== "catalog") {
       url.searchParams.delete("collection");
       url.searchParams.delete("collection_page");
+      url.searchParams.delete("collection_sort");
     } else if (url.searchParams.has("day") && url.searchParams.get("day") !== selectedDay) {
       url.searchParams.delete("collection_page");
     }
