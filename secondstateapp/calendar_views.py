@@ -145,6 +145,10 @@ def _artist_label(lot: AuctionWatchLot) -> str:
     return lot.artist_watchlist_name or lot.artist or "Unknown artist"
 
 
+def _calendar_house_label(lot: AuctionWatchLot) -> str:
+    return clean_display_text(lot.auction_house) or clean_display_text(lot.source) or "Auction"
+
+
 def _sale_identity(lot: AuctionWatchLot, sale_for=verified_sale) -> str:
     sale = sale_for(lot)
     if sale:
@@ -308,12 +312,12 @@ def _lot_json(lot: AuctionWatchLot, zone: ZoneInfo, selected_lot_ids: set[int] |
         **({"numbering_baseline": numbering_baseline} if numbering_baseline is not None else {}),
         **({"arrival_schedule": arrival_schedule} if arrival_schedule else {}),
         **({"arrival_estimate": arrival_estimate} if arrival_estimate else {}),
-        "artist": artist_display_name(source_artist),
+        "artist": artist_display_name(source_artist) or "Unknown artist",
         "artist_source": source_artist,
         "attribution_label": artist_attribution_label(lot.artist, source_artist, title=lot.title),
         "artist_sort_key": artist_sort_key(source_artist),
         "title": clean_display_text(lot.title, strip_lot_markers=True) or "Untitled lot",
-        "auction_house": clean_display_text(lot.auction_house or lot.source or "Auction"),
+        "auction_house": _calendar_house_label(lot),
         "oliver_house": bool(canonical_oliver_house),
         "oliver_house_name": canonical_oliver_house,
         "sale_title": clean_display_text(lot.sale_title or (timed_catalog["title"] if timed_catalog else "")),
@@ -636,9 +640,59 @@ def _random_lots_by_day(zone):
     return dict(counts)
 
 
+def _random_artist_order(label):
+    artist = artist_sort_key(label)
+    if artist in {"unknown", "unknown artist", "anonymous", "anonymous artist",
+                  "uncredited", "unidentified", "unidentified artist"}:
+        artist = ""
+    return not artist, artist
+
+
+def _random_house_order(label):
+    house = clean_display_text(label).casefold()
+    house = "".join(c for c in unicodedata.normalize("NFKD", house) if not unicodedata.combining(c))
+    if house in {"unknown", "house unknown", "unknown house", "unknown auction house"}:
+        house = ""
+    return not house, house
+
+
+def _filter_random_lots(lots, house, artist, include_facets):
+    houses, artists, matches = {}, {}, []
+    display_artist = lru_cache(maxsize=1024)(artist_display_name)
+
+    def count(options, key, label, matches_other, selected):
+        # Keep a valid selection available to clear when the intersection is empty.
+        if matches_other or key == selected:
+            option = options.setdefault(key, {"key": key, "label": label, "count": 0})
+            option["count"] += int(matches_other)
+
+    for lot in lots:
+        house_label = _calendar_house_label(lot) if house or include_facets else ""
+        artist_label = (display_artist(_artist_label(lot)) or "Unknown artist") if artist or include_facets else ""
+        # The Calendar artist picker groups the full displayed credit, including
+        # attribution qualifiers. Its surname sorting key deliberately omits them.
+        house_key, artist_key = house_label.lower(), artist_label.lower()
+        matches_house = not house or house_key == house
+        matches_artist = not artist or artist_key == artist
+        if matches_house and matches_artist:
+            matches.append(lot)
+        if include_facets:
+            count(houses, house_key, house_label, matches_artist, house)
+            count(artists, artist_key, artist_label, matches_house, artist)
+
+    facets = None
+    if include_facets:
+        facets = {
+            "houses": sorted(houses.values(), key=lambda item: (_random_house_order(item["label"]), item["key"])),
+            "artists": sorted(artists.values(), key=lambda item: (_random_artist_order(item["label"]), item["key"])),
+        }
+    return matches, facets
+
+
 @never_cache
 @staff_member_required
 @require_http_methods(["GET"])
+@gzip_page
 def auction_calendar_random_lots(request):
     zone = _calendar_zone()
     day_bounds = None
@@ -653,12 +707,22 @@ def auction_calendar_random_lots(request):
 
     sort = request.GET.get("sort", "catalog")
     estimate_sort = sort in ("estimate-desc", "estimate-asc")
+    house = request.GET.get("collection_house", "")
+    artist = request.GET.get("collection_artist", "")
+    prices_only = request.GET.get("prices") == "usd"
+    include_facets = request.GET.get("facets") == "1" and not prices_only
     fields = ["event_at", "auction_house", "lot_number"]
-    if sort == "artist":
+    if house or include_facets:
+        fields.append("source")
+    if sort == "artist" or artist or include_facets:
         fields.extend(("artist", "artist_watchlist_name"))
-    elif estimate_sort:
+    if estimate_sort:
         fields.extend(("currency", "estimate_low", "estimate_high"))
     lots = _saved_random_lots(*fields, day_bounds=day_bounds)
+    day_total = len(lots)
+    facets = None
+    if house or artist or include_facets:
+        lots, facets = _filter_random_lots(lots, house, artist, include_facets)
     # Repeated estimates, including unavailable conversions, share a result
     # during this request. The USD response can reuse it for the selected page.
     convert = lru_cache(maxsize=1024)(convert_to_usd) if estimate_sort else convert_to_usd
@@ -669,17 +733,9 @@ def auction_calendar_random_lots(request):
                        for i, part in enumerate(re.split(r"([0-9]+)", lot.lot_number)))
         catalog = (day, lot.auction_house.casefold(), number, lot.pk)
         if sort == "artist":
-            artist = artist_sort_key(_artist_label(lot))
-            if artist in {"unknown", "unknown artist", "anonymous", "anonymous artist",
-                          "uncredited", "unidentified", "unidentified artist"}:
-                artist = ""
-            return not artist, artist, catalog
+            return _random_artist_order(_artist_label(lot)), catalog
         if sort == "house":
-            house = clean_display_text(lot.auction_house).casefold()
-            house = "".join(c for c in unicodedata.normalize("NFKD", house) if not unicodedata.combining(c))
-            if house in {"unknown", "house unknown", "unknown house", "unknown auction house"}:
-                house = ""
-            return not house, house, catalog
+            return _random_house_order(lot.auction_house), catalog
         if estimate_sort:
             estimate = lot.estimate_low
             if estimate is None or estimate <= 0:
@@ -702,7 +758,7 @@ def auction_calendar_random_lots(request):
     if day_bounds:
         page_lots = page_lots.filter(event_at__gte=day_bounds[0], event_at__lt=day_bounds[1])
     cards = []
-    if request.GET.get("prices") == "usd":
+    if prices_only:
         prices = {row["id"]: row for row in _catalog_usd_prices(page_lots, convert=convert)}
         cards = [prices[pk] for pk in ids if pk in prices]
     elif ids:
@@ -716,6 +772,8 @@ def auction_calendar_random_lots(request):
             params = {"view": "research", "day": day, "lot": card["id"], "look": "dossier", "artists": "all"}
             card["research_url"] = f"{reverse('auction_calendar')}?{urlencode(params)}" if day else ""
     payload = {"total": pages.count, "page": page.number, "pages": pages.num_pages, "lots": cards}
+    if facets is not None:
+        payload.update(day_total=day_total, facets=facets)
     if day_bounds:
         payload["day"] = selected_day.isoformat()
     return JsonResponse(payload)

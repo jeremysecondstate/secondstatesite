@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=daily-random-lots-20261123">
+  <link rel="stylesheet" href="{% static 'secondstateapp/calendar.css' %}?v=random-lots-browse-20261128">
   <link rel="stylesheet" href="{% static 'secondstateapp/calendar_concepts.css' %}?v=evidence-bulk-20261027">
   <link rel="stylesheet" href="{% static 'secondstateapp/archive_bid_board.css' %}?v=bid-research-20261118">
   <link rel="stylesheet" href="{% static 'secondstateapp/liveart_manual_entry.css' %}?v=field-alignment-20261027">
@@ -341,6 +341,26 @@
         </div>
       </header>
       <p id="random-lots-sort-note" class="day-gallery-sort-note" hidden>Uses the low estimate in USD, or the high estimate when no low estimate is available. Lots without a USD estimate appear last.</p>
+      <details id="random-lots-houses" class="day-gallery-section">
+        <summary class="day-gallery-section-toggle">
+          <span>
+            <span id="random-lots-houses-title" class="day-gallery-section-title">Auction houses</span>
+            <span id="random-lots-houses-summary" class="day-gallery-section-summary" aria-live="polite"></span>
+          </span>
+        </summary>
+        <div id="random-lots-house-filters" class="day-gallery-house-filters random-lots-filter-list" role="group" aria-labelledby="random-lots-houses-title"></div>
+      </details>
+      <details id="random-lots-artists" class="day-gallery-section">
+        <summary class="day-gallery-section-toggle">
+          <span>
+            <span id="random-lots-artists-title" class="day-gallery-section-title">Artists this day</span>
+            <span id="random-lots-artists-summary" class="day-gallery-section-summary" aria-live="polite"></span>
+          </span>
+        </summary>
+        <label class="random-lots-search-label" for="random-lots-artist-search">Find an artist</label>
+        <input id="random-lots-artist-search" type="search" aria-controls="random-lots-artist-filters" autocomplete="off">
+        <div id="random-lots-artist-filters" class="day-gallery-house-filters random-lots-filter-list" role="group" aria-labelledby="random-lots-artists-title"></div>
+      </details>
       <button id="random-lots-retry" class="day-gallery-filter" type="button" hidden>Retry loading lots</button>
       <div id="random-lots-grid" class="day-gallery-grid"></div>
       <nav id="random-lots-pagination" class="day-gallery-pagination" aria-label="Random Lots pages" hidden>
@@ -491,7 +511,7 @@
 <script src="{% static 'secondstateapp/saved_bid_board.js' %}?v=bid-research-20261118"></script>
 <script src="{% static 'secondstateapp/calendar_currency.js' %}?v=usd-20261021"></script>
 <script src="{% static 'secondstateapp/calendar_artists.js' %}?v=timed-catalogs-20261121"></script>
-<script src="{% static 'secondstateapp/calendar_random_lots.js' %}?v=random-lots-sort-20261127"></script>
+<script src="{% static 'secondstateapp/calendar_random_lots.js' %}?v=random-lots-browse-20261128"></script>
 <script src="{% static 'secondstateapp/calendar_research_images.js' %}?v=saved-sale-images-20261118"></script>
 <script src="{% static 'secondstateapp/liveart_manual_entry.js' %}?v=archive-fx-modes-20261028"></script>
 <script src="{% static 'secondstateapp/research_queue.js' %}?v=queue-20261118"></script>
@@ -4714,10 +4734,12 @@
     const url = new URL(window.location.href);
     if (activeView !== "catalog") {
       url.searchParams.delete("collection");
-      url.searchParams.delete("collection_page");
       url.searchParams.delete("collection_sort");
-    } else if (url.searchParams.has("day") && url.searchParams.get("day") !== selectedDay) {
+    }
+    if (url.searchParams.get("collection") !== "random" || (url.searchParams.has("day") && url.searchParams.get("day") !== selectedDay)) {
       url.searchParams.delete("collection_page");
+      url.searchParams.delete("collection_house");
+      url.searchParams.delete("collection_artist");
     }
     writeGalleryOrganization(url);
     if (activeView !== "calendar") url.searchParams.set("view", activeView);

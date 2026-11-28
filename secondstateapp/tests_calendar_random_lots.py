@@ -8,7 +8,9 @@ from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from .models import AuctionWatchLot
@@ -165,6 +167,97 @@ class CalendarRandomLotsTests(TestCase):
         for invalid in ("", "not-a-date", "2026-02-30"):
             with self.subTest(day=invalid):
                 self.assertEqual(self.client.get(self.url, {"day": invalid}).status_code, 400)
+
+    def test_facet_counts_cover_the_full_day_and_filtered_usd_pages_match_the_cards(self):
+        params = {"day": "2026-07-25", "facets": "1"}
+        common = []
+        for number in range(1, 27):
+            common.append(watch_lot(
+                source_lot_id=f"facet-common-{number}", random_lot=True,
+                artist_watchlist_name="", artist="Joan Miró" if number % 2 else "Miró, Joan",
+                auction_house="Gallery &amp; Sons", lot_number=str(number), estimate_low=number,
+            ).pk)
+        rare = watch_lot(source_lot_id="facet-rare", random_lot=True,
+                         artist_watchlist_name="", artist="After Andy Warhol", auction_house="Zephyr")
+        watch_lot(source_lot_id="facet-direct", random_lot=True,
+                  artist_watchlist_name="Andy Warhol", artist="Catalog spelling", auction_house="Zephyr")
+        later = datetime(2026, 7, 26, 17, tzinfo=timezone.utc)
+        watch_lot(source_lot_id="facet-other-day", random_lot=True,
+                  artist_watchlist_name="", artist="Other artist", auction_house="Other house", event_at=later)
+        watch_lot(source_lot_id="facet-unsaved", artist_watchlist_name="", artist="Unsaved artist")
+
+        response = self.client.get(self.url, params).json()
+        self.assertEqual((response["day_total"], response["total"], response["pages"]), (28, 28, 2))
+        self.assertNotIn(rare.pk, [card["id"] for card in response["lots"]])
+        self.assertEqual(response["facets"]["houses"], [
+            {"key": "gallery & sons", "label": "Gallery & Sons", "count": 26},
+            {"key": "zephyr", "label": "Zephyr", "count": 2},
+        ])
+        self.assertEqual({(row["key"], row["label"], row["count"]) for row in response["facets"]["artists"]}, {
+            ("miró, joan", "Miró, Joan", 26),
+            ("after warhol, andy", "After Warhol, Andy", 1),
+            ("warhol, andy", "Warhol, Andy", 1),
+        })
+        # Reading facet labels for positions beyond page one should use the
+        # same database round trips as loading just the first page of cards.
+        with CaptureQueriesContext(connection) as card_queries:
+            self.client.get(self.url, {"day": params["day"]})
+        with self.assertNumQueries(len(card_queries)):
+            self.client.get(self.url, params)
+        rare_rows = self.client.get(self.url, {**params, "collection_artist": "after warhol, andy"}).json()
+        self.assertEqual([row["id"] for row in rare_rows["lots"]], [rare.pk])
+        self.assertEqual(rare_rows["facets"]["houses"], [{"key": "zephyr", "label": "Zephyr", "count": 1}])
+
+        filtered = {
+            **params, "collection_house": "gallery & sons", "collection_artist": "miró, joan",
+            "sort": "estimate-desc",
+        }
+        expected = list(reversed(common))
+        for page, ids in enumerate((expected[:24], expected[24:]), start=1):
+            with self.subTest(page=page):
+                options = {**filtered, "page": page}
+                cards = self.client.get(self.url, options).json()
+                prices = self.client.get(self.url, {**options, "prices": "usd"}).json()
+                self.assertEqual((cards["total"], cards["day_total"], prices["total"]), (26, 28, 26))
+                self.assertEqual([row["id"] for row in cards["lots"]], ids)
+                self.assertEqual([row["id"] for row in prices["lots"]], ids)
+                self.assertNotIn("facets", prices)
+        next_day = self.client.get(self.url, {"day": "2026-07-26", "facets": "1"}).json()
+        self.assertEqual(next_day["day_total"], 1)
+        self.assertEqual(next_day["facets"]["artists"], [{"key": "other artist", "label": "Other artist", "count": 1}])
+
+    def test_facets_keep_disjoint_selections_and_count_the_uncredited_survivor_once(self):
+        today = {"day": "2026-07-25", "facets": "1"}
+        survivor = watch_lot(source_lot_id="facet-survivor", artist="", artist_watchlist_name="", auction_house="")
+        older_day = datetime(2026, 7, 24, 17, tzinfo=timezone.utc)
+        middle = watch_lot(source_lot_id="facet-middle", superseded_by=survivor, event_at=older_day)
+        watch_lot(source_lot_id="facet-donor-one", random_lot=True, superseded_by=middle, event_at=older_day)
+        watch_lot(source_lot_id="facet-donor-two", random_lot=True, superseded_by=survivor, event_at=older_day)
+        watch_lot(source_lot_id="facet-credited", random_lot=True, artist_watchlist_name="", artist="Artist A",
+                  auction_house="House A")
+
+        data = self.client.get(self.url, {
+            **today, "collection_artist": "unknown artist", "collection_house": "invaluable",
+        }).json()
+        self.assertEqual((data["day_total"], data["total"]), (2, 1))
+        self.assertEqual([(r["id"], r["artist"], r["auction_house"]) for r in data["lots"]],
+                         [(survivor.pk, "Unknown artist", "Invaluable")])
+        self.assertEqual(data["facets"]["artists"], [{"key": "unknown artist", "label": "Unknown artist", "count": 1}])
+        self.assertEqual(data["facets"]["houses"], [{"key": "invaluable", "label": "Invaluable", "count": 1}])
+
+        disjoint = self.client.get(self.url, {
+            **today, "collection_artist": "unknown artist", "collection_house": "house a",
+        }).json()
+        self.assertEqual((disjoint["day_total"], disjoint["total"], disjoint["lots"]), (2, 0, []))
+        self.assertEqual({row["key"]: row["count"] for row in disjoint["facets"]["houses"]},
+                         {"invaluable": 1, "house a": 0})
+        self.assertEqual({row["key"]: row["count"] for row in disjoint["facets"]["artists"]},
+                         {"artist a": 1, "unknown artist": 0})
+        stale = self.client.get(self.url, {**today, "collection_artist": "no such artist"}).json()
+        self.assertEqual((stale["day_total"], stale["total"], stale["facets"]["houses"]), (2, 0, []))
+        self.assertNotIn("no such artist", [row["key"] for row in stale["facets"]["artists"]])
+        yesterday = self.client.get(self.url, {"day": "2026-07-24", "facets": "1"}).json()
+        self.assertEqual((yesterday["day_total"], yesterday["facets"]), (0, {"houses": [], "artists": []}))
 
     def test_catalog_artist_and_house_order_across_sale_days(self):
         warhol = watch_lot(source_lot_id="sort-warhol", random_lot=True, artist="After Andy Warhol",

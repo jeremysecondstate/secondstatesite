@@ -14,15 +14,24 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
   const countBadge = element("random-lots-count");
   const orderSelect = element("random-lots-sort");
   const sortNote = element("random-lots-sort-note");
+  const artistSearch = element("random-lots-artist-search");
+  const facetControls = {
+    house: {details: element("random-lots-houses"), list: element("random-lots-house-filters"),
+      summary: element("random-lots-houses-summary"), all: "All houses"},
+    artist: {details: element("random-lots-artists"), list: element("random-lots-artist-filters"),
+      summary: element("random-lots-artists-summary"), all: "All artists"},
+  };
   const orders = new Set(["catalog", "artist", "house", "estimate-desc", "estimate-asc"]);
   let saleDay = "";
   let loadedDay = "";
   let loadedOrder = "catalog";
+  let filters = {house: "", artist: ""};
+  let choices = {houses: [], artists: []};
   let lots = [];
   let page = 0;
   let pending = null;
 
-  function writeLocation(number, method, order = loadedOrder) {
+  function writeLocation(number, method, order = loadedOrder, selection = filters) {
     const url = new URL(window.location.href);
     if (number) url.searchParams.set("collection", "random");
     else url.searchParams.delete("collection");
@@ -30,12 +39,76 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
     else url.searchParams.delete("collection_page");
     if (number && order !== "catalog") url.searchParams.set("collection_sort", order);
     else url.searchParams.delete("collection_sort");
+    for (const name of Object.keys(facetControls)) {
+      if (number && selection[name]) url.searchParams.set("collection_" + name, selection[name]);
+      else url.searchParams.delete("collection_" + name);
+    }
     window.history[method](window.history.state, "", url);
+  }
+
+  const searchText = text => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+
+  function sameOptions(left, right) {
+    return left === right || (left.length === right.length && left.every((option, index) => {
+      const other = right[index];
+      return option.key === other.key && option.label === other.label && option.count === other.count;
+    }));
+  }
+
+  function renderChoices(name) {
+    const control = facetControls[name];
+    const {details, list, summary, all} = control;
+    const options = name === "artist" ? choices.artists : choices.houses;
+    const selected = filters[name];
+    const current = options.find(option => option.key === selected);
+    const available = options.filter(option => option.count > 0).length;
+    const selectionLabel = selected ? (current?.label ?? `Selected ${name} unavailable`) : all;
+    summary.textContent = `${available} ${name}${available === 1 ? "" : "s"} · ${selectionLabel}`;
+    if (!details.open) return;
+    const query = name === "artist" ? searchText(artistSearch.value) : "";
+    const last = control.rendered;
+    if (last && selected === last.selected && query === last.query && sameOptions(options, last.options)) return;
+    control.rendered = {options, selected, query};
+    const count = options.reduce((total, option) => total + option.count, 0);
+    const focusedKey = list.contains(document.activeElement) ? document.activeElement.dataset.key : undefined;
+    let focusTarget;
+    const buttons = [];
+    for (const {key, label, count: optionCount} of [{key: "", label: all, count}, ...options]) {
+      if (key && query && !searchText(label).includes(query)) continue;
+      const button = document.createElement("button");
+      button.className = "day-gallery-filter";
+      button.type = "button";
+      button.dataset.key = key;
+      button.setAttribute("aria-pressed", String(key === selected));
+      const title = document.createElement("span");
+      title.className = "day-gallery-filter-name";
+      title.textContent = label;
+      const badge = document.createElement("span");
+      badge.className = "day-gallery-filter-count";
+      badge.textContent = String(optionCount);
+      button.append(title, badge);
+      button.addEventListener("click", () => {
+        if (filters[name] === key) return;
+        writeLocation(1, "pushState", loadedOrder, {...filters, [name]: key});
+        syncPanel();
+      });
+      buttons.push(button);
+      if (key === focusedKey) focusTarget = button;
+    }
+    if (query && buttons.length === 1) {
+      const empty = document.createElement("p");
+      empty.className = "day-gallery-sort-note";
+      empty.textContent = "No artists match your search.";
+      buttons.push(empty);
+    }
+    list.replaceChildren(...buttons);
+    if (focusedKey !== undefined) (focusTarget || buttons[0]).focus({preventScroll: true});
   }
 
   async function loadPrices(url, request) {
     if (!lots.some(window.CalendarCurrency.hasForeignPrices)) return;
     const priceUrl = new URL(url);
+    priceUrl.searchParams.delete("facets");
     priceUrl.searchParams.set("prices", "usd");
     let quotes = [];
     try {
@@ -53,13 +126,24 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
     if (request === pending) updatePrices(grid, lots, quotes);
   }
 
-  async function loadPage(number, order = loadedOrder) {
+  async function loadPage(number, order = loadedOrder, selection = filters) {
     pending?.abort();
     const request = new AbortController();
     pending = request;
     const day = saleDay;
+    const changedDay = day !== loadedDay;
+    const changedFilters = selection.house !== filters.house || selection.artist !== filters.artist;
     loadedDay = day;
     loadedOrder = order;
+    filters = selection;
+    if (changedDay || changedFilters) {
+      if (changedDay) {
+        choices = {houses: [], artists: []};
+        artistSearch.value = "";
+      }
+      renderChoices("house");
+      renderChoices("artist");
+    }
     page = number;
     lots = [];
     grid.replaceChildren();
@@ -71,6 +155,10 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
     url.searchParams.set("day", day);
     url.searchParams.set("page", number);
     url.searchParams.set("sort", order);
+    url.searchParams.set("facets", "1");
+    for (const name of Object.keys(facetControls)) {
+      if (selection[name]) url.searchParams.set("collection_" + name, selection[name]);
+    }
     try {
       const response = await window.fetch(url, {
         credentials: "same-origin", headers: {Accept: "application/json"}, signal: request.signal,
@@ -85,15 +173,27 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
       if (request !== pending) return;
       if (data.day !== day) throw new Error("Unexpected sale date");
       if (data.sort != null && data.sort !== order) throw new Error("Unexpected sort order");
+      if (data.facets) {
+        choices = data.facets;
+        renderChoices("house");
+        renderChoices("artist");
+      }
       lots = data.lots;
       grid.replaceChildren(...lots.map(renderCard));
       grid.setAttribute("aria-busy", "false");
       page = data.page;
       if (number !== page) writeLocation(page, "replaceState");
-      countBadge.textContent = String(data.total);
-      status.textContent = data.total
-        ? `${data.total} saved lot${data.total === 1 ? "" : "s"} for this date`
-        : "No saved lots for this date.";
+      const filtered = Boolean(selection.house || selection.artist);
+      if (data.day_total != null || !filtered) countBadge.textContent = String(data.day_total ?? data.total);
+      if (filtered && data.day_total !== 0) {
+        status.textContent = data.total
+          ? `${data.total} matching saved lot${data.total === 1 ? "" : "s"} for this date`
+          : "No saved lots match these filters.";
+      } else {
+        status.textContent = data.total
+          ? `${data.total} saved lot${data.total === 1 ? "" : "s"} for this date`
+          : "No saved lots for this date.";
+      }
       element("random-lots-page").textContent = `Page ${page} of ${data.pages}`;
       previous.disabled = page <= 1;
       next.disabled = page >= data.pages;
@@ -123,15 +223,18 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
       const number = Number.isSafeInteger(requested) && requested > 0 ? requested : 1;
       const requestedOrder = params.get("collection_sort");
       const order = orders.has(requestedOrder) ? requestedOrder : "catalog";
+      const selection = {house: params.get("collection_house") || "", artist: params.get("collection_artist") || ""};
       orderSelect.value = order;
       sortNote.hidden = !order.startsWith("estimate-");
-      if (loadedDay !== saleDay || number !== page || order !== loadedOrder) loadPage(number, order);
+      if (loadedDay !== saleDay || number !== page || order !== loadedOrder ||
+          filters.house !== selection.house || filters.artist !== selection.artist) loadPage(number, order, selection);
       if (!wasVisible) heading.focus();
     } else if (wasVisible) {
       pending?.abort();
       pending = null;
       page = 0;
       lots = [];
+      artistSearch.value = "";
       grid.replaceChildren();
       if (!open.hidden) {
         element("day-gallery-houses").open = true;
@@ -149,7 +252,7 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
   }
 
   open.addEventListener("click", () => {
-    writeLocation(1, "pushState", "catalog");
+    writeLocation(1, "pushState", "catalog", {});
     syncPanel();
   });
   element("random-lots-back").addEventListener("click", () => {
@@ -160,6 +263,12 @@ function createRandomLotsGallery(document, window, renderCard, updatePrices) {
     writeLocation(1, "replaceState", orderSelect.value);
     syncPanel();
   });
+  artistSearch.addEventListener("input", () => renderChoices("artist"));
+  for (const [name, control] of Object.entries(facetControls)) {
+    control.details.addEventListener("toggle", () => {
+      if (control.details.open) renderChoices(name);
+    });
+  }
   function goToPage(number) {
     writeLocation(number, "replaceState");
     loadPage(number);

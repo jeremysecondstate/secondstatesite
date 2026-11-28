@@ -2727,6 +2727,38 @@ body:has(.lot-browser[open]) {
   margin-top: 24px;
 }
 
+.random-lots-filter-list {
+  max-height: min(50vh, 24rem);
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding: 5px;
+}
+
+.random-lots-search-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--calendar-muted);
+  font-size: 12px;
+}
+
+#random-lots-artist-search {
+  box-sizing: border-box;
+  width: min(100%, 24rem);
+  min-height: 44px;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--calendar-line);
+  border-radius: 2px;
+  background: #111715;
+  color: rgba(255, 255, 255, .9);
+  font: inherit;
+}
+
+#random-lots-artist-search:focus-visible {
+  outline: 2px solid var(--calendar-gold);
+  outline-offset: 2px;
+}
+
 .day-gallery-house-filters:empty {
   padding-bottom: 0;
 }

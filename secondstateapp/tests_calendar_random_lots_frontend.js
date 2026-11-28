@@ -6,30 +6,38 @@ const CalendarCurrency = require("./static/secondstateapp/calendar_currency.js")
 
 function gallery(search, fetchPage) {
   const elements = new Map();
+  function createElement() {
+    const node = new EventTarget();
+    return Object.assign(node, {
+      value: "",
+      dataset: {},
+      children: [],
+      classList: {toggle() {}},
+      setAttribute(name, value) { this[name] = value; },
+      replaceChildren(...children) { this.children = children; },
+      append(...children) { this.children.push(...children); },
+      contains(target) { return this === target || this.children.some(child => child?.contains?.(target)); },
+      focus() { this.focused = true; document.activeElement = this; },
+    });
+  }
   function element(id) {
     if (!elements.has(id)) {
-      const node = new EventTarget();
-      Object.assign(node, {
-        hidden: true,
-        dataset: {},
-        classList: {toggle() {}},
-        setAttribute(name, value) { this[name] = value; },
-        replaceChildren(...children) { this.children = children; },
-        focus() { this.focused = true; },
-      });
+      const node = createElement();
+      node.hidden = true;
       elements.set(id, node);
     }
     return elements.get(id);
   }
+  const document = {getElementById: element, createElement, activeElement: null};
   element("random-lots-panel").dataset.url = "/calendar/random-lots/";
   const location = new URL("/calendar/?" + search, "https://secondstate.art");
   const navigate = (_state, _title, url) => { location.href = url; };
   const window = {location, history: {pushState: navigate, replaceState: navigate}, fetch: fetchPage, CalendarCurrency};
   const prices = [];
-  const controller = createRandomLotsGallery({getElementById: element}, window, lot => lot.id,
+  const controller = createRandomLotsGallery(document, window, lot => lot.id,
     (_grid, lots, quotes) => prices.push({lots, quotes}));
   return {
-    element, location, controller, prices,
+    element, location, controller, prices, document,
     click: id => element(id).dispatchEvent(new Event("click")),
   };
 }
@@ -185,4 +193,135 @@ test("changing the date with an open gallery replaces its count and ignores the 
   assert.match(g.element("random-lots-status").textContent, /no saved lots/i);
   assert.equal(g.element("random-lots-pagination").hidden, true);
   assert.equal(g.element("random-lots-retry").hidden, true);
+});
+
+function choice(g, name, key) {
+  return g.element(`random-lots-${name}-filters`).children.find(node => node.dataset.key === key);
+}
+
+function showChoices(g, name) {
+  const details = g.element(`random-lots-${name}s`);
+  details.open = true;
+  details.dispatchEvent(new Event("toggle"));
+}
+
+function choose(g, name, key) {
+  const button = choice(g, name, key);
+  assert.ok(button, `Missing ${name} choice ${key}`);
+  button.focus();
+  button.dispatchEvent(new Event("click"));
+}
+
+test("saved-lot facets combine across pages, preserve catalog settings and search accented artist names", async () => {
+  const day = "2026-11-30";
+  const catalog = `view=catalog&day=${day}&house=Main+House&artist=Main+Artist&sort=time_asc`;
+  const requests = [];
+  const houses = [{key: "h:2 / α", label: "House Two", count: 27}, {key: "h1", label: "House One", count: 25}];
+  const artists = [{key: "a:é", label: "Émilie Müller", count: 25}, {key: "other", label: "Marc", count: 27}];
+  const g = gallery(catalog + "&collection=random&collection_page=2&collection_sort=estimate-desc", async url => {
+    const params = url.searchParams;
+    const house = params.get("collection_house");
+    const artist = params.get("collection_artist");
+    const prices = params.has("prices");
+    const page = Number(params.get("page"));
+    requests.push({house, artist, prices, page});
+    assert.equal(params.has("house") || params.has("artist"), false);
+    assert.equal(params.get("facets"), prices ? null : "1");
+    assert.equal(params.get("sort"), "estimate-desc");
+    const total = house && artist ? 17 : house ? 27 : artist ? 25 : 52;
+    return {ok: true, json: async () => ({
+      day, page, total, day_total: 52, pages: Math.ceil(total / 24),
+      lots: [{id: 7, currency: "EUR", estimate_low: "100"}],
+      facets: prices ? undefined : {
+        houses: artist ? [{...houses[0], count: 17}, {...houses[1], count: 8}] : houses,
+        artists: house ? [{...artists[0], count: 17}, {...artists[1], count: 10}] : artists,
+      },
+    })};
+  });
+  g.controller.syncView("catalog", day, 52);
+  await completeRequests();
+  assert.equal(g.element("random-lots-houses-summary").textContent, "2 houses · All houses");
+  assert.equal(g.element("random-lots-artists-summary").textContent, "2 artists · All artists");
+  assert.equal(choice(g, "artist", ""), undefined);
+  showChoices(g, "house");
+  showChoices(g, "artist");
+  assert.equal(choice(g, "house", "")["aria-pressed"], "true");
+  assert.equal(choice(g, "artist", "").children[1].textContent, "52");
+  choose(g, "house", houses[0].key);
+  await completeRequests();
+  assert.equal(choice(g, "house", houses[0].key)["aria-pressed"], "true");
+  assert.equal(g.document.activeElement, choice(g, "house", houses[0].key));
+  assert.equal(g.location.searchParams.get("collection_page"), null);
+  assert.equal(g.location.searchParams.get("house"), "Main House");
+  assert.equal(g.location.searchParams.get("sort"), "time_asc");
+  assert.equal(choice(g, "artist", "").children[1].textContent, "27");
+
+  const search = g.element("random-lots-artist-search");
+  const numberOfRequests = requests.length;
+  search.value = "MULLER";
+  search.focus();
+  search.dispatchEvent(new Event("input"));
+  assert.ok(choice(g, "artist", artists[0].key));
+  assert.equal(choice(g, "artist", "other"), undefined);
+  assert.equal(g.document.activeElement, search);
+  assert.equal(requests.length, numberOfRequests);
+  choose(g, "artist", artists[0].key);
+  await completeRequests();
+  assert.equal(g.location.searchParams.get("artist"), "Main Artist");
+  assert.equal(g.location.searchParams.get("collection_artist"), artists[0].key);
+  assert.equal(g.element("random-lots-artists-summary").textContent, "2 artists · " + artists[0].label);
+  assert.equal(g.element("random-lots-count").textContent, "52");
+  assert.match(g.element("random-lots-status").textContent, /17 matching/);
+  assert.deepEqual(requests.slice(-2), [
+    {house: houses[0].key, artist: artists[0].key, prices: false, page: 1},
+    {house: houses[0].key, artist: artists[0].key, prices: true, page: 1},
+  ]);
+  choose(g, "house", "");
+  await completeRequests();
+  assert.equal(g.location.searchParams.has("collection_house"), false);
+  assert.equal(g.location.searchParams.get("collection_artist"), artists[0].key);
+  g.click("random-lots-back");
+  assert.equal(g.location.searchParams.toString(), catalog);
+});
+
+test("restoring filter history cancels stale cards and keeps zero-match filters clearable on a nonempty day", async () => {
+  const day = "2026-11-30";
+  const nextDay = "2026-12-01";
+  let finishStale;
+  const g = gallery(`view=catalog&collection=random&day=${day}&collection_artist=stale`, async url => {
+    const params = url.searchParams;
+    if (params.get("collection_artist") === "stale") return new Promise(resolve => { finishStale = resolve; });
+    const date = params.get("day");
+    const hasArtist = params.has("collection_artist");
+    return {ok: true, json: async () => ({
+      day: date, page: 1, pages: 1, total: hasArtist || date === nextDay ? 0 : 2,
+      day_total: date === day ? 2 : 0, lots: [],
+      facets: {houses: [{key: "h", label: "House", count: hasArtist ? 0 : 2}], artists: []},
+    })};
+  });
+  g.controller.syncView("catalog", day, 2);
+  showChoices(g, "artist");
+  g.location.searchParams.set("collection_artist", "gone");
+  g.controller.syncView("catalog", day, 2);
+  await completeRequests();
+  finishStale({ok: true, json: async () => ({
+    day, page: 1, pages: 1, total: 90, day_total: 90, lots: [{id: 9}],
+    facets: {houses: [], artists: [{key: "stale", label: "Late artist", count: 90}]},
+  })});
+  await completeRequests();
+  assert.equal(g.element("random-lots-count").textContent, "2");
+  assert.match(g.element("random-lots-status").textContent, /No saved lots match/);
+  assert.equal(choice(g, "artist", "stale"), undefined);
+  assert.equal(choice(g, "artist", "")["aria-pressed"], "false");
+  assert.deepEqual(g.element("random-lots-grid").children, []);
+  choose(g, "artist", "");
+  await completeRequests();
+  assert.equal(g.element("random-lots-status").textContent, "2 saved lots for this date");
+  assert.equal(choice(g, "artist", "")["aria-pressed"], "true");
+  g.location.searchParams.set("day", nextDay);
+  g.location.searchParams.set("collection_artist", "gone");
+  g.controller.syncView("catalog", nextDay, 0);
+  await completeRequests();
+  assert.equal(g.element("random-lots-count").textContent, "0");
+  assert.equal(g.element("random-lots-status").textContent, "No saved lots for this date.");
 });
