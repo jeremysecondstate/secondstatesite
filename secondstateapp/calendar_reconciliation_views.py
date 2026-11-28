@@ -22,6 +22,7 @@ from django.views.decorators.gzip import gzip_page
 from django.views.decorators.http import require_http_methods
 
 from .calendar_duplicates import PUBLIC_FIELDS, apply_pairs, audit_lots, fingerprint, snapshot
+from .calendar_catalog_scope import calendar_tracked_credit, is_regular_catalog_lot
 from .calendar_views import _calendar_zone, _sync_authorized
 from .models import AuctionLotReconciliation, AuctionLotSupersessionReceipt, AuctionWatchLot
 
@@ -33,10 +34,11 @@ EXTRA_FIELDS = ("current_bid", "bid_count", "sold_price", "sold_currency", "loca
                 "source_first_seen_at", "source_last_seen_at", "source_status")
 
 
-def _projection(lot):
+def _projection(lot, tracked):
     row = snapshot(lot)
     row.update({name: getattr(lot, name) for name in EXTRA_FIELDS})
     row["fingerprint"] = fingerprint(lot)
+    row["regular_catalog"] = is_regular_catalog_lot(lot, tracked)
     return row
 
 
@@ -102,8 +104,9 @@ def _read(request):
     if not 0 <= cursor <= 2**63 - 1 or not 1 <= page_size <= MAX_PAGE:
         raise ValueError("Invalid cursor or page_size.")
     lots = list(rows.filter(pk__gt=cursor).only(*PUBLIC_FIELDS, *EXTRA_FIELDS).order_by("pk")[:page_size + 1])
+    tracked = calendar_tracked_credit()
     return JsonResponse({"ok": True, "version": 1, "observed_at": timezone.now(),
-                         "lots": [_projection(lot) for lot in lots[:page_size]],
+                         "lots": [_projection(lot, tracked) for lot in lots[:page_size]],
                          "next_cursor": str(lots[page_size - 1].pk) if len(lots) > page_size else None})
 
 

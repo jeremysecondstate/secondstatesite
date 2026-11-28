@@ -1,4 +1,4 @@
-"""Saved audit lots belong to their current sale day, independently of tracked artists."""
+"""Random Lots contains saved, off-catalog survivors on their current sale day."""
 
 import json
 from datetime import datetime, timezone
@@ -37,7 +37,7 @@ class CalendarRandomLotsTests(TestCase):
                               artist="Outside roster", artist_watchlist_name="",
                               auction_house="Base Zero", lot_number="1",
                               event_at=datetime(2026, 11, 26, 17, tzinfo=timezone.utc))
-        tracked = watch_lot(source="Drouot", source_lot_id="36113097", event_at=after_midnight_utc)
+        tracked = watch_lot(source="Drouot", source_lot_id="36113097", random_lot=True, event_at=after_midnight_utc)
         watch_lot(source="Drouot", source_lot_id=aguttes.source_lot_id, event_at=after_midnight_utc,
                   artist="Unrelated", artist_watchlist_name="")
         watch_lot(source_lot_id="unrelated-outside-roster", artist="Outside roster",
@@ -115,6 +115,7 @@ class CalendarRandomLotsTests(TestCase):
 
     def test_converging_supersession_chains_show_the_saved_survivor_on_its_current_sale_day_once(self):
         survivor = watch_lot(source_lot_id="verified-replacement", title="Current saved title",
+                             artist="Off-roster printmaker", artist_watchlist_name="",
                              event_at=datetime(2026, 7, 26, 17, tzinfo=timezone.utc))
         middle = watch_lot(source_lot_id="older-replacement", superseded_by=survivor)
         watch_lot(source="Drouot", source_lot_id="35991044", superseded_by=middle)
@@ -174,13 +175,13 @@ class CalendarRandomLotsTests(TestCase):
         for number in range(1, 27):
             common.append(watch_lot(
                 source_lot_id=f"facet-common-{number}", random_lot=True,
-                artist_watchlist_name="", artist="Joan Miró" if number % 2 else "Miró, Joan",
+                artist_watchlist_name="", artist="Antoni Clavé" if number % 2 else "Clavé, Antoni",
                 auction_house="Gallery &amp; Sons", lot_number=str(number), estimate_low=number,
             ).pk)
         rare = watch_lot(source_lot_id="facet-rare", random_lot=True,
-                         artist_watchlist_name="", artist="After Andy Warhol", auction_house="Zephyr")
+                         artist_watchlist_name="", artist="After Tracey Emin", auction_house="Zephyr")
         watch_lot(source_lot_id="facet-direct", random_lot=True,
-                  artist_watchlist_name="Andy Warhol", artist="Catalog spelling", auction_house="Zephyr")
+                  artist_watchlist_name="Tracey Emin", artist="Catalog spelling", auction_house="Zephyr")
         later = datetime(2026, 7, 26, 17, tzinfo=timezone.utc)
         watch_lot(source_lot_id="facet-other-day", random_lot=True,
                   artist_watchlist_name="", artist="Other artist", auction_house="Other house", event_at=later)
@@ -194,9 +195,9 @@ class CalendarRandomLotsTests(TestCase):
             {"key": "zephyr", "label": "Zephyr", "count": 2},
         ])
         self.assertEqual({(row["key"], row["label"], row["count"]) for row in response["facets"]["artists"]}, {
-            ("miró, joan", "Miró, Joan", 26),
-            ("after warhol, andy", "After Warhol, Andy", 1),
-            ("warhol, andy", "Warhol, Andy", 1),
+            ("clavé, antoni", "Clavé, Antoni", 26),
+            ("after emin, tracey", "After Emin, Tracey", 1),
+            ("emin, tracey", "Emin, Tracey", 1),
         })
         # Reading facet labels for positions beyond page one should use the
         # same database round trips as loading just the first page of cards.
@@ -204,12 +205,12 @@ class CalendarRandomLotsTests(TestCase):
             self.client.get(self.url, {"day": params["day"]})
         with self.assertNumQueries(len(card_queries)):
             self.client.get(self.url, params)
-        rare_rows = self.client.get(self.url, {**params, "collection_artist": "after warhol, andy"}).json()
+        rare_rows = self.client.get(self.url, {**params, "collection_artist": "after emin, tracey"}).json()
         self.assertEqual([row["id"] for row in rare_rows["lots"]], [rare.pk])
         self.assertEqual(rare_rows["facets"]["houses"], [{"key": "zephyr", "label": "Zephyr", "count": 1}])
 
         filtered = {
-            **params, "collection_house": "gallery & sons", "collection_artist": "miró, joan",
+            **params, "collection_house": "gallery & sons", "collection_artist": "clavé, antoni",
             "sort": "estimate-desc",
         }
         expected = list(reversed(common))
@@ -260,18 +261,18 @@ class CalendarRandomLotsTests(TestCase):
         self.assertEqual((yesterday["day_total"], yesterday["facets"]), (0, {"houses": [], "artists": []}))
 
     def test_catalog_artist_and_house_order_across_sale_days(self):
-        warhol = watch_lot(source_lot_id="sort-warhol", random_lot=True, artist="After Andy Warhol",
-                           artist_watchlist_name="", auction_house="Zephyr", lot_number="1")
+        emin = watch_lot(source_lot_id="sort-emin", random_lot=True, artist="After Tracey Emin",
+                         artist_watchlist_name="", auction_house="Zephyr", lot_number="1")
         later = datetime(2026, 7, 26, 17, tzinfo=timezone.utc)
-        miro = watch_lot(source_lot_id="sort-miro", random_lot=True, artist="Unresolved catalogue spelling",
-                         artist_watchlist_name="Joan Miró", auction_house="Aster", lot_number="10", event_at=later)
-        monet = watch_lot(source_lot_id="sort-monet", random_lot=True, artist="Claude Monet",
+        bochner = watch_lot(source_lot_id="sort-bochner", random_lot=True, artist="Unresolved catalogue spelling",
+                            artist_watchlist_name="Mel Bochner", auction_house="Aster", lot_number="10", event_at=later)
+        clave = watch_lot(source_lot_id="sort-clave", random_lot=True, artist="Antoni Clavé",
                           artist_watchlist_name="", auction_house="Aster", lot_number="2a", event_at=later)
         expectations = (
-            ({}, [warhol.pk, monet.pk, miro.pk]),
-            ({"sort": "catalog"}, [warhol.pk, monet.pk, miro.pk]),
-            ({"sort": "artist"}, [miro.pk, monet.pk, warhol.pk]),
-            ({"sort": "house"}, [monet.pk, miro.pk, warhol.pk]),
+            ({}, [emin.pk, clave.pk, bochner.pk]),
+            ({"sort": "catalog"}, [emin.pk, clave.pk, bochner.pk]),
+            ({"sort": "artist"}, [bochner.pk, clave.pk, emin.pk]),
+            ({"sort": "house"}, [clave.pk, bochner.pk, emin.pk]),
         )
         for params, expected in expectations:
             with self.subTest(params=params):
@@ -293,6 +294,7 @@ class CalendarRandomLotsTests(TestCase):
             currency, low, high = estimates.get(number, ("USD", 200, 250))
             by_number[number] = watch_lot(
                 source_lot_id=f"sort-estimate-{number}", random_lot=True, lot_number=str(number),
+                artist="Off-roster printmaker", artist_watchlist_name="",
                 currency=currency, estimate_low=low, estimate_high=high, current_bid=20000,
             ).pk
 
@@ -323,10 +325,11 @@ class CalendarRandomLotsTests(TestCase):
         source_ids = json.loads(path.read_text(encoding="utf-8"))["source_lot_ids"]["Drouot"][:26]
         numbers = ["1", "2", "2a", "2b", *map(str, range(3, 24))]
         for source_id, number in reversed(list(zip(source_ids[:25], numbers, strict=True))):
-            artist = "Alexander Calder" if number == "23" else "Joan Miró"
+            artist = "Mel Bochner" if number == "23" else "Antoni Clavé"
             watch_lot(source="Drouot", source_lot_id=source_id, lot_number=number, currency="EUR",
                       artist=artist, artist_watchlist_name="")
         next_day = watch_lot(source="Drouot", source_lot_id=source_ids[25], lot_number="1",
+                             artist="Off-roster printmaker", artist_watchlist_name="",
                              auction_house="Aster", event_at=datetime(2026, 7, 26, 17, tzinfo=timezone.utc))
 
         first = self.client.get(self.url, {"day": "2026-07-25"}).json()
@@ -358,6 +361,7 @@ class CalendarRandomLotsTests(TestCase):
 
     def test_unsafe_saved_links_are_not_returned_to_the_gallery(self):
         watch_lot(source_lot_id="207302212", lot_url="javascript:alert(1)", sale_url="data:text/html,test",
+                  artist="Off-roster printmaker", artist_watchlist_name="",
                   image_url="data:text/html,test")
         row = self.client.get(self.url).json()["lots"][0]
         self.assertFalse(row["lot_url"])

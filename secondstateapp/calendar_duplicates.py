@@ -154,6 +154,7 @@ def audit_lots(lots, *, timezone_name="America/Los_Angeles"):
 def apply_pairs(pairs):
     """Apply an explicitly reviewed plan atomically; reject stale or chained plans."""
     from django.db import transaction
+    from .calendar_catalog_scope import calendar_tracked_credit, clear_regular_random_flags, is_regular_catalog_lot
     from .models import AuctionWatchLot
 
     remove_ids = [pair["remove_id"] for pair in pairs]
@@ -161,6 +162,8 @@ def apply_pairs(pairs):
     if len(set(remove_ids)) != len(remove_ids) or set(remove_ids) & set(keep_ids):
         raise ValueError("A duplicate may appear only once and may not also be a survivor.")
     changes = []
+    tracked = calendar_tracked_credit()
+    regular_ids = set()
     with transaction.atomic():
         rows = {lot.pk: lot for lot in AuctionWatchLot.objects.select_for_update().filter(pk__in=remove_ids + keep_ids)}
         for pair in pairs:
@@ -179,19 +182,26 @@ def apply_pairs(pairs):
                 raise ValueError(f"Lot {old.pk} already has retained duplicates; resolve its children explicitly.")
             changes.append({"remove_id": old.pk, "keep_id": keep.pk, "active_before": old.active,
                             "reason": pair["reason"], "before": snapshot(old)})
+            if is_regular_catalog_lot(keep, tracked):
+                regular_ids.add(keep.pk)
+                if old.random_lot:
+                    changes[-1]["random_lot_before"] = True
         for change in changes:
             AuctionWatchLot.objects.filter(pk=change["remove_id"]).update(superseded_by_id=change["keep_id"], active=False)
+        clear_regular_random_flags(regular_ids)
     return {"format": "secondstate-calendar-duplicate-receipt-v1", "changes": changes}
 
 
 def rollback_receipt(receipt):
     """Restore only suppression flags, leaving later source updates/saved work intact."""
     from django.db import transaction
+    from .calendar_catalog_scope import calendar_tracked_credit, regular_catalog_credit
     from .models import AuctionWatchLot
 
     if receipt.get("format") != "secondstate-calendar-duplicate-receipt-v1":
         raise ValueError("Not a Calendar duplicate receipt.")
     changes = receipt["changes"]
+    tracked = calendar_tracked_credit()
     with transaction.atomic():
         rows = {lot.pk: lot for lot in AuctionWatchLot.objects.select_for_update().filter(pk__in=[row["remove_id"] for row in changes])}
         for change in changes:
@@ -200,5 +210,10 @@ def rollback_receipt(receipt):
                 raise ValueError("A suppression link changed; rollback requires another review.")
             # A newer sale result must not be reactivated by an old receipt.
             active = change["active_before"] and old.sold_price is None and old.source_status != "ended"
-            AuctionWatchLot.objects.filter(pk=old.pk).update(superseded_by_id=None, active=active)
+            restored = {"superseded_by_id": None, "active": active}
+            if change.get("random_lot_before") and not (
+                old.event_at and regular_catalog_credit(old.artist, old.artist_watchlist_name, tracked)
+            ):
+                restored["random_lot"] = True
+            AuctionWatchLot.objects.filter(pk=old.pk).update(**restored)
     return len(changes)

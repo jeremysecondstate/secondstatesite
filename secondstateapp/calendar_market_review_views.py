@@ -20,6 +20,7 @@ from .calendar_market_review import (
     CATALOG_FIELDS, FIRST_REVIEW_DAY, RECHECK_START_DAY, missing_mismatch_evidence,
     review_is_current, saved_review_details,
 )
+from .calendar_catalog_scope import calendar_tracked_credit, is_regular_catalog_lot
 from .calendar_views import _calendar_zone, _market_review_projections, _sync_authorized
 from .models import AuctionLotMarketReview, AuctionWatchLot
 
@@ -69,10 +70,12 @@ def _inspect(raw_ids, recheck_from=None):
     lots = list(AuctionWatchLot.objects.select_related("market_review").filter(pk__in=_ids(raw_ids)).order_by("pk"))
     rows = _market_review_projections(lots)
     start = _review_start(recheck_from)
+    tracked = calendar_tracked_credit()
     for lot, row in zip(lots, rows):
         review = getattr(lot, "market_review", None)
         row.update(
             eligible=bool(lot.superseded_by_id is None and lot.event_at and lot.event_at >= start),
+            regular_catalog=is_regular_catalog_lot(lot, tracked),
             revision=review.revision if review else 0, review=None,
         )
         if review:

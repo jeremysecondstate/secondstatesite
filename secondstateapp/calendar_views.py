@@ -38,7 +38,6 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from catalogapp.artprice_artist_links import artist_identity_key
 from catalogapp.bookmark_watchlist import DEFAULT_ALLOWED_DOMAINS
-from catalogapp.tracked_artists import allows_watchlist_credit, is_tracked_credit, tracked_artist_keys
 
 from .artprice_image_store import saved_artprice_image_url, store_saved_artprice_image
 from .artprice_max_bid import (
@@ -60,6 +59,10 @@ from .auction_email import (
 )
 from .bid_board_snapshot import saved_board_summary, uses_max_bid_label
 from .calendar_arrival import published_lot_arrival, sale_arrival_estimate, sale_numbering_baseline
+from .calendar_catalog_scope import (
+    calendar_tracked_credit, clear_regular_random_flags, is_regular_catalog_lot,
+    regular_catalog_artist_filter, regular_catalog_credit,
+)
 from .calendar_linked_sales import LinkedCatalogs
 from .calendar_lot_numbers import calendar_lot_number
 from .calendar_market_evidence import resale_auction_houses
@@ -513,19 +516,7 @@ def _calendar_display_lots(request):
     lots = AuctionWatchLot.objects.filter(superseded_by__isnull=True)
     if request.GET.get("artists") == "all":
         return lots
-    if not hasattr(request, "_calendar_artist_filter"):
-        roster = tracked_artist_keys(Path(settings.BASE_DIR) / "docs" / "artist-links.html")
-        # Sync can create artist rows for any artist. Resolve each distinct stored
-        # credit once, including historical lots with no watchlist foreign key.
-        pairs = list(lots.order_by().values_list("artist", "artist_watchlist_name").distinct())
-        labels = {value for pair in pairs for value in pair}
-        names = {label for label in labels if is_tracked_credit(label, roster)}
-        # Some verified mixed-lot credits abbreviate their contributor list.
-        # A saved canonical name can identify the tracked print in that case.
-        qualified = {credit for credit, watch in pairs
-                     if watch in names and credit not in names and allows_watchlist_credit(credit)}
-        request._calendar_artist_filter = Q(artist__in=names) | Q(artist_watchlist_name__in=names, artist__in=qualified)
-    return lots.filter(request._calendar_artist_filter)
+    return lots.filter(regular_catalog_artist_filter(request))
 
 
 def _with_catalog_details(lots):
@@ -599,7 +590,10 @@ def _calendar_lot_image(lot):
 
 def _saved_random_lots(*fields, day_bounds=None, merged_only=False):
     """Follow each audit identity to its current survivor, including later merges."""
-    lots = AuctionWatchLot.objects.order_by().only("id", "superseded_by", *fields)
+    tracked = calendar_tracked_credit()
+    lots = AuctionWatchLot.objects.order_by().only(
+        "id", "superseded_by", "artist", "artist_watchlist_name", "event_at", *fields,
+    )
     if day_bounds:
         # A saved listing can move to another day when its survivor is corrected.
         # Follow all replacement links, then apply the date to the terminal lots.
@@ -617,7 +611,7 @@ def _saved_random_lots(*fields, day_bounds=None, merged_only=False):
             seen.add(lot.pk)
             if lot.superseded_by_id:
                 replacements.add(lot.superseded_by_id)
-            else:
+            elif not is_regular_catalog_lot(lot, tracked):
                 visible.append(lot)
         replacements -= seen
         if not replacements:
@@ -625,10 +619,11 @@ def _saved_random_lots(*fields, day_bounds=None, merged_only=False):
         pending = lots.filter(pk__in=replacements)
 
 
-def _random_lots_by_day(zone):
+def _random_lots_by_day(zone, catalog_artist_filter):
     grouped = list(AuctionWatchLot.objects.filter(_random_lot_membership()).order_by().values(
         sale_day=TruncDate("event_at", tzinfo=zone),
-    ).annotate(total=Count("pk", filter=Q(superseded_by__isnull=True)), merged=Count("superseded_by")))
+    ).annotate(total=Count("pk", filter=Q(superseded_by__isnull=True) & ~catalog_artist_filter),
+               merged=Count("superseded_by")))
     counts = Counter({row["sale_day"].isoformat(): row["total"] for row in grouped if row["sale_day"] and row["total"]})
     if any(row["merged"] for row in grouped):
         # Direct members were counted in SQL. Only merged identities can add
@@ -879,7 +874,7 @@ def auction_calendar(request):
     calendar_sales_data = {}
     oliver_calendar_sales_data = {}
     calendar_day_counts = {}
-    random_lots_by_day = _random_lots_by_day(zone)
+    random_lots_by_day = _random_lots_by_day(zone, regular_catalog_artist_filter(request))
     is_scoped_house = lru_cache(maxsize=None)(is_oliver_house)
 
     def summarize_day(day, day_lots):
@@ -2812,13 +2807,13 @@ def _sync_authorized(request) -> bool:
     return bool(expected and provided and secrets.compare_digest(expected, provided))
 
 
-def _effective_random_member_ids(lots):
+def _effective_random_member_ids(lots, regular_ids):
     """Resolve membership inherited from saved provider listings merged into these survivors."""
     legacy = _random_lot_manifest()["source_lot_ids"]
     members = set()
     pending = {}
     for lot in lots:
-        if lot.superseded_by_id is not None:
+        if lot.superseded_by_id is not None or lot.pk in regular_ids:
             continue
         if lot.random_lot or lot.source_lot_id in legacy.get(lot.source, ()):
             members.add(lot.pk)
@@ -2838,11 +2833,12 @@ def _effective_random_member_ids(lots):
     return members
 
 
-def _random_lot_receipt(lot, zone):
+def _random_lot_receipt(lot, zone, tracked):
     return {
         "id": lot.pk, "source": lot.source, "source_lot_id": lot.source_lot_id,
         "calendar_day": timezone.localdate(lot.event_at, zone).isoformat() if lot.event_at else "",
         "superseded_by_id": lot.superseded_by_id,
+        "regular_catalog": is_regular_catalog_lot(lot, tracked),
     }
 
 
@@ -2856,7 +2852,7 @@ def auction_calendar_random_lot_membership(request):
     if verify_only:
         if not request.GET:
             return JsonResponse({"ok": True, "schema_version": 1, "max_batch": RANDOM_LOTS_BATCH,
-                                 "create_mode": RANDOM_LOTS_CREATE_MODE})
+                                 "create_mode": RANDOM_LOTS_CREATE_MODE, "exclusive_catalogs": True})
         records = [request.GET.dict()]
     else:
         try:
@@ -2889,22 +2885,26 @@ def auction_calendar_random_lot_membership(request):
     zone = _calendar_zone()
     with transaction.atomic():
         lots = AuctionWatchLot.objects.filter(pk__in=expected).only(
-            "pk", "source", "source_lot_id", "event_at", "superseded_by", "random_lot",
+            "pk", "source", "source_lot_id", "event_at", "superseded_by", "random_lot", "artist", "artist_watchlist_name",
         ).order_by("pk")
         if not verify_only:
             lots = lots.select_for_update()
         by_id = {lot.pk: lot for lot in lots}
         receipts = []
+        tracked = calendar_tracked_credit()
         for pk, record in expected.items():
             lot = by_id.get(pk)
             if lot is None:
                 return JsonResponse({"ok": False, "error": "Calendar lot no longer exists.", "id": pk}, status=409)
-            row = _random_lot_receipt(lot, zone)
+            row = _random_lot_receipt(lot, zone, tracked)
             if lot.superseded_by_id or any(row[k] != record[k] for k in ("source", "source_lot_id", "calendar_day")):
                 return JsonResponse({"ok": False, "error": "Recheck the current source, survivor and sale day.", "lot": row}, status=409)
             receipts.append(row)
-        members = _effective_random_member_ids(by_id.values())
-        added = set() if verify_only else expected.keys() - members
+        regular_ids = {row["id"] for row in receipts if row["regular_catalog"]}
+        members = _effective_random_member_ids(by_id.values(), regular_ids)
+        added = set() if verify_only else expected.keys() - members - regular_ids
+        if not verify_only:
+            clear_regular_random_flags(regular_ids)
         if added:
             AuctionWatchLot.objects.filter(pk__in=added).update(random_lot=True)
         for row in receipts:
@@ -3087,16 +3087,20 @@ def _create_random_lots(prepared, zone):
     artist_ids = dict(artists)
     rows = []
     lots = []
+    tracked = calendar_tracked_credit()
     for source, identity, defaults, _name, artist_key in prepared:
         # A concurrent sync can insert the source identity after the audit's
         # latest census. The unique constraint and get_or_create preserve that row.
+        regular = regular_catalog_credit(defaults["artist"], defaults["artist_watchlist_name"], tracked)
         lot, created = AuctionWatchLot.objects.select_for_update().get_or_create(
             source=source, source_lot_id=identity,
-            defaults={**defaults, "watchlist_artist_id": artist_ids.get(artist_key), "random_lot": True},
+            defaults={**defaults, "watchlist_artist_id": artist_ids.get(artist_key), "random_lot": not regular},
         )
         lots.append(lot)
-        rows.append({**_random_lot_receipt(lot, zone), "created": created, "membership_added": created})
-    members = _effective_random_member_ids(lots)
+        receipt = _random_lot_receipt(lot, zone, tracked)
+        rows.append({**receipt, "created": created, "membership_added": created and not receipt["regular_catalog"]})
+    regular_ids = {row["id"] for row in rows if row["regular_catalog"]}
+    members = _effective_random_member_ids(lots, regular_ids)
     for row in rows:
         row["random_lot"] = row["id"] in members
     return JsonResponse({
@@ -3254,7 +3258,9 @@ def sync_auction_calendar(request):
         return JsonResponse({"ok": False, "error": "Calendar image storage is unavailable. Please retry."}, status=503)
     if create_only:
         return _create_random_lots(prepared, zone)
+    tracked = calendar_tracked_credit()
     with transaction.atomic():
+        regular_ids = set()
         artists_by_key: dict[str, AuctionWatchArtist] = {}
         for normalized_name, (name, artprice_url) in prepared_artist_links.items():
             artist, _created = AuctionWatchArtist.objects.update_or_create(
@@ -3299,14 +3305,18 @@ def sync_auction_calendar(request):
                         defaults["sold_currency"] = existing_lot.sold_currency or existing_lot.currency
                 if "sold_price" in defaults and not defaults["sold_currency"]:
                     defaults["sold_currency"] = existing_lot.sold_currency or existing_lot.currency
-            _lot, created = AuctionWatchLot.objects.update_or_create(
+            lot, created = AuctionWatchLot.objects.update_or_create(
                 source=source,
                 source_lot_id=source_lot_id,
                 defaults=defaults,
             )
+            if not created and (is_regular_catalog_lot(lot, tracked)
+                                or (existing_lot is not None and is_regular_catalog_lot(existing_lot, tracked))):
+                regular_ids.add(lot.pk)
             created_count += int(created)
             updated_count += int(not created)
             ended_count += int(not defaults["active"])
+        clear_regular_random_flags(regular_ids)
 
     return JsonResponse(
         {

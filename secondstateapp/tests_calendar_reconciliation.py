@@ -144,6 +144,26 @@ class CalendarReconciliationTests(TestCase):
         self.assertEqual(saved["receipt"], first["receipt"])
         self.assertEqual(self.get(operation="missing").status_code, 404)
 
+    def test_merge_into_regular_survivor_retires_and_rollback_restores_only_independent_membership(self):
+        keep, old = self.pair(random_lot=True, artist="Off-roster artist", artist_watchlist_name="")
+        other = watch_lot(source_lot_id="separate-impression", random_lot=True,
+                          artist="Unidentified printmaker", artist_watchlist_name="")
+        result = self.post(self.plan((keep, old)))
+        self.assertEqual(result.status_code, 200, result.content)
+        old.refresh_from_db()
+        self.assertEqual((old.superseded_by_id, old.random_lot), (keep.pk, False))
+        self.client.force_login(get_user_model().objects.create_user("catalog-reviewer", is_staff=True))
+        day = {"day": "2026-07-25"}
+        random_url = reverse("auction_calendar_random_lots")
+        self.assertEqual([r["id"] for r in self.client.get(random_url, day).json()["lots"]], [other.pk])
+        self.assertEqual([r["id"] for r in self.client.get(reverse("auction_calendar_day_lots"), day).json()["lots"]],
+                         [keep.pk])
+        self.assertEqual(rollback_receipt(result.json()["receipt"]), 1)
+        old.refresh_from_db()
+        self.assertIsNone(old.superseded_by_id)
+        self.assertTrue(old.random_lot)
+        self.assertEqual({r["id"] for r in self.client.get(random_url, day).json()["lots"]}, {old.pk, other.pk})
+
     def test_stale_pair_rejects_entire_plan_and_operation_record(self):
         keep, old = self.pair()
         keep2, old2 = self.pair("2")

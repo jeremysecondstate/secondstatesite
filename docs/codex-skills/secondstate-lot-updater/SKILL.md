@@ -19,6 +19,12 @@ Use timestamped run directories beneath `private_data/secondstate-lot-updater/`,
 
 Prevent overlapping writers using an exclusively created `private_data/secondstate-lot-updater/run.lock` containing the owning chat/run ID and start time. If it exists, inspect its owner and saved progress before work. Continue only when the earlier owner is demonstrably finished; do not clear another live owner's lock or infer abandonment from elapsed time alone. If a prior single-source collector is active, defer conflicting collection/synchronization. Release only this run's lock after saving progress, including on an incomplete exit.
 
+## Catalog scope
+
+Use the regular Catalog’s tracked-artist view for bid checks, updates, duplicates, retries and coverage. The Fine Art Print Audit files verified prints outside that view in Random Lots. Resolve provider copies to their surviving Calendar listing and use the live membership receipt for its sale day. A lot that qualifies for the regular Catalog belongs there, including a previously filed Random Lot whose attribution was corrected.
+
+Validate complete bookmark captures, then synchronize eligible Catalog records through the existing updater. Match a newly discovered tracked listing against existing Calendar identities before creating it.
+
 ## Collect both sources
 
 Read [Invaluable collector](C:/dev/secondstatesite/docs/invaluable-collector.md) and [Drouot collector](C:/dev/secondstatesite/docs/drouot-collector.md) for the maintained formats, collection helpers, validation and recovery. These are technical references; this skill defines the combined task's scope, cadence and pair preference.
