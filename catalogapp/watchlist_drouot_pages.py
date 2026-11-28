@@ -77,6 +77,7 @@ _SOURCE_CREDIT_ALIASES = {
     "pablo picasso": ("Pablo Ruiz Picasso",),
     "jean pierre vasarely yvaral": ("Jean-Pierre Vasarely",),
     "manolo valdes": ("Manolo Valdes Blasco",),
+    "matta roberto": ("Roberto Sebastián Matta",),
     "arman": ("Armand Pierre Fernandez known as Arman",),
     "de francisco goya": ("Francisco José de Goya y Lucientes", "Francisco de Goya y Lucientes"),
     "jacques villon": ("Jacques Villon Gaston Duchamp dit",),
